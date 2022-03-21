@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.spi.snapshot;
 
 import java.lang.annotation.ElementType;
@@ -21,7 +22,7 @@ import java.lang.annotation.Target;
 
 /**
  * Help to clarify snapshot support of the annotated class:
- * - unsupported: controls whether the class is expeccted to be involved in snapshot. Default is false.
+ * - unsupported: controls whether the class is expected to be involved in snapshot. Default is false.
  * - stateClassName: name of state class, the result of capturing the annotated class. Default is class name with State suffix.
  * The state class can also be omitted if there are 0 or 1 fields to capture.
  * - baseClassStateName: name of field in stateClass that corresponds to result of "super.capture()". Default is "baseState".

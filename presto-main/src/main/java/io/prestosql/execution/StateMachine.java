@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -43,7 +44,7 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public class StateMachine<T>
 {
-    private static final Logger log = Logger.get(StateMachine.class);
+    private static final Logger LOG = Logger.get(StateMachine.class);
 
     private final String name;
     private final Executor executor;
@@ -226,7 +227,7 @@ public class StateMachine<T>
                 futureStateChange.complete(newState);
             }
             catch (Throwable e) {
-                log.error(e, "Error setting future state for %s", name);
+                LOG.error(e, "Error setting future state for %s", name);
             }
             for (StateChangeListener<T> stateChangeListener : stateChangeListeners) {
                 fireStateChangedListener(newState, stateChangeListener);
@@ -240,7 +241,7 @@ public class StateMachine<T>
             stateChangeListener.stateChanged(newState);
         }
         catch (Throwable e) {
-            log.error(e, "Error notifying state change listener for %s", name);
+            LOG.error(e, "Error notifying state change listener for %s", name);
         }
     }
 

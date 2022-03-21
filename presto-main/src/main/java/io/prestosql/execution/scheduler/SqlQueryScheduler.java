@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution.scheduler;
 
 import com.google.common.collect.ImmutableList;
@@ -125,7 +126,7 @@ import static java.util.stream.Collectors.toSet;
 
 public class SqlQueryScheduler
 {
-    private static final Logger log = Logger.get(SqlQueryScheduler.class);
+    private static final Logger LOG = Logger.get(SqlQueryScheduler.class);
     private static final int[] THROTTLE_SLEEP_TIMER = {5, 10, 15}; //seconds
     private static final long MIN_RESUME_INTERVAL = 5000; // milliseconds
     private static final int[] SPLIT_GROUP_GRADATION = {1, 2, 4, 8, 16, 32, 64, 128};
@@ -734,7 +735,7 @@ public class SqlQueryScheduler
             return true;
         }
 
-        log.debug("Splits scheduling throttled....!!! Used memory " + cachedMemoryUsage + " configured " + softReservedMemory);
+        LOG.debug("Splits scheduling throttled....!!! Used memory " + cachedMemoryUsage + " configured " + softReservedMemory);
         return false;
     }
 

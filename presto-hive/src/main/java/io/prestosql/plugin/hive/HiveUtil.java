@@ -167,7 +167,7 @@ import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Cate
 
 public final class HiveUtil
 {
-    public static final Logger log = Logger.get(HiveUtil.class);
+    public static final Logger LOG = Logger.get(HiveUtil.class);
 
     public static final String PRESTO_VIEW_FLAG = "presto_view";
 
@@ -398,7 +398,7 @@ public final class HiveUtil
                 break;
             }
             catch (NoSuchMethodException ignored) {
-                log.warn("GetDeclaredMethod error(FileSystem = %s, path = %s)", FileSystem.class.getName(), Path.class.getName());
+                LOG.warn("GetDeclaredMethod error(FileSystem = %s, path = %s)", FileSystem.class.getName(), Path.class.getName());
             }
         }
 
@@ -1136,7 +1136,7 @@ public final class HiveUtil
                     }
                 }
                 catch (PrestoException | ClassCastException e) {
-                    log.error("cannot cast class" + e.getMessage());
+                    LOG.error("cannot cast class" + e.getMessage());
                     return false;
                 }
                 //return if this dynamic filter is not filtering

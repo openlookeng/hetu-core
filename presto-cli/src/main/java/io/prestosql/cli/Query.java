@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.cli;
 
 import com.google.common.base.Splitter;
@@ -58,7 +59,7 @@ public class Query
 {
     private static final Signal SIGINT = new Signal("INT");
 
-    private static final Logger log = Logger.get(Query.class);
+    private static final Logger LOG = Logger.get(Query.class);
 
     private final AtomicBoolean ignoreUserInterrupt = new AtomicBoolean();
     private final StatementClient client;
@@ -201,7 +202,7 @@ public class Query
                 client.advance();
             }
             catch (RuntimeException e) {
-                log.debug(e, "error printing status");
+                LOG.debug(e, "error printing status");
             }
         }
         List<Warning> warnings;

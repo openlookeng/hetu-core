@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
@@ -92,7 +93,7 @@ import static java.util.stream.Collectors.toList;
 public class HivePageSink
         implements ConnectorPageSink
 {
-    private static final Logger log = Logger.get(HivePageSink.class);
+    private static final Logger LOG = Logger.get(HivePageSink.class);
 
     private static final int MAX_PAGE_POSITIONS = 4096;
 
@@ -344,7 +345,7 @@ public class HivePageSink
             return doFinish();
         }
         catch (IOException e) {
-            log.debug("exception '%s' while merging subfile", e);
+            LOG.debug("exception '%s' while merging subfile", e);
             throw new RuntimeException(e);
         }
     }
@@ -375,7 +376,7 @@ public class HivePageSink
                     writer.rollback(isCancel);
                 }
                 catch (Exception e) {
-                    log.warn("exception '%s' while rollback on %s", e, writer);
+                    LOG.warn("exception '%s' while rollback on %s", e, writer);
                     rollbackException = Optional.of(e);
                 }
             }

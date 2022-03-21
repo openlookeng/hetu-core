@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.sql.planner;
 
 import com.google.common.base.VerifyException;
@@ -340,7 +341,7 @@ import static java.util.stream.IntStream.range;
 
 public class LocalExecutionPlanner
 {
-    private static final Logger log = Logger.get(LocalExecutionPlanner.class);
+    private static final Logger LOG = Logger.get(LocalExecutionPlanner.class);
 
     protected final Metadata metadata;
     protected final TypeAnalyzer typeAnalyzer;
@@ -1783,7 +1784,7 @@ public class LocalExecutionPlanner
         protected Supplier<List<Map<ColumnHandle, DynamicFilter>>> getDynamicFilterSupplier(Optional<List<List<DynamicFilters.Descriptor>>> dynamicFilters, PlanNode sourceNode, LocalExecutionPlanContext context)
         {
             if (dynamicFilters.isPresent() && !dynamicFilters.get().isEmpty()) {
-                log.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
+                LOG.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
                 if (sourceNode instanceof TableScanNode) {
                     TableScanNode tableScanNode = (TableScanNode) sourceNode;
                     LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
@@ -2244,7 +2245,7 @@ public class LocalExecutionPlanner
 
             // TODO: Execution must be plugged in here
             if (!node.getDynamicFilters().isEmpty()) {
-                log.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
+                LOG.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
             }
 
             List<Symbol> leftSymbols = Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft);
@@ -2875,7 +2876,7 @@ public class LocalExecutionPlanner
 
             node.getDynamicFilterId().ifPresent(filterId -> {
                 // Add a DynamicFilterSourceOperatorFactory to build operator factories
-                log.debug("[Semi-join] Dynamic filter: %s", filterId);
+                LOG.debug("[Semi-join] Dynamic filter: %s", filterId);
                 LocalDynamicFilter filterConsumer = createDynamicFilter(node, context).orElse(null);
                 if (filterConsumer != null) {
                     addSuccessCallback(filterConsumer.getDynamicFilterResultFuture(), context::getDynamicFiltersCollector);

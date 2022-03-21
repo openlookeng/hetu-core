@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.base.Function;
@@ -76,7 +77,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class SqlTask
 {
-    private static final Logger log = Logger.get(SqlTask.class);
+    private static final Logger LOG = Logger.get(SqlTask.class);
 
     private final TaskId taskId;
     private final String taskInstanceId;
@@ -148,7 +149,7 @@ public class SqlTask
                 () -> queryContext.getTaskContext(taskInstanceId).localSystemMemoryContext());
         taskStateMachine = new TaskStateMachine(taskId, taskNotificationExecutor);
 
-        log.debug("Created new SqlTask object for task %s, with instanceId %s", taskId, taskInstanceId);
+        LOG.debug("Created new SqlTask object for task %s, with instanceId %s", taskId, taskInstanceId);
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -197,7 +198,7 @@ public class SqlTask
                     onDone.apply(SqlTask.this);
                 }
                 catch (Exception e) {
-                    log.warn(e, "Error running task cleanup callback %s", SqlTask.this.taskId);
+                    LOG.warn(e, "Error running task cleanup callback %s", SqlTask.this.taskId);
                 }
             }
         });
@@ -464,7 +465,7 @@ public class SqlTask
     {
         requireNonNull(bufferId, "bufferId is null");
 
-        log.debug("Aborting task %s output %s", taskId, bufferId);
+        LOG.debug("Aborting task %s output %s", taskId, bufferId);
         outputBuffer.abort(bufferId);
 
         return getTaskInfo();

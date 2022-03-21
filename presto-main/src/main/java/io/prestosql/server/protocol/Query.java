@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.server.protocol;
 
 import com.google.common.collect.ImmutableList;
@@ -115,7 +116,7 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public class Query
 {
-    private static final Logger log = Logger.get(Query.class);
+    private static final Logger LOG = Logger.get(Query.class);
 
     private final QueryManager queryManager;
     private final QueryId queryId;
@@ -582,7 +583,7 @@ public class Query
             queryHtmlUri = new URI("http://localhost");
         }
         catch (URISyntaxException e) {
-            log.error("get uri error: %s", e.getMessage());
+            LOG.error("get uri error: %s", e.getMessage());
         }
 
         // Remove as many pages as possible from the exchange until just greater than DESIRED_RESULT_BYTES
@@ -679,7 +680,7 @@ public class Query
                 nextResultsUri = new URI(Long.toString(nextToken.getAsLong()));
             }
             catch (URISyntaxException e) {
-                log.error("get uri error: %s", e.getMessage());
+                LOG.error("get uri error: %s", e.getMessage());
             }
         }
 
@@ -881,7 +882,7 @@ public class Query
                     capturingSnapshots.add(snapshotId);
                 }
                 else {
-                    log.info("Neither successful nor in progress, Snapshot: %d, Status: %s", snapshotId, snapshotInfo.getSnapshotResult().toString());
+                    LOG.info("Neither successful nor in progress, Snapshot: %d, Status: %s", snapshotId, snapshotInfo.getSnapshotResult().toString());
                 }
             });
             SnapshotStats.Builder builder = SnapshotStats.builder();
@@ -926,7 +927,7 @@ public class Query
                         restoredSnapshotList.add(restoreResult.getSnapshotId());
                     }
                     else {
-                        log.info("Query restarted instead of resume..");
+                        LOG.info("Query restarted instead of resume..");
                     }
                 });
                 builder.setSuccessRestoreCount(restoreCount)
@@ -941,7 +942,7 @@ public class Query
                 builder.setRestoringSnapshotId(restoringSnapshotId);
             }
             SnapshotStats snapshotStats = builder.build();
-            log.debug("SnapshotStats: " + snapshotStats.toString());
+            LOG.debug("SnapshotStats: " + snapshotStats.toString());
             return snapshotStats;
         }
         return null;
@@ -966,7 +967,7 @@ public class Query
             URI uri = task.getTaskStatus().getSelf();
             uniqueNodes.add(uri.getHost() + ":" + uri.getPort());
         }
-        log.debug("StageStats Id: %s, IsRestoring: %b, SnapshotId: %d", stageInfo.getStageId().toString(), stageInfo.isRestoring(), stageInfo.getSnapshotId());
+        LOG.debug("StageStats Id: %s, IsRestoring: %b, SnapshotId: %d", stageInfo.getStageId().toString(), stageInfo.isRestoring(), stageInfo.getSnapshotId());
         return StageStats.builder()
                 .setStageId(String.valueOf(stageInfo.getStageId().getId()))
                 .setState(stageInfo.getState().toString())
@@ -1054,7 +1055,7 @@ public class Query
             executionFailure = queryInfo.getFailureInfo();
         }
         else {
-            log.warn("Query %s in state %s has no failure info", queryInfo.getQueryId(), state);
+            LOG.warn("Query %s in state %s has no failure info", queryInfo.getQueryId(), state);
             executionFailure = toFailure(new RuntimeException(format("Query is %s (reason unknown)", state)));
         }
         FailureInfo failure = executionFailure.toFailureInfoWithoutStack();
@@ -1065,7 +1066,7 @@ public class Query
         }
         else {
             errorCode = GENERIC_INTERNAL_ERROR.toErrorCode();
-            log.warn("Failed query %s has no error code", queryInfo.getQueryId());
+            LOG.warn("Failed query %s has no error code", queryInfo.getQueryId());
         }
         return new QueryError(
                 firstNonNull(failure.getMessage(), "Internal error"),

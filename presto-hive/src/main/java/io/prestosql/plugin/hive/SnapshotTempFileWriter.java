@@ -32,7 +32,7 @@ import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
 public class SnapshotTempFileWriter
         implements HiveFileWriter
 {
-    private static final Logger log = Logger.get(SnapshotTempFileWriter.class);
+    private static final Logger LOG = Logger.get(SnapshotTempFileWriter.class);
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SnapshotTempFileWriter.class).instanceSize();
 
     private final TempFileWriter writer;
@@ -83,7 +83,7 @@ public class SnapshotTempFileWriter
         catch (Exception e) {
             // DO NOT delete the file. A newly schedule task may be recreating this file.
             // Don't need to throw the exception either. This is part of the cancel-to-resume task.
-            log.debug(e, "Error rolling back write to Hive");
+            LOG.debug(e, "Error rolling back write to Hive");
         }
     }
 

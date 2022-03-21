@@ -81,7 +81,7 @@ import static java.util.Objects.requireNonNull;
 class HiveSplitSource
         implements ConnectorSplitSource
 {
-    private static final Logger log = Logger.get(HiveSplitSource.class);
+    private static final Logger LOG = Logger.get(HiveSplitSource.class);
 
     private final String queryId;
     private final String databaseName;
@@ -329,7 +329,7 @@ class HiveSplitSource
             // If it's hit, it means individual splits are huge.
             if (loggedHighMemoryWarning.compareAndSet(false, true)) {
                 highMemorySplitSourceCounter.update(1);
-                log.warn("Split buffering for %s.%s in query %s exceeded memory limit (%s). %s splits are buffered.",
+                LOG.warn("Split buffering for %s.%s in query %s exceeded memory limit (%s). %s splits are buffered.",
                         databaseName, tableName, queryId, succinctBytes(maxOutstandingSplitsBytes), getBufferedInternalSplitCount());
             }
             throw new PrestoException(HiveErrorCode.HIVE_EXCEEDED_SPLIT_BUFFERING_LIMIT, format(
@@ -521,7 +521,7 @@ class HiveSplitSource
             }
         }
         catch (Exception ex) {
-            log.warn(ex, "Unable to match partition keys %s with cached predicates. Ignoring this partition key. Error = %s", partitionKeys, ex.getMessage());
+            LOG.warn(ex, "Unable to match partition keys %s with cached predicates. Ignoring this partition key. Error = %s", partitionKeys, ex.getMessage());
         }
         return false;
     }
@@ -728,7 +728,7 @@ class HiveSplitSource
                     numberOfSplitsGrouped += 1;
                     if ((maxSplitBytes < totalSize) || (avgSplitsPerNode < numberOfSplitsGrouped) || (maxSmallSplitsCanBeGrouped < numberOfSplitsGrouped)) {
                         connectorSplitList.add(HiveSplitWrapper.wrap(groupedHiveSplit, bucketNumberPresent ? OptionalInt.of(bucketNumber) : OptionalInt.empty()));
-                        log.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
+                        LOG.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
                                 groupedHiveSplit.get(0).getTable(), groupedHiveSplit.size(), maxSplitBytes, totalSize, avgSplitsPerNode, numberOfSplitsGrouped, maxSmallSplitsCanBeGrouped, numberOfSplitsGrouped);
                         totalSize = 0;
                         numberOfSplitsGrouped = 0;
@@ -747,7 +747,7 @@ class HiveSplitSource
                     numberOfSplitsGrouped += 1;
                     if ((maxSplitBytes < totalSize) || (avgSplitsPerNode < numberOfSplitsGrouped) || (maxSmallSplitsCanBeGrouped < numberOfSplitsGrouped)) {
                         connectorSplitList.add(HiveSplitWrapper.wrap(groupedHiveSplit, bucketNumberPresent ? OptionalInt.of(bucketNumber) : OptionalInt.empty()));
-                        log.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
+                        LOG.debug("info table %s,  groupedHiveSplit size %d, maxSplitBytes %d, totalSize %d, avgSplitsPerNode %d, numberOfSplitsGrouped %d, maxSmallSplitsCanBeGrouped %d, numberOfSplitsGrouped %d ",
                                 groupedHiveSplit.get(0).getTable(), groupedHiveSplit.size(), maxSplitBytes, totalSize, avgSplitsPerNode, numberOfSplitsGrouped, maxSmallSplitsCanBeGrouped, numberOfSplitsGrouped);
                         totalSize = 0;
                         numberOfSplitsGrouped = 0;
@@ -764,7 +764,7 @@ class HiveSplitSource
             }
         }
         List<ConnectorSplit> resultConnectorSplits = connectorSplitList.build();
-        log.debug("info resultBuilder size %d", resultConnectorSplits.size());
+        LOG.debug("info resultBuilder size %d", resultConnectorSplits.size());
         return resultConnectorSplits;
     }
 
@@ -797,7 +797,7 @@ class HiveSplitSource
             return false;
         }
 
-        log.info("info total Split %d,  numSmallSplits %d ", hiveSplitWrappers.size(), numSmallSplits);
+        LOG.info("info total Split %d,  numSmallSplits %d ", hiveSplitWrappers.size(), numSmallSplits);
         return true;
     }
 

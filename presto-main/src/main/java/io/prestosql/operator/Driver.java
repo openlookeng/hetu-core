@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.operator;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -68,7 +69,7 @@ import static java.util.Objects.requireNonNull;
 public class Driver
         implements Closeable
 {
-    private static final Logger log = Logger.get(Driver.class);
+    private static final Logger LOG = Logger.get(Driver.class);
 
     private final DriverContext driverContext;
     private final boolean isSnapshotEnabled;
@@ -376,7 +377,7 @@ public class Driver
     }
 
     // Snapshot: for debugging only, to print number of rows received by each operator for each snapshot
-    private final Map<Operator, Long> receivedRows = log.isDebugEnabled() ? new HashMap<>() : null;
+    private final Map<Operator, Long> receivedRows = LOG.isDebugEnabled() ? new HashMap<>() : null;
 
     @GuardedBy("exclusiveLock")
     private ListenableFuture<?> processInternal(OperationTimer operationTimer)
@@ -403,9 +404,9 @@ public class Driver
                 Operator current = activeOperators.get(i);
                 Operator next = activeOperators.get(i + 1);
 
-                if (log.isDebugEnabled()) {
+                if (LOG.isDebugEnabled()) {
                     if (getBlockedFuture(current).isPresent() || getBlockedFuture(next).isPresent()) {
-                        log.debug("Blocking info next=%s: getBlockedFuture(current)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
+                        LOG.debug("Blocking info next=%s: getBlockedFuture(current)=%b; current.isFinished=%b; getBlockedFuture(next)=%b; next.needsInput=%b",
                                 next.getOperatorContext().getUniqueId(), getBlockedFuture(current).isPresent(), current.isFinished(), getBlockedFuture(next).isPresent(), next.needsInput());
                     }
                 }
@@ -439,12 +440,12 @@ public class Driver
 
                     // if we got an output page, add it to the next operator
                     if (page != null && page.getPositionCount() != 0) {
-                        if (log.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             // Snapshot: print number of rows received by each operator for each snapshot
                             final Page p = page;
                             if (page instanceof MarkerPage) {
                                 long count = receivedRows.compute(next, (o, v) -> v == null ? 0 : v);
-                                log.debug("Operator %s received %d rows at marker %s", next.getOperatorContext().getUniqueId(), count, page);
+                                LOG.debug("Operator %s received %d rows at marker %s", next.getOperatorContext().getUniqueId(), count, page);
                             }
                             else {
                                 receivedRows.compute(next, (o, v) -> v == null ? p.getPositionCount() : v + p.getPositionCount());
@@ -595,13 +596,13 @@ public class Driver
         try {
             inFlightException = closeAndDestroyOperators(activeOperators, toResume);
             if (driverContext.getMemoryUsage() > 0) {
-                log.error("Driver still has memory reserved after freeing all operator memory.");
+                LOG.error("Driver still has memory reserved after freeing all operator memory.");
             }
             if (driverContext.getSystemMemoryUsage() > 0) {
-                log.error("Driver still has system memory reserved after freeing all operator memory.");
+                LOG.error("Driver still has system memory reserved after freeing all operator memory.");
             }
             if (driverContext.getRevocableMemoryUsage() > 0) {
-                log.error("Driver still has revocable memory reserved after freeing all operator memory. Freeing it.");
+                LOG.error("Driver still has revocable memory reserved after freeing all operator memory. Freeing it.");
             }
             driverContext.finished();
         }
@@ -631,9 +632,9 @@ public class Driver
             for (Operator operator : operators) {
                 try {
                     if (toResume) {
-                        if (log.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             long count = receivedRows.compute(operator, (o, v) -> v == null ? 0 : v);
-                            log.debug("Operator %s received %d rows when the operator is cancelled to resume", operator.getOperatorContext().getUniqueId(), count);
+                            LOG.debug("Operator %s received %d rows when the operator is cancelled to resume", operator.getOperatorContext().getUniqueId(), count);
                         }
                         // Snapshot: different ways to cancel operators. They may choose different strategies.
                         // e.g. for table-writer, normal cancel should remove any data that's been written,
@@ -642,9 +643,9 @@ public class Driver
                         operator.cancelToResume();
                     }
                     else {
-                        if (log.isDebugEnabled()) {
+                        if (LOG.isDebugEnabled()) {
                             long count = receivedRows.compute(operator, (o, v) -> v == null ? 0 : v);
-                            log.debug("Operator %s received %d rows when the operator finishes", operator.getOperatorContext().getUniqueId(), count);
+                            LOG.debug("Operator %s received %d rows when the operator finishes", operator.getOperatorContext().getUniqueId(), count);
                         }
                         operator.close();
                     }
@@ -738,7 +739,7 @@ public class Driver
         }
         else {
             // log normal exceptions instead of rethrowing them
-            log.error(newException, message, args);
+            LOG.error(newException, message, args);
         }
         return inFlightExceptionNew;
     }

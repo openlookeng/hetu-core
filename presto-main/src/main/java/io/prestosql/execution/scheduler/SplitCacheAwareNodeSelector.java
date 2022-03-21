@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution.scheduler;
 
 import com.google.common.base.Supplier;
@@ -49,7 +50,7 @@ import static java.util.Objects.requireNonNull;
 public class SplitCacheAwareNodeSelector
         implements NodeSelector
 {
-    private static final Logger log = Logger.get(SplitCacheAwareNodeSelector.class);
+    private static final Logger LOG = Logger.get(SplitCacheAwareNodeSelector.class);
 
     private final InternalNodeManager nodeManager;
     private final NodeTaskMap nodeTaskMap;
@@ -160,7 +161,7 @@ public class SplitCacheAwareNodeSelector
             }
         }
 
-        log.info("%d out of %d splits already cached. %d new splits to be cached. %d splits cannot be cached.", assignment.size(), splits.size(), newCacheableSplits.size(), uncacheableSplits.size());
+        LOG.info("%d out of %d splits already cached. %d new splits to be cached. %d splits cannot be cached.", assignment.size(), splits.size(), newCacheableSplits.size(), uncacheableSplits.size());
 
         Set<Split> unassignedSplits = new HashSet<>();
         unassignedSplits.addAll(newCacheableSplits);

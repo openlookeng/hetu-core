@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.server.remotetask;
 
 import com.google.common.util.concurrent.Futures;
@@ -60,7 +61,7 @@ import static java.util.Objects.requireNonNull;
 class ContinuousTaskStatusFetcher
         implements SimpleHttpResponseCallback<TaskStatus>
 {
-    private static final Logger log = Logger.get(ContinuousTaskStatusFetcher.class);
+    private static final Logger LOG = Logger.get(ContinuousTaskStatusFetcher.class);
 
     private final TaskId taskId;
     private final String instanceId;
@@ -151,7 +152,7 @@ class ContinuousTaskStatusFetcher
         // outstanding request?
         if (future != null && !future.isDone()) {
             // this should never happen
-            log.error("Can not reschedule update because an update is already running");
+            LOG.error("Can not reschedule update because an update is already running");
             return;
         }
 

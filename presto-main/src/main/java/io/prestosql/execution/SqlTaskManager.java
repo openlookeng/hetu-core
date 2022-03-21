@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -90,7 +91,7 @@ import static java.util.concurrent.Executors.newScheduledThreadPool;
 public class SqlTaskManager
         implements TaskManager, Closeable
 {
-    private static final Logger log = Logger.get(SqlTaskManager.class);
+    private static final Logger LOG = Logger.get(SqlTaskManager.class);
 
     private final ExecutorService taskNotificationExecutor;
     private final ThreadPoolExecutorMBean taskNotificationExecutorMBean;
@@ -295,13 +296,13 @@ public class SqlTaskManager
                 removeOldTasks();
             }
             catch (Throwable e) {
-                log.warn(e, "Error removing old tasks");
+                LOG.warn(e, "Error removing old tasks");
             }
             try {
                 failAbandonedTasks();
             }
             catch (Throwable e) {
-                log.warn(e, "Error canceling abandoned tasks");
+                LOG.warn(e, "Error canceling abandoned tasks");
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
 
@@ -310,7 +311,7 @@ public class SqlTaskManager
                 updateStats();
             }
             catch (Throwable e) {
-                log.warn(e, "Error updating stats");
+                LOG.warn(e, "Error updating stats");
             }
         }, 0, 1, TimeUnit.SECONDS);
     }
@@ -510,7 +511,7 @@ public class SqlTaskManager
         TaskState oldState = sqlTask.getTaskStatus().getState();
         TaskInfo result = sqlTask.cancel(targetState);
 
-        log.debug("Cancelling task %s (instanceId %s). Old state: %s; new state: %s", taskId, expectedTaskInstanceId, oldState, targetState);
+        LOG.debug("Cancelling task %s (instanceId %s). Old state: %s; new state: %s", taskId, expectedTaskInstanceId, oldState, targetState);
         if (targetState == TaskState.CANCELED_TO_RESUME) {
             cleanupTaskToResume(taskId, sqlTask.getTaskInstanceId());
         }
@@ -550,7 +551,7 @@ public class SqlTaskManager
                 }
             }
             catch (RuntimeException e) {
-                log.warn(e, "Error while inspecting age of complete task with instanceId %s and taskId %s", instanceId, task.getTaskId());
+                LOG.warn(e, "Error while inspecting age of complete task with instanceId %s and taskId %s", instanceId, task.getTaskId());
             }
         }
     }
@@ -568,7 +569,7 @@ public class SqlTaskManager
                 }
                 DateTime lastHeartbeat = taskInfo.getLastHeartbeat();
                 if (lastHeartbeat != null && lastHeartbeat.isBefore(oldestAllowedHeartbeat)) {
-                    log.info("Failing abandoned task %s (instanceId %s)", taskStatus.getTaskId(), sqlTask.getTaskInstanceId());
+                    LOG.info("Failing abandoned task %s (instanceId %s)", taskStatus.getTaskId(), sqlTask.getTaskInstanceId());
                     if (sqlTask.isSnapshotEnabled()) {
                         // When a task is abandoned, to be safe, we cancel it and allow recovery.
                         sqlTask.cancel(TaskState.CANCELED_TO_RESUME);
@@ -579,7 +580,7 @@ public class SqlTaskManager
                 }
             }
             catch (RuntimeException e) {
-                log.warn(e, "Error while inspecting age of task with instanceId %s and taskId %s", sqlTask.getTaskInstanceId(), sqlTask.getTaskId());
+                LOG.warn(e, "Error while inspecting age of task with instanceId %s and taskId %s", sqlTask.getTaskInstanceId(), sqlTask.getTaskId());
             }
         }
     }

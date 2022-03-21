@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.operator;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -68,7 +69,7 @@ import static java.util.Objects.requireNonNull;
 public class ExchangeClient
         implements Closeable
 {
-    private static final Logger log = Logger.get(ExchangeClient.class);
+    private static final Logger LOG = Logger.get(ExchangeClient.class);
     private static final SerializedPage NO_MORE_PAGES = new SerializedPage(EMPTY_SLICE, PageCodecMarker.MarkerSet.empty(), 0, 0);
 
     private final long bufferCapacity;
@@ -726,7 +727,7 @@ public class ExchangeClient
             client.close();
         }
         catch (RuntimeException e) {
-            log.error("ExchangeClient close failed: %s", e.getMessage());
+            LOG.error("ExchangeClient close failed: %s", e.getMessage());
         }
     }
 }

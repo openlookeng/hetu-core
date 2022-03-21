@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.server.remotetask;
 
 import com.google.common.base.Ticker;
@@ -116,7 +117,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public final class HttpRemoteTask
         implements RemoteTask
 {
-    private static final Logger log = Logger.get(HttpRemoteTask.class);
+    private static final Logger LOG = Logger.get(HttpRemoteTask.class);
 
     private final TaskId taskId;
     private final String instanceId;
@@ -644,7 +645,7 @@ public final class HttpRemoteTask
 
     private void sendCancelRequest(TaskStatus taskStatus, TaskState targetState, String action)
     {
-        log.debug("Cancelling task %s, with target state %s", taskStatus.getTaskId(), targetState);
+        LOG.debug("Cancelling task %s, with target state %s", taskStatus.getTaskId(), targetState);
 
         // send cancel to task and ignore response
         HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).addParameter("targetState", targetState.toString());
@@ -809,7 +810,7 @@ public final class HttpRemoteTask
     {
         TaskStatus taskStatus = getTaskStatus();
         if (!taskStatus.getState().isDone()) {
-            log.debug(cause, "Remote task %s failed with %s", taskStatus.getSelf(), cause);
+            LOG.debug(cause, "Remote task %s failed with %s", taskStatus.getSelf(), cause);
         }
 
         ExecutionFailureInfo failureInfo = toFailure(cause);
@@ -820,7 +821,7 @@ public final class HttpRemoteTask
                 taskStatusFetcher.updateTaskStatus(taskStatus);
                 return;
             }
-            log.debug(cause, "Snapshot: remote task %s failed with unresumable error %s", taskStatus.getSelf(), cause);
+            LOG.debug(cause, "Snapshot: remote task %s failed with unresumable error %s", taskStatus.getSelf(), cause);
         }
 
         abort(failWith(taskStatus, FAILED, ImmutableList.of(failureInfo)));

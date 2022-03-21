@@ -44,7 +44,7 @@ import static java.util.Objects.requireNonNull;
 public class HiveConnector
         implements Connector
 {
-    private static final Logger log = Logger.get(HiveConnector.class);
+    private static final Logger LOG = Logger.get(HiveConnector.class);
 
     private final LifeCycleManager lifeCycleManager;
     private final Supplier<TransactionalMetadata> metadataFactory;
@@ -216,7 +216,7 @@ public class HiveConnector
             lifeCycleManager.stop();
         }
         catch (Exception e) {
-            log.error(e, "Error shutting down connector");
+            LOG.error(e, "Error shutting down connector");
         }
     }
 
