@@ -607,7 +607,8 @@ public class SqlQueryExecution
                 heuristicIndexerManager,
                 snapshotManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
-                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null);
+                snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
+                true);
     }
 
     private void resetOutputData(PlanRoot plan, OptionalLong snapshotId)
@@ -868,7 +869,8 @@ public class SqlQueryExecution
                 dynamicFilterService,
                 heuristicIndexerManager,
                 snapshotManager,
-                null);
+                null,
+                false);
 
         queryScheduler.set(scheduler);
 
