@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.log.Logger;
 import io.prestosql.orc.OrcDataSink;
 import io.prestosql.orc.OrcDataSource;
 import io.prestosql.orc.OrcDataSourceId;
@@ -61,6 +62,8 @@ import static java.util.stream.Collectors.toList;
 public class OrcFileWriterFactory
         implements HiveFileWriterFactory
 {
+    private static final Logger log = Logger.get(OrcFileWriterFactory.class);
+
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
     private final NodeVersion nodeVersion;
@@ -195,6 +198,7 @@ public class OrcFileWriterFactory
             }
 
             Callable<Void> rollbackAction = () -> {
+                log.debug("RollBack action to delete file %s", path);
                 fileSystem.delete(path, false);
                 return null;
             };
@@ -238,6 +242,7 @@ public class OrcFileWriterFactory
     protected OrcDataSink createOrcDataSink(ConnectorSession session, FileSystem fileSystem, Path path)
             throws IOException
     {
+        log.debug("Creation of OrcDataSink for file %s", path);
         return new OutputStreamOrcDataSink(fileSystem.create(path));
     }
 

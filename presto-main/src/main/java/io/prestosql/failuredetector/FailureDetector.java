@@ -24,6 +24,11 @@ public interface FailureDetector
 
     State getState(HostAddress hostAddress);
 
+    default void waitForServiceStateRefresh()
+    {
+        // do - nothing
+    }
+
     enum State
     {
         UNKNOWN,
