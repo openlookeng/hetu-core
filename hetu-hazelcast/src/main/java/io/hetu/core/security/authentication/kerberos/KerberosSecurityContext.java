@@ -23,6 +23,7 @@ import com.hazelcast.security.Credentials;
 import com.hazelcast.security.ICredentialsFactory;
 import com.hazelcast.security.SecureCallable;
 import com.hazelcast.security.SecurityContext;
+import com.hazelcast.sql.impl.security.SqlSecurityContext;
 import org.ietf.jgss.GSSException;
 
 import javax.security.auth.Subject;
@@ -113,4 +114,10 @@ public class KerberosSecurityContext
 
     @Override
     public void refreshPermissions(Set<PermissionConfig> permissionConfigs) {}
+
+    @Override
+    public SqlSecurityContext createSqlContext(Subject var1)
+    {
+        return null;
+    }
 }

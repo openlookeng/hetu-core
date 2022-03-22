@@ -17,9 +17,9 @@ package io.hetu.core.security.networking;
 
 import com.hazelcast.internal.networking.Channel;
 import com.hazelcast.internal.networking.ChannelOptions;
-import com.hazelcast.internal.nio.IOService;
-import com.hazelcast.internal.nio.tcp.UnifiedProtocolDecoder;
-import com.hazelcast.internal.nio.tcp.UnifiedProtocolEncoder;
+import com.hazelcast.internal.server.ServerContext;
+import com.hazelcast.internal.server.tcp.UnifiedProtocolDecoder;
+import com.hazelcast.internal.server.tcp.UnifiedProtocolEncoder;
 import com.hazelcast.spi.properties.HazelcastProperties;
 import io.hetu.core.security.networking.ssl.SslConfig;
 import io.hetu.core.security.networking.ssl.SslContext;
@@ -37,7 +37,7 @@ import static com.hazelcast.internal.networking.ChannelOption.SO_LINGER;
 import static com.hazelcast.internal.networking.ChannelOption.SO_RCVBUF;
 import static com.hazelcast.internal.networking.ChannelOption.SO_SNDBUF;
 import static com.hazelcast.internal.networking.ChannelOption.TCP_NODELAY;
-import static com.hazelcast.internal.nio.IOService.KILO_BYTE;
+import static com.hazelcast.internal.server.ServerContext.KILO_BYTE;
 import static com.hazelcast.spi.properties.ClusterProperty.SOCKET_BUFFER_DIRECT;
 import static com.hazelcast.spi.properties.ClusterProperty.SOCKET_KEEP_ALIVE;
 import static com.hazelcast.spi.properties.ClusterProperty.SOCKET_LINGER_SECONDS;
@@ -49,15 +49,15 @@ import static com.hazelcast.spi.properties.ClusterProperty.SOCKET_SEND_BUFFER_SI
 @Component
 public class UnifiedChannelInitializerAspect
 {
-    @Around("execution(* com.hazelcast.internal.nio.tcp.UnifiedChannelInitializer.initChannel(Channel)) && args(channel)")
+    @Around("execution(* com.hazelcast.internal.server.tcp.UnifiedChannelInitializer.initChannel(Channel)) && args(channel)")
     public void aroundInitChannel(ProceedingJoinPoint joinPoint, Channel channel)
     {
         Field ioServiceField = null;
         Field propsField = null;
         try {
-            ioServiceField = joinPoint.getTarget().getClass().getDeclaredField("ioService");
+            ioServiceField = joinPoint.getTarget().getClass().getDeclaredField("serverContext");
             ioServiceField.setAccessible(true);
-            IOService ioService = (IOService) ioServiceField.get(joinPoint.getTarget());
+            ServerContext serverContext = (ServerContext) ioServiceField.get(joinPoint.getTarget());
 
             propsField = joinPoint.getTarget().getClass().getDeclaredField("props");
             propsField.setAccessible(true);
@@ -71,8 +71,8 @@ public class UnifiedChannelInitializerAspect
                     .setOption(SO_RCVBUF, props.getInteger(SOCKET_RECEIVE_BUFFER_SIZE) * KILO_BYTE)
                     .setOption(SO_LINGER, props.getSeconds(SOCKET_LINGER_SECONDS));
 
-            UnifiedProtocolEncoder encoder = new UnifiedProtocolEncoder(ioService);
-            UnifiedProtocolDecoder decoder = new UnifiedProtocolDecoder(ioService, encoder);
+            UnifiedProtocolEncoder encoder = new UnifiedProtocolEncoder(serverContext);
+            UnifiedProtocolDecoder decoder = new UnifiedProtocolDecoder(serverContext, encoder);
 
             channel.outboundPipeline().addLast(encoder);
 
