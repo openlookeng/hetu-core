@@ -17,6 +17,7 @@ package io.hetu.core.statestore.hazelcast;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.ClientConnectionStrategyConfig;
 import com.hazelcast.config.DiscoveryStrategyConfig;
 import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.HazelcastInstance;
@@ -39,7 +40,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -111,6 +111,9 @@ public class HazelcastStateStoreFactory
         }
 
         ClientConfig clientConfig = new ClientConfig();
+        ClientConnectionStrategyConfig connectionStrategy = clientConfig.getConnectionStrategyConfig();
+        connectionStrategy.setReconnectMode(ClientConnectionStrategyConfig.ReconnectMode.OFF);
+
         // Add serialization for Slice
         SerializerConfig sc = new SerializerConfig().setImplementation(new HazelCastSliceSerializer()).setTypeClass(Slice.class);
         clientConfig.getSerializationConfig().addSerializerConfig(sc);
@@ -123,9 +126,6 @@ public class HazelcastStateStoreFactory
 
         SerializerConfig tableEntity = new SerializerConfig().setImplementation(new HazelcastTableEntitySerializer()).setTypeClass(TableEntity.class);
         clientConfig.getSerializationConfig().addSerializerConfig(tableEntity);
-
-        SerializerConfig op = new SerializerConfig().setImplementation(new HazelcastOptionalSerializer()).setTypeClass(Optional.class);
-        clientConfig.getSerializationConfig().addSerializerConfig(op);
 
         clientConfig.setClusterName(clusterId);
 
