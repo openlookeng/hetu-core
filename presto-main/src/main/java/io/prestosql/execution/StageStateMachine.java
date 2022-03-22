@@ -266,11 +266,11 @@ public class StageStateMachine
         finalStageInfo.addStateChangeListener(fireOnceStateChangeListener);
     }
 
-    public void setAllTasksFinal(Iterable<TaskInfo> finalTaskInfos)
+    public void setAllTasksFinal(Iterable<TaskInfo> finalTaskInfos, boolean restoreInProgress, long captureSnapshotId)
     {
         requireNonNull(finalTaskInfos, "finalTaskInfos is null");
         checkState(stageState.get().isDone());
-        StageInfo stageInfo = getStageInfo(() -> finalTaskInfos);
+        StageInfo stageInfo = getStageInfo(() -> finalTaskInfos, restoreInProgress, captureSnapshotId);
         checkArgument(stageInfo.isCompleteInfo(), "finalTaskInfos are not all done");
         finalStageInfo.compareAndSet(Optional.empty(), Optional.of(stageInfo));
     }
@@ -408,7 +408,7 @@ public class StageStateMachine
                 progressPercentage);
     }
 
-    public StageInfo getStageInfo(Supplier<Iterable<TaskInfo>> taskInfosSupplier)
+    public StageInfo getStageInfo(Supplier<Iterable<TaskInfo>> taskInfosSupplier, boolean restoreInProgress, long snapshotId)
     {
         Optional<StageInfo> localFinalStageInfo = this.finalStageInfo.get();
         if (localFinalStageInfo.isPresent()) {
@@ -599,6 +599,8 @@ public class StageStateMachine
         }
         return new StageInfo(stageId,
                 state,
+                restoreInProgress,
+                snapshotId,
                 location,
                 fragment,
                 fragment.getTypes(),

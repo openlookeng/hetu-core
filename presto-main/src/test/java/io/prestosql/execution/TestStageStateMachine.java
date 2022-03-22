@@ -294,7 +294,7 @@ public class TestStageStateMachine
         assertEquals(stateMachine.getLocation(), LOCATION);
         assertSame(stateMachine.getSession(), TEST_SESSION);
 
-        StageInfo stageInfo = stateMachine.getStageInfo(ImmutableList::of);
+        StageInfo stageInfo = stateMachine.getStageInfo(ImmutableList::of, false, -1);
         assertEquals(stageInfo.getStageId(), STAGE_ID);
         assertEquals(stageInfo.getSelf(), LOCATION);
         assertEquals(stageInfo.getSubStages(), ImmutableList.of());

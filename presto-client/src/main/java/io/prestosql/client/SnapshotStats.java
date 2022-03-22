@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.util.List;
+
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 @Immutable
@@ -38,8 +40,10 @@ public class SnapshotStats
     private final long allCaptureSize;
     // Size (bytes) of last successful snapshot
     private final long lastCaptureSize;
-    // Snapshot id of last restore
-    private final long lastRestoreSnapshotId;
+    // List of snapshots from which restore happened
+    private final List<Long> restoredSnapshotList;
+    // List of successfully captured snapshots
+    private final List<Long> capturedSnapshotList;
     // Number of successful restores in current query
     private final long successRestoreCount;
     // Total Wall time (ms) for all restores happened during query
@@ -48,6 +52,10 @@ public class SnapshotStats
     private final long totalRestoreSize;
     // Total Cpu time (ms) for loading state during restore
     private final long totalRestoreCpuTime;
+    // Snapshot Id from which restore in progress
+    private final long restoringSnapshotId;
+    // Snapshot Ids from which capture in progress (Multiple captures possible at a time)
+    private final List<Long> capturingSnapshotIds;
 
     @JsonCreator
     public SnapshotStats(
@@ -58,11 +66,14 @@ public class SnapshotStats
             @JsonProperty("lastCaptureWallTime") long lastCaptureWallTime,
             @JsonProperty("allCaptureSize") long allCaptureSize,
             @JsonProperty("lastCaptureSize") long lastCaptureSize,
-            @JsonProperty("lastRestoreSnapshotId") long lastRestoreSnapshotId,
+            @JsonProperty("restoredSnapshotList") List<Long> restoredSnapshotList,
+            @JsonProperty("capturedSnapshotList") List<Long> capturedSnapshotList,
             @JsonProperty("successRestoreCount") long successRestoreCount,
             @JsonProperty("totalRestoreWallTime") long totalRestoreWallTime,
             @JsonProperty("totalRestoreSize") long totalRestoreSize,
-            @JsonProperty("totalRestoreCpuTime") long totalRestoreCpuTime)
+            @JsonProperty("totalRestoreCpuTime") long totalRestoreCpuTime,
+            @JsonProperty("restoringSnapshotId") long restoringSnapshotId,
+            @JsonProperty("capturingSnapshotIds") List<Long> capturingSnapshotIds)
     {
         this.lastCaptureSnapshotId = lastCaptureSnapshotId;
         this.totalCaptureCpuTime = totalCaptureCpuTime;
@@ -71,11 +82,14 @@ public class SnapshotStats
         this.lastCaptureWallTime = lastCaptureWallTime;
         this.allCaptureSize = allCaptureSize;
         this.lastCaptureSize = lastCaptureSize;
-        this.lastRestoreSnapshotId = lastRestoreSnapshotId;
+        this.restoredSnapshotList = restoredSnapshotList;
+        this.capturedSnapshotList = capturedSnapshotList;
         this.successRestoreCount = successRestoreCount;
         this.totalRestoreWallTime = totalRestoreWallTime;
         this.totalRestoreSize = totalRestoreSize;
         this.totalRestoreCpuTime = totalRestoreCpuTime;
+        this.restoringSnapshotId = restoringSnapshotId;
+        this.capturingSnapshotIds = capturingSnapshotIds;
     }
 
     @JsonProperty
@@ -121,9 +135,27 @@ public class SnapshotStats
     }
 
     @JsonProperty
-    public long getLastRestoreSnapshotId()
+    public List<Long> getRestoredSnapshotList()
     {
-        return lastRestoreSnapshotId;
+        return restoredSnapshotList;
+    }
+
+    @JsonProperty
+    public List<Long> getCapturedSnapshotList()
+    {
+        return capturedSnapshotList;
+    }
+
+    @JsonProperty
+    public List<Long> getCapturingSnapshotIds()
+    {
+        return capturingSnapshotIds;
+    }
+
+    @JsonProperty
+    public long getRestoringSnapshotId()
+    {
+        return restoringSnapshotId;
     }
 
     @JsonProperty
@@ -161,11 +193,14 @@ public class SnapshotStats
                 .add("lastCaptureWallTime", lastCaptureWallTime)
                 .add("allCaptureSize", allCaptureSize)
                 .add("lastCaptureSize", lastCaptureSize)
-                .add("lastRestoreSnapshotId", lastRestoreSnapshotId)
+                .add("restoredSnapshotList", restoredSnapshotList)
+                .add("capturedSnapshotList", capturedSnapshotList)
                 .add("successRestoreCount", successRestoreCount)
                 .add("totalRestoreWallTime", totalRestoreWallTime)
                 .add("totalRestoreSize", totalRestoreSize)
                 .add("totalRestoreCpuTime", totalRestoreCpuTime)
+                .add("restoringSnapshotId", restoringSnapshotId)
+                .add("capturingSnapshotIds", capturingSnapshotIds)
                 .toString();
     }
 
@@ -183,11 +218,14 @@ public class SnapshotStats
         private long lastCaptureWallTime;
         private long allCaptureSize;
         private long lastCaptureSize;
-        private long lastRestoreSnapshotId;
+        private List<Long> restoredSnapshotList;
+        private List<Long> capturedSnapshotList;
         private long successRestoreCount;
         private long totalRestoreWallTime;
         private long totalRestoreSize;
         private long totalRestoreCpuTime;
+        private long restoringSnapshotId;
+        private List<Long> capturingSnapshotIds;
 
         private Builder() {}
 
@@ -233,9 +271,21 @@ public class SnapshotStats
             return this;
         }
 
-        public Builder setLastRestoreSnapshotId(long lastRestoreSnapshotId)
+        public Builder setRestoringSnapshotId(long restoringSnapshotId)
         {
-            this.lastRestoreSnapshotId = lastRestoreSnapshotId;
+            this.restoringSnapshotId = restoringSnapshotId;
+            return this;
+        }
+
+        public Builder setRestoredSnapshotList(List<Long> restoredSnapshotList)
+        {
+            this.restoredSnapshotList = restoredSnapshotList;
+            return this;
+        }
+
+        public Builder setCapturedSnapshotList(List<Long> capturedSnapshotList)
+        {
+            this.capturedSnapshotList = capturedSnapshotList;
             return this;
         }
 
@@ -263,6 +313,12 @@ public class SnapshotStats
             return this;
         }
 
+        public Builder setCapturingSnapshotIds(List<Long> capturingSnapshotIds)
+        {
+            this.capturingSnapshotIds = capturingSnapshotIds;
+            return this;
+        }
+
         public SnapshotStats build()
         {
             return new SnapshotStats(
@@ -273,11 +329,14 @@ public class SnapshotStats
                     lastCaptureWallTime,
                     allCaptureSize,
                     lastCaptureSize,
-                    lastRestoreSnapshotId,
+                    restoredSnapshotList,
+                    capturedSnapshotList,
                     successRestoreCount,
                     totalRestoreWallTime,
                     totalRestoreSize,
-                    totalRestoreCpuTime);
+                    totalRestoreCpuTime,
+                    restoringSnapshotId,
+                    capturingSnapshotIds);
         }
     }
 }

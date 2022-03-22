@@ -19,6 +19,7 @@ import io.airlift.log.Logger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -32,6 +33,8 @@ public class SnapshotComponentCounter<T>
 
     // Function to verify if snapshot is complete for query components
     private final Function<Set<T>, Boolean> checkComplete;
+    // Function to verify if snapshot is complete for stage components
+    private final BiConsumer<T, Set<T>> checkStageComplete;
     // Total number of components needs to be captured/restored, used when the above function is not present,
     // to verify if snapshot is complete for task components.
     private final int totalComponentCount;
@@ -44,12 +47,14 @@ public class SnapshotComponentCounter<T>
     {
         this.totalComponentCount = totalComponentCount;
         this.checkComplete = null;
+        this.checkStageComplete = null;
     }
 
-    public SnapshotComponentCounter(Function<Set<T>, Boolean> checkComplete)
+    public SnapshotComponentCounter(Function<Set<T>, Boolean> checkComplete, BiConsumer<T, Set<T>> checkStageComplete)
     {
         this.totalComponentCount = 0;
         this.checkComplete = checkComplete;
+        this.checkStageComplete = checkStageComplete;
     }
 
     // Returns whether a change was made
@@ -68,6 +73,10 @@ public class SnapshotComponentCounter<T>
         }
         else if (state == ComponentState.FAILED && snapshotResult != SnapshotResult.FAILED_FATAL && snapshotResult != SnapshotResult.IN_PROGRESS_FAILED_FATAL) {
             snapshotResult = SnapshotResult.IN_PROGRESS_FAILED;
+        }
+
+        if (checkStageComplete != null) {
+            checkStageComplete.accept(stateId, componentMap.keySet());
         }
 
         if (checkComplete != null) {

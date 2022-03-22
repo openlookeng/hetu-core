@@ -45,11 +45,16 @@ public class StageInfo
     private final List<StageInfo> subStages;
     private final ExecutionFailureInfo failureCause;
     private final Map<PlanNodeId, TableInfo> tables;
+    private final boolean restoring;
+    // id for which capture is completed
+    private final long snapshotId;
 
     @JsonCreator
     public StageInfo(
             @JsonProperty("stageId") StageId stageId,
             @JsonProperty("state") StageState state,
+            @JsonProperty("restoring") boolean restoring,
+            @JsonProperty("snapshotId") long snapshotId,
             @JsonProperty("self") URI self,
             @JsonProperty("plan") @Nullable PlanFragment plan,
             @JsonProperty("types") List<Type> types,
@@ -68,6 +73,8 @@ public class StageInfo
         requireNonNull(tables, "tables is null");
 
         this.stageId = stageId;
+        this.restoring = restoring;
+        this.snapshotId = snapshotId;
         this.state = state;
         this.self = self;
         this.plan = plan;
@@ -138,6 +145,18 @@ public class StageInfo
     public ExecutionFailureInfo getFailureCause()
     {
         return failureCause;
+    }
+
+    @JsonProperty
+    public boolean isRestoring()
+    {
+        return restoring;
+    }
+
+    @JsonProperty
+    public long getSnapshotId()
+    {
+        return snapshotId;
     }
 
     public boolean isFinalStageInfo()

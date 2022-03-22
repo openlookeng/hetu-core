@@ -54,6 +54,7 @@ import io.prestosql.operator.TaskLocation;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.RestoreResult;
 import io.prestosql.snapshot.SnapshotInfo;
+import io.prestosql.snapshot.SnapshotResult;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -79,6 +80,7 @@ import javax.ws.rs.core.UriInfo;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -853,63 +855,94 @@ public class Query
             return null;
         }
         AtomicLong totalCpuTimeMillis = new AtomicLong(0L);
-        AtomicLong lastSnapshotCpuTimeMillis = new AtomicLong(0L);
         AtomicLong allSnapshotsSizeBytes = new AtomicLong(0L);
-        AtomicLong lastSnapshotSizeBytes = new AtomicLong(0L);
         AtomicLong totalWallTimeMillis = new AtomicLong(0L);
-        AtomicLong lastWallTimeMillis = new AtomicLong(0L);
+        AtomicLong lastSnapshotId = new AtomicLong(0L);
+
         QuerySnapshotManager querySnapshotManager = queryManager.getQuerySnapshotManager(queryId);
         if (querySnapshotManager != null) {
-            long lastSnapshotId = querySnapshotManager.collectSnapshotCaptureStats(eachSize -> (eachWallTime, eachCpuTime) -> {
-                allSnapshotsSizeBytes.addAndGet(eachSize);
-                totalWallTimeMillis.addAndGet(eachWallTime);
-                totalCpuTimeMillis.addAndGet(eachCpuTime);
-            }, lastSize -> (lastWallTime, lastCpuTime) -> {
-                lastSnapshotSizeBytes.set(lastSize);
-                lastSnapshotCpuTimeMillis.set(lastCpuTime);
-                lastWallTimeMillis.set(lastWallTime);
-            });
-            if (lastSnapshotId > 0) {
-                SnapshotStats.Builder builder = SnapshotStats.builder();
-                log.debug("SnapshotMetrics: totalWallTimeMillis: [%s]ms, lastWallTimeMillis: [%s]ms", totalWallTimeMillis.toString(), lastWallTimeMillis.toString());
-                log.debug("SnapshotMetrics: allSnapshotsSizeBytes: [%d], lastSnapshotSizeBytes: [%d]", allSnapshotsSizeBytes.get(), lastSnapshotSizeBytes.get());
-                log.debug("SnapshotMetrics: totalCpuTimeMillis: [%d]ms, lastSnapshotCpuTimeMillis: [%d]ms", totalCpuTimeMillis.get(), lastSnapshotCpuTimeMillis.get());
-                builder.setLastCaptureSnapshotId(lastSnapshotId)
-                        .setAllSnapshotsSizeBytes(allSnapshotsSizeBytes.get())
-                        .setLastSnapshotSizeBytes(lastSnapshotSizeBytes.get())
-                        .setTotalWallTimeMillis(totalWallTimeMillis.get())
-                        .setLastSnapshotWallTimeMillis(lastWallTimeMillis.get())
-                        .setTotalCpuTimeMillis(totalCpuTimeMillis.get())
-                        .setLastSnapshotCpuTimeMillis(lastSnapshotCpuTimeMillis.get());
+            List<Long> capturedSnapshots = new ArrayList<Long>();
+            List<Long> capturingSnapshots = new ArrayList<Long>();
 
-                // Restore stats
-                AtomicLong totalRestoreWallTime = new AtomicLong(0L);
-                AtomicLong totalRestoreCpuTime = new AtomicLong(0L);
-                AtomicLong totalRestoreSize = new AtomicLong(0L);
-                long lastRestoreSnapshotId = 0;
-                int restoreCount = 0;
-                List<RestoreResult> restoreStats = querySnapshotManager.getRestoreStats();
-                restoreCount = restoreStats.size();
-                log.debug("SnapshotMetrics: restoreCount: [%d]", restoreCount);
-                // Add restore stats if restore is happened
-                if (restoreCount > 0) {
-                    lastRestoreSnapshotId = restoreStats.get(restoreCount - 1).getSnapshotId();
-                    restoreStats.forEach(restoreResult -> {
-                        SnapshotInfo info = restoreResult.getSnapshotInfo();
-                        totalRestoreWallTime.addAndGet(info.getEndTime() - info.getBeginTime());
-                        totalRestoreCpuTime.addAndGet(info.getCpuTime());
-                        totalRestoreSize.addAndGet(info.getSizeBytes());
-                    });
-                    log.debug("SnapshotMetrics: totalRestoreWallTime: [%d]ms, totalRestoreCpuTime: [%d]ms", totalRestoreWallTime.get(), totalRestoreCpuTime.get());
-                    log.debug("SnapshotMetrics: totalRestoreSize: [%d], lastRestoreSnapshotId: [%d]", totalRestoreSize.get(), lastRestoreSnapshotId);
-                    builder.setSuccessRestoreCount(restoreCount)
-                            .setLastRestoreSnapshotId(lastRestoreSnapshotId)
-                            .setTotalRestoreWallTime(totalRestoreWallTime.get())
-                            .setTotalRestoreCpuTime(totalRestoreCpuTime.get())
-                            .setTotalRestoreSize(totalRestoreSize.get());
+            Map<Long, SnapshotInfo> captureResults = querySnapshotManager.getCaptureResults();
+            captureResults.forEach((snapshotId, snapshotInfo) -> {
+                if (snapshotId > 0 && snapshotInfo.isCompleteSnapshot()) {
+                    if (snapshotId.compareTo(lastSnapshotId.get()) > 0) {
+                        // Get last successful snapshot id
+                        lastSnapshotId.set(snapshotId);
+                    }
+                    long wallTime = snapshotInfo.getEndTime() - snapshotInfo.getBeginTime();
+                    capturedSnapshots.add(snapshotId);
+                    allSnapshotsSizeBytes.addAndGet(snapshotInfo.getSizeBytes());
+                    totalWallTimeMillis.addAndGet(wallTime);
+                    totalCpuTimeMillis.addAndGet(snapshotInfo.getCpuTime());
                 }
-                return builder.build();
+                else if (snapshotInfo.getSnapshotResult() == SnapshotResult.IN_PROGRESS) {
+                    capturingSnapshots.add(snapshotId);
+                }
+                else {
+                    log.info("Neither successful nor in progress, Snapshot: %d, Status: %s", snapshotId, snapshotInfo.getSnapshotResult().toString());
+                }
+            });
+            SnapshotStats.Builder builder = SnapshotStats.builder();
+            if (capturedSnapshots.size() > 0) {
+                builder.setAllSnapshotsSizeBytes(allSnapshotsSizeBytes.get())
+                        .setTotalWallTimeMillis(totalWallTimeMillis.get())
+                        .setTotalCpuTimeMillis(totalCpuTimeMillis.get())
+                        .setCapturedSnapshotList(capturedSnapshots);
             }
+            if (capturingSnapshots.size() > 0) {
+                builder.setCapturingSnapshotIds(capturingSnapshots);
+            }
+            // Gather last successful snapshot stats if available
+            if (lastSnapshotId.get() > 0) {
+                SnapshotInfo lastSnapshotInfo = captureResults.get(lastSnapshotId.get());
+                long lastWallTime = lastSnapshotInfo.getEndTime() - lastSnapshotInfo.getBeginTime();
+                builder.setLastCaptureSnapshotId(lastSnapshotId.get())
+                        .setLastSnapshotSizeBytes(lastSnapshotInfo.getSizeBytes())
+                        .setLastSnapshotWallTimeMillis(lastWallTime)
+                        .setLastSnapshotCpuTimeMillis(lastSnapshotInfo.getCpuTime());
+            }
+
+            // Restore stats
+            AtomicLong totalRestoreWallTime = new AtomicLong(0L);
+            AtomicLong totalRestoreCpuTime = new AtomicLong(0L);
+            AtomicLong totalRestoreSize = new AtomicLong(0L);
+            int restoreCount = 0;
+
+            List<RestoreResult> restoreStats = querySnapshotManager.getRestoreStats();
+            restoreCount = restoreStats.size();
+            // Add restore stats if restore is happened
+            if (restoreCount > 0) {
+                List<Long> restoredSnapshotList = new ArrayList<Long>();
+                restoreStats.forEach(restoreResult -> {
+                    SnapshotInfo info = restoreResult.getSnapshotInfo();
+                    // Wall Time and CPU Time
+                    totalRestoreWallTime.addAndGet(info.getEndTime() - info.getBeginTime());
+                    totalRestoreCpuTime.addAndGet(info.getCpuTime());
+                    totalRestoreSize.addAndGet(info.getSizeBytes());
+                    // Collect list of restored snapshots
+                    if (restoreResult.getSnapshotId() > 0) {
+                        restoredSnapshotList.add(restoreResult.getSnapshotId());
+                    }
+                    else {
+                        log.info("Query restarted instead of resume..");
+                    }
+                });
+                builder.setSuccessRestoreCount(restoreCount)
+                        .setTotalRestoreWallTime(totalRestoreWallTime.get())
+                        .setTotalRestoreCpuTime(totalRestoreCpuTime.get())
+                        .setTotalRestoreSize(totalRestoreSize.get())
+                        .setRestoredSnapshotList(restoredSnapshotList);
+            }
+            // Collect current restoring snapshot if restore in progress
+            long restoringSnapshotId = querySnapshotManager.getRestoringSnapshotId();
+            if (restoringSnapshotId > 0) {
+                builder.setRestoringSnapshotId(restoringSnapshotId);
+            }
+            SnapshotStats snapshotStats = builder.build();
+            log.debug("SnapshotStats: " + snapshotStats.toString());
+            return snapshotStats;
         }
         return null;
     }
@@ -933,10 +966,12 @@ public class Query
             URI uri = task.getTaskStatus().getSelf();
             uniqueNodes.add(uri.getHost() + ":" + uri.getPort());
         }
-
+        log.debug("StageStats Id: %s, IsRestoring: %b, SnapshotId: %d", stageInfo.getStageId().toString(), stageInfo.isRestoring(), stageInfo.getSnapshotId());
         return StageStats.builder()
                 .setStageId(String.valueOf(stageInfo.getStageId().getId()))
                 .setState(stageInfo.getState().toString())
+                .setRestoring(stageInfo.isRestoring())
+                .setSnapshotId(stageInfo.getSnapshotId())
                 .setDone(stageInfo.getState().isDone())
                 .setNodes(uniqueNodes.size())
                 .setTotalSplits(stageStats.getTotalDrivers())

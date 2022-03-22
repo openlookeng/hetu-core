@@ -289,6 +289,7 @@ public class SqlQueryScheduler
             // snapshot is complete, because all known tasks are covered.
             for (SqlStageExecution stage : stageExecutions) {
                 snapshotManager.addNewTask(new TaskId(stage.getStageId(), 0));
+                snapshotManager.setStageCompleteListener(stage.getStageId(), stage::OnSnapshotXCompleted);
             }
         }
 
@@ -684,6 +685,8 @@ public class SqlQueryScheduler
         return new StageInfo(
                 parent.getStageId(),
                 parent.getState(),
+                parent.isRestoring(),
+                parent.getSnapshotId(),
                 parent.getSelf(),
                 parent.getPlan(),
                 parent.getTypes(),
@@ -914,6 +917,14 @@ public class SqlQueryScheduler
         }
 
         return future;
+    }
+
+    public void setResuming(long restoringSnapshotId)
+    {
+        for (SqlStageExecution stageExecution : stages.values()) {
+            stageExecution.setResuming(restoringSnapshotId);
+        }
+        snapshotManager.setRestoringSnapshotId(restoringSnapshotId);
     }
 
     private interface ExchangeLocationsConsumer

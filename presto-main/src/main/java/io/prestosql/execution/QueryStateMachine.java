@@ -1102,6 +1102,8 @@ public class QueryStateMachine
         Optional<StageInfo> prunedOutputStage = queryInfo.getOutputStage().map(outputStage -> new StageInfo(
                 outputStage.getStageId(),
                 outputStage.getState(),
+                outputStage.isRestoring(),
+                outputStage.getSnapshotId(),
                 outputStage.getSelf(),
                 null, // Remove the plan
                 outputStage.getTypes(),

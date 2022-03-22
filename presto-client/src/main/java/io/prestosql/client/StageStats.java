@@ -29,6 +29,8 @@ public class StageStats
 {
     private final String stageId;
     private final String state;
+    private final boolean restoring;
+    private final long snapshotId;
     private final boolean done;
     private final int nodes;
     private final int totalSplits;
@@ -45,6 +47,8 @@ public class StageStats
     public StageStats(
             @JsonProperty("stageId") String stageId,
             @JsonProperty("state") String state,
+            @JsonProperty("restoring") boolean restoring,
+            @JsonProperty("snapshotId") long snapshotId,
             @JsonProperty("done") boolean done,
             @JsonProperty("nodes") int nodes,
             @JsonProperty("totalSplits") int totalSplits,
@@ -59,6 +63,8 @@ public class StageStats
     {
         this.stageId = stageId;
         this.state = requireNonNull(state, "state is null");
+        this.restoring = restoring;
+        this.snapshotId = snapshotId;
         this.done = done;
         this.nodes = nodes;
         this.totalSplits = totalSplits;
@@ -82,6 +88,18 @@ public class StageStats
     public String getState()
     {
         return state;
+    }
+
+    @JsonProperty
+    public boolean isRestoring()
+    {
+        return restoring;
+    }
+
+    @JsonProperty
+    public long getSnapshotId()
+    {
+        return snapshotId;
     }
 
     @JsonProperty
@@ -155,6 +173,8 @@ public class StageStats
     {
         return toStringHelper(this)
                 .add("state", state)
+                .add("restoring", restoring)
+                .add("snapshotId", snapshotId)
                 .add("done", done)
                 .add("nodes", nodes)
                 .add("totalSplits", totalSplits)
@@ -178,6 +198,8 @@ public class StageStats
     {
         private String stageId;
         private String state;
+        private boolean restoring;
+        private long snapshotId;
         private boolean done;
         private int nodes;
         private int totalSplits;
@@ -201,6 +223,18 @@ public class StageStats
         public Builder setState(String state)
         {
             this.state = requireNonNull(state, "state is null");
+            return this;
+        }
+
+        public Builder setRestoring(boolean restoring)
+        {
+            this.restoring = restoring;
+            return this;
+        }
+
+        public Builder setSnapshotId(long snapshotId)
+        {
+            this.snapshotId = snapshotId;
             return this;
         }
 
@@ -275,6 +309,8 @@ public class StageStats
             return new StageStats(
                     stageId,
                     state,
+                    restoring,
+                    snapshotId,
                     done,
                     nodes,
                     totalSplits,
