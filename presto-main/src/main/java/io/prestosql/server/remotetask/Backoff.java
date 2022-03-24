@@ -16,6 +16,7 @@ package io.prestosql.server.remotetask;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.operator.ExchangeClientConfig;
 
@@ -33,6 +34,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 @ThreadSafe
 public class Backoff
 {
+    private static final Logger log = Logger.get(Backoff.class);
     private static final int MIN_RETRIES = 3;
     private static final int MAX_RETRIES = ExchangeClientConfig.MAX_RETRY_COUNT;
     private static final List<Duration> DEFAULT_BACKOFF_DELAY_INTERVALS = ImmutableList.<Duration>builder()
@@ -81,7 +83,7 @@ public class Backoff
         checkArgument(!backoffDelayIntervals.isEmpty(), "backoffDelayIntervals must contain at least one entry");
 
         this.minTries = minTries;
-        this.maxTries = (minTries < maxTries) ? maxTries : minTries;
+        this.maxTries = (MAX_RETRIES < maxTries) ? maxTries : MAX_RETRIES;
         this.maxFailureIntervalNanos = maxFailureInterval.roundTo(NANOSECONDS);
         this.ticker = ticker;
         this.backoffDelayIntervalsNanos = backoffDelayIntervals.stream()
@@ -170,6 +172,10 @@ public class Backoff
 
         if (getFailureCount() < minTries) {
             return false;
+        }
+
+        if (getFailureCount() >= maxTries) {
+            log.debug("failure retry count cross max retry number " + maxTries);
         }
         return getFailureCount() >= maxTries;
     }
