@@ -188,11 +188,16 @@ public class HeartbeatFailureDetector
                     // TODO: distinguish between process unresponsiveness (e.g GC pause) and host reboot
                     return UNRESPONSIVE;
                 }
-
+                if (lastFailureException == null) {
+                    log.debug("State is UNKNOWN. Last Failure Exception is null");
+                }
+                else {
+                    log.debug("State is UNKNOWN. Last Failure exception " + lastFailureException.toString());
+                }
                 return UNKNOWN;
             }
         }
-
+        log.debug("State is UNKNOWN");
         return UNKNOWN;
     }
 
