@@ -374,6 +374,8 @@ public class MarkerSplitSource
     public void close()
     {
         announcer.deactivateSplitSource(this);
+        // In case of closing split source before source is exhausted. (e.g. query with limit function).
+        sourceExhausted = true;
         source.close();
     }
 
