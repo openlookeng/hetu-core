@@ -65,6 +65,8 @@ When the build table is partitioned, the spill-to-disk mechanism can decrease th
 
 With this mechanism, the peak memory used by the join operator can be decreased to the size of the largest build table partition. Assuming no data skew, this will be `1 / task.concurrency` times the size of the whole build table.
 
+Note: spill-to-disk is not supported for Cross Join.
+
 ### Aggregations
 
 Aggregation functions perform an operation on a group of values and return one value. If the number of groups you\'re aggregating over is large, a significant amount of memory may be needed. When spill-to-disk
