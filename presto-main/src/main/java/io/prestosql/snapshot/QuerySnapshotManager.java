@@ -87,6 +87,8 @@ public class QuerySnapshotManager
     // It is important for the management of snapshot sub-files written by TableWriterOperator.
     private List<Long> initiatedSnapshotId;
 
+    private boolean restoreInitiated;
+
     public QuerySnapshotManager(QueryId queryId, SnapshotUtils snapshotUtils, Session session)
     {
         this.queryId = requireNonNull(queryId);
@@ -146,6 +148,7 @@ public class QuerySnapshotManager
             throw new PrestoException(TOO_MANY_RESUMES, "Tried to recover query execution for too many times");
         }
         retryCount++;
+        restoreInitiated = true;
 
         lastTriedId = getResumeSnapshotId(lastTriedId);
         startSnapshotRestoreTimer();
@@ -265,8 +268,8 @@ public class QuerySnapshotManager
                 restoreStats.add(restoreResult);
             }
             cancelRestoreTimer();
-            // reset retry count on successful restore
-            retryCount = 0;
+            // reset restore initiated on successful restore
+            restoreInitiated = false;
             if (lastTriedId.isPresent()) {
                 // Successfully resumed from this snapshot id. Avoid resuming from it again.
                 // See HashBuilderOperator#finish(), which depends on this behavior.
@@ -631,7 +634,7 @@ public class QuerySnapshotManager
     public void setRestoreStartTime(long curTime)
     {
         // Beginning restore process, reset restore result and init with Begin time
-        if (retryCount == 0) {
+        if (!restoreInitiated) {
             restoreResult = new RestoreResult();
             SnapshotInfo info = restoreResult.getSnapshotInfo();
             info.setBeginTime(curTime);
@@ -650,7 +653,7 @@ public class QuerySnapshotManager
             SnapshotInfo info = restoreResult.getSnapshotInfo();
             info.setEndTime(System.currentTimeMillis());
             restoreStats.add(restoreResult);
-            retryCount = 0;
+            restoreInitiated = false;
         }
     }
 }

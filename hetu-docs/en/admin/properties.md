@@ -852,6 +852,9 @@ helps with cache affinity scheduling.
 > -   **Default value:** `5m`
 >
 > The maximum time coordinator waits for remote-task related error to be resolved before it's considered a failure.
+>
+> Note:
+> For snapshot recovery `query.remote-task.max-error-duration` should be greater than `exchange.max-error-duration`.
 
 ## Distributed Snapshot
 
