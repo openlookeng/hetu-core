@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class ExchangeClientConfig
 {
     public static final boolean DETECT_TIMEOUT_FAILURES = true;
-    public static final int MAX_RETRY_COUNT = 10;
+    public static final int MAX_RETRY_COUNT = 100;
     private DataSize maxBufferSize = new DataSize(32, Unit.MEGABYTE);
     private int concurrentRequestMultiplier = 3;
     private final Duration minErrorDuration = new Duration(1, TimeUnit.MINUTES);
@@ -38,7 +38,7 @@ public class ExchangeClientConfig
     private int clientThreads = 25;
     private int pageBufferClientMaxCallbackThreads = 25;
     private boolean acknowledgePages = true;
-    private int maxRetryCount = 10;
+    private int maxRetryCount = MAX_RETRY_COUNT;
     private boolean detectTimeoutFailures = true;
 
     @NotNull
@@ -113,7 +113,7 @@ public class ExchangeClientConfig
         return this;
     }
 
-    @Min(1)
+    @Min(100)
     public int getMaxRetryCount()
     {
         return this.maxRetryCount;

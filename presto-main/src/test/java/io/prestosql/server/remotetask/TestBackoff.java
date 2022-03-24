@@ -113,15 +113,14 @@ public class TestBackoff
 
         ticker.increment(14, SECONDS);
 
-        for (int i = 2; i < 14; i++) {  // increase failure count to 13
+        for (int i = 2; i < 14; i++) {
             assertFalse(backoff.failure());
             assertEquals(backoff.getFailureCount(), i);
             assertEquals(backoff.getFailureDuration().roundTo(SECONDS), 14 + i - 2);
             ticker.increment(1, SECONDS);
         }
 
-        // max retry = min retry (3) + max retry (10) = 13.
-        assertTrue(backoff.maxTried());
+        assertFalse(backoff.maxTried());
         assertFalse(backoff.timeout()); // 30 s should not elapse
 
         ticker.increment(5, SECONDS);
