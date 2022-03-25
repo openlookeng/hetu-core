@@ -499,6 +499,12 @@ public class PartitionedLookupSource
                 if (lookupSources.get(partition).getJoinPositionCount() <= 0
                         || lookupSources.get(partition).getJoinPositionCount() <= visitedPositions.get(partition).getCardinality()) {
                     setPartitionDone(partition); /* all matched in this partition; skip it! */
+                    partitionReady.get(partition)
+                            .set(new PartitionedLookupOuterPositionIterator(
+                                    new LookupSource[0],
+                                    new RoaringBitmap[0],
+                                    new int[0],
+                                    this));
                 }
                 else {
                     partitionReady.get(partition)
