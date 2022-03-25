@@ -22,6 +22,9 @@ import io.prestosql.spi.eventlistener.QueryCompletedEvent;
 import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import io.prestosql.spi.eventlistener.SplitCompletedEvent;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.logging.Logger;
 
 import static java.util.Objects.requireNonNull;
@@ -111,18 +114,20 @@ public abstract class BaseEventListener
     public final void auditLogged(AuditLogEvent auditLogEvent)
     {
         Logger log = HetuLogUtil.getLoggerByName(auditLogEvent.getUser(), auditLogEvent.getLevel(), HetuLogUtil.AuditType.valueOf(auditLogEvent.getType()));
+        ZonedDateTime zonedDateTime = LocalDateTime.now().atZone(ZoneId.systemDefault());
+        String logRecord = zonedDateTime + " " + auditLogEvent;
         switch (auditLogEvent.getLevel()) {
             case "INFO":
-                log.info(auditLogEvent.toString());
+                log.info(logRecord);
                 break;
             case "ERROR":
-                log.severe(auditLogEvent.toString());
+                log.severe(logRecord);
                 break;
             case "WARN":
-                log.warning(auditLogEvent.toString());
+                log.warning(logRecord);
                 break;
             case "DEBUG":
-                log.fine(auditLogEvent.toString());
+                log.fine(logRecord);
                 break;
             default:
                 break;

@@ -132,8 +132,8 @@ public class ServerInfoResource
         }
 
         try {
-            nodeStateChangeHandler.doStateTransition(state);
             eventListenerManager.eventEnhanced(new AuditLogEvent(servletRequest.getHeader("X-Presto-User"), nodeInfo.getInternalAddress(), state.toString(), "Cluster", "INFO"));
+            nodeStateChangeHandler.doStateTransition(state);
             return Response.ok().build();
         }
         catch (IllegalStateException e) {
@@ -167,7 +167,7 @@ public class ServerInfoResource
 
     public void startupComplete()
     {
-        eventListenerManager.eventEnhanced(new AuditLogEvent("admin", nodeInfo.getInternalAddress(), "Server: " + nodeInfo.getNodeId() + " Start!", "Cluster", "INFO"));
+        eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", nodeInfo.getInternalAddress(), "Server: " + nodeInfo.getNodeId() + " Start!", "Cluster", "INFO"));
         checkState(startupComplete.compareAndSet(false, true), "Server startup already marked as complete");
     }
 

@@ -501,8 +501,6 @@ export class QueryList extends React.Component {
     }
 
     renderDateRangePicker() {
-        let beginTimeStore = '';
-        let endTimeStore = '';
         let that = this;
         $('#date-picker').daterangepicker({
             "timePicker": true,
@@ -513,20 +511,33 @@ export class QueryList extends React.Component {
                 format: 'YYYY-MM-DD.HH:mm',
                 separator: ' ~ ',
                 applyLabel: "确定",
-                cancelLabel: "取消",
+                cancelLabel: "清空",
                 resetLabel: "重置",
             }
         }, function(start, end, label) {
-            beginTimeStore = start;
-            endTimeStore = end;
-            if(!this.startDate){
-                this.element.val('');
-            }else{
-                this.element.val(this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format));
-                that.state.queryString = "";
-                that.state.searchStringDate = this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format);
-                that.refreshData();
+
+        });
+
+        $('#date-picker').on('apply.daterangepicker', function(ev, picker) {
+            picker.element.val(picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format));
+            that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('hide.daterangepicker', function(ev, picker) {
+            if(that.state.searchStringDate === "") {
+                that.state.searchStringDate = "";
             }
+            else {
+                that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
+            }
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('cancel.daterangepicker', function(ev, picker) {
+            $('#date-picker').val('');
+            that.state.searchStringDate = "";
+            setTimeout(that.debounceSearch,0);
         });
     }
 

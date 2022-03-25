@@ -76,7 +76,7 @@ class CollectionTable extends React.Component {
     }
 
     onPageSizeChange(current, pageSize) {
-        this.setState({pageSize: pageSize});
+        this.state.pageSize = pageSize;
         _.defer(this.refreshData);
     }
 

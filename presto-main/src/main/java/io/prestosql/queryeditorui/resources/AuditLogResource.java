@@ -20,6 +20,7 @@ import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.protocol.ObjectMapperProvider;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
+import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.spi.security.GroupProvider;
 
@@ -43,10 +44,10 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -90,7 +91,7 @@ public class AuditLogResource
         //if the user is admin, don't filter results by user.
         Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
-        if (!filterUser.isPresent()) {
+        if (filterUser.isPresent()) {
             response.setStatus(400);
             return;
         }
@@ -109,22 +110,25 @@ public class AuditLogResource
         response.setContentType("application/json");
         ServletOutputStream out = response.getOutputStream();
         List<String> resLog = new ArrayList<>(100);
-        BufferedReader br = new BufferedReader(new FileReader(logFiles.get(logFiles.size() - 1)));
-        String str = null;
         int auditLogLimit = 99; // show 100 logs in webUI
-        while ((str = br.readLine()) != null) {
-            resLog.add(str + System.lineSeparator());
-            auditLogLimit--;
-            if (auditLogLimit < 0) {
-                break;
+        for (int i = logFiles.size() - 1; auditLogLimit >= 0 && i >= 0; i--) {
+            BufferedReader br = new BufferedReader(new FileReader(logFiles.get(i)));
+            String str = null;
+            while ((str = br.readLine()) != null) {
+                resLog.add(str + System.lineSeparator());
+                auditLogLimit--;
+                if (auditLogLimit < 0) {
+                    break;
+                }
             }
+            br.close();
         }
-        br.close();
         ObjectMapper objectMapper = new ObjectMapperProvider().get();
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
         out.println(objectMapper.writeValueAsString(resLog));
         out.flush();
+        resLog.clear();
     }
 
     //downloadLogFiles, return compressed package in. Zip format
@@ -142,7 +146,9 @@ public class AuditLogResource
         //if the user is admin, don't filter results by user.
         Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
-        if (!filterUser.isPresent()) {
+        String sessionUser = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
+
+        if (filterUser.isPresent()) {
             response.setStatus(400);
             return;
         }
@@ -158,7 +164,7 @@ public class AuditLogResource
         }
         response.reset();
         response.setContentType("multipart/form-data");
-        String downloadName = getCurrentDate() + "_" + filterUser.get() + "_auditLog.zip";
+        String downloadName = getCurrentDate() + "_" + sessionUser + "_auditLog.zip";
         response.setHeader("Content-Disposition", "attachment;fileName=" + downloadName);
 
         //set compression stream: write response directly to achieve compression while downloading
@@ -185,6 +191,20 @@ public class AuditLogResource
             os.close();
             zipos.close();
         }
+    }
+
+    @GET
+    @Path("/pattern")
+    public String getPattern()
+    {
+        String pattern = eventListenerManager.getLogconversionpattern();
+        if (pattern == null || !pattern.contains(".")) {
+            pattern = "YYYY-MM-DD";
+        }
+        else {
+            pattern = "YYYY-MM-DD.HH";
+        }
+        return pattern;
     }
 
     public List<String> getLogFiles(String type, String beginTime, String endTime, String user, String level) throws IOException
@@ -216,6 +236,9 @@ public class AuditLogResource
         String tmpUser = values[1];
         String tmpTime = values[2].substring(0, values[2].length() - 4); // cut ".log" from filename
 
+        if (beginTime != null && beginTime.contains(".") && tmpTime.length() != beginTime.length()) {
+            tmpTime = tmpTime + ".00";
+        }
         if (beginTime != null && tmpTime.compareTo(beginTime) < 0) {
             return false;
         }
@@ -233,8 +256,8 @@ public class AuditLogResource
 
     private static String getCurrentDate()
     {
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd.HH");
-        String dateString = formatter.format(new Date());
-        return dateString;
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-MM-dd.HH");
+        return now.format(format);
     }
 }
