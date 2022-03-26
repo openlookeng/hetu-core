@@ -160,6 +160,7 @@ public final class DiscoveryNodeManager
         pollWorkers();
     }
 
+    @Override
     public void refreshWorkerStates()
     {
         failureDetector.waitForServiceStateRefresh();
