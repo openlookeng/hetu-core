@@ -75,6 +75,7 @@ import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
 import static io.prestosql.orc.metadata.PostScript.MAGIC;
 import static io.prestosql.orc.stream.OrcDataOutput.createDataOutput;
 import static io.prestosql.orc.writer.ColumnWriters.createColumnWriter;
+import static io.prestosql.orc.writer.ColumnWriters.getBloomFilterBuilder;
 import static java.lang.Integer.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -173,7 +174,14 @@ public final class OrcWriter
         for (int fieldId = 0; fieldId < types.size(); fieldId++) {
             OrcColumnId fieldColumnIndex = localRootType.getFieldTypeIndex(fieldId);
             Type fieldType = types.get(fieldId);
-            ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, maxCompressionBufferSize, options.getMaxStringStatisticsLimit());
+            ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex,
+                    orcTypes,
+                    fieldType,
+                    compression,
+                    maxCompressionBufferSize,
+                    options,
+                    columnNames.get(fieldId),
+                    getBloomFilterBuilder(options, columnNames.get(fieldId), fieldColumnIndex.getId()));
             localColumnWriters.add(columnWriter);
 
             if (columnWriter instanceof SliceDictionaryColumnWriter) {
@@ -401,6 +409,11 @@ public final class OrcWriter
                 allStreams.add(indexStream.getStream());
                 indexLength += indexStream.size();
             }
+            for (StreamDataOutput bloomFilter : columnWriter.getBloomFilters(metadataWriter)) {
+                outputData.add(bloomFilter);
+                allStreams.add(bloomFilter.getStream());
+                indexLength += bloomFilter.size();
+            }
         }
 
         // data streams (sorted by size)
@@ -430,7 +443,7 @@ public final class OrcWriter
 
         // the 0th column is a struct column for the whole row
         columnEncodings.put(ROOT_COLUMN, new ColumnEncoding(DIRECT, 0));
-        columnStatistics.put(ROOT_COLUMN, new ColumnStatistics((long) stripeRowCount, 0, null, null, null, null, null, null, null, null));
+        columnStatistics.put(ROOT_COLUMN, new ColumnStatistics((long) stripeRowCount, 0, null, null, null, null, null, null, null, null, null));
 
         // add footer
         StripeFooter stripeFooter = new StripeFooter(allStreams, toColumnMetadata(columnEncodings, orcTypes.size()), ZoneId.of("UTC"));

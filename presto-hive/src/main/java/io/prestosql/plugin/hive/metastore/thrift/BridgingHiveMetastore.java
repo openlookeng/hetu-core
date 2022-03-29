@@ -13,6 +13,7 @@
  */
 package io.prestosql.plugin.hive.metastore.thrift;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.hive.HivePartition;
 import io.prestosql.plugin.hive.HiveType;
@@ -47,9 +48,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.plugin.hive.HiveMetadata.ORC_BLOOM_FILTER_COLUMNS_KEY;
+import static io.prestosql.plugin.hive.HiveMetadata.ORC_BLOOM_FILTER_FPP_KEY;
 import static io.prestosql.plugin.hive.HiveMetadata.TABLE_COMMENT;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.toMetastoreApiTable;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -249,6 +254,7 @@ public class BridgingHiveMetastore
                 fieldSchema.setName(newColumnName);
             }
         }
+        alterBloomColumns(oldColumnName, table, newColumnName);
         alterTable(identity, databaseName, tableName, table);
     }
 
@@ -258,8 +264,44 @@ public class BridgingHiveMetastore
         MetastoreUtil.verifyCanDropColumn(this, identity, databaseName, tableName, columnName);
         org.apache.hadoop.hive.metastore.api.Table table = delegate.getTable(identity, databaseName, tableName)
                 .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+
+        removeBloomColumns(columnName, table);
         table.getSd().getCols().removeIf(fieldSchema -> fieldSchema.getName().equals(columnName));
         alterTable(identity, databaseName, tableName, table);
+    }
+
+    private void alterBloomColumns(String oldColumnName, org.apache.hadoop.hive.metastore.api.Table table, String newColumnName)
+    {
+        if (table.getParameters().get(ORC_BLOOM_FILTER_COLUMNS_KEY) != null) {
+            List<String> bloomColumnNames = Stream.of(table.getParameters().get(ORC_BLOOM_FILTER_COLUMNS_KEY).split(","))
+                    .map(s -> s.startsWith(oldColumnName + ".") ? s.replaceFirst(oldColumnName, newColumnName) : s)
+                    .collect(Collectors.toList());
+            bloomColumnNames = bloomColumnNames.stream()
+                    .map(s -> s.equals(oldColumnName) ? newColumnName : s)
+                    .collect(Collectors.toList());
+
+            table.getParameters().put(ORC_BLOOM_FILTER_COLUMNS_KEY, Joiner.on(",").join(bloomColumnNames));
+        }
+    }
+
+    private void removeBloomColumns(String oldColumnName, org.apache.hadoop.hive.metastore.api.Table table)
+    {
+        if (table.getParameters().get(ORC_BLOOM_FILTER_COLUMNS_KEY) != null) {
+            Predicate<String> subColumnMatch = s -> !s.startsWith(oldColumnName + ".");
+            Predicate<String> columnMatch = r -> !r.equals(oldColumnName);
+
+            List<String> bloomColumnNames = Stream.of(table.getParameters().get(ORC_BLOOM_FILTER_COLUMNS_KEY).split(","))
+                    .map(String::trim)
+                    .filter(subColumnMatch.and(columnMatch))
+                    .collect(Collectors.toList());
+            if (bloomColumnNames.size() > 0) {
+                table.getParameters().put(ORC_BLOOM_FILTER_COLUMNS_KEY, Joiner.on(",").join(bloomColumnNames));
+            }
+            else {
+                table.getParameters().remove(ORC_BLOOM_FILTER_COLUMNS_KEY);
+                table.getParameters().remove(ORC_BLOOM_FILTER_FPP_KEY);
+            }
+        }
     }
 
     private void alterTable(HiveIdentity identity, String databaseName, String tableName, org.apache.hadoop.hive.metastore.api.Table table)

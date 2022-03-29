@@ -254,4 +254,11 @@ public class DecimalColumnWriter
         shortDecimalStatisticsBuilder = new ShortDecimalStatisticsBuilder(this.type.getScale());
         longDecimalStatisticsBuilder = new LongDecimalStatisticsBuilder();
     }
+
+    @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException
+    {
+        return ImmutableList.of();
+    }
 }
