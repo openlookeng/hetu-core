@@ -607,6 +607,13 @@ public final class HttpPageBufferClient
         @Override
         public PagesResponse handleException(Request request, Exception exception)
         {
+            if (exception instanceof RuntimeException || exception instanceof IOException) {
+                throw propagate(request,
+                        new PageTransportErrorException(format("%s %d! Error fetching %s: %s",
+                                PAGE_TRANSPORT_ERROR_PREFIX, HttpStatus.INTERNAL_SERVER_ERROR.code(),
+                                request.getUri().toASCIIString(), exception.getMessage()),
+                        exception));
+            }
             throw propagate(request, exception);
         }
 
