@@ -38,7 +38,6 @@ import io.prestosql.spi.statestore.StateStoreBootstrapper;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 
 import static io.hetu.core.statestore.Constants.STATE_STORE_CLUSTER_CONFIG_NAME;
 import static io.hetu.core.statestore.StateStoreUtils.getEncryptionTypeFromConfig;
@@ -105,9 +104,6 @@ public class HazelcastStateStoreBootstrapper
 
         SerializerConfig tableEntity = new SerializerConfig().setImplementation(new HazelcastTableEntitySerializer()).setTypeClass(TableEntity.class);
         hzConfig.getSerializationConfig().addSerializerConfig(tableEntity);
-
-        SerializerConfig op = new SerializerConfig().setImplementation(new HazelcastOptionalSerializer()).setTypeClass(Optional.class);
-        hzConfig.getSerializationConfig().addSerializerConfig(op);
 
         String clusterId = config.get(STATE_STORE_CLUSTER_CONFIG_NAME);
         if (clusterId == null) {

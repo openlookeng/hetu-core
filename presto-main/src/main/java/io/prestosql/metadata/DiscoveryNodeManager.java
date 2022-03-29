@@ -160,6 +160,29 @@ public final class DiscoveryNodeManager
         pollWorkers();
     }
 
+    @Override
+    public void refreshWorkerStates()
+    {
+        failureDetector.waitForServiceStateRefresh();
+        pollWorkers();
+        AllNodes allNodesOverDiscovery = getAllNodes();
+        Set<InternalNode> aliveNodes = ImmutableSet.<InternalNode>builder()
+                .addAll(allNodesOverDiscovery.getActiveNodes())
+                .addAll(allNodesOverDiscovery.getIsolatingNodes())
+                .addAll(allNodesOverDiscovery.getIsolatedNodes())
+                .addAll(allNodesOverDiscovery.getShuttingDownNodes())
+                .build();
+
+        ImmutableSet<String> aliveNodeIds = aliveNodes.stream()
+                .map(InternalNode::getNodeIdentifier)
+                .collect(toImmutableSet());
+
+        // Remove nodes that don't exist anymore
+        // Make a copy to materialize the set difference
+        Set<String> deadNodes = difference(nodeStates.keySet(), aliveNodeIds).immutableCopy();
+        nodeStates.keySet().removeAll(deadNodes);
+    }
+
     private void pollWorkers()
     {
         AllNodes allNodesOverDiscovery = getAllNodes();

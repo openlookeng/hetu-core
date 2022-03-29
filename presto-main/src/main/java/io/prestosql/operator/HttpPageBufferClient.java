@@ -438,10 +438,11 @@ public final class HttpPageBufferClient
                          * If node state is gone or unresponsive (e.g. GC pause), immediately fail.
                          * if node is otherwise (e.g.active), keep retrying till timeout of maxErrorDuration
                          */
+                        FailureDetector.State state = failureDetector.getState(fromUri(uri));
+                        log.debug("failure detector state is " + state.toString());
                         hasFailed = (backoff.maxTried() &&
-                                (FailureDetector.State.GONE.equals(failureDetector.getState(fromUri(uri))) ||
-                                        FailureDetector.State.UNRESPONSIVE.equals(failureDetector.getState(fromUri(uri)))))
-                                || backoff.timeout();
+                                !FailureDetector.State.ALIVE.equals(state)
+                                || backoff.timeout());
                     }
                     if (hasFailed) {
                         String message = format("%s (%s - %s failures, failure duration %s, total failed request time %s)",

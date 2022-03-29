@@ -42,7 +42,7 @@ public class TestExchangeClientConfig
                 .setClientThreads(25)
                 .setAcknowledgePages(true)
                 .setDetectTimeoutFailures(true)
-                .setMaxRetryCount(10));
+                .setMaxRetryCount(100));
     }
 
     @Test
@@ -57,7 +57,7 @@ public class TestExchangeClientConfig
                 .put("exchange.client-threads", "2")
                 .put("exchange.page-buffer-client.max-callback-threads", "16")
                 .put("exchange.acknowledge-pages", "false")
-                .put("exchange.max-retry-count", "100")
+                .put("exchange.max-retry-count", "110")
                 .put("exchange.is-timeout-failure-detection-enabled", "false")
                 .build();
 
@@ -70,7 +70,7 @@ public class TestExchangeClientConfig
                 .setClientThreads(2)
                 .setPageBufferClientMaxCallbackThreads(16)
                 .setAcknowledgePages(false)
-                .setMaxRetryCount(100)
+                .setMaxRetryCount(110)
                 .setDetectTimeoutFailures(false);
 
         assertFullMapping(properties, expected);

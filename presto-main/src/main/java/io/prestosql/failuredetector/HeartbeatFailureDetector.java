@@ -61,6 +61,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -97,6 +98,7 @@ public class HeartbeatFailureDetector
     private final boolean httpsRequired;
 
     private final AtomicBoolean started = new AtomicBoolean();
+    private AtomicBoolean isTasksRemoved = new AtomicBoolean();
 
     @Inject
     public HeartbeatFailureDetector(
@@ -186,11 +188,16 @@ public class HeartbeatFailureDetector
                     // TODO: distinguish between process unresponsiveness (e.g GC pause) and host reboot
                     return UNRESPONSIVE;
                 }
-
+                if (lastFailureException == null) {
+                    log.debug("State is UNKNOWN. Last Failure Exception is null");
+                }
+                else {
+                    log.debug("State is UNKNOWN. Last Failure exception " + lastFailureException.toString());
+                }
                 return UNKNOWN;
             }
         }
-
+        log.debug("State is UNKNOWN");
         return UNKNOWN;
     }
 
@@ -221,32 +228,57 @@ public class HeartbeatFailureDetector
         return builder.build();
     }
 
+    @Override
+    public void waitForServiceStateRefresh()
+    {
+        Map<ServiceDescriptor, Long> waitingTasks = getTasksTimestamp();
+        long currentTime = waitingTasks.values().stream().mapToLong(t -> t).max().getAsLong();
+        updateMonitoredServices();
+        // remove expired tasks
+        synchronized (tasks) {
+            removeExpiredIds();
+            if (tasks.size() == 0) {
+                return;
+            }
+        }
+        Map<ServiceDescriptor, Long> finalCurrentTasks;
+        do {
+            Map<ServiceDescriptor, Long> currentTasks;
+            Set<ServiceDescriptor> failedTasks;
+            synchronized (tasks) {
+                currentTasks = getTasksTimestamp();
+                failedTasks = getFailed();
+            }
+            currentTasks.entrySet().stream().forEach(e -> {
+                if (e.getValue() > currentTime || failedTasks.contains(e.getKey())) {
+                    if (currentTasks.containsKey(e.getKey())) {
+                        currentTasks.remove(e.getKey());
+                    }
+                }
+            });
+            finalCurrentTasks = currentTasks;
+        } while (finalCurrentTasks.size() > 0);
+    }
+
+    private ConcurrentMap<ServiceDescriptor, Long> getTasksTimestamp()
+    {
+        return tasks.values().stream().collect(Collectors.toConcurrentMap(t -> t.getService(), t -> t.getLastCompleteTimestamp()));
+    }
+
     @VisibleForTesting
     void updateMonitoredServices()
     {
-        Set<ServiceDescriptor> online = selector.selectAllServices().stream()
-                .filter(descriptor -> !nodeInfo.getNodeId().equals(descriptor.getNodeId()))
-                .collect(toImmutableSet());
+        Set<ServiceDescriptor> online = getOnlineServiceDescriptors();
 
-        Set<UUID> onlineIds = online.stream()
-                .map(ServiceDescriptor::getId)
-                .collect(toImmutableSet());
+        Set<UUID> onlineIds = getOnlineIds(online);
 
         // make sure only one thread is updating the registrations
         synchronized (tasks) {
             // 1. remove expired tasks
-            List<UUID> expiredIds = tasks.values().stream()
-                    .filter(MonitoringTask::isExpired)
-                    .map(MonitoringTask::getService)
-                    .map(ServiceDescriptor::getId)
-                    .collect(toImmutableList());
-
-            tasks.keySet().removeAll(expiredIds);
+            removeExpiredIds();
 
             // 2. disable offline services
-            tasks.values().stream()
-                    .filter(task -> !onlineIds.contains(task.getService().getId()))
-                    .forEach(MonitoringTask::disable);
+            disableOfflineTasks(onlineIds);
 
             // 3. create tasks for new services
             Set<ServiceDescriptor> newServices = online.stream()
@@ -266,6 +298,38 @@ public class HeartbeatFailureDetector
                     .filter(task -> onlineIds.contains(task.getService().getId()))
                     .forEach(MonitoringTask::enable);
         }
+    }
+
+    private Set<ServiceDescriptor> getOnlineServiceDescriptors()
+    {
+        return selector.selectAllServices().stream()
+                .filter(descriptor -> !nodeInfo.getNodeId().equals(descriptor.getNodeId()))
+                .collect(toImmutableSet());
+    }
+
+    private Set<UUID> getOnlineIds(Set<ServiceDescriptor> online)
+    {
+        return online.stream()
+                .map(ServiceDescriptor::getId)
+                .collect(toImmutableSet());
+    }
+
+    private void disableOfflineTasks(Set<UUID> onlineIds)
+    {
+        tasks.values().stream()
+                .filter(task -> !onlineIds.contains(task.getService().getId()))
+                .forEach(MonitoringTask::disable);
+    }
+
+    private void removeExpiredIds()
+    {
+        List<UUID> expiredIds = tasks.values().stream()
+                .filter(MonitoringTask::isExpired)
+                .map(MonitoringTask::getService)
+                .map(ServiceDescriptor::getId)
+                .collect(toImmutableList());
+
+        tasks.keySet().removeAll(expiredIds);
     }
 
     private URI getHttpUri(ServiceDescriptor descriptor)
@@ -297,6 +361,12 @@ public class HeartbeatFailureDetector
 
         @GuardedBy("this")
         private Long successTransitionTimestamp;
+
+        @GuardedBy("this")
+        private long lastCompleteTimestamp;
+
+        @GuardedBy("this")
+        private double lastFailureCount;
 
         private MonitoringTask(ServiceDescriptor service, URI uri)
         {
@@ -358,6 +428,11 @@ public class HeartbeatFailureDetector
                     Duration.nanosSince(successTransitionTimestamp).compareTo(warmupInterval) < 0; // are we within the warmup period?
         }
 
+        public synchronized long getLastCompleteTimestamp()
+        {
+            return lastCompleteTimestamp;
+        }
+
         private void ping()
         {
             try {
@@ -396,6 +471,11 @@ public class HeartbeatFailureDetector
             }
             else if (successTransitionTimestamp == null) {
                 successTransitionTimestamp = System.nanoTime();
+                lastCompleteTimestamp = System.nanoTime();
+                lastFailureCount = stats.getRecentFailures();
+            }
+            else if (Duration.nanosSince(lastCompleteTimestamp).compareTo(new Duration(1, TimeUnit.SECONDS)) > 0 && stats.getRecentFailures() == lastFailureCount) {
+                lastCompleteTimestamp = System.nanoTime();
             }
         }
     }

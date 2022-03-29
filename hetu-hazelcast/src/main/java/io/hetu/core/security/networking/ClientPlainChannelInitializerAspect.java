@@ -16,9 +16,8 @@
 package io.hetu.core.security.networking;
 
 import com.hazelcast.client.config.SocketOptions;
-import com.hazelcast.client.impl.connection.nio.ClientConnection;
-import com.hazelcast.client.impl.connection.nio.ClientProtocolEncoder;
-import com.hazelcast.client.impl.protocol.ClientMessage;
+import com.hazelcast.client.impl.connection.tcp.ClientProtocolEncoder;
+import com.hazelcast.client.impl.connection.tcp.TcpClientConnection;
 import com.hazelcast.client.impl.protocol.util.ClientMessageDecoder;
 import com.hazelcast.client.impl.protocol.util.ClientMessageEncoder;
 import com.hazelcast.internal.networking.Channel;
@@ -31,7 +30,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
-import java.util.function.Consumer;
 
 import static com.hazelcast.client.config.SocketOptions.KILO_BYTE;
 import static com.hazelcast.internal.networking.ChannelOption.DIRECT_BUF;
@@ -47,7 +45,7 @@ import static com.hazelcast.internal.networking.ChannelOption.TCP_NODELAY;
 @Component
 public class ClientPlainChannelInitializerAspect
 {
-    @Around("execution(* com.hazelcast.client.impl.connection.nio.ClientPlainChannelInitializer.initChannel(Channel)) && args(channel)")
+    @Around("execution(* com.hazelcast.client.impl.connection.tcp.ClientPlainChannelInitializer.initChannel(Channel)) && args(channel)")
     public void aroundInitChannel(ProceedingJoinPoint joinPoint, Channel channel)
     {
         Field directBufferField = null;
@@ -71,15 +69,9 @@ public class ClientPlainChannelInitializerAspect
                     .setOption(TCP_NODELAY, socketOptions.isTcpNoDelay())
                     .setOption(DIRECT_BUF, directBuffer);
 
-            final ClientConnection connection = (ClientConnection) channel.attributeMap().get(ClientConnection.class);
+            final TcpClientConnection connection = (TcpClientConnection) channel.attributeMap().get(TcpClientConnection.class);
 
-            ClientMessageDecoder decoder = new ClientMessageDecoder(connection, new Consumer<ClientMessage>() {
-                @Override
-                public void accept(ClientMessage message)
-                {
-                    connection.handleClientMessage(message);
-                }
-            }, null);
+            ClientMessageDecoder decoder = new ClientMessageDecoder(connection, connection::handleClientMessage, null);
 
             if (SslConfig.isSslEnabled()) {
                 SslContext sslContext = SslContextBuilder

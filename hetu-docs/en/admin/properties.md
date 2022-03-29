@@ -387,9 +387,9 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 ### `exchange.max-retry-count`
 
 > -   **Type:** `integer`
-> -   **Default value:** `10`
+> -   **Default value:** `100`
 >
-> The maximum number of retry for failed task performed by the coordinator before considering it as a permanent failure. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false. This value needs to be atleast 3 (minimum retry count) to take effect.
+> The maximum number of retry for failed task performed by the coordinator before consulting the failure detector module about the remote node status. If the remote node status is failed as per the failure detector module, it is considered as a permanent failure. This parameter is the minimum count which is required to decide, not necessarily the exact count. Based on the cluster size, load on the cluster the exact count may vary slightly. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false. This value needs to be at least 100 to take effect.
 
 ### `sink.max-buffer-size`
 
@@ -852,6 +852,9 @@ helps with cache affinity scheduling.
 > -   **Default value:** `5m`
 >
 > The maximum time coordinator waits for remote-task related error to be resolved before it's considered a failure.
+>
+> Note:
+> For snapshot recovery `query.remote-task.max-error-duration` should be greater than `exchange.max-error-duration`.
 
 ## Distributed Snapshot
 

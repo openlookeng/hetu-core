@@ -447,22 +447,22 @@ public class TestHttpPageBufferClient
                 ticker,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, new MockNodeCrashFailureDetector(), false, 10);
+                null, new MockNodeCrashFailureDetector(), false, 100);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 101; i++) {
             client.scheduleRequest();
             requestComplete.await(10, TimeUnit.SECONDS);
             tickerIncrement.set(new Duration(1, TimeUnit.SECONDS));
         }
         assertEquals(callback.getPages().size(), 0);
-        assertEquals(callback.getCompletedRequests(), 11);
+        assertEquals(callback.getCompletedRequests(), 101);
         assertEquals(callback.getFinishedBuffers(), 0);
         assertEquals(callback.getFailedBuffers(), 2);
         assertInstanceOf(callback.getFailure(), PageTransportTimeoutException.class);
-        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 10 failures,");
-        assertStatus(client, location, "queued", 0, 11, 11, 11, "not scheduled");
+        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 100 failures,");
+        assertStatus(client, location, "queued", 0, 101, 101, 101, "not scheduled");
     }
 
     @Test
@@ -493,31 +493,31 @@ public class TestHttpPageBufferClient
                 ticker,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, new MockActiveFailureDetector(), false, 10);
+                null, new MockActiveFailureDetector(), false, 100);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 101; i++) {
             client.scheduleRequest();
             requestComplete.await(10, TimeUnit.SECONDS);
             tickerIncrement.set(new Duration(1, TimeUnit.SECONDS));
         }
         assertEquals(callback.getPages().size(), 0);
-        assertEquals(callback.getCompletedRequests(), 11);
+        assertEquals(callback.getCompletedRequests(), 101);
         assertEquals(callback.getFinishedBuffers(), 0);
         assertEquals(callback.getFailedBuffers(), 0);
 
-        assertStatus(client, location, "queued", 0, 11, 11, 11, "not scheduled");
+        assertStatus(client, location, "queued", 0, 101, 101, 101, "not scheduled");
 
         tickerIncrement.set(new Duration(301, TimeUnit.SECONDS));
         client.scheduleRequest();
         requestComplete.await(10, TimeUnit.SECONDS);
 
-        assertEquals(callback.getCompletedRequests(), 12);
+        assertEquals(callback.getCompletedRequests(), 102);
         assertEquals(callback.getFinishedBuffers(), 0);
         assertEquals(callback.getFailedBuffers(), 1);
         assertInstanceOf(callback.getFailure(), PageTransportTimeoutException.class);
-        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 12 failures,");
+        assertContains(callback.getFailure().getMessage(), WORKER_NODE_ERROR + " (http://localhost:8080/0 - 102 failures,");
     }
 
     @Test
