@@ -29,7 +29,6 @@ public class ShortDecimalStatisticsBuilder
     private long nonNullValueCount;
     private long minimum = Long.MAX_VALUE;
     private long maximum = Long.MIN_VALUE;
-    private final BloomFilterBuilder bloomFilterBuilder;
 
     public ShortDecimalStatisticsBuilder(int scale)
     {
