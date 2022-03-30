@@ -31,7 +31,7 @@
 
 
 
-### ConnectorSplitManger
+### ConnectorSplitManager
 
 分片管理器将表的数据分区成多个块，这些块由 openLooKeng 分发至工作节点进行处理。
 

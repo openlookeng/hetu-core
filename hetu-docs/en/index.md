@@ -172,6 +172,7 @@ headless: true
     - [SHOW CACHE]({{< relref "./docs/sql/show-cache.md" >}})
     - [SHOW CATALOGS]({{< relref "./docs/sql/show-catalogs.md" >}})
     - [SHOW COLUMNS]({{< relref "./docs/sql/show-columns.md" >}})
+    - [SHOW CREATE CUBE]({{< relref "./docs/sql/show-create-cube.md" >}})
     - [SHOW CREATE TABLE]({{< relref "./docs/sql/show-create-table.md" >}})
     - [SHOW CREATE VIEW]({{< relref "./docs/sql/show-create-view.md" >}})
     - [SHOW FUNCTIONS]({{< relref "./docs/sql/show-functions.md" >}})

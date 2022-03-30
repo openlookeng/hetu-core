@@ -21,7 +21,7 @@ This interface is too big to list in this documentation, but if you are interest
 connector. If your underlying data source supports schemas, tables and columns, this interface should be straightforward to implement. If you are attempting to adapt something that is not a relational database (as
 the Example HTTP connector does), you may need to get creative about how you map your data source to openLooKeng\'s schema, table, and column concepts.
 
-### ConnectorSplitManger
+### ConnectorSplitManager
 
 The split manager partitions the data for a table into the individual chunks that openLooKeng will distribute to workers for processing. For example, the Hive connector lists the files for each Hive partition and creates
 one or more split per file. For data sources that don\'t have partitioned data, a good strategy here is to simply return a single split for the entire table. This is the strategy employed by the Example HTTP connector.
