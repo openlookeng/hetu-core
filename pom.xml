@@ -1870,4 +1870,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.6</tag>
+  </scm>
 </project>
