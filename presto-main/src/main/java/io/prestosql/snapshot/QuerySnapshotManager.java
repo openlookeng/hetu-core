@@ -451,7 +451,7 @@ public class QuerySnapshotManager
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
                 SnapshotInfo info = captureResults.get(snapshotId);
-                if (info.getSnapshotResult() != SnapshotResult.NA) {
+                if (info != null && info.getSnapshotResult() != SnapshotResult.NA) {
                     LOG.debug("Finished capturing snapshot %d for task %s", snapshotId, taskId);
                     updateTaskCaptureStats(snapshotId, snapshotInfo);
                     SnapshotResult oldResult = updateSnapshotStatus(snapshotId, snapshotResult);
