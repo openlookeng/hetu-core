@@ -43,6 +43,8 @@ public class SnapshotComponentCounter<T>
     // Overall result
     private SnapshotResult snapshotResult = SnapshotResult.IN_PROGRESS;
 
+    private Function<T, Boolean> checkFinishedTask = (stateId) -> false;
+
     public SnapshotComponentCounter(int totalComponentCount)
     {
         this.totalComponentCount = totalComponentCount;
@@ -50,11 +52,12 @@ public class SnapshotComponentCounter<T>
         this.checkStageComplete = null;
     }
 
-    public SnapshotComponentCounter(Function<Set<T>, Boolean> checkComplete, BiConsumer<T, Set<T>> checkStageComplete)
+    public SnapshotComponentCounter(Function<Set<T>, Boolean> checkComplete, BiConsumer<T, Set<T>> checkStageComplete, Function<T, Boolean> checkFinishedTask)
     {
         this.totalComponentCount = 0;
         this.checkComplete = checkComplete;
         this.checkStageComplete = checkStageComplete;
+        this.checkFinishedTask = checkFinishedTask;
     }
 
     // Returns whether a change was made
@@ -82,6 +85,9 @@ public class SnapshotComponentCounter<T>
         if (checkComplete != null) {
             if (checkComplete.apply(componentMap.keySet())) {
                 doneResult();
+            }
+            else if (checkFinishedTask != null && checkFinishedTask.apply(stateId)) {
+                return false;
             }
         }
         else {

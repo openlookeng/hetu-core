@@ -460,7 +460,7 @@ public class QuerySnapshotManager
     {
         SnapshotComponentCounter<TaskId> counter = captureComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageCaptureCompletion(curTaskId, ids, snapshotId)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageCaptureCompletion(curTaskId, ids, snapshotId), task -> !unfinishedTasks.contains(task)));
         if (counter.updateComponent(taskId, componentState)) {
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
@@ -493,7 +493,7 @@ public class QuerySnapshotManager
         // update queryToRestoredSnapshotComponentCounterMap
         SnapshotComponentCounter<TaskId> counter = restoreComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageRestoreCompletion(curTaskId, ids)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageRestoreCompletion(curTaskId, ids), null));
 
         if (counter.updateComponent(taskId, componentState)) {
             LOG.debug("Finished restoring snapshot %d for task %s", snapshotId, taskId);

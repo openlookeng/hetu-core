@@ -272,7 +272,7 @@ public class TaskSnapshotManager
 
     public void failedToRestore(SnapshotStateId componentId, boolean fatal)
     {
-        LOG.debug("Failed (fatal=%b) to restore snapshot %d for component %s", fatal, componentId.getSnapshotId(), componentId);
+        LOG.warn("Failed (fatal=%b) to restore snapshot %d for component %s", fatal, componentId.getSnapshotId(), componentId);
         if (fatal) {
             updateRestore(componentId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
         }
