@@ -23,6 +23,7 @@ import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.spi.security.GroupProvider;
+import org.eclipse.jetty.server.Response;
 
 import javax.inject.Inject;
 import javax.servlet.ServletOutputStream;
@@ -92,7 +93,7 @@ public class AuditLogResource
         Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         if (filterUser.isPresent()) {
-            response.setStatus(400);
+            response.setStatus(Response.SC_FORBIDDEN);
             return;
         }
         String inputUsername = emptyToNull(username);
@@ -102,7 +103,7 @@ public class AuditLogResource
 
         List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
         if (logFiles.isEmpty()) {
-            response.setStatus(404);
+            response.setStatus(Response.SC_NOT_FOUND);
             return;
         }
         response.reset();
@@ -149,7 +150,7 @@ public class AuditLogResource
         String sessionUser = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
 
         if (filterUser.isPresent()) {
-            response.setStatus(400);
+            response.setStatus(Response.SC_FORBIDDEN);
             return;
         }
         String inputUsername = emptyToNull(username);
@@ -159,7 +160,7 @@ public class AuditLogResource
 
         List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
         if (logFiles.isEmpty()) {
-            response.setStatus(404);
+            response.setStatus(Response.SC_NOT_FOUND);
             return;
         }
         response.reset();

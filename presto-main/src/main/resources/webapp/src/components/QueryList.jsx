@@ -510,9 +510,9 @@ export class QueryList extends React.Component {
             "locale": {
                 format: 'YYYY-MM-DD.HH:mm',
                 separator: ' ~ ',
-                applyLabel: "确定",
-                cancelLabel: "清空",
-                resetLabel: "重置",
+                applyLabel: "confirm",
+                cancelLabel: "clear",
+                resetLabel: "reset",
             }
         }, function(start, end, label) {
 
@@ -525,10 +525,7 @@ export class QueryList extends React.Component {
         });
 
         $('#date-picker').on('hide.daterangepicker', function(ev, picker) {
-            if(that.state.searchStringDate === "") {
-                that.state.searchStringDate = "";
-            }
-            else {
+            if(that.state.searchStringDate !== "") {
                 that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
             }
             setTimeout(that.debounceSearch,0);
