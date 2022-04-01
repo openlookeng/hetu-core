@@ -19,8 +19,8 @@ import io.prestosql.spi.PrestoException;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.FileHandler;
 import java.util.logging.Formatter;
@@ -52,9 +52,9 @@ public class HetuLogUtil
         if (hetuLogConversionPattern == null) {
             hetuLogConversionPattern = "yyyy-MM-dd.HH";
         }
-        SimpleDateFormat formatter = new SimpleDateFormat(hetuLogConversionPattern);
-        String dateString = formatter.format(new Date());
-        return dateString;
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter format = DateTimeFormatter.ofPattern(hetuLogConversionPattern);
+        return now.format(format);
     }
 
     public static Logger getLoggerByName(String username, String level, AuditType type)

@@ -43,6 +43,7 @@ public class EventListenerManager
     private static final File EVENT_LISTENER_CONFIGURATION = new File("etc/event-listener.properties");
     private static final String EVENT_LISTENER_PROPERTY_NAME = "event-listener.name";
     private static String logOutput = "etc/log/";
+    private static String logconversionpattern = "yyyy-MM-dd.HH";
 
     private final Map<String, EventListenerFactory> eventListenerFactories = new ConcurrentHashMap<>();
     private final AtomicReference<Optional<EventListener>> configuredEventListener = new AtomicReference<>(Optional.empty());
@@ -66,6 +67,7 @@ public class EventListenerManager
             checkArgument(!isNullOrEmpty(eventListenerName),
                     "Access control configuration %s does not contain %s", EVENT_LISTENER_CONFIGURATION.getAbsoluteFile(), EVENT_LISTENER_PROPERTY_NAME);
             logOutput = properties.get("hetu.auditlog.logoutput");
+            logconversionpattern = properties.get("hetu.auditlog.logconversionpattern");
             setConfiguredEventListener(eventListenerName, properties);
         }
     }
@@ -92,6 +94,11 @@ public class EventListenerManager
     public String getLogOutput()
     {
         return logOutput;
+    }
+
+    public String getLogconversionpattern()
+    {
+        return logconversionpattern;
     }
 
     public void queryCompleted(QueryCompletedEvent queryCompletedEvent)

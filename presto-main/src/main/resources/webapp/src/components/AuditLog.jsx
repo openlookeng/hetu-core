@@ -71,6 +71,7 @@ export class AuditLog extends React.Component {
                 {key: "WebUI", value: "WebUi"},
                 {key: "Cluster", value: "Cluster"}
             ],
+            dateRangePickerPattern: '',
         };
         this.flag = {
             searchStringUser: '',
@@ -128,6 +129,16 @@ export class AuditLog extends React.Component {
     }
 
     componentDidMount() {
+        $.get(`../v1/audit/pattern`, function (pattern) {
+            this.setState({
+                dateRangePickerPattern: pattern
+            });
+            this.resetTimer();
+        }.bind(this))
+            .error(function () {
+                this.resetTimer();
+            }.bind(this));
+
         this.refreshLoop();
         RunActions.connect();
         TableStore.listen(this.onChange);
@@ -202,28 +213,68 @@ export class AuditLog extends React.Component {
 
     renderDateRangePicker() {
         let that = this;
+        let pattern = this.state.dateRangePickerPattern;
+        let flag = true;
+        let today = new Date();
+        let tomorrow = new Date();
+        let todayText = "";
+        let tomorrowText = "";
+        if(pattern === "YYYY-MM-DD") {
+            flag = false;
+            todayText = today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate();
+            tomorrow.setTime(tomorrow.getTime()+24*60*60*1000);
+            tomorrowText = tomorrow.getFullYear()+ '/' + (tomorrow.getMonth()+1) + '/' + tomorrow.getDate();
+        }
+        else {
+            todayText = today.getFullYear() + '/' + (today.getMonth() + 1) + '/' + today.getDate() + '.00';
+            tomorrow.setTime(tomorrow.getTime()+24*60*60*1000);
+            tomorrowText = tomorrow.getFullYear()+ '/' + (tomorrow.getMonth()+1) + '/' + tomorrow.getDate() + '.00';
+        }
         $('#date-picker').daterangepicker({
-            "timePicker": true,
+            startDate:that.state.searchStringBeginTime == "" ? todayText : that.state.searchStringBeginTime,
+            endDate:that.state.searchStringEndTime == "" ? tomorrowText : that.state.searchStringEndTime,
+            "timePicker": flag,
             "timePicker24Hour": true,
             "linkedCalendars": false,
             "autoUpdateInput": false,
+            "timePickerIncrement": 60,
             "locale": {
-                format: 'YYYY-MM-DD.HH:mm',
+                format: pattern,
                 separator: ' ~ ',
-                applyLabel: "确定",
-                cancelLabel: "取消",
-                resetLabel: "重置",
+                applyLabel: "confirm",
+                cancelLabel: "clear",
+                resetLabel: "reset",
             }
         }, function(start, end, label) {
-            if(!this.startDate){
-                this.element.val('');
-            }else{
-                this.element.val(this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format));
-                that.state.searchStringDate = this.startDate.format(this.locale.format) + this.locale.separator + this.endDate.format(this.locale.format);
-                that.state.searchStringBeginTime = this.startDate.format(this.locale.format);
-                that.state.searchStringEndTime = this.endDate.format(this.locale.format);
-                setTimeout(that.debounceSearch,0);
+
+        });
+
+        $('#date-picker').on('apply.daterangepicker', function(ev, picker) {
+            picker.element.val(picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format));
+            that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
+            that.state.searchStringBeginTime = picker.startDate.format(picker.locale.format);
+            that.state.searchStringEndTime = picker.endDate.format(picker.locale.format);
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('cancel.daterangepicker', function(ev, picker) {
+            $('#date-picker').val('');
+            that.state.searchStringBeginTime = "";
+            that.state.searchStringEndTime = "";
+            that.state.searchStringDate = "";
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('hide.daterangepicker', function(ev, picker) {
+            if(that.state.searchStringDate === "") {
+                that.state.searchStringBeginTime = "";
+                that.state.searchStringEndTime = "";
             }
+            else {
+                that.state.searchStringBeginTime = picker.startDate.format(pattern);
+                that.state.searchStringEndTime = picker.endDate.format(pattern);
+            }
+            setTimeout(that.debounceSearch,0);
         });
 
     }

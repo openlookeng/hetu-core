@@ -16,7 +16,6 @@
 package io.prestosql.catalog.showcatalog;
 
 import com.google.inject.Inject;
-import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.spi.security.GroupProvider;
 import org.assertj.core.util.VisibleForTesting;
 
@@ -86,7 +85,7 @@ public class ShowCatalogResource
         checkCatalogName(catalogName);
         Map<String, String> response;
         try {
-            response = service.getCatalogpropertites(new HttpRequestSessionContext(servletRequest, groupProvider), catalogName);
+            response = service.getCatalogpropertites(catalogName);
         }
         catch (WebApplicationException ex) {
             throw ex;

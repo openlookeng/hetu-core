@@ -16,7 +16,6 @@
 package io.prestosql.catalog.showcatalog;
 
 import com.google.inject.Inject;
-import io.prestosql.server.HttpRequestSessionContext;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
@@ -46,7 +45,7 @@ public class ShowCatalogService
                         .build());
     }
 
-    public Map<String, String> getCatalogpropertites(HttpRequestSessionContext sessionContext, String catalogname)
+    public Map<String, String> getCatalogpropertites(String catalogname)
             throws IOException
     {
         return showCatalogStore.getCatalogProperties(catalogname);
