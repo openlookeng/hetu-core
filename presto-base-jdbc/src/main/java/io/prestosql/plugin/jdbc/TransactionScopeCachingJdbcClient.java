@@ -83,6 +83,18 @@ public class TransactionScopeCachingJdbcClient
     }
 
     @Override
+    public void createSchema(ConnectorSession session, String schemaName)
+    {
+        getDelegate().createSchema(session, schemaName);
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        getDelegate().dropSchema(session, schemaName);
+    }
+
+    @Override
     public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         return super.getDeleteRowIdColumnHandle(session, tableHandle);
