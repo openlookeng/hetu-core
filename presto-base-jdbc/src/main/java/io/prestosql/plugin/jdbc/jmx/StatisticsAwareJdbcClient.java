@@ -242,6 +242,18 @@ public class StatisticsAwareJdbcClient
     }
 
     @Override
+    public void createSchema(ConnectorSession session, String schemaName)
+    {
+        stats.createSchema.wrap(() -> getDelegate().createSchema(session, schemaName));
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        stats.dropSchema.wrap(() -> getDelegate().dropSchema(session, schemaName));
+    }
+
+    @Override
     public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         return stats.getDeleteRowIdColumnHandle.wrap(() -> getDelegate().getDeleteRowIdColumnHandle(session, tableHandle));
@@ -348,6 +360,8 @@ public class StatisticsAwareJdbcClient
         private final JdbcApiStats buildInsertSql = new JdbcApiStats();
         private final JdbcApiStats getPreparedStatement = new JdbcApiStats();
         private final JdbcApiStats getTableStatistics = new JdbcApiStats();
+        private final JdbcApiStats createSchema = new JdbcApiStats();
+        private final JdbcApiStats dropSchema = new JdbcApiStats();
         private final JdbcApiStats addColumn = new JdbcApiStats();
         private final JdbcApiStats dropColumn = new JdbcApiStats();
         private final JdbcApiStats renameColumn = new JdbcApiStats();
@@ -511,6 +525,20 @@ public class StatisticsAwareJdbcClient
         public JdbcApiStats getGetTableStatistics()
         {
             return getTableStatistics;
+        }
+
+        @Managed
+        @Nested
+        public JdbcApiStats getCreateSchema()
+        {
+            return createSchema;
+        }
+
+        @Managed
+        @Nested
+        public JdbcApiStats getDropSchema()
+        {
+            return dropSchema;
         }
 
         @Managed

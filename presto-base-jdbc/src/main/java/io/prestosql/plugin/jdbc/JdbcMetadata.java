@@ -310,6 +310,18 @@ public class JdbcMetadata
         return jdbcClient.getTableStatistics(session, handle, constraint.getSummary());
     }
 
+    @Override
+    public void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties)
+    {
+        jdbcClient.createSchema(session, schemaName);
+    }
+
+    @Override
+    public void dropSchema(ConnectorSession session, String schemaName)
+    {
+        jdbcClient.dropSchema(session, schemaName);
+    }
+
     // added by Hetu so extending class can access the client
     public JdbcClient getJdbcClient()
     {
