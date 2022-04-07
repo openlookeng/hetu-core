@@ -98,6 +98,19 @@ public class TupleDomainOrcPredicate
                 return false;
             }
         }
+
+        for (ColumnDomain column : orColumnDomains) {
+            ColumnStatistics columnStatistics = allColumnStatistics.get(column.getColumnId());
+            if (columnStatistics == null) {
+                // no statistics for this column, so we can't exclude this section
+                return true;
+            }
+
+            if (columnOverlaps(column.getDomain(), numberOfRows, columnStatistics)) {
+                return true;
+            }
+        }
+
         // this section was not excluded
         return found || missingColumns.size() > 0;
     }

@@ -29,18 +29,16 @@ The optional `WITH` clause can be used to set properties on the newly created ta
 
 For example, to hive connector, below are some of available and frequently used table properties:
 
-| Property Name    | data type      | Description                                                                                                                   | Default |
-| ---------------- |----------------|-------------------------------------------------------------------------------------------------------------------------------| -- |
-| `format`         | varchar        | Hive storage format for the table. Possible values: [ORC, PARQUET, AVRO, RCBINARY, RCTEXT, SEQUENCEFILE, JSON, TEXTFILE, CSV] | ORC |
-| `bucket_count`   | integer        | Number of buckets                                                                                                             |    |
-| `bucketed_by`    | array(varchar) | Bucketing columns                                                                                                             |    |
-| `sorted_by`      | array(varchar) | Bucket sorting columns                                                                                                        |    |
-| `external`       | boolean        | Is the table an external table                                                                                                | `false` |
-| `location`       | varchar        | File system location URI for the table location value must be provided if `external`=`true`                                   |    |
-| `partitioned_by` | array(varchar) | Partition columns                                                                                                             |    |
-| `transactional`  | boolean        | Is transactional property enabled There is a limitation that only ORC Storage format support creating an transactional table  | `false` |
-| `orc_bloom_filter_columns` | array(varchar) | Bloom Filter Index columns                                                                                                    |    |
-| `orc_bloom_filter_fpp` | double         | False positive probability of bloom filter.                                                                       | 0.05 |
+| Property Name    | data type      | Description                                                  | Default |
+| ---------------- | -------------- | ------------------------------------------------------------ | ------- |
+| `format`         | varchar        | Hive storage format for the table. Possible values: [ORC, PARQUET, AVRO, RCBINARY, RCTEXT, SEQUENCEFILE, JSON, TEXTFILE, CSV] | ORC     |
+| `bucket_count`   | integer        | Number of buckets                                            |         |
+| `bucketed_by`    | array(varchar) | Bucketing columns                                            |         |
+| `sorted_by`      | array(varchar) | Bucket sorting columns                                       |         |
+| `external`       | boolean        | Is the table an external table                               | `false` |
+| `location`       | varchar        | File system location URI for the table location value must be provided if `external`=`true` |         |
+| `partitioned_by` | array(varchar) | Partition columns                                            |         |
+| `transactional`  | boolean        | Is transactional property enabled There is a limitation that only ORC Storage format support creating an transactional table | `false` |
 
 To list all available column properties, run the following query:
 
