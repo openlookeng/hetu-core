@@ -28,8 +28,8 @@ import static io.airlift.units.DataSize.Unit.KILOBYTE;
 public class DynamicCatalogConfig
 {
     private boolean dynamicCatalogEnabled;
-    private String catalogConfigurationDir;
-    private String catalogShareConfigurationDir;
+    private String catalogConfigurationDir = "etc/catalog";
+    private String catalogShareConfigurationDir = "etc/share";
     private Duration catalogScannerInterval = Duration.valueOf("5s");
     private DataSize catalogMaxFileSize = new DataSize(128, KILOBYTE);
     private int catalogMaxFileNumber = 10;

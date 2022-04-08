@@ -57,8 +57,12 @@ public class ShowCatalogStore
                 maxCatalogFileSize);
 
         String shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
+        String ShareFileSystemProfile = dynamicCatalogConfig.getShareFileSystemProfile();
+        if (!dynamicCatalogConfig.isDynamicCatalogEnabled()) {
+            ShareFileSystemProfile = "local-config-default";
+        }
         this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(dynamicCatalogConfig.getShareFileSystemProfile(), Paths.get(shareConfigurationDir)),
+                fileSystemClientManager.getFileSystemClient(ShareFileSystemProfile, Paths.get(shareConfigurationDir)),
                 maxCatalogFileSize);
     }
 
