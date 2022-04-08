@@ -18,17 +18,27 @@ package io.prestosql.operator;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
+import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
+import io.airlift.slice.Slices;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.block.BlockJsonSerde;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.Restorable;
+import io.prestosql.spi.snapshot.RestorableConfig;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import javax.annotation.concurrent.GuardedBy;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.Serializable;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,11 +47,13 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 
+@RestorableConfig()
 public class CommonTableExecutionContext
+    implements Restorable
 {
     private static final Logger LOG = Logger.get(CommonTableExecutionContext.class);
     private final String name;
-    private final int queueCnt;
+    private int queueCnt;
     private final PlanNodeId feederId;
     private boolean isFeederInitialized;
     private List<Integer> feeders = Collections.synchronizedList(new ArrayList<>());
@@ -52,9 +64,9 @@ public class CommonTableExecutionContext
     private final Executor notificationExecutor;
     @GuardedBy("this")
     private SettableFuture<?> blockedFuture;
-    private final int taskCount;
-    private final int maxMainQueueSize;
-    private final int maxPrefetchQueueSize;
+    private int taskCount;
+    private int maxMainQueueSize;
+    private int maxPrefetchQueueSize;
 
     public CommonTableExecutionContext(String name, Set<PlanNodeId> consumers, PlanNodeId feederId, Executor notificationExecutor,
                                                 int taskCount, int maxMainQueueSize, int maxPrefetchQueueSize)
@@ -264,4 +276,86 @@ public class CommonTableExecutionContext
             super();
         }
     }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider) {
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        CommonTableExecutionContextState myState = new CommonTableExecutionContextState();
+        PagesSerdeFactory pagesSerdeFactory = new PagesSerdeFactory(blockSerde,false);
+        PagesSerde pagesSerde  =  pagesSerdeFactory.createPagesSerde();
+
+        myState.queueCnt = queueCnt;
+        myState.maxPrefetchQueueSize = maxPrefetchQueueSize;
+        myState.maxMainQueueSize = maxMainQueueSize;
+        myState.taskCount = taskCount;
+        myState.feeders = new Object[feeders.size()];
+        for (int i = 0; i < feeders.size(); i++) {
+            myState.feeders[i] = feeders.get(i);
+        }
+        myState.prefetchedQueue = new Object[prefetchedQueue.size()];
+        Iterator iterator = prefetchedQueue.iterator();
+        while (iterator.hasNext()) {
+                Page page = (Page) iterator.next();
+                SerializedPage serializedPage = pagesSerde.serialize(page);
+                int p = 0;
+                myState.prefetchedQueue[p] = serializedPage;
+                p++;
+        }
+        myState.consumerQueues = new Object[consumerQueues.size()][2];
+        if (consumerQueues != null) {
+            int count = 0;
+            for (Map.Entry<PlanNodeId, LinkedList<Page>> entry : consumerQueues.entrySet()) {
+                myState.consumerQueues[count][0] = entry.getKey();
+                LinkedList<Page> pages = entry.getValue();
+                LinkedList<SerializedPage> serializedPages = pages.stream().map(page -> pagesSerde.serialize(page)).collect(Collectors.toCollection(LinkedList::new));
+                myState.consumerQueues[count][1] = serializedPages;
+                count ++;
+            }
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        BlockEncodingSerde blockSerde = serdeProvider.getBlockEncodingSerde();
+        CommonTableExecutionContextState myState = (CommonTableExecutionContextState) state;
+
+        PagesSerdeFactory pagesSerdeFactory = new PagesSerdeFactory(blockSerde,false);
+        PagesSerde pagesSerde  =  pagesSerdeFactory.createPagesSerde();
+
+        this.queueCnt = myState.queueCnt;
+        this.maxPrefetchQueueSize = myState.maxPrefetchQueueSize;
+        this.maxMainQueueSize = myState.maxMainQueueSize;
+        this.taskCount = myState.taskCount;
+        for (int i = 0; i < myState.feeders.length; i++) {
+            feeders.add((Integer) myState.feeders[i]);
+        }
+        for (int i = 0; i < myState.prefetchedQueue.length; i++) {
+            SerializedPage serializedPage = (SerializedPage) myState.prefetchedQueue[i];
+            Page page =  pagesSerde.deserialize(serializedPage);
+            prefetchedQueue.add(page);
+        }
+        for (int i = 0; i < myState.consumerQueues.length; i++) {
+            LinkedList<SerializedPage>  pages = (LinkedList<SerializedPage>) myState.consumerQueues[i][1];
+            LinkedList<Page> depages = pages.stream().map(page -> pagesSerde.deserialize(page)).collect(Collectors.toCollection(LinkedList::new));
+            consumerQueues.put((PlanNodeId) myState.consumerQueues[i][0], depages);
+        }
+
+    }
+
+    private static class CommonTableExecutionContextState
+            implements Serializable
+    {
+
+        private int queueCnt;
+        private int maxPrefetchQueueSize;
+        private int maxMainQueueSize;
+        private int taskCount;
+        private Object[] feeders;
+        private Object[] prefetchedQueue;
+        private Object[][] consumerQueues;
+    }
+
+
 }
