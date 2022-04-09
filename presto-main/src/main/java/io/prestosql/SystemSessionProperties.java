@@ -37,6 +37,9 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_CLASS_PATH;
+import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_ENABLED;
+import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_JAR_PATH;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.dataSizeProperty;
@@ -810,6 +813,22 @@ public final class SystemSessionProperties
                         SKIP_NON_APPLICABLE_RULES_ENABLED,
                         "Whether to skip applying some selected rules based on query pattern",
                         featuresConfig.isSkipNonApplicableRulesEnabled(),
+                        false),
+                // add extension execution planner and operator
+                stringProperty(
+                        EXTENSION_EXECUTION_PLANNER_JAR_PATH,
+                        "extension execution planner jar path",
+                        hetuConfig.getExtensionExecutionPlannerJarPath(),
+                        false),
+                stringProperty(
+                        EXTENSION_EXECUTION_PLANNER_CLASS_PATH,
+                        "extension execution planner class path",
+                        hetuConfig.getExtensionExecutionPlannerClassPath(),
+                        false),
+                booleanProperty(
+                        EXTENSION_EXECUTION_PLANNER_ENABLED,
+                        "extension execution planner enabled",
+                        hetuConfig.getExtensionExecutionPlannerEnabled(),
                         false));
     }
 
@@ -1417,5 +1436,20 @@ public final class SystemSessionProperties
     public static boolean isSkipNonApplicableRulesEnabled(Session session)
     {
         return session.getSystemProperty(SKIP_NON_APPLICABLE_RULES_ENABLED, Boolean.class);
+    }
+
+    public static Boolean isExtensionExecutionPlannerEnabled(Session session)
+    {
+        return session.getSystemProperty(EXTENSION_EXECUTION_PLANNER_ENABLED, Boolean.class);
+    }
+
+    public static String getExtensionExecutionPlannerJarPath(Session session)
+    {
+        return session.getSystemProperty(EXTENSION_EXECUTION_PLANNER_JAR_PATH, String.class);
+    }
+
+    public static String getExtensionExecutionPlannerClassPath(Session session)
+    {
+        return session.getSystemProperty(EXTENSION_EXECUTION_PLANNER_CLASS_PATH, String.class);
     }
 }

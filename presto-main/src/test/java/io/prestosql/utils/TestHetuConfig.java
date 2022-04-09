@@ -54,7 +54,10 @@ public class TestHetuConfig
                 .setSplitCacheMapEnabled(false)
                 .setSplitCacheStateUpdateInterval(new Duration(2, TimeUnit.SECONDS))
                 .setTraceStackVisible(false)
-                .setIndexToPreload(""));
+                .setIndexToPreload("")
+                .setExtensionExecutionPlannerEnabled(false)
+                .setExtensionExecutionPlannerJarPath(null)
+                .setExtensionExecutionPlannerClassPath(null));
     }
 
     @Test
@@ -85,6 +88,9 @@ public class TestHetuConfig
                 .put("hetu.split-cache-map.state-update-interval", "5s")
                 .put("stack-trace-visible", "true")
                 .put("hetu.heuristicindex.filter.cache.preload-indices", "idx1,idx2")
+                .put("extension_execution_planner_enabled", "true")
+                .put("extension_execution_planner_jar_path", "")
+                .put("extension_execution_planner_class_path", "")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -111,7 +117,10 @@ public class TestHetuConfig
                 .setSplitCacheMapEnabled(true)
                 .setSplitCacheStateUpdateInterval(new Duration(5, TimeUnit.SECONDS))
                 .setTraceStackVisible(true)
-                .setIndexToPreload("idx1,idx2");
+                .setIndexToPreload("idx1,idx2")
+                .setExtensionExecutionPlannerEnabled(true)
+                .setExtensionExecutionPlannerJarPath("")
+                .setExtensionExecutionPlannerClassPath("");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

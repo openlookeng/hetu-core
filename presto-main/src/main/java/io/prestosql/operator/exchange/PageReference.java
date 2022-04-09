@@ -23,7 +23,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
-class PageReference
+public class PageReference
 {
     private final Page page;
     private final Runnable onFree;

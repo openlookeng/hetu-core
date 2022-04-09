@@ -121,6 +121,15 @@ public class TaskStateMachine
         taskState.addStateChangeListener(stateChangeListener);
     }
 
+    /**
+     * Add listener to the tail, this listener will be notified at last when state changed.
+     * @param stateChangeListener listener of state change.
+     */
+    public void addStateChangeListenerToTail(StateChangeListener<TaskState> stateChangeListener)
+    {
+        taskState.addStateChangeListenerToTail(stateChangeListener);
+    }
+
     @Override
     public String toString()
     {

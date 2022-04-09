@@ -66,7 +66,10 @@ public interface Operator
     /**
      * For Snapshot - If next output is a marker page, then return it, otherwise return null
      */
-    Page pollMarker();
+    default Page pollMarker()
+    {
+        return null;
+    }
 
     /**
      * After calling this method operator should revoke all reserved revocable memory.

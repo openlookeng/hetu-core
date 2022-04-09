@@ -121,6 +121,24 @@ public class ByteArrayBlock
     }
 
     @Override
+    public byte[] getValues()
+    {
+        return values;
+    }
+
+    @Override
+    public int getBlockOffset()
+    {
+        return arrayOffset;
+    }
+
+    @Override
+    public boolean[] getValueNulls()
+    {
+        return valueIsNull;
+    }
+
+    @Override
     public byte getByte(int position, int offset)
     {
         checkReadablePosition(position);

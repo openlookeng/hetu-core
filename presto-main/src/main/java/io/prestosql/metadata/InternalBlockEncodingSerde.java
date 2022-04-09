@@ -24,7 +24,7 @@ import java.util.Optional;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
-final class InternalBlockEncodingSerde
+public class InternalBlockEncodingSerde
         implements BlockEncodingSerde
 {
     private final FunctionAndTypeManager functionAndTypeManager;

@@ -397,9 +397,21 @@ public class DictionaryBlock<T>
         return dictionary;
     }
 
-    Slice getIds()
+    public Slice getIds()
     {
         return Slices.wrappedIntArray(ids, idsOffset, positionCount);
+    }
+
+    public int[] getIdsArray()
+    {
+        if (idsOffset == 0) {
+            return ids;
+        }
+        else {
+            int[] res = new int[positionCount];
+            System.arraycopy(ids, idsOffset, res, 0, positionCount);
+            return res;
+        }
     }
 
     public int getId(int position)

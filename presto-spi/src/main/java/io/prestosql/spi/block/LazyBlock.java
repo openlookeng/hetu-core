@@ -98,6 +98,11 @@ public class LazyBlock<T>
         return block.getObject(position, clazz);
     }
 
+    public Block<T> getBlock()
+    {
+        return block;
+    }
+
     @Override
     public boolean bytesEqual(int position, int offset, Slice otherSlice, int otherOffset, int length)
     {

@@ -370,4 +370,9 @@ public class Page
     {
         pageMetadata.setProperty(key, value);
     }
+
+    public Block[] getBlocks()
+    {
+        return blocks;
+    }
 }
