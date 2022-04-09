@@ -66,11 +66,11 @@ public class LocalExchange
 {
     private static final Logger LOG = Logger.get(LocalExchange.class);
 
-    private final Supplier<LocalExchanger> exchangerSupplier;
+    protected Supplier<LocalExchanger> exchangerSupplier;
 
-    private final List<LocalExchangeSource> sources;
+    protected final List<LocalExchangeSource> sources;
 
-    private final LocalExchangeMemoryManager memoryManager;
+    protected final LocalExchangeMemoryManager memoryManager;
 
     @GuardedBy("this")
     private boolean allSourcesFinished;
@@ -352,27 +352,27 @@ public class LocalExchange
     @ThreadSafe
     public static class LocalExchangeFactory
     {
-        private final PartitioningHandle partitioning;
-        private final List<Type> types;
-        private final List<Integer> partitionChannels;
-        private final Optional<Integer> partitionHashChannel;
-        private final PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy;
-        private final DataSize maxBufferedBytes;
-        private final int bufferCount;
-        private final boolean isForMerge;
-        private final AggregationNode.AggregationType aggregationType;
+        protected final PartitioningHandle partitioning;
+        protected final List<Type> types;
+        protected final List<Integer> partitionChannels;
+        protected final Optional<Integer> partitionHashChannel;
+        protected final PipelineExecutionStrategy exchangeSourcePipelineExecutionStrategy;
+        protected final DataSize maxBufferedBytes;
+        protected final int bufferCount;
+        protected final boolean isForMerge;
+        protected final AggregationNode.AggregationType aggregationType;
 
         @GuardedBy("this")
-        private boolean noMoreSinkFactories;
+        protected boolean noMoreSinkFactories;
         // The number of total sink factories are tracked at planning time
         // so that the exact number of sink factory is known by the time execution starts.
         @GuardedBy("this")
-        private int numSinkFactories;
+        protected int numSinkFactories;
 
         @GuardedBy("this")
-        private final Map<Lifespan, LocalExchange> localExchangeMap = new HashMap<>();
+        protected final Map<Lifespan, LocalExchange> localExchangeMap = new HashMap<>();
         @GuardedBy("this")
-        private final List<LocalExchangeSinkFactoryId> closedSinkFactories = new ArrayList<>();
+        protected final List<LocalExchangeSinkFactoryId> closedSinkFactories = new ArrayList<>();
 
         public LocalExchangeFactory(
                 PartitioningHandle partitioning,
@@ -514,7 +514,7 @@ public class LocalExchange
     {
         private final LocalExchange exchange;
 
-        private LocalExchangeSinkFactory(LocalExchange exchange)
+        public LocalExchangeSinkFactory(LocalExchange exchange)
         {
             this.exchange = requireNonNull(exchange, "exchange is null");
         }

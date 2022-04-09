@@ -70,6 +70,14 @@ public interface Block<T>
     }
 
     /**
+     * Gets a little endian double at {@code offset} in the value at {@code position}.
+     */
+    default double getDouble(int position, int offset)
+    {
+        throw new UnsupportedOperationException(getClass().getName());
+    }
+
+    /**
      * Gets a slice at {@code offset} in the value at {@code position}.
      */
     default Slice getSlice(int position, int offset, int length)
@@ -339,5 +347,33 @@ public interface Block<T>
     {
         System.arraycopy(positions, positionCount, matchedPositions, positionCount, positionCount);
         return positionCount;
+    }
+
+    default Object getValues()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default int getBlockOffset()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean[] getValueNulls()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void close()
+    {
+    }
+
+    default boolean isExtensionBlock()
+    {
+        return false;
+    }
+
+    default void setClosable(boolean isClosable)
+    {
     }
 }

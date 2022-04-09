@@ -24,6 +24,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -31,6 +32,7 @@ import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -121,6 +123,8 @@ public class ExchangeClient
     private long successfulRequests;
     @GuardedBy("this")
     private long averageBytesPerRequest;
+
+    private List<Page> pages = new ArrayList<>();
 
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -341,6 +345,19 @@ public class ExchangeClient
                         return SerializedPage.restoreSerializedPage(resultState);
                     }
                 });
+    }
+
+    public List<Page> getPages(String target, PagesSerde pagesSerde)
+    {
+        SerializedPage serializedPage = pollPage(target).getLeft();
+        if (serializedPage == null) {
+            if (isFinished()) {
+                return pages;
+            }
+            return null;
+        }
+        pages.add(pagesSerde.deserialize(serializedPage));
+        return null;
     }
 
     @Nullable
