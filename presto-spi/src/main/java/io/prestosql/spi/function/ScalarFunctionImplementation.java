@@ -13,6 +13,22 @@
  */
 package io.prestosql.spi.function;
 
+import java.lang.invoke.MethodHandle;
+
 public interface ScalarFunctionImplementation
 {
+    default InvocationConvention getInvocationConvention()
+    {
+        throw new UnsupportedOperationException("Not support this ScalarFunctionImplementation to get InvocationConvention");
+    }
+
+    default MethodHandle getMethodHandle()
+    {
+        throw new UnsupportedOperationException("Not support this ScalarFunctionImplementation to get MethodHandle");
+    }
+
+    default boolean isNullable()
+    {
+        throw new UnsupportedOperationException("Not support this ScalarFunctionImplementation to check whether isNullable");
+    }
 }

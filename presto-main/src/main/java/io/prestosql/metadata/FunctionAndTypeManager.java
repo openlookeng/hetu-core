@@ -212,8 +212,8 @@ public class FunctionAndTypeManager
             String catalogName,
             Map<String, String> properties)
     {
-        requireNonNull(hetuMetaStoreManager, "hetuMetaStoreManager is nll");
-        FunctionNamespaceManagerContextInstance functionNamespaceManagerContextInstance = new FunctionNamespaceManagerContextInstance(hetuMetaStoreManager.getHetuMetastore());
+        requireNonNull(hetuMetaStoreManager, "hetuMetaStoreManager is null");
+        FunctionNamespaceManagerContextInstance functionNamespaceManagerContextInstance = new FunctionNamespaceManagerContextInstance(hetuMetaStoreManager.getHetuMetastore(), this);
         requireNonNull(functionNamespaceManagerName, "functionNamespaceManagerName is null");
         FunctionNamespaceManagerFactory factory = functionNamespaceManagerFactories.get(functionNamespaceManagerName);
         checkState(factory != null, "No factory for function namespace manager %s", functionNamespaceManagerName);
@@ -237,6 +237,11 @@ public class FunctionAndTypeManager
     public FunctionInvokerProvider getFunctionInvokerProvider()
     {
         return functionInvokerProvider;
+    }
+
+    public Map<String, FunctionNamespaceManager<? extends SqlFunction>> getFunctionNamespaceManagers()
+    {
+        return functionNamespaceManagers;
     }
 
     public void addFunctionNamespaceFactory(FunctionNamespaceManagerFactory factory)
@@ -539,6 +544,11 @@ public class FunctionAndTypeManager
 
         Optional<FunctionNamespaceTransactionHandle> transactionHandle = transactionId
                 .map(id -> transactionManager.getFunctionNamespaceTransaction(id, functionName.getCatalogSchemaName().getCatalogName()));
+
+        if (functionNamespaceManager.canResolveFunction()) {
+            return functionNamespaceManager.resolveFunction(transactionHandle, functionName,
+                    parameterTypes.stream().map(TypeSignatureProvider::getTypeSignature).collect(toImmutableList()));
+        }
         Collection<? extends SqlFunction> candidates = functionNamespaceManager.getFunctions(transactionHandle, functionName);
 
         return functionResolver.resolveFunction(functionNamespaceManager, transactionHandle, functionName, parameterTypes, candidates);
