@@ -57,14 +57,17 @@ public class ShowCatalogStore
         if (!dynamicCatalogConfig.isDynamicCatalogEnabled()) {
             shareConfigurationDir = "etc/share";
             localConfigurationDir = "etc/catalog";
-            shareFileSystemProfile = "local-config-default";
+            this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
+                    fileSystemClientManager.getFileSystemClient(properties, Paths.get(shareConfigurationDir)),
+                    maxCatalogFileSize);
+        }
+        else {
+            this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
+                    fileSystemClientManager.getFileSystemClient(shareFileSystemProfile, Paths.get(shareConfigurationDir)),
+                    maxCatalogFileSize);
         }
         this.localCatalogStore = new LocalCatalogStore(localConfigurationDir,
                 fileSystemClientManager.getFileSystemClient(properties, Paths.get(localConfigurationDir)),
-                maxCatalogFileSize);
-
-        this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
-                fileSystemClientManager.getFileSystemClient(shareFileSystemProfile, Paths.get(shareConfigurationDir)),
                 maxCatalogFileSize);
     }
 
