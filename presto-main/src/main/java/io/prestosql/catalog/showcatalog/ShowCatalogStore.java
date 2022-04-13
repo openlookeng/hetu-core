@@ -55,8 +55,8 @@ public class ShowCatalogStore
         String shareConfigurationDir = dynamicCatalogConfig.getCatalogShareConfigurationDir();
         String shareFileSystemProfile = dynamicCatalogConfig.getShareFileSystemProfile();
         if (!dynamicCatalogConfig.isDynamicCatalogEnabled()) {
-            shareConfigurationDir = "etc/share";
-            localConfigurationDir = "etc/catalog";
+            shareConfigurationDir = shareConfigurationDir == null ? "etc/share" : shareConfigurationDir;
+            localConfigurationDir = localConfigurationDir == null ? "etc/catalog" : localConfigurationDir;
             this.shareCatalogStore = new ShareCatalogStore(shareConfigurationDir,
                     fileSystemClientManager.getFileSystemClient(properties, Paths.get(shareConfigurationDir)),
                     maxCatalogFileSize);
