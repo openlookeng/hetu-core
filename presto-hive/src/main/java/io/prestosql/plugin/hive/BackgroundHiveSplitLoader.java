@@ -257,7 +257,7 @@ public class BackgroundHiveSplitLoader
                 ListenableFuture<?> future;
                 taskExecutionLock.readLock().lock();
                 try {
-                    future = loadSplits();
+                    future = hdfsEnvironment.doAs(hdfsContext.getIdentity().getUser(), () -> loadSplits());
                 }
                 catch (Exception e) {
                     if (e instanceof IOException) {
