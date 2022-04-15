@@ -40,6 +40,7 @@ class CollectionTable extends React.Component {
             total: 0,
             currentPage: 1,
             allCollection: [],
+            metaStoreType: ''
         }
         this.onPageChange = this.onPageChange.bind(this);
         this.onPageSizeChange = this.onPageSizeChange.bind(this);
@@ -60,6 +61,13 @@ class CollectionTable extends React.Component {
     }
 
     componentDidMount() {
+        $.get(`../v1/query/hetuMetastoreType`, function (metaStoreType) {
+            this.state.metaStoreType = metaStoreType;
+            if(this.state.metaStoreType != "jdbc") {
+                alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
+            }
+        }.bind(this))
+
         this.refreshData();
     }
 
@@ -112,7 +120,9 @@ class CollectionTable extends React.Component {
         }
         const {allCollection, total, pageSize, currentPage, user} = this.state;
         if (allCollection == null){
-            this.renderEmptyMessage()
+            return (
+                <p className="info panel-body text-light text-center">No queries to show</p>
+            );
         }
         else {
             return (
