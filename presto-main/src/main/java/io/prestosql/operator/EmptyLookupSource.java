@@ -16,7 +16,7 @@ package io.prestosql.operator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 
-final class EmptyLookupSource
+public final class EmptyLookupSource
         implements LookupSource
 {
     @Override

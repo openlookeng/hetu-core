@@ -121,6 +121,24 @@ public class IntArrayBlock
     }
 
     @Override
+    public int[] getValues()
+    {
+        return values;
+    }
+
+    @Override
+    public int getBlockOffset()
+    {
+        return arrayOffset;
+    }
+
+    @Override
+    public boolean[] getValueNulls()
+    {
+        return valueIsNull;
+    }
+
+    @Override
     public int getInt(int position, int offset)
     {
         checkReadablePosition(position);

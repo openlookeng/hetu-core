@@ -125,6 +125,24 @@ public class LongArrayBlock
     }
 
     @Override
+    public long[] getValues()
+    {
+        return values;
+    }
+
+    @Override
+    public int getBlockOffset()
+    {
+        return arrayOffset;
+    }
+
+    @Override
+    public boolean[] getValueNulls()
+    {
+        return valueIsNull;
+    }
+
+    @Override
     public long getLong(int position, int offset)
     {
         checkReadablePosition(position);

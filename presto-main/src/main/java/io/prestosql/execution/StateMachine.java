@@ -49,6 +49,7 @@ public class StateMachine<T>
     private final Executor executor;
     private final Object lock = new Object();
     private final Set<T> terminalStates;
+    private StateChangeListener tailStateChangeListener;
 
     @GuardedBy("lock")
     private volatile T state;
@@ -279,12 +280,24 @@ public class StateMachine<T>
             inTerminalState = isTerminalState(currentState);
             if (!inTerminalState) {
                 stateChangeListeners.add(stateChangeListener);
+                if (tailStateChangeListener != null) {
+                    if (stateChangeListeners.contains(tailStateChangeListener)) {
+                        stateChangeListeners.remove(tailStateChangeListener);
+                    }
+                    stateChangeListeners.add(tailStateChangeListener);
+                }
             }
         }
 
         // fire state change listener with the current state
         // always fire listener callbacks from a different thread
         safeExecute(() -> stateChangeListener.stateChanged(currentState));
+    }
+
+    public void addStateChangeListenerToTail(StateChangeListener<T> stateChangeListener)
+    {
+        tailStateChangeListener = stateChangeListener;
+        addStateChangeListener(stateChangeListener);
     }
 
     @VisibleForTesting

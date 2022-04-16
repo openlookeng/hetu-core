@@ -66,6 +66,8 @@ public class LocalExchangeSource
 
     private final Object lock = new Object();
 
+    private List<Page> pages = new ArrayList<>();
+
     @GuardedBy("lock")
     private SettableFuture<?> notEmptyFuture = NOT_EMPTY;
 
@@ -99,7 +101,7 @@ public class LocalExchangeSource
         return Collections.unmodifiableSet(inputChannels);
     }
 
-    void addPage(PageReference pageReference, String origin)
+    public void addPage(PageReference pageReference, String origin)
     {
         checkNotHoldsLock();
 
@@ -236,6 +238,19 @@ public class LocalExchangeSource
         checkFinished();
 
         return Pair.of(page, origin.orElse(null));
+    }
+
+    public List<Page> getPages()
+    {
+        Page page = removePage().getLeft();
+        if (page == null) {
+            if (isFinished()) {
+                return pages;
+            }
+            return null;
+        }
+        pages.add(page);
+        return null;
     }
 
     public ListenableFuture<?> waitForReading()

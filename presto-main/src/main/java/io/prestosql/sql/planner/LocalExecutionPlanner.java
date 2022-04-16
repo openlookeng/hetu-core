@@ -342,37 +342,188 @@ public class LocalExecutionPlanner
 {
     private static final Logger log = Logger.get(LocalExecutionPlanner.class);
 
-    private final Metadata metadata;
-    private final TypeAnalyzer typeAnalyzer;
-    private final Optional<ExplainAnalyzeContext> explainAnalyzeContext;
-    private final PageSourceProvider pageSourceProvider;
-    private final IndexManager indexManager;
-    private final NodePartitioningManager nodePartitioningManager;
-    private final PageSinkManager pageSinkManager;
-    private final ExchangeClientSupplier exchangeClientSupplier;
-    private final ExpressionCompiler expressionCompiler;
-    private final PageFunctionCompiler pageFunctionCompiler;
-    private final JoinFilterFunctionCompiler joinFilterFunctionCompiler;
-    private final DataSize maxIndexMemorySize;
-    private final IndexJoinLookupStats indexJoinLookupStats;
-    private final DataSize maxPartialAggregationMemorySize;
-    private final DataSize maxPagePartitioningBufferSize;
-    private final DataSize maxLocalExchangeBufferSize;
-    private final SpillerFactory spillerFactory;
-    private final SingleStreamSpillerFactory singleStreamSpillerFactory;
-    private final PartitioningSpillerFactory partitioningSpillerFactory;
-    private final PagesIndex.Factory pagesIndexFactory;
-    private final JoinCompiler joinCompiler;
-    private final LookupJoinOperators lookupJoinOperators;
-    private final OrderingCompiler orderingCompiler;
-    private final StateStoreProvider stateStoreProvider;
-    private final NodeInfo nodeInfo;
-    private final CubeManager cubeManager;
-    private final StateStoreListenerManager stateStoreListenerManager;
-    private final DynamicFilterCacheManager dynamicFilterCacheManager;
-    private final HeuristicIndexerManager heuristicIndexerManager;
-    private final FunctionResolution functionResolution;
-    private final LogicalRowExpressions logicalRowExpressions;
+    protected final Metadata metadata;
+    protected final TypeAnalyzer typeAnalyzer;
+    protected final Optional<ExplainAnalyzeContext> explainAnalyzeContext;
+    protected final PageSourceProvider pageSourceProvider;
+    protected final IndexManager indexManager;
+    protected final NodePartitioningManager nodePartitioningManager;
+    protected final PageSinkManager pageSinkManager;
+    protected final ExchangeClientSupplier exchangeClientSupplier;
+    protected final ExpressionCompiler expressionCompiler;
+    protected final PageFunctionCompiler pageFunctionCompiler;
+    protected final JoinFilterFunctionCompiler joinFilterFunctionCompiler;
+    protected final DataSize maxIndexMemorySize;
+    protected final IndexJoinLookupStats indexJoinLookupStats;
+    protected final DataSize maxPartialAggregationMemorySize;
+    protected final DataSize maxPagePartitioningBufferSize;
+    protected final DataSize maxLocalExchangeBufferSize;
+    protected final SpillerFactory spillerFactory;
+    protected final SingleStreamSpillerFactory singleStreamSpillerFactory;
+    protected final PartitioningSpillerFactory partitioningSpillerFactory;
+    protected final PagesIndex.Factory pagesIndexFactory;
+    protected final JoinCompiler joinCompiler;
+    protected final LookupJoinOperators lookupJoinOperators;
+    protected final OrderingCompiler orderingCompiler;
+    protected final StateStoreProvider stateStoreProvider;
+    protected final NodeInfo nodeInfo;
+    protected final CubeManager cubeManager;
+    protected final StateStoreListenerManager stateStoreListenerManager;
+    protected final DynamicFilterCacheManager dynamicFilterCacheManager;
+    protected final HeuristicIndexerManager heuristicIndexerManager;
+    protected final FunctionResolution functionResolution;
+    protected final LogicalRowExpressions logicalRowExpressions;
+    protected final TaskManagerConfig taskManagerConfig;
+
+    public Metadata getMetadata()
+    {
+        return metadata;
+    }
+
+    public TypeAnalyzer getTypeAnalyzer()
+    {
+        return typeAnalyzer;
+    }
+
+    public Optional<ExplainAnalyzeContext> getExplainAnalyzeContext()
+    {
+        return explainAnalyzeContext;
+    }
+
+    public PageSourceProvider getPageSourceProvider()
+    {
+        return pageSourceProvider;
+    }
+
+    public IndexManager getIndexManager()
+    {
+        return indexManager;
+    }
+
+    public NodePartitioningManager getNodePartitioningManager()
+    {
+        return nodePartitioningManager;
+    }
+
+    public PageSinkManager getPageSinkManager()
+    {
+        return pageSinkManager;
+    }
+
+    public ExchangeClientSupplier getExchangeClientSupplier()
+    {
+        return exchangeClientSupplier;
+    }
+
+    public ExpressionCompiler getExpressionCompiler()
+    {
+        return expressionCompiler;
+    }
+
+    public PageFunctionCompiler getPageFunctionCompiler()
+    {
+        return pageFunctionCompiler;
+    }
+
+    public JoinFilterFunctionCompiler getJoinFilterFunctionCompiler()
+    {
+        return joinFilterFunctionCompiler;
+    }
+
+    public DataSize getMaxIndexMemorySize()
+    {
+        return maxIndexMemorySize;
+    }
+
+    public IndexJoinLookupStats getIndexJoinLookupStats()
+    {
+        return indexJoinLookupStats;
+    }
+
+    public DataSize getMaxPartialAggregationMemorySize()
+    {
+        return maxPartialAggregationMemorySize;
+    }
+
+    public DataSize getMaxPagePartitioningBufferSize()
+    {
+        return maxPagePartitioningBufferSize;
+    }
+
+    public DataSize getMaxLocalExchangeBufferSize()
+    {
+        return maxLocalExchangeBufferSize;
+    }
+
+    public SpillerFactory getSpillerFactory()
+    {
+        return spillerFactory;
+    }
+
+    public SingleStreamSpillerFactory getSingleStreamSpillerFactory()
+    {
+        return singleStreamSpillerFactory;
+    }
+
+    public PartitioningSpillerFactory getPartitioningSpillerFactory()
+    {
+        return partitioningSpillerFactory;
+    }
+
+    public PagesIndex.Factory getPagesIndexFactory()
+    {
+        return pagesIndexFactory;
+    }
+
+    public JoinCompiler getJoinCompiler()
+    {
+        return joinCompiler;
+    }
+
+    public LookupJoinOperators getLookupJoinOperators()
+    {
+        return lookupJoinOperators;
+    }
+
+    public OrderingCompiler getOrderingCompiler()
+    {
+        return orderingCompiler;
+    }
+
+    public StateStoreProvider getStateStoreProvider()
+    {
+        return stateStoreProvider;
+    }
+
+    public NodeInfo getNodeInfo()
+    {
+        return nodeInfo;
+    }
+
+    public CubeManager getCubeManager()
+    {
+        return cubeManager;
+    }
+
+    public StateStoreListenerManager getStateStoreListenerManager()
+    {
+        return stateStoreListenerManager;
+    }
+
+    public DynamicFilterCacheManager getDynamicFilterCacheManager()
+    {
+        return dynamicFilterCacheManager;
+    }
+
+    public HeuristicIndexerManager getHeuristicIndexerManager()
+    {
+        return heuristicIndexerManager;
+    }
+
+    public TaskManagerConfig getTaskManagerConfig()
+    {
+        return taskManagerConfig;
+    }
 
     @Inject
     public LocalExecutionPlanner(
@@ -415,6 +566,7 @@ public class LocalExecutionPlanner
         this.pageFunctionCompiler = requireNonNull(pageFunctionCompiler, "pageFunctionCompiler is null");
         this.joinFilterFunctionCompiler = requireNonNull(joinFilterFunctionCompiler, "compiler is null");
         this.indexJoinLookupStats = requireNonNull(indexJoinLookupStats, "indexJoinLookupStats is null");
+        this.taskManagerConfig = taskManagerConfig;
         this.maxIndexMemorySize = requireNonNull(taskManagerConfig, "taskManagerConfig is null").getMaxIndexMemoryUsage();
         this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory is null");
@@ -633,7 +785,7 @@ public class LocalExecutionPlanner
         return first instanceof LookupOuterOperatorFactory && isTableScanPipeline(context.outerToJoinMap.get(driverFactory));
     }
 
-    private static void addLookupOuterDrivers(LocalExecutionPlanContext context)
+    protected static void addLookupOuterDrivers(LocalExecutionPlanContext context)
     {
         // For an outer join on the lookup side (RIGHT or FULL) add an additional
         // driver to output the unused rows in the lookup source
@@ -664,29 +816,29 @@ public class LocalExecutionPlanner
         }
     }
 
-    private static class LocalExecutionPlanContext
+    public static class LocalExecutionPlanContext
     {
-        private final TaskContext taskContext;
-        private final TypeProvider types;
-        private final List<DriverFactory> driverFactories;
-        private final Optional<IndexSourceContext> indexSourceContext;
+        protected final TaskContext taskContext;
+        protected final TypeProvider types;
+        protected List<DriverFactory> driverFactories;
+        protected final Optional<IndexSourceContext> indexSourceContext;
 
         // the collector is shared with all subContexts to allow local dynamic filtering
         // with multiple table scans (e.g. co-located joins).
-        private final LocalDynamicFiltersCollector dynamicFiltersCollector;
+        protected final LocalDynamicFiltersCollector dynamicFiltersCollector;
 
         // this is shared with all subContexts
-        private final AtomicInteger nextPipelineId;
+        protected final AtomicInteger nextPipelineId;
 
         private int nextOperatorId;
         private boolean inputDriver = true;
         private OptionalInt driverInstanceCount = OptionalInt.empty();
         private Map<PlanNodeId, OperatorFactory> cteOperationMap = new HashMap<>();
-        private Map<String, CommonTableExecutionContext> cteCtx;
+        protected Map<String, CommonTableExecutionContext> cteCtx;
         private static Map<String, PhysicalOperation> sourceInitialized = new ConcurrentHashMap<>();
         private final PlanNodeId consumerId;
-        private final Optional<PlanFragmentId> feederCTEId;
-        private final Optional<PlanNodeId> feederCTEParentId;
+        protected final Optional<PlanFragmentId> feederCTEId;
+        protected final Optional<PlanNodeId> feederCTEParentId;
 
         // Snapshot: record pipeline that corresponds to the lookup-outer pipeline.
         // This is used to help determine if a lookup-outer pipeline should be treated as a tabel-scan pipeine.
@@ -700,7 +852,7 @@ public class LocalExecutionPlanner
             this(taskContext, types, new ArrayList<>(), Optional.empty(), new LocalDynamicFiltersCollector(taskContext, Optional.of(metadata), dynamicFilterCacheManager), new AtomicInteger(0), feederCTEId, feederCTEParentId, cteCtx);
         }
 
-        private LocalExecutionPlanContext(
+        protected LocalExecutionPlanContext(
                 TaskContext taskContext,
                 TypeProvider types,
                 List<DriverFactory> driverFactories,
@@ -745,9 +897,14 @@ public class LocalExecutionPlanner
             return driverFactory;
         }
 
-        private List<DriverFactory> getDriverFactories()
+        public List<DriverFactory> getDriverFactories()
         {
             return ImmutableList.copyOf(driverFactories);
+        }
+
+        public void setDriverFactories(List<DriverFactory> driverFactories)
+        {
+            this.driverFactories = driverFactories;
         }
 
         public Session getSession()
@@ -780,22 +937,27 @@ public class LocalExecutionPlanner
             return indexSourceContext;
         }
 
-        private int getNextPipelineId()
+        private AtomicInteger getPipelineId()
+        {
+            return nextPipelineId;
+        }
+
+        public int getNextPipelineId()
         {
             return nextPipelineId.getAndIncrement();
         }
 
-        private int getNextOperatorId()
+        public int getNextOperatorId()
         {
             return nextOperatorId++;
         }
 
-        private boolean isInputDriver()
+        public boolean isInputDriver()
         {
             return inputDriver;
         }
 
-        private void setInputDriver(boolean inputDriver)
+        public void setInputDriver(boolean inputDriver)
         {
             this.inputDriver = inputDriver;
         }
@@ -866,7 +1028,7 @@ public class LocalExecutionPlanner
         }
     }
 
-    private static class IndexSourceContext
+    public static class IndexSourceContext
     {
         private final SetMultimap<Symbol, Integer> indexLookupToProbeInput;
 
@@ -918,13 +1080,13 @@ public class LocalExecutionPlanner
         }
     }
 
-    private class Visitor
+    public class Visitor
             extends InternalPlanVisitor<PhysicalOperation, LocalExecutionPlanContext>
     {
-        private final Session session;
-        private final StageExecutionDescriptor stageExecutionDescriptor;
+        protected final Session session;
+        protected final StageExecutionDescriptor stageExecutionDescriptor;
 
-        private Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor)
+        public Visitor(Session session, StageExecutionDescriptor stageExecutionDescriptor)
         {
             this.session = session;
             this.stageExecutionDescriptor = stageExecutionDescriptor;
@@ -1618,7 +1780,7 @@ public class LocalExecutionPlanner
             }
         }
 
-        private Supplier<List<Map<ColumnHandle, DynamicFilter>>> getDynamicFilterSupplier(Optional<List<List<DynamicFilters.Descriptor>>> dynamicFilters, PlanNode sourceNode, LocalExecutionPlanContext context)
+        protected Supplier<List<Map<ColumnHandle, DynamicFilter>>> getDynamicFilterSupplier(Optional<List<List<DynamicFilters.Descriptor>>> dynamicFilters, PlanNode sourceNode, LocalExecutionPlanContext context)
         {
             if (dynamicFilters.isPresent() && !dynamicFilters.get().isEmpty()) {
                 log.debug("[TableScan] Dynamic filters: %s", dynamicFilters);
@@ -1643,7 +1805,7 @@ public class LocalExecutionPlanner
             return null;
         }
 
-        private RowExpression bindChannels(RowExpression inputExpression, Map<Symbol, Integer> sourceLayout, TypeProvider types)
+        public RowExpression bindChannels(RowExpression inputExpression, Map<Symbol, Integer> sourceLayout, TypeProvider types)
         {
             RowExpression expression = inputExpression;
             Type type = expression.getType();
@@ -1864,12 +2026,12 @@ public class LocalExecutionPlanner
                     stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
         }
 
-        private ImmutableMap<Symbol, Integer> makeLayout(PlanNode node)
+        protected ImmutableMap<Symbol, Integer> makeLayout(PlanNode node)
         {
             return makeLayoutFromOutputSymbols(node.getOutputSymbols());
         }
 
-        private ImmutableMap<Symbol, Integer> makeLayoutFromOutputSymbols(List<Symbol> outputSymbols)
+        protected ImmutableMap<Symbol, Integer> makeLayoutFromOutputSymbols(List<Symbol> outputSymbols)
         {
             ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
             int channel = 0;
@@ -2231,7 +2393,7 @@ public class LocalExecutionPlanner
             return symbols.stream().map(SymbolUtils::toSymbolReference).collect(toImmutableSet());
         }
 
-        private PhysicalOperation createNestedLoopJoin(JoinNode node, LocalExecutionPlanContext context)
+        protected PhysicalOperation createNestedLoopJoin(JoinNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation probeSource = node.getLeft().accept(this, context);
 
@@ -2459,7 +2621,7 @@ public class LocalExecutionPlanner
             return new PhysicalOperation(operator, outputMappings.build(), context, probeSource);
         }
 
-        private Optional<LocalDynamicFilter> createDynamicFilter(JoinNode node, LocalExecutionPlanContext context, int partitionCount)
+        protected Optional<LocalDynamicFilter> createDynamicFilter(JoinNode node, LocalExecutionPlanContext context, int partitionCount)
         {
             if (!isEnableDynamicFiltering(context.getSession())) {
                 return Optional.empty();
@@ -2625,7 +2787,7 @@ public class LocalExecutionPlanner
             return lookupSourceFactoryManager;
         }
 
-        private JoinFilterFunctionFactory compileJoinFilterFunction(
+        protected JoinFilterFunctionFactory compileJoinFilterFunction(
                 RowExpression filterExpression,
                 Map<Symbol, Integer> probeLayout,
                 Map<Symbol, Integer> buildLayout,
@@ -2636,7 +2798,7 @@ public class LocalExecutionPlanner
             return joinFilterFunctionCompiler.compileJoinFilterFunction(bindChannels(filterExpression, joinSourcesLayout, types), buildLayout.size());
         }
 
-        private int sortExpressionAsSortChannel(
+        public int sortExpressionAsSortChannel(
                 RowExpression sortExpression,
                 Map<Symbol, Integer> probeLayout,
                 Map<Symbol, Integer> buildLayout,
@@ -2682,7 +2844,7 @@ public class LocalExecutionPlanner
             }
         }
 
-        private Map<Symbol, Integer> createJoinSourcesLayout(Map<Symbol, Integer> lookupSourceLayout, Map<Symbol, Integer> probeSourceLayout)
+        protected Map<Symbol, Integer> createJoinSourcesLayout(Map<Symbol, Integer> lookupSourceLayout, Map<Symbol, Integer> probeSourceLayout)
         {
             ImmutableMap.Builder<Symbol, Integer> joinSourcesLayout = ImmutableMap.builder();
             joinSourcesLayout.putAll(lookupSourceLayout);
@@ -3203,19 +3365,19 @@ public class LocalExecutionPlanner
             throw new UnsupportedOperationException("not yet implemented");
         }
 
-        private List<Type> getSourceOperatorTypes(PlanNode node, TypeProvider types)
+        protected List<Type> getSourceOperatorTypes(PlanNode node, TypeProvider types)
         {
             return getSymbolTypes(node.getOutputSymbols(), types);
         }
 
-        private List<Type> getSymbolTypes(List<Symbol> symbols, TypeProvider types)
+        protected List<Type> getSymbolTypes(List<Symbol> symbols, TypeProvider types)
         {
             return symbols.stream()
                     .map(types::get)
                     .collect(toImmutableList());
         }
 
-        private AccumulatorFactory buildAccumulatorFactory(
+        protected AccumulatorFactory buildAccumulatorFactory(
                 PhysicalOperation source,
                 Aggregation aggregation)
         {
@@ -3558,7 +3720,7 @@ public class LocalExecutionPlanner
         };
     }
 
-    private static Function<Page, Page> enforceLayoutProcessor(List<Symbol> expectedLayout, Map<Symbol, Integer> inputLayout)
+    protected static Function<Page, Page> enforceLayoutProcessor(List<Symbol> expectedLayout, Map<Symbol, Integer> inputLayout)
     {
         int[] channels = expectedLayout.stream()
                 .peek(symbol -> checkArgument(inputLayout.containsKey(symbol), "channel not found for symbol: %s", symbol))
@@ -3573,7 +3735,7 @@ public class LocalExecutionPlanner
         return new PageChannelSelector(channels);
     }
 
-    private static List<Integer> getChannelsForSymbols(List<Symbol> symbols, Map<Symbol, Integer> layout)
+    protected static List<Integer> getChannelsForSymbols(List<Symbol> symbols, Map<Symbol, Integer> layout)
     {
         ImmutableList.Builder<Integer> builder = ImmutableList.builder();
         for (Symbol symbol : symbols) {
@@ -3582,7 +3744,7 @@ public class LocalExecutionPlanner
         return builder.build();
     }
 
-    private static Function<Symbol, Integer> channelGetter(PhysicalOperation source)
+    protected static Function<Symbol, Integer> channelGetter(PhysicalOperation source)
     {
         return input -> {
             checkArgument(source.getLayout().containsKey(input));
@@ -3593,7 +3755,7 @@ public class LocalExecutionPlanner
     /**
      * Encapsulates an physical operator plus the mapping of logical symbols to channel/field
      */
-    private static class PhysicalOperation
+    public static class PhysicalOperation
     {
         private final List<OperatorFactory> operatorFactories;
         private final Map<Symbol, Integer> layout;
@@ -3664,7 +3826,7 @@ public class LocalExecutionPlanner
             return layout;
         }
 
-        private List<OperatorFactory> getOperatorFactories()
+        public List<OperatorFactory> getOperatorFactories()
         {
             return operatorFactories;
         }
@@ -3675,7 +3837,7 @@ public class LocalExecutionPlanner
         }
     }
 
-    private static class DriverFactoryParameters
+    protected static class DriverFactoryParameters
     {
         private final LocalExecutionPlanContext subContext;
         private final PhysicalOperation source;

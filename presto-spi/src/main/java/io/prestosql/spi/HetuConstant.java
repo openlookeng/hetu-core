@@ -58,4 +58,9 @@ public class HetuConstant
 
     // error message
     public static final String HINDEX_CONFIG_ERROR_MSG = "Heuristic Index is not enabled in config.properties or is configured incorrectly.";
+
+    // extension support message
+    public static final String EXTENSION_EXECUTION_PLANNER_ENABLED = "extension_execution_planner_enabled";
+    public static final String EXTENSION_EXECUTION_PLANNER_JAR_PATH = "extension_execution_planner_jar_path";
+    public static final String EXTENSION_EXECUTION_PLANNER_CLASS_PATH = "extension_execution_planner_class_path";
 }

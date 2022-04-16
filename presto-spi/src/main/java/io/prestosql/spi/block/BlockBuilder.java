@@ -52,6 +52,14 @@ public interface BlockBuilder<T>
     }
 
     /**
+     * Write a double to the current entry;
+     */
+    default BlockBuilder writeDouble(double value)
+    {
+        throw new UnsupportedOperationException(getClass().getName());
+    }
+
+    /**
      * Write a byte sequences to the current entry;
      */
     default BlockBuilder writeBytes(Slice source, int sourceIndex, int length)
