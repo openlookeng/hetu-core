@@ -40,7 +40,9 @@ import org.joda.time.DateTime;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -110,6 +112,8 @@ public class TaskContext
 
     private final PagesSerdeFactory serdeFactory;
     private final TaskSnapshotManager snapshotManager;
+
+    private final Map<String, Object> taskExtendProperties = new HashMap<>();
 
     public static TaskContext createTaskContext(
             QueryContext queryContext,
@@ -183,6 +187,16 @@ public class TaskContext
     public TaskSnapshotManager getSnapshotManager()
     {
         return snapshotManager;
+    }
+
+    public TaskStateMachine getTaskStateMachine()
+    {
+        return taskStateMachine;
+    }
+
+    public Map<String, Object> getTaskExtendProperties()
+    {
+        return taskExtendProperties;
     }
 
     public PipelineContext addPipelineContext(int pipelineId, boolean inputPipeline, boolean outputPipeline, boolean partitioned)

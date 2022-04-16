@@ -124,6 +124,24 @@ public class Int128ArrayBlock
     }
 
     @Override
+    public long[] getValues()
+    {
+        return values;
+    }
+
+    @Override
+    public int getBlockOffset()
+    {
+        return positionOffset;
+    }
+
+    @Override
+    public boolean[] getValueNulls()
+    {
+        return valueIsNull;
+    }
+
+    @Override
     public long getLong(int position, int offset)
     {
         checkReadablePosition(position);

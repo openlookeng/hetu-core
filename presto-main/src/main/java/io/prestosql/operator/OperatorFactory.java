@@ -13,7 +13,11 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.execution.Lifespan;
+import io.prestosql.spi.type.Type;
+
+import java.util.List;
 
 public interface OperatorFactory
 {
@@ -47,4 +51,14 @@ public interface OperatorFactory
     }
 
     OperatorFactory duplicate();
+
+    default boolean isExtensionOperatorFactory()
+    {
+        return false;
+    }
+
+    default List<Type> getSourceTypes()
+    {
+        return ImmutableList.of();
+    }
 }

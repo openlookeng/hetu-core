@@ -64,6 +64,16 @@ public class WindowFunctionDefinition
         return type;
     }
 
+    public WindowFunctionSupplier getFunctionSupplier()
+    {
+        return functionSupplier;
+    }
+
+    public List<Integer> getArgumentChannels()
+    {
+        return argumentChannels;
+    }
+
     public WindowFunction createWindowFunction()
     {
         return functionSupplier.createWindowFunction(argumentChannels);

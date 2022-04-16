@@ -62,8 +62,51 @@ public class HetuConfig
     private Duration splitCacheStateUpdateInterval = new Duration(2, TimeUnit.SECONDS);
     private boolean isTraceStackVisible;
 
+    private String extensionExecutionPlannerJarPath;
+    private String extensionExecutionPlannerClassPath;
+    private boolean extensionExecutionPlannerEnabled;
+
     public HetuConfig()
     {
+    }
+
+    public boolean getExtensionExecutionPlannerEnabled()
+    {
+        return extensionExecutionPlannerEnabled;
+    }
+
+    @Config(HetuConstant.EXTENSION_EXECUTION_PLANNER_ENABLED)
+    @ConfigDescription("extension execution planner enable from config")
+    public HetuConfig setExtensionExecutionPlannerEnabled(boolean extensionExecutionPlannerEnabled)
+    {
+        this.extensionExecutionPlannerEnabled = extensionExecutionPlannerEnabled;
+        return this;
+    }
+
+    public String getExtensionExecutionPlannerJarPath()
+    {
+        return extensionExecutionPlannerJarPath;
+    }
+
+    @Config(HetuConstant.EXTENSION_EXECUTION_PLANNER_JAR_PATH)
+    @ConfigDescription("extension execution planner jar path from config")
+    public HetuConfig setExtensionExecutionPlannerJarPath(String extensionExecutionPlannerJarPath)
+    {
+        this.extensionExecutionPlannerJarPath = extensionExecutionPlannerJarPath;
+        return this;
+    }
+
+    public String getExtensionExecutionPlannerClassPath()
+    {
+        return extensionExecutionPlannerClassPath;
+    }
+
+    @Config(HetuConstant.EXTENSION_EXECUTION_PLANNER_CLASS_PATH)
+    @ConfigDescription("extension execution planner class path from config")
+    public HetuConfig setExtensionExecutionPlannerClassPath(String extensionExecutionPlannerClassPath)
+    {
+        this.extensionExecutionPlannerClassPath = extensionExecutionPlannerClassPath;
+        return this;
     }
 
     @NotNull

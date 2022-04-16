@@ -117,7 +117,7 @@ public class LocalExchangeSinkOperator
     private final Function<Page, Page> pagePreprocessor;
     private final SingleInputSnapshotState snapshotState;
 
-    LocalExchangeSinkOperator(String id, OperatorContext operatorContext, LocalExchangeSink sink, Function<Page, Page> pagePreprocessor)
+    public LocalExchangeSinkOperator(String id, OperatorContext operatorContext, LocalExchangeSink sink, Function<Page, Page> pagePreprocessor)
     {
         this.id = id;
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");

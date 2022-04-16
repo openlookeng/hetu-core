@@ -117,7 +117,7 @@ public class HashAggregationOperator
         }
 
         @VisibleForTesting
-        HashAggregationOperatorFactory(
+        public HashAggregationOperatorFactory(
                 int operatorId,
                 PlanNodeId planNodeId,
                 List<? extends Type> groupByTypes,

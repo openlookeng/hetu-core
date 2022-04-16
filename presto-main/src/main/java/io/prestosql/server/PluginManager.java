@@ -89,6 +89,7 @@ public class PluginManager
             .add("io.airlift.units.")
             .add("org.openjdk.jol.")
             .add("io.prestosql.sql.tree.")
+            .add("nova.hetu.omniruntime.vector.")
             .build();
 
     private static final Logger log = Logger.get(PluginManager.class);

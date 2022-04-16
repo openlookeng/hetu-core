@@ -99,6 +99,11 @@ public class VariableWidthBlock
         this.isInitialized = true;
     }
 
+    public int[] getOffsets()
+    {
+        return offsets;
+    }
+
     @Override
     protected final int getPositionOffset(int position)
     {
@@ -128,6 +133,18 @@ public class VariableWidthBlock
     public int getPositionCount()
     {
         return positionCount;
+    }
+
+    @Override
+    public int getBlockOffset()
+    {
+        return arrayOffset;
+    }
+
+    @Override
+    public boolean[] getValueNulls()
+    {
+        return valueIsNull;
     }
 
     @Override
@@ -203,7 +220,7 @@ public class VariableWidthBlock
     }
 
     @Override
-    protected Slice getRawSlice(int position)
+    public Slice getRawSlice(int position)
     {
         return slice;
     }
