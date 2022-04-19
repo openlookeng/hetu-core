@@ -87,7 +87,7 @@ public class TestOrcWriterOptions
     @DataProvider
     public Object[][] invalidBloomFilterFpp()
     {
-        return new Object[][]{
+        return new Object[][] {
                 {"abc"},
                 {"12c"},
                 {"$"},
@@ -98,7 +98,7 @@ public class TestOrcWriterOptions
     @DataProvider
     public Object[][] invalidRangeBloomFilterFpp()
     {
-        return new Object[][]{
+        return new Object[][] {
                 {"10"},
                 {"-10"},
                 {"0"},
