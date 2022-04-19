@@ -48,7 +48,7 @@ public class TestSynonym
         return name;
     }
 
-    public String randomTableSuffix()
+    public static String randomTableSuffix()
     {
         String randomSuffix = Long.toString(abs(RANDOM.nextLong()), MAX_RADIX);
         return randomSuffix.substring(0, min(RANDOM_SUFFIX_LENGTH, randomSuffix.length()));

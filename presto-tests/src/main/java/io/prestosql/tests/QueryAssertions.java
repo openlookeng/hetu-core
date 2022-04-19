@@ -378,6 +378,7 @@ public final class QueryAssertions
         long start = System.nanoTime();
         log.info("Running import for %s", table.getObjectName());
         @Language("SQL") String sql = format("CREATE TABLE %s AS SELECT * FROM %s", table.getObjectName(), table);
+//        @Language("SQL") String sql = format("CREATE TABLE %s WITH (format='ORC',transactional=false, orc_bloom_filter_columns=ARRAY['orderkey'], orc_bloom_filter_fpp=0.001) AS SELECT * FROM %s", table.getObjectName(), table);
         long rows = (Long) queryRunner.execute(session, sql).getMaterializedRows().get(0).getField(0);
         log.info("Imported %s rows for %s in %s", rows, table.getObjectName(), nanosSince(start).convertToMostSuccinctTimeUnit());
     }

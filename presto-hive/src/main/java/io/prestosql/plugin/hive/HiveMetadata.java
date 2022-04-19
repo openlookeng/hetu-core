@@ -877,8 +877,10 @@ public class HiveMetadata
         List<String> columns = HiveTableProperties.getOrcBloomFilterColumns(tableMetadata.getProperties());
         if (columns != null && !columns.isEmpty()) {
             checkFormatForProperty(hiveStorageFormat, HiveStorageFormat.ORC, HiveTableProperties.ORC_BLOOM_FILTER_COLUMNS);
+            Double bloomFilterFpp = HiveTableProperties.getOrcBloomFilterFpp(tableMetadata.getProperties());
+            checkValueForBloomFilterFpp(bloomFilterFpp);
             tableProperties.put(ORC_BLOOM_FILTER_COLUMNS_KEY, Joiner.on(",").join(columns));
-            tableProperties.put(ORC_BLOOM_FILTER_FPP_KEY, String.valueOf(HiveTableProperties.getOrcBloomFilterFpp(tableMetadata.getProperties())));
+            tableProperties.put(ORC_BLOOM_FILTER_FPP_KEY, String.valueOf(bloomFilterFpp));
         }
 
         // Avro specific properties
@@ -946,6 +948,13 @@ public class HiveMetadata
     {
         if (actualStorageFormat != expectedStorageFormat) {
             throw new PrestoException(INVALID_TABLE_PROPERTY, format("Cannot specify %s table property for storage format: %s", propertyName, actualStorageFormat));
+        }
+    }
+
+    private static void checkValueForBloomFilterFpp(Double bloomFilterFpp)
+    {
+        if (bloomFilterFpp < 0.0 || bloomFilterFpp > 1.0) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, String.format("Invalid value for %s property: %s", HiveTableProperties.ORC_BLOOM_FILTER_FPP, bloomFilterFpp));
         }
     }
 

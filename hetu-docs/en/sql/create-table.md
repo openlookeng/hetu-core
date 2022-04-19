@@ -103,17 +103,6 @@ Create the table `bigger_orders` using the columns from `orders` plus additional
       another_orderdate date
     )
 
-Create a table with bloom indexes. Assuming orderkey has unique values: 
-
-    CREATE TABLE IF NOT EXISTS sale_order(
-        orderkey bigint,
-        orderstatus varchar,
-        totalprice double,
-        orderdate date
-    )
-    with (format='ORC', transactional=true,orc_bloom_filter_columns=ARRAY['orderkey'], orc_bloom_filter_fpp=0.001);
-
-
 Limitations
 -----------
 

@@ -24,6 +24,7 @@ import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.TaskCountEstimator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.execution.QueryStats;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -396,6 +397,29 @@ public abstract class AbstractTestQueryFramework
                 ImmutableMap.of(),
                 new HeuristicIndexerManager(null, null),
                 new CubeManager(featuresConfig, hetuMetaStoreManager));
+    }
+
+    protected void assertQueryStats(
+            Session session,
+            @Language("SQL") String query,
+            Consumer<QueryStats> queryStatsAssertion,
+            Consumer<MaterializedResult> resultAssertion)
+    {
+        DistributedQueryRunner queryRunner = getDistributedQueryRunner();
+        ResultWithQueryId<MaterializedResult> resultWithQueryId = queryRunner.executeWithQueryId(session, query);
+        QueryStats queryStats = queryRunner.getCoordinator()
+                .getQueryManager()
+                .getFullQueryInfo(resultWithQueryId.getQueryId())
+                .getQueryStats();
+        queryStatsAssertion.accept(queryStats);
+        resultAssertion.accept(resultWithQueryId.getResult());
+    }
+
+    protected final DistributedQueryRunner getDistributedQueryRunner()
+    {
+        checkState(queryRunner != null, "queryRunner not set");
+        checkState(queryRunner instanceof DistributedQueryRunner, "queryRunner is not a DistributedQueryRunner");
+        return (DistributedQueryRunner) queryRunner;
     }
 
     protected static void skipTestUnless(boolean requirement)
