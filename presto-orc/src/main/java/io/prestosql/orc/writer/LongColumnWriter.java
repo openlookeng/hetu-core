@@ -33,17 +33,20 @@ import io.prestosql.orc.stream.PresentOutputStream;
 import io.prestosql.orc.stream.StreamDataOutput;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT_V2;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
@@ -208,5 +211,23 @@ public class LongColumnWriter
         presentStream.reset();
         rowGroupColumnStatistics.clear();
         statisticsBuilder = statisticsBuilderSupplier.get();
+    }
+
+    @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException
+    {
+        List<BloomFilter> bloomFilters = rowGroupColumnStatistics.stream()
+                .map(ColumnStatistics::getBloomFilter)
+                .filter(Objects::nonNull)
+                .collect(toImmutableList());
+
+        if (!bloomFilters.isEmpty()) {
+            Slice slice = metadataWriter.writeBloomFilters(bloomFilters);
+            Stream stream = new Stream(columnId, StreamKind.BLOOM_FILTER_UTF8, slice.length(), false);
+            return ImmutableList.of(new StreamDataOutput(slice, stream));
+        }
+
+        return ImmutableList.of();
     }
 }

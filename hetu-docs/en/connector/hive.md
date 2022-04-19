@@ -567,6 +567,24 @@ VACUUM TABLE hive_acid_table_partitioned
 
 
 
+## Table Properties
+
+Bloom Index is supported for both transactional and non-transactional tables. Support is added for real, date, timestamp and char datatypes.
+
+| Property Name                    | Data type      | Description                                                        | Default  |
+|:---------------------------------|:---------------|:-------------------------------------------------------------------|:---------|
+| `orc_bloom_filter_columns`       | array(varchar) | Bloom Filter Index columns for ORC files as a comma seperated list |          |
+| `orc_bloom_filter_fpp`           | double         | False positive probability of bloom filter                         | `0.05`   |
+
+Example: Creating a table with bloom columns specified:
+
+```sql
+CREATE TABLE testbloom 
+  (a bigint, b row(c bigint, d bigint), e row(f double, g date))  
+  WITH (format='orc',transactional=true, 
+  orc_bloom_filter_columns=ARRAY['a','b.c','e'], orc_bloom_filter_fpp=0.001);
+```
+
 ## Schema Evolution
 
 

@@ -31,6 +31,13 @@ public class DoubleStatisticsBuilder
     private double minimum = Double.POSITIVE_INFINITY;
     private double maximum = Double.NEGATIVE_INFINITY;
 
+    private final BloomFilterBuilder bloomFilterBuilder;
+
+    public DoubleStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
+    {
+        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder is null");
+    }
+
     @Override
     public void addBlock(Type type, Block block)
     {
@@ -58,6 +65,7 @@ public class DoubleStatisticsBuilder
             minimum = Math.min(value, minimum);
             maximum = Math.max(value, maximum);
         }
+        bloomFilterBuilder.addDouble(value);
     }
 
     private void addDoubleStatistics(long valueCount, DoubleStatistics value)
@@ -94,12 +102,13 @@ public class DoubleStatisticsBuilder
                 null,
                 null,
                 null,
-                null);
+                null,
+                bloomFilterBuilder.buildBloomFilter());
     }
 
     public static Optional<DoubleStatistics> mergeDoubleStatistics(List<ColumnStatistics> stats)
     {
-        DoubleStatisticsBuilder doubleStatisticsBuilder = new DoubleStatisticsBuilder();
+        DoubleStatisticsBuilder doubleStatisticsBuilder = new DoubleStatisticsBuilder(new NoOpBloomFilterBuilder());
         for (ColumnStatistics columnStatistics : stats) {
             DoubleStatistics partialStatistics = columnStatistics.getDoubleStatistics();
             if (columnStatistics.getNumberOfValues() > 0) {

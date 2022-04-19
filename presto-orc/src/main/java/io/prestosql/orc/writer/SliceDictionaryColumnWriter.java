@@ -29,7 +29,7 @@ import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
-import io.prestosql.orc.metadata.statistics.StringStatisticsBuilder;
+import io.prestosql.orc.metadata.statistics.SliceColumnStatisticsBuilder;
 import io.prestosql.orc.stream.ByteArrayOutputStream;
 import io.prestosql.orc.stream.LongOutputStream;
 import io.prestosql.orc.stream.LongOutputStreamV2;
@@ -38,6 +38,7 @@ import io.prestosql.orc.stream.StreamDataOutput;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import it.unimi.dsi.fastutil.ints.AbstractIntComparator;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import org.openjdk.jol.info.ClassLayout;
@@ -46,11 +47,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.orc.DictionaryCompressionOptimizer.estimateIndexBytesPerValue;
 import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DICTIONARY_V2;
@@ -71,7 +75,6 @@ public class SliceDictionaryColumnWriter
     private final Type type;
     private final CompressionKind compression;
     private final int bufferSize;
-    private final int stringStatisticsLimitInBytes;
 
     private final LongOutputStream dataStream;
     private final PresentOutputStream presentStream;
@@ -81,10 +84,11 @@ public class SliceDictionaryColumnWriter
     private final DictionaryBuilder dictionary = new DictionaryBuilder(10000);
 
     private final List<DictionaryRowGroup> rowGroups = new ArrayList<>();
+    private final Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier;
 
     private IntBigArray values;
     private int rowGroupValueCount;
-    private StringStatisticsBuilder statisticsBuilder;
+    private SliceColumnStatisticsBuilder statisticsBuilder;
 
     private long rawBytes;
     private long totalValueCount;
@@ -97,19 +101,19 @@ public class SliceDictionaryColumnWriter
     private boolean directEncoded;
     private SliceDirectColumnWriter directColumnWriter;
 
-    public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, DataSize stringStatisticsLimit)
+    public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
         this.type = requireNonNull(type, "type is null");
         this.compression = requireNonNull(compression, "compression is null");
         this.bufferSize = bufferSize;
-        this.stringStatisticsLimitInBytes = toIntExact(requireNonNull(stringStatisticsLimit, "stringStatisticsLimit is null").toBytes());
         this.dataStream = new LongOutputStreamV2(compression, bufferSize, false, DATA);
         this.presentStream = new PresentOutputStream(compression, bufferSize);
         this.dictionaryDataStream = new ByteArrayOutputStream(compression, bufferSize, StreamKind.DICTIONARY_DATA);
         this.dictionaryLengthStream = createLengthOutputStream(compression, bufferSize);
         values = new IntBigArray();
-        this.statisticsBuilder = newStringStatisticsBuilder();
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
     }
 
     @Override
@@ -160,7 +164,7 @@ public class SliceDictionaryColumnWriter
         checkState(!closed);
         checkState(!directEncoded);
         if (directColumnWriter == null) {
-            directColumnWriter = new SliceDirectColumnWriter(columnId, type, compression, bufferSize, this::newStringStatisticsBuilder);
+            directColumnWriter = new SliceDirectColumnWriter(columnId, type, compression, bufferSize, statisticsBuilderSupplier);
         }
         checkState(directColumnWriter.getBufferedBytes() == 0);
 
@@ -190,8 +194,6 @@ public class SliceDictionaryColumnWriter
             checkState(rowGroupValueCount == 0);
         }
 
-        rowGroups.clear();
-
         // free the dictionary
         dictionary.clear();
 
@@ -200,7 +202,7 @@ public class SliceDictionaryColumnWriter
         totalNonNullValueCount = 0;
 
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
 
         directEncoded = true;
 
@@ -310,7 +312,7 @@ public class SliceDictionaryColumnWriter
         ColumnStatistics statistics = statisticsBuilder.buildColumnStatistics();
         rowGroups.add(new DictionaryRowGroup(values, rowGroupValueCount, statistics));
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
         values = new IntBigArray();
         return ImmutableMap.of(columnId, statistics);
     }
@@ -537,7 +539,7 @@ public class SliceDictionaryColumnWriter
         dictionaryLengthStream.reset();
         rowGroups.clear();
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
         columnEncoding = null;
 
         dictionary.clear();
@@ -551,9 +553,22 @@ public class SliceDictionaryColumnWriter
         }
     }
 
-    private StringStatisticsBuilder newStringStatisticsBuilder()
+    @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException
     {
-        return new StringStatisticsBuilder(stringStatisticsLimitInBytes);
+        List<BloomFilter> bloomFilters = rowGroups.stream()
+                .map(rowGroup -> rowGroup.getColumnStatistics().getBloomFilter())
+                .filter(Objects::nonNull)
+                .collect(toImmutableList());
+
+        if (!bloomFilters.isEmpty()) {
+            Slice slice = metadataWriter.writeBloomFilters(bloomFilters);
+            Stream stream = new Stream(columnId, StreamKind.BLOOM_FILTER_UTF8, slice.length(), false);
+            return ImmutableList.of(new StreamDataOutput(slice, stream));
+        }
+
+        return ImmutableList.of();
     }
 
     private static class DictionaryRowGroup

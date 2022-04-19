@@ -317,6 +317,7 @@ public class TestOrcBloomFilters
                 null,
                 null,
                 null,
+                null,
                 toBloomFilter(orcBloomFilter))));
 
         ColumnMetadata<ColumnStatistics> nonMatchingStatisticsByColumnIndex = new ColumnMetadata<>(ImmutableList.of(new ColumnStatistics(
@@ -329,6 +330,7 @@ public class TestOrcBloomFilters
                 null,
                 null,
                 null,
+                null,
                 toBloomFilter(emptyOrcBloomFilter))));
 
         ColumnMetadata<ColumnStatistics> withoutBloomFilterStatisticsByColumnIndex = new ColumnMetadata<>(ImmutableList.of(new ColumnStatistics(
@@ -336,6 +338,7 @@ public class TestOrcBloomFilters
                 0,
                 null,
                 new IntegerStatistics(10L, 2000L, null),
+                null,
                 null,
                 null,
                 null,

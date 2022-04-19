@@ -147,10 +147,7 @@ public class TupleDomainOrcPredicate
         }
 
         // if none of the discrete predicate values are found in the bloom filter, there is no overlap and the section should be skipped
-        if (discreteValues.get().stream().noneMatch(value -> checkInBloomFilter(bloomFilter, value, stripeDomain.getType()))) {
-            return false;
-        }
-        return true;
+        return discreteValues.get().stream().anyMatch(value -> checkInBloomFilter(bloomFilter, value, stripeDomain.getType()));
     }
 
     @VisibleForTesting
@@ -241,6 +238,9 @@ public class TupleDomainOrcPredicate
         }
         else if (type.getTypeSignature().getBase().equals(StandardTypes.DATE) && columnStatistics.getDateStatistics() != null) {
             return createDomain(type, hasNullValue, columnStatistics.getDateStatistics(), value -> (long) value);
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.TIMESTAMP) && columnStatistics.getTimestampStatistics() != null) {
+            return createDomain(type, hasNullValue, columnStatistics.getTimestampStatistics(), value -> (long) value);
         }
         else if (type.getJavaType() == long.class && columnStatistics.getIntegerStatistics() != null) {
             return createDomain(type, hasNullValue, columnStatistics.getIntegerStatistics());

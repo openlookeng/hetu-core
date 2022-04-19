@@ -167,6 +167,12 @@ public class BooleanColumnWriter
     }
 
     @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+    {
+        return ImmutableList.of();
+    }
+
+    @Override
     public List<StreamDataOutput> getDataStreams()
     {
         checkState(closed);

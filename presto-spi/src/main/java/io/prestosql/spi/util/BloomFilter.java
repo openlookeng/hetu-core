@@ -237,6 +237,16 @@ public class BloomFilter
         addHash(getLongHash(val));
     }
 
+    public void addDouble(double val)
+    {
+        addLong(doubleToLongBits(val));
+    }
+
+    public void addFloat(float val)
+    {
+        addDouble(val);
+    }
+
     public void add(double val)
     {
         addLong(doubleToLongBits(val));

@@ -32,16 +32,19 @@ import io.prestosql.orc.stream.PresentOutputStream;
 import io.prestosql.orc.stream.StreamDataOutput;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
 import static java.util.Objects.requireNonNull;
@@ -110,7 +113,7 @@ public class ByteColumnWriter
     public Map<OrcColumnId, ColumnStatistics> finishRowGroup()
     {
         checkState(!closed);
-        ColumnStatistics statistics = new ColumnStatistics((long) nonNullValueCount, 0, null, null, null, null, null, null, null, null);
+        ColumnStatistics statistics = new ColumnStatistics((long) nonNullValueCount, 0, null, null, null, null, null, null, null, null, null);
         rowGroupColumnStatistics.add(statistics);
         nonNullValueCount = 0;
         return ImmutableMap.of(columnId, statistics);
@@ -164,6 +167,24 @@ public class ByteColumnWriter
         presentCheckpoint.ifPresent(booleanStreamCheckpoint -> positionList.addAll(booleanStreamCheckpoint.toPositionList(compressed)));
         positionList.addAll(dataCheckpoint.toPositionList(compressed));
         return positionList.build();
+    }
+
+    @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException
+    {
+        List<BloomFilter> bloomFilters = rowGroupColumnStatistics.stream()
+                .map(ColumnStatistics::getBloomFilter)
+                .filter(Objects::nonNull)
+                .collect(toImmutableList());
+
+        if (!bloomFilters.isEmpty()) {
+            Slice slice = metadataWriter.writeBloomFilters(bloomFilters);
+            Stream stream = new Stream(columnId, StreamKind.BLOOM_FILTER_UTF8, slice.length(), false);
+            return ImmutableList.of(new StreamDataOutput(slice, stream));
+        }
+
+        return ImmutableList.of();
     }
 
     @Override

@@ -66,4 +66,7 @@ public interface ColumnWriter
     long getRetainedBytes();
 
     void reset();
+
+    List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException;
 }

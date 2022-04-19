@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.prestosql.orc.OrcDataSink;
 import io.prestosql.orc.OrcDataSource;
@@ -51,10 +52,17 @@ import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
+import static io.prestosql.plugin.hive.HiveMetadata.COLUMN_NAMES_SPLITTER;
+import static io.prestosql.plugin.hive.HiveMetadata.ORC_BLOOM_FILTER_COLUMNS_KEY;
+import static io.prestosql.plugin.hive.HiveMetadata.ORC_BLOOM_FILTER_FPP_KEY;
+import static io.prestosql.plugin.hive.HiveTableProperties.ORC_BLOOM_FILTER_FPP;
+import static io.prestosql.plugin.hive.HiveTableProperties.TRANSACTIONAL;
 import static io.prestosql.plugin.hive.HiveUtil.getColumnNames;
 import static io.prestosql.plugin.hive.HiveUtil.getColumnTypes;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static java.lang.Double.parseDouble;
+import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -63,7 +71,8 @@ public class OrcFileWriterFactory
         implements HiveFileWriterFactory
 {
     private static final Logger log = Logger.get(OrcFileWriterFactory.class);
-
+    private static final Integer BASE_OFFSET_FOR_TRANSACTIONAL_TABLE = 6;
+    private static final Integer BASE_OFFSET_FOR_NON_TRANSACTIONAL_TABLE = 0;
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
     private final NodeVersion nodeVersion;
@@ -210,12 +219,7 @@ public class OrcFileWriterFactory
                     fileColumnTypes,
                     dataFileColumnTypes,
                     compression,
-                    orcWriterOptions
-                            .withStripeMinSize(HiveSessionProperties.getOrcOptimizedWriterMinStripeSize(session))
-                            .withStripeMaxSize(HiveSessionProperties.getOrcOptimizedWriterMaxStripeSize(session))
-                            .withStripeMaxRowCount(HiveSessionProperties.getOrcOptimizedWriterMaxStripeRows(session))
-                            .withDictionaryMaxMemory(HiveSessionProperties.getOrcOptimizedWriterMaxDictionaryMemory(session))
-                            .withMaxStringStatisticsLimit(HiveSessionProperties.getOrcStringStatisticsLimit(session)),
+                    getOrcWriterBloomOptions(schema, getOrcWriterOptions(schema, session)),
                     writeLegacyVersion,
                     fileInputColumnIndexes,
                     ImmutableMap.<String, String>builder()
@@ -234,6 +238,35 @@ public class OrcFileWriterFactory
         catch (IOException e) {
             throw new PrestoException(HiveErrorCode.HIVE_WRITER_OPEN_ERROR, "Error creating ORC file", e);
         }
+    }
+
+    public static OrcWriterOptions getOrcWriterBloomOptions(Properties schema, OrcWriterOptions orcWriterOptions)
+    {
+        if (schema.containsKey(ORC_BLOOM_FILTER_COLUMNS_KEY)) {
+            if (!schema.containsKey(ORC_BLOOM_FILTER_FPP_KEY)) {
+                throw new PrestoException(HiveErrorCode.HIVE_INVALID_METADATA, "FPP for bloom filter is missing");
+            }
+            try {
+                return orcWriterOptions
+                        .withBloomFilterFpp(parseDouble(schema.getProperty(ORC_BLOOM_FILTER_FPP_KEY)))
+                        .withBloomFilterColumns(ImmutableSet.copyOf(COLUMN_NAMES_SPLITTER.splitToList(schema.getProperty(ORC_BLOOM_FILTER_COLUMNS_KEY))));
+            }
+            catch (NumberFormatException e) {
+                throw new PrestoException(HiveErrorCode.HIVE_UNSUPPORTED_FORMAT, format("Invalid value for %s property: %s", ORC_BLOOM_FILTER_FPP, schema.getProperty(ORC_BLOOM_FILTER_FPP_KEY)));
+            }
+        }
+        return orcWriterOptions;
+    }
+
+    private OrcWriterOptions getOrcWriterOptions(Properties schema, ConnectorSession session)
+    {
+        return orcWriterOptions
+                .withStripeMinSize(HiveSessionProperties.getOrcOptimizedWriterMinStripeSize(session))
+                .withStripeMaxSize(HiveSessionProperties.getOrcOptimizedWriterMaxStripeSize(session))
+                .withStripeMaxRowCount(HiveSessionProperties.getOrcOptimizedWriterMaxStripeRows(session))
+                .withDictionaryMaxMemory(HiveSessionProperties.getOrcOptimizedWriterMaxDictionaryMemory(session))
+                .withMaxStringStatisticsLimit(HiveSessionProperties.getOrcStringStatisticsLimit(session))
+                .withBaseIndex(Boolean.valueOf(schema.getProperty(TRANSACTIONAL)) ? BASE_OFFSET_FOR_TRANSACTIONAL_TABLE : BASE_OFFSET_FOR_NON_TRANSACTIONAL_TABLE);
     }
 
     /**
