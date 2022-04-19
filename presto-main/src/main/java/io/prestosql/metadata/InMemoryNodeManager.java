@@ -143,4 +143,10 @@ public class InMemoryNodeManager
     {
         listeners.remove(requireNonNull(listener, "listener is null"));
     }
+
+    @Override
+    public void refreshWorkerStates()
+    {
+        // no-op
+    }
 }
