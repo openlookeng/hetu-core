@@ -5106,7 +5106,7 @@ public class TestHiveIntegrationSmokeTest
                 // MULTIDELIMIT is supported only when field.delim property is specified
                 continue;
             }
-//            formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
+            formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
         }
         return formats.build();
     }
