@@ -374,7 +374,8 @@ export class QueryList extends React.Component {
             pageSize: 10,
             total: 0,
             queryString: '',
-            queryNums: -1
+            queryNums: -1,
+            metaStoreType:''
         };
 
         this.refreshLoop = this.refreshLoop.bind(this);
@@ -461,6 +462,18 @@ export class QueryList extends React.Component {
     }
 
     componentDidMount() {
+        $.get(`../v1/query/hetuMetastoreType`, function (metaStoreType) {
+            console.log(metaStoreType);
+            this.state.metaStoreType = metaStoreType;
+            if(this.state.metaStoreType != "jdbc") {
+                alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
+            }
+            this.resetTimer();
+        }.bind(this))
+            .error(function () {
+                this.resetTimer();
+            }.bind(this));
+
         this.refreshLoop();
     }
 
@@ -510,7 +523,7 @@ export class QueryList extends React.Component {
             "locale": {
                 format: 'YYYY-MM-DD.HH:mm',
                 separator: ' ~ ',
-                applyLabel: "confirm",
+                applyLabel: "apply",
                 cancelLabel: "clear",
                 resetLabel: "reset",
             }
@@ -674,10 +687,11 @@ export class QueryList extends React.Component {
 
     render() {
         const { allQueries, currentPage, total, stateFilters, pageSize } = this.state;
-        let queryList = <DisplayedQueriesList queries={allQueries} />;
-        if (allQueries.queries === null || total === 0) {
+        // let queryList = <DisplayedQueriesList queries={allQueries} />;
+        let queryList;
+        if (allQueries == null || total === 0) {
             let label = (<div className="loader">Loading...</div>);
-            if (allQueries.queries === null || total === 0) {
+            if (allQueries == null || total === 0) {
                 label = "No queries";
             }
             queryList = (
@@ -685,6 +699,9 @@ export class QueryList extends React.Component {
                     <div className="col-xs-12"><h4>{label}</h4></div>
                 </div>
             );
+        }
+        else {
+            queryList = <DisplayedQueriesList queries={allQueries} />;
         }
 
 
@@ -762,7 +779,6 @@ export class QueryList extends React.Component {
                             </div>
                         </div>
                         {queryList}
-                        {allQueries.length > 0 &&
                         <Pagination
                             defaultCurrent={1}
                             current={currentPage}
@@ -777,7 +793,6 @@ export class QueryList extends React.Component {
                             onShowSizeChange={this.onPageSizeChange}
                             selectComponentClass={Select}
                         />
-                        }
                     </div>
                 </div>
                 <div className='flex flex-row flex-initial statusFooter'>

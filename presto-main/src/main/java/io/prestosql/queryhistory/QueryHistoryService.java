@@ -204,9 +204,9 @@ public class QueryHistoryService
             failFilter.add(s.toUpperCase(Locale.ENGLISH));
         }
         failFilter.add("null");
+
         QueryHistoryResult queryHistoryResult = hetuMetaStoreManager.getHetuMetastore().getQueryHistory(startNum, pageSize, user, startTime, endTime,
                 queryId, query, resource, source, stateFilter, failFilter, sort, sortOrder);
-
         return queryHistoryResult;
     }
 
@@ -222,6 +222,11 @@ public class QueryHistoryService
             currentQueries.set(0);
         }
         return currentQueries.get();
+    }
+
+    public String getHetuMetastoreType()
+    {
+        return hetuMetaStoreManager.getHetuMetastoreType();
     }
 
     public static QueryInfo toFullQueryInfo(DispatchQuery query)

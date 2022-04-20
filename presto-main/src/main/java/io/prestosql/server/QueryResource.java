@@ -160,6 +160,13 @@ public class QueryResource
     }
 
     @GET
+    @Path("/hetuMetastoreType")
+    public Response getHetuMetastoreType()
+    {
+        return Response.ok(queryHistoryService.getHetuMetastoreType()).build();
+    }
+
+    @GET
     public Response getAllQueryInfo(
             @QueryParam("state") String stateFilter,
             @QueryParam("failed") String failedFilter,

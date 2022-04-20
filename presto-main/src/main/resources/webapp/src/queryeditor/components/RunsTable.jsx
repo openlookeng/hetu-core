@@ -40,6 +40,7 @@ let columnWidths = {
   output: 150,
   addtocollection: 120,
 };
+let metaStoreType = '';
 
 // State actions
 function getRuns(user) {
@@ -87,6 +88,11 @@ class RunsTable extends React.Component {
   }
 
   componentDidMount() {
+    $.get(`../v1/query/hetuMetastoreType`, function (type) {
+      metaStoreType = type;
+      this.setState();
+    }.bind(this))
+
     UserStore.listen(this._onChange);
     RunStore.listen(this._onChange);
   }
@@ -311,8 +317,11 @@ function toggleModal(component, msg=null) {
 
 function handleCollection(e,rowIndex,parentObj) {
   let queryText = e.query;
-  if(queryText.length > 1000){
+  if(queryText.length > 1000) {
     alert("Error! Your SQL statement is too long! Please shorten it!");
+  }
+  else if(metaStoreType != "jdbc") {
+    alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
   }
   else {
     let catalog = e.sessionContext.catalog;

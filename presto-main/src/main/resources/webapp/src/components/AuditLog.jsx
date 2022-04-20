@@ -241,7 +241,7 @@ export class AuditLog extends React.Component {
             "locale": {
                 format: pattern,
                 separator: ' ~ ',
-                applyLabel: "confirm",
+                applyLabel: "apply",
                 cancelLabel: "clear",
                 resetLabel: "reset",
             }
