@@ -267,6 +267,8 @@ public class TableScanOperator
 
     private boolean finished;
 
+    // completedPositionCount is used only if connectorPageSource.getCompletedPositionCount is present.
+    private long completedPositionCount;
     private long completedBytes;
     private long readTimeNanos;
     Optional<TableScanNode> tableScanNodeOptional;
@@ -707,17 +709,34 @@ public class TableScanOperator
         }
 
         Page page = source.getNextPage();
+
+        // if pageSource.getCompletedPositionCount is present, get operator statistics from pageSource
+        if (source.getCompletedPositionCount().isPresent()) {
+            long endCompletedPositionCount = source.getCompletedPositionCount().getAsLong();
+            long endCompletedBytes = source.getCompletedBytes();
+            long endReadTimeNanos = source.getReadTimeNanos();
+            long currentPositionCount = endCompletedPositionCount - completedPositionCount;
+            long currentCompletedBytes = endCompletedBytes - completedBytes;
+            operatorContext.recordPhysicalInputWithTiming(currentCompletedBytes, currentPositionCount, endReadTimeNanos - readTimeNanos);
+            operatorContext.recordProcessedInput(currentCompletedBytes, currentPositionCount);
+            completedPositionCount = endCompletedPositionCount;
+            completedBytes = endCompletedBytes;
+            readTimeNanos = endReadTimeNanos;
+        }
+
         if (page != null) {
             // assure the page is in memory before handing to another operator
             page = page.getLoadedPage();
 
             // update operator stats
-            long endCompletedBytes = source.getCompletedBytes();
-            long endReadTimeNanos = source.getReadTimeNanos();
-            operatorContext.recordPhysicalInputWithTiming(endCompletedBytes - completedBytes, page.getPositionCount(), endReadTimeNanos - readTimeNanos);
-            operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
-            completedBytes = endCompletedBytes;
-            readTimeNanos = endReadTimeNanos;
+            if (!source.getCompletedPositionCount().isPresent()) {
+                long endCompletedBytes = source.getCompletedBytes();
+                long endReadTimeNanos = source.getReadTimeNanos();
+                operatorContext.recordPhysicalInputWithTiming(endCompletedBytes - completedBytes, page.getPositionCount(), endReadTimeNanos - readTimeNanos);
+                operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
+                completedBytes = endCompletedBytes;
+                readTimeNanos = endReadTimeNanos;
+            }
 
             // pull bloomFilter from stateStore and filter page
             if (existsCrossFilter) {
