@@ -61,9 +61,11 @@ It is suggested to only turn on distributed snapshot when necessary, i.e. for qu
 
 Snapshot capture and restore statistics are displayed in CLI along with query result when CLI is launched in debug mode
 
-Snapshot capture statistics covers size of snapshots captured, CPU Time taken for capturing the snapshots and Wall Time taken for capturing the snapshots during the query.  These statistics are displayed for all snapshots and for last snapshot separately.
+Snapshot capture statistics includes number of snapshots captured, size of snapshots captured, CPU Time taken for capturing the snapshots and Wall Time taken for capturing the snapshots during the query.  These statistics are displayed for all snapshots and for last snapshot separately.
 
 Snapshot restore statistics covers number of times restored from snapshots during query, Size of the snapshots loaded for restoring, CPU Time taken for restoring from snapshots and Wall Time taken for restoring from snapshots.  Restore statistics are displayed only when there is restore(recovery) happened during the query.
+
+Additionally, while query is in progress number of capturing snapshots and id of the restoring snapshot will be displayed. Refer below picture for more details 
 
 ![](../images/snapshot_statistics.png)
 

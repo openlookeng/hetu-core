@@ -218,33 +218,7 @@ Spilled: 20GB
                         readTime.getValue(SECONDS));
                 reprintLine(summary);
             }
-
-            // Snapshot Capture stats All: 100MB/22s/18s, Last: 40MB/10s/7s
-            SnapshotStats snapshotStats = stats.getSnapshotStats();
-            // snapshotStats should be null in case snapshot feature is disabled
-            if (snapshotStats != null) {
-                Duration allCaptureCPUTime = millis(snapshotStats.getTotalCaptureCpuTime());
-                Duration allCaptureWallTime = millis(snapshotStats.getTotalCaptureWallTime());
-                Duration lastCaptureCPUTime = millis(snapshotStats.getLastCaptureCpuTime());
-                Duration lastCaptureWallTime = millis(snapshotStats.getLastCaptureWallTime());
-                String allSnapshotsSize = FormatUtils.formatDataSize(bytes(snapshotStats.getAllCaptureSize()), true);
-                String lastSnapshotSize = FormatUtils.formatDataSize(bytes(snapshotStats.getLastCaptureSize()), true);
-                String captureSummary = String.format("Snapshot Capture: All: %s/%.1fs/%.1fs, Last: %s/%.1fs/%.1fs",
-                        allSnapshotsSize, allCaptureCPUTime.getValue(SECONDS), allCaptureWallTime.getValue(SECONDS),
-                        lastSnapshotSize, lastCaptureCPUTime.getValue(SECONDS), lastCaptureWallTime.getValue(SECONDS));
-                reprintLine(captureSummary);
-
-                // Snapshot restore stats: 1/100MB/22s/18s
-                long restoreCount = snapshotStats.getSuccessRestoreCount();
-                if (restoreCount > 0) {
-                    Duration allRestoreCPUTime = millis(snapshotStats.getTotalRestoreCpuTime());
-                    Duration allRestoreWallTime = millis(snapshotStats.getTotalRestoreWallTime());
-                    String allRestoreSize = FormatUtils.formatDataSize(bytes(snapshotStats.getTotalRestoreSize()), true);
-                    String restoreSummary = String.format(Locale.ROOT, "Snapshot Restore: %d/%s/%.1fs/%.1fs", restoreCount,
-                            allRestoreSize, allRestoreCPUTime.getValue(SECONDS), allRestoreWallTime.getValue(SECONDS));
-                    reprintLine(restoreSummary);
-                }
-            }
+            printSnapshotStats(stats, true);
         }
 
         // 0:32 [2.12GB, 15M rows] [67MB/s, 463K rows/s]
@@ -259,6 +233,54 @@ Spilled: 20GB
 
         // blank line
         out.println();
+    }
+
+    private void printSnapshotStats(StatementStats stats, boolean isFinal)
+    {
+        SnapshotStats snapshotStats = stats.getSnapshotStats();
+        // snapshotStats should be null in case snapshot feature is disabled
+        if (snapshotStats != null) {
+            List<Long> capturedList = snapshotStats.getCapturedSnapshotList();
+            int capturedListSize = capturedList != null ? capturedList.size() : 0;
+            long restoreCount = snapshotStats.getSuccessRestoreCount();
+            String snapshotSummary = null;
+
+            // Display captured snapshot stats if we have any captured snapshots already
+            if (capturedListSize > 0) {
+                Duration allCaptureCPUTime = millis(snapshotStats.getTotalCaptureCpuTime());
+                Duration allCaptureWallTime = millis(snapshotStats.getTotalCaptureWallTime());
+                Duration lastCaptureCPUTime = millis(snapshotStats.getLastCaptureCpuTime());
+                Duration lastCaptureWallTime = millis(snapshotStats.getLastCaptureWallTime());
+                String allSnapshotsSize = FormatUtils.formatDataSize(bytes(snapshotStats.getAllCaptureSize()), true);
+                String lastSnapshotSize = FormatUtils.formatDataSize(bytes(snapshotStats.getLastCaptureSize()), true);
+
+                snapshotSummary = String.format(Locale.ROOT, "Snapshots Captured: %d [All: %s/%.1fs/%.1fs, Last: %s/%.1fs/%.1fs]",
+                        capturedListSize,
+                        allSnapshotsSize, allCaptureCPUTime.getValue(SECONDS), allCaptureWallTime.getValue(SECONDS),
+                        lastSnapshotSize, lastCaptureCPUTime.getValue(SECONDS), lastCaptureWallTime.getValue(SECONDS));
+                reprintLine(snapshotSummary);
+            }
+
+            // Display restored snapshot stats if we have any captured snapshots already
+            if (restoreCount > 0) {
+                Duration allRestoreCPUTime = millis(snapshotStats.getTotalRestoreCpuTime());
+                Duration allRestoreWallTime = millis(snapshotStats.getTotalRestoreWallTime());
+                String allRestoreSize = FormatUtils.formatDataSize(bytes(snapshotStats.getTotalRestoreSize()), true);
+                snapshotSummary = String.format(Locale.ROOT, "Snapshots Restored: %d/%s/%.1fs/%.1fs",
+                        restoreCount, allRestoreSize, allRestoreCPUTime.getValue(SECONDS), allRestoreWallTime.getValue(SECONDS));
+                reprintLine(snapshotSummary);
+            }
+
+            List<Long> inProgressCaptureList = snapshotStats.getCapturingSnapshotIds();
+            long inProgressRestoreSnapshot = snapshotStats.getRestoringSnapshotId();
+            // Snapshots in progress: Capture: 4,5, Restore: 3
+            if (!isFinal && ((inProgressCaptureList != null && inProgressCaptureList.size() > 0) || inProgressRestoreSnapshot != 0)) {
+                String restoreId = inProgressRestoreSnapshot == 0 ? "None" : String.valueOf(inProgressRestoreSnapshot);
+                int captureCount = (inProgressCaptureList != null) ? inProgressCaptureList.size() : 0;
+                String inProgressMsg = String.format(Locale.ROOT, "Snapshots in progress: Capture count: %d  Restoring id: %s", captureCount, restoreId);
+                reprintLine(inProgressMsg);
+            }
+        }
     }
 
     private void printQueryInfo(QueryStatusInfo results, WarningsPrinter warningsPrinter)
@@ -347,6 +369,7 @@ Spilled: 20GB
                             readTime.getValue(SECONDS));
                     reprintLine(summary);
                 }
+                printSnapshotStats(stats, false);
             }
 
             verify(terminalWidth >= 75); // otherwise handled above
@@ -387,21 +410,37 @@ Spilled: 20GB
 
             // blank line
             reprintLine("");
-
-            // STAGE  S    ROWS    RPS  BYTES    BPS   QUEUED    RUN   DONE
-            String stagesHeader = format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
-                    "STAGE",
-                    "S",
-                    "ROWS",
-                    "ROWS/s",
-                    "BYTES",
-                    "BYTES/s",
-                    "QUEUED",
-                    "RUN",
-                    "DONE");
+            String stagesHeader = null;
+            if (!debug || stats.getSnapshotStats() == null) {
+                // STAGE  S    ROWS    RPS  BYTES    BPS   QUEUED    RUN   DONE
+                stagesHeader = format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
+                        "STAGE",
+                        "S",
+                        "ROWS",
+                        "ROWS/s",
+                        "BYTES",
+                        "BYTES/s",
+                        "QUEUED",
+                        "RUN",
+                        "DONE");
+            }
+            else {
+                // STAGE  SS    ROWS    RPS  BYTES    BPS   QUEUED    RUN   DONE  SNAPSHOT
+                stagesHeader = format("%10s%2s  %5s  %6s  %5s  %7s  %6s  %5s  %5s  %8s",
+                        "STAGE",
+                        "SS",
+                        "ROWS",
+                        "ROWS/s",
+                        "BYTES",
+                        "BYTES/s",
+                        "QUEUED",
+                        "RUN",
+                        "DONE",
+                        "SNAPSHOT");
+            }
             reprintLine(stagesHeader);
 
-            printStageTree(stats.getRootStage(), "", new AtomicInteger());
+            printStageTree(stats.getRootStage(), "", new AtomicInteger(), stats.getSnapshotStats());
         }
         else {
             // Query 31 [S] i[2.7M 67.3MB 62.7MBps] o[35 6.1KB 1KBps] splits[252/16/380]
@@ -425,16 +464,9 @@ Spilled: 20GB
         warningsPrinter.print(results.getWarnings(), false, false);
     }
 
-    private void printStageTree(StageStats stage, String indent, AtomicInteger stageNumberCounter)
+    private void printStageTree(StageStats stage, String indent, AtomicInteger stageNumberCounter, SnapshotStats snapshotStats)
     {
         Duration elapsedTime = nanosSince(start);
-
-        // STAGE  S    ROWS  ROWS/s  BYTES  BYTES/s  QUEUED    RUN   DONE
-        // 0......Q     26M   9077M  9993G    9077M   9077M  9077M  9077M
-        //   2....R     17K    627M   673M     627M    627M   627M   627M
-        //     3..C     999    627M   673M     627M    627M   627M   627M
-        //   4....R     26M    627M   673T     627M    627M   627M   627M
-        //     5..F     29T    627M   673M     627M    627M   627M   627M
 
         String id = String.valueOf(stageNumberCounter.getAndIncrement());
         String name = indent + id;
@@ -451,23 +483,55 @@ Spilled: 20GB
             rowsPerSecond = FormatUtils.formatCountRate(stage.getProcessedRows(), elapsedTime, false);
         }
 
-        String stageSummary = String.format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
-                name,
-                stageStateCharacter(stage.getState()),
+        String stageSummary = null;
+        if (!debug || snapshotStats == null) {
+            // STAGE  S    ROWS  ROWS/s  BYTES  BYTES/s  QUEUED    RUN   DONE
+            // 0......Q     26M   9077M  9993G    9077M   9077M  9077M  9077M
+            //   2....R     17K    627M   673M     627M    627M   627M   627M
+            //     3..C     999    627M   673M     627M    627M   627M   627M
+            //   4....R     26M    627M   673T     627M    627M   627M   627M
+            //     5..F     29T    627M   673M     627M    627M   627M   627M
+            stageSummary = String.format("%10s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s",
+                    name,
+                    stageStateCharacter(stage.getState()),
 
-                FormatUtils.formatCount(stage.getProcessedRows()),
-                rowsPerSecond,
+                    FormatUtils.formatCount(stage.getProcessedRows()),
+                    rowsPerSecond,
 
-                FormatUtils.formatDataSize(bytes(stage.getProcessedBytes()), false),
-                bytesPerSecond,
+                    FormatUtils.formatDataSize(bytes(stage.getProcessedBytes()), false),
+                    bytesPerSecond,
 
-                stage.getQueuedSplits(),
-                stage.getRunningSplits(),
-                stage.getCompletedSplits());
+                    stage.getQueuedSplits(),
+                    stage.getRunningSplits(),
+                    stage.getCompletedSplits());
+        }
+        else {
+            // STAGE  SS    ROWS  ROWS/s  BYTES  BYTES/s  QUEUED    RUN   DONE  SNAPSHOT
+            // 0.......Q     26M   9077M  9993G    9077M   9077M  9077M  9077M      1
+            //   2.....R     17K    627M   673M     627M    627M   627M   627M      4
+            //     3...C     999    627M   673M     627M    627M   627M   627M      3
+            //   4....#R     26M    627M   673T     627M    627M   627M   627M     12
+            //     5..#F     29T    627M   673M     627M    627M   627M   627M     11
+            stageSummary = String.format("%10s%1s%1s  %5s  %6s  %5s  %7s  %6s  %5s  %5s  %8d",
+                    name,
+                    stage.isRestoring() ? "#" : ".",
+                    stageStateCharacter(stage.getState()),
+
+                    FormatUtils.formatCount(stage.getProcessedRows()),
+                    rowsPerSecond,
+
+                    FormatUtils.formatDataSize(bytes(stage.getProcessedBytes()), false),
+                    bytesPerSecond,
+
+                    stage.getQueuedSplits(),
+                    stage.getRunningSplits(),
+                    stage.getCompletedSplits(),
+                    stage.getSnapshotId());
+        }
         reprintLine(stageSummary);
 
         for (StageStats subStage : stage.getSubStages()) {
-            printStageTree(subStage, indent + "  ", stageNumberCounter);
+            printStageTree(subStage, indent + "  ", stageNumberCounter, snapshotStats);
         }
     }
 

@@ -134,6 +134,8 @@ public final class SqlStageExecution
 
     private final QuerySnapshotManager snapshotManager;
     private boolean throttledSchedule;
+    private boolean restoreInProgress;
+    private long captureSnapshotId;
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -212,6 +214,8 @@ public final class SqlStageExecution
         }
 
         this.throttledSchedule = false;
+        this.restoreInProgress = false;
+        this.captureSnapshotId = 0;
     }
 
     private void traverseNodesForDynamicFiltering(List<PlanNode> nodes)
@@ -328,6 +332,19 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::cancelToResume);
     }
 
+    public void OnSnapshotXCompleted(boolean capture, long snapshotId)
+    {
+        log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
+        if (!capture) {
+            restoreInProgress = false;
+            captureSnapshotId = 0;
+        }
+        // For capture completed, update snapshot id
+        else {
+            captureSnapshotId = snapshotId;
+        }
+    }
+
     public synchronized void abort()
     {
         stateMachine.transitionToAborted();
@@ -359,7 +376,7 @@ public final class SqlStageExecution
 
     public StageInfo getStageInfo()
     {
-        return stateMachine.getStageInfo(this::getAllTaskInfo);
+        return stateMachine.getStageInfo(this::getAllTaskInfo, restoreInProgress, captureSnapshotId);
     }
 
     private Iterable<TaskInfo> getAllTaskInfo()
@@ -705,7 +722,8 @@ public final class SqlStageExecution
             List<TaskInfo> finalTaskInfos = getAllTasks().stream()
                     .map(RemoteTask::getTaskInfo)
                     .collect(toImmutableList());
-            stateMachine.setAllTasksFinal(finalTaskInfos);
+            // Once stage is done, consider restore is complete
+            stateMachine.setAllTasksFinal(finalTaskInfos, false, captureSnapshotId);
         }
     }
 
@@ -731,6 +749,11 @@ public final class SqlStageExecution
     public String toString()
     {
         return stateMachine.toString();
+    }
+
+    public void setResuming(long restoringSnapshotId)
+    {
+        restoreInProgress = true;
     }
 
     private class StageTaskListener
