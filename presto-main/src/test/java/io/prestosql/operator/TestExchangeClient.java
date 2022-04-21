@@ -161,7 +161,7 @@ public class TestExchangeClient
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 pageBufferClientCallbackExecutor, failureDetectorManager);
-        exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
+        exchangeClient.setRecoveryEnabled(NOOP_SNAPSHOT_UTILS.getRecoveryManager(new QueryId("query")));
 
         final String target1 = "target1";
         final String target2 = "target2";
@@ -215,7 +215,7 @@ public class TestExchangeClient
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 pageBufferClientCallbackExecutor, failureDetectorManager);
-        exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
+        exchangeClient.setRecoveryEnabled(NOOP_SNAPSHOT_UTILS.getRecoveryManager(new QueryId("query")));
 
         String origin1 = "location1";
         String origin2 = "location2";

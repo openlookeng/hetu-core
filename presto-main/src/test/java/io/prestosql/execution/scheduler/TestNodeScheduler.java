@@ -58,6 +58,7 @@ import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
@@ -77,6 +78,7 @@ import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.StageExecutionPlan;
 import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.statestore.LocalStateStoreProvider;
+import io.prestosql.testing.TestingSnapshotUtils;
 import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
 import org.testng.annotations.AfterMethod;
@@ -916,7 +918,8 @@ public class TestNodeScheduler
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
         Map.Entry<InternalNode, Split> producerAssignment = Iterables.getOnlyElement(nodeSelector.computeAssignments(splits, ImmutableList.copyOf(this.taskMap.values()), Optional.of(producerStage)).getAssignments().entries());
 
         PlanFragment testFragmentConsumer = createTableScanPlanFragment("build", ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER, uuid, 1);
@@ -941,7 +944,8 @@ public class TestNodeScheduler
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
 
         Map.Entry<InternalNode, Split> consumerAssignment = Iterables.getOnlyElement(nodeSelector.computeAssignments(splits, ImmutableList.copyOf(this.taskMap.values()), Optional.of(stage)).getAssignments().entries());
 
@@ -989,7 +993,8 @@ public class TestNodeScheduler
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
         nodeSelector.computeAssignments(splits, ImmutableList.copyOf(this.taskMap.values()), Optional.of(producerStage)).getAssignments().entries();
 
         // Consumer
@@ -1017,7 +1022,8 @@ public class TestNodeScheduler
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
         try {
             nodeSelector.computeAssignments(splitConsumers, ImmutableList.copyOf(this.taskMap.values()), Optional.of(stage)).getAssignments().entries();
         }

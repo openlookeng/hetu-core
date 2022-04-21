@@ -122,6 +122,7 @@ public class OperatorContext
 
     private final MemoryTrackingContext operatorMemoryContext;
     private final boolean snapshotEnabled;
+    private final boolean recoveryEnabled;
 
     public OperatorContext(
             int operatorId,
@@ -146,6 +147,7 @@ public class OperatorContext
         operatorMemoryContext.initializeLocalMemoryContexts(operatorType);
 
         this.snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(driverContext.getSession());
+        this.recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(driverContext.getSession());
     }
 
     public int getOperatorId()
@@ -814,6 +816,11 @@ public class OperatorContext
     public boolean isSnapshotEnabled()
     {
         return snapshotEnabled;
+    }
+
+    public boolean isRecoveryEnabled()
+    {
+        return recoveryEnabled;
     }
 
     public String getUniqueId()

@@ -280,7 +280,7 @@ public class SourcePartitionedScheduler
                     // add split filter to filter out split has no valid rows
                     Pair<Optional<RowExpression>, Map<Symbol, ColumnHandle>> pair = SplitFiltering.getExpression(stage);
 
-                    if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                    if (SystemSessionProperties.isRecoveryEnabled(session)) {
                         List<Split> batchSplits = nextSplits.getSplits();
                         // Don't apply filter to MarkerSplit
                         if (batchSplits.size() == 1 && batchSplits.get(0).getConnectorSplit() instanceof MarkerSplit) {
@@ -352,7 +352,7 @@ public class SourcePartitionedScheduler
 
                 splitAssignment = splitPlacementResult.getAssignments();
 
-                if (SystemSessionProperties.isSnapshotEnabled(session)) {
+                if (SystemSessionProperties.isRecoveryEnabled(session)) {
                     Split firstSplit = pendingSplits.iterator().next();
                     if (pendingSplits.size() == 1 && firstSplit.getConnectorSplit() instanceof MarkerSplit) {
                         // We'll create a new assignment, but still need to call computeAssignments above, and cannot modify the returned assignment map directly

@@ -22,7 +22,7 @@ import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.MemoryPool;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.operator.TaskContext;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spiller.SpillSpaceTracker;
@@ -49,9 +49,9 @@ public final class TestingTaskContext
         return builder(notificationExecutor, yieldExecutor, session).build();
     }
 
-    public static TaskContext createTaskContext(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, SnapshotUtils snapshotUtils)
+    public static TaskContext createTaskContext(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, RecoveryUtils recoveryUtils)
     {
-        return builder(notificationExecutor, yieldExecutor, session, snapshotUtils).build();
+        return builder(notificationExecutor, yieldExecutor, session, recoveryUtils).build();
     }
 
     public static TaskContext createTaskContext(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, DataSize maxMemory)
@@ -97,9 +97,9 @@ public final class TestingTaskContext
         return new Builder(notificationExecutor, yieldExecutor, session, NOOP_SNAPSHOT_UTILS);
     }
 
-    public static Builder builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, SnapshotUtils snapshotUtils)
+    public static Builder builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, RecoveryUtils recoveryUtils)
     {
-        return new Builder(notificationExecutor, yieldExecutor, session, snapshotUtils);
+        return new Builder(notificationExecutor, yieldExecutor, session, recoveryUtils);
     }
 
     public static class Builder
@@ -114,15 +114,15 @@ public final class TestingTaskContext
         private DataSize memoryPoolSize = new DataSize(1, GIGABYTE);
         private DataSize maxSpillSize = new DataSize(1, GIGABYTE);
         private DataSize queryMaxSpillSize = new DataSize(1, GIGABYTE);
-        private SnapshotUtils snapshotUtils;
+        private RecoveryUtils recoveryUtils;
 
-        private Builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, SnapshotUtils snapshotUtils)
+        private Builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, RecoveryUtils recoveryUtils)
         {
             this.notificationExecutor = notificationExecutor;
             this.yieldExecutor = yieldExecutor;
             this.session = session;
             this.taskStateMachine = new TaskStateMachine(new TaskId("query", 0, 0), notificationExecutor);
-            this.snapshotUtils = snapshotUtils;
+            this.recoveryUtils = recoveryUtils;
         }
 
         public Builder setTaskStateMachine(TaskStateMachine taskStateMachine)
@@ -161,9 +161,9 @@ public final class TestingTaskContext
             return this;
         }
 
-        public Builder setSnapshotUtils(SnapshotUtils snapshotUtils)
+        public Builder setSnapshotUtils(RecoveryUtils recoveryUtils)
         {
-            this.snapshotUtils = snapshotUtils;
+            this.recoveryUtils = recoveryUtils;
             return this;
         }
 
@@ -181,7 +181,7 @@ public final class TestingTaskContext
                     yieldExecutor,
                     queryMaxSpillSize,
                     spillSpaceTracker,
-                    snapshotUtils);
+                    recoveryUtils);
 
             return createTaskContext(queryContext, session, taskStateMachine);
         }

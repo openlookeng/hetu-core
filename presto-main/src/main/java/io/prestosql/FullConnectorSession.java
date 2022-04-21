@@ -171,6 +171,12 @@ public class FullConnectorSession
     }
 
     @Override
+    public boolean isRecoveryEnabled()
+    {
+        return SystemSessionProperties.isRecoveryEnabled(session);
+    }
+
+    @Override
     public boolean isSnapshotEnabled()
     {
         return SystemSessionProperties.isSnapshotEnabled(session);

@@ -136,7 +136,7 @@ public class SqlTaskExecution
     // then buffer the marker and subsequent sources.
     @GuardedBy("this")
     private final Map<PlanNodeId, LinkedList<TaskSource>> pendingSources = new HashMap<>();
-    private final boolean snapshotEnabled;
+    private final boolean recoveryEnabled;
 
     private final TaskHandle taskHandle;
     private final TaskExecutor taskExecutor;
@@ -206,7 +206,7 @@ public class SqlTaskExecution
         this.taskId = taskStateMachine.getTaskId();
         this.taskContext = requireNonNull(taskContext, "taskContext is null");
         this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
-        snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(taskContext.getSession());
+        recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(taskContext.getSession());
 
         this.taskExecutor = requireNonNull(taskExecutor, "driverExecutor is null");
         this.notificationExecutor = requireNonNull(notificationExecutor, "notificationExecutor is null");
@@ -375,8 +375,8 @@ public class SqlTaskExecution
         // update task with new sources
         for (TaskSource source : sources) {
             if (driverRunnerFactoriesWithSplitLifeCycle.containsKey(source.getPlanNodeId())) {
-                if (snapshotEnabled) {
-                    // Snapshot: only source splits (split lifecycle) may contain markers.
+                if (recoveryEnabled) {
+                    // recovery: only source splits (split lifecycle) may contain markers.
                     // Some source splits can't be scheduled until others finish, so need to keep track of pending ones.
                     // Need to maintain order between marker splits and other source ones.
                     pendingSources.computeIfAbsent(source.getPlanNodeId(), p -> new LinkedList<>()).add(source);
@@ -390,7 +390,7 @@ public class SqlTaskExecution
             }
         }
 
-        if (snapshotEnabled) {
+        if (recoveryEnabled) {
             for (LinkedList<TaskSource> sourcesForPlanNode : pendingSources.values()) {
                 while (!sourcesForPlanNode.isEmpty()) {
                     // Schedule sources that can be scheduled, and stop when a marker is encountered but there are pending splits
@@ -701,7 +701,7 @@ public class SqlTaskExecution
 
                         splitMonitor.splitCompletedEvent(taskId, getDriverStats());
 
-                        if (snapshotEnabled) {
+                        if (recoveryEnabled) {
                             if (splitRunner.partitionedSplit != null) {
                                 boolean tryScheduling;
                                 synchronized (SqlTaskExecution.this) {

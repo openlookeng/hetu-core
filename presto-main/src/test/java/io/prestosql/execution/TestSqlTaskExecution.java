@@ -787,7 +787,7 @@ public class TestSqlTaskExecution
         }
     }
 
-    private TaskContext newTestingTaskContext(ScheduledExecutorService taskNotificationExecutor, ScheduledExecutorService driverYieldExecutor, TaskStateMachine taskStateMachine, boolean snapshotEnabled)
+    private TaskContext newTestingTaskContext(ScheduledExecutorService taskNotificationExecutor, ScheduledExecutorService driverYieldExecutor, TaskStateMachine taskStateMachine, boolean recoveryEnabled)
     {
         QueryContext queryContext = new QueryContext(
                 new QueryId("queryid"),

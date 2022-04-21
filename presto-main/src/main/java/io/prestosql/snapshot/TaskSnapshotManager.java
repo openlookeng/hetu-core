@@ -48,7 +48,7 @@ public class TaskSnapshotManager
 
     private final TaskId taskId;
     private final long resumeCount;
-    private final SnapshotUtils snapshotUtils;
+    private final RecoveryUtils recoveryUtils;
 
     private int totalComponents = -1;
     // LinkedHashMap can be used to keep ordering
@@ -65,11 +65,11 @@ public class TaskSnapshotManager
 
     private Set<String> createdConsolidatedFiles;
 
-    public TaskSnapshotManager(TaskId taskId, long resumeCount, SnapshotUtils snapshotUtils)
+    public TaskSnapshotManager(TaskId taskId, long resumeCount, RecoveryUtils recoveryUtils)
     {
         this.taskId = taskId;
         this.resumeCount = resumeCount;
-        this.snapshotUtils = snapshotUtils;
+        this.recoveryUtils = recoveryUtils;
     }
 
     public long getResumeCount()
@@ -79,7 +79,7 @@ public class TaskSnapshotManager
 
     public QuerySnapshotManager getQuerySnapshotManager()
     {
-        return snapshotUtils.getQuerySnapshotManager(taskId.getQueryId());
+        return recoveryUtils.getQuerySnapshotManager(taskId.getQueryId());
     }
 
     public static SnapshotStateId createConsolidatedId(long snapshotId, TaskId taskId)
@@ -100,7 +100,7 @@ public class TaskSnapshotManager
     public void storeState(SnapshotStateId snapshotStateId, Object state, long serCpuTime)
             throws Exception
     {
-        snapshotUtils.storeState(snapshotStateId, state, this);
+        recoveryUtils.storeState(snapshotStateId, state, this);
 
         // store dummy value
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
@@ -117,9 +117,9 @@ public class TaskSnapshotManager
                 if (!loadCache.containsKey(snapshotId)) {
                     String queryId = taskId.getQueryId().getId();
                     SnapshotStateId stateId = createConsolidatedId(snapshotId, taskId);
-                    Optional<Object> loadedState = snapshotUtils.loadState(stateId, this);
+                    Optional<Object> loadedState = recoveryUtils.loadState(stateId, this);
                     if (createdConsolidatedFiles == null) {
-                        createdConsolidatedFiles = snapshotUtils.loadConsolidatedFiles(queryId);
+                        createdConsolidatedFiles = recoveryUtils.loadConsolidatedFiles(queryId);
                     }
                     // if it is still null after loading, that means it is deleted, and we need to fail
                     if (createdConsolidatedFiles == null || (createdConsolidatedFiles.contains(stateId.toString()) && !loadedState.isPresent())) {
@@ -152,7 +152,7 @@ public class TaskSnapshotManager
             // Snapshot is complete but no entry for this id, then the component must have finished
             // before the snapshot was taken. Look at previous complete snapshots for last saved state.
             if (snapshotToSnapshotResultMap == null) {
-                snapshotToSnapshotResultMap = snapshotUtils.loadSnapshotResult(newSnapshotStateId.getTaskId().getQueryId().getId());
+                snapshotToSnapshotResultMap = recoveryUtils.loadSnapshotResult(newSnapshotStateId.getTaskId().getQueryId().getId());
             }
             OptionalLong prevSnapshotId = getPreviousSnapshotIdIfComplete(snapshotToSnapshotResultMap, newSnapshotStateId.getSnapshotId());
             if (!prevSnapshotId.isPresent()) {
@@ -190,7 +190,7 @@ public class TaskSnapshotManager
     {
         Optional<Object> loadedValue = loadWithBacktrack(snapshotStateId);
         if (loadedValue.isPresent() && loadedValue.get() != NO_STATE) {
-            return snapshotUtils.loadState(SnapshotStateId.fromString((String) loadedValue.get()), this);
+            return recoveryUtils.loadState(SnapshotStateId.fromString((String) loadedValue.get()), this);
         }
         return loadedValue;
     }
@@ -198,7 +198,7 @@ public class TaskSnapshotManager
     public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
             throws Exception
     {
-        snapshotUtils.storeFile(snapshotStateId, sourceFile, this);
+        recoveryUtils.storeFile(snapshotStateId, sourceFile, this);
         // store dummy value
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
         map.put(snapshotStateId.toString(), snapshotStateId.toString());
@@ -216,7 +216,7 @@ public class TaskSnapshotManager
         if (loadedValue.get() == NO_STATE) {
             return null;
         }
-        return snapshotUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile, this);
+        return recoveryUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile, this);
     }
 
     private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotInfo> snapshotToSnapshotResultMap, long snapshotId)
@@ -272,7 +272,7 @@ public class TaskSnapshotManager
 
     public void failedToRestore(SnapshotStateId componentId, boolean fatal)
     {
-        LOG.debug("Failed (fatal=%b) to restore snapshot %d for component %s", fatal, componentId.getSnapshotId(), componentId);
+        LOG.warn("Failed (fatal=%b) to restore snapshot %d for component %s", fatal, componentId.getSnapshotId(), componentId);
         if (fatal) {
             updateRestore(componentId, SnapshotComponentCounter.ComponentState.FAILED_FATAL);
         }
@@ -328,7 +328,7 @@ public class TaskSnapshotManager
                             else {
                                 map = Collections.emptyMap();
                             }
-                            snapshotUtils.storeState(newId, map, this);
+                            recoveryUtils.storeState(newId, map, this);
                         }
                         catch (Exception e) {
                             LOG.error(e, "Failed to store state for " + newId);
@@ -336,9 +336,9 @@ public class TaskSnapshotManager
                             updateSnapshotStatus(snapshotId, snapshotResult);
                         }
                     }
-                    if (snapshotUtils.isCoordinator()) {
+                    if (recoveryUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
-                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
+                        QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
                         if (querySnapshotManager != null) {
                             if (snapshotResult == SnapshotResult.SUCCESSFUL) {
                                 querySnapshotManager.addConsolidatedFileToList(createConsolidatedId(snapshotId, componentIdTaskId).toString());
@@ -366,9 +366,9 @@ public class TaskSnapshotManager
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (restoreResult) {
                 if (restoreResult.setSnapshotResult(snapshotId, snapshotResult) && snapshotResult.isDone()) {
-                    if (snapshotUtils.isCoordinator()) {
+                    if (recoveryUtils.isCoordinator()) {
                         // Results on coordinator won't be reported through remote task. Send to the query side.
-                        QuerySnapshotManager querySnapshotManager = snapshotUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
+                        QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(componentIdTaskId.getQueryId());
                         if (querySnapshotManager != null) {
                             querySnapshotManager.updateQueryRestore(componentIdTaskId, Optional.of(restoreResult));
                         }

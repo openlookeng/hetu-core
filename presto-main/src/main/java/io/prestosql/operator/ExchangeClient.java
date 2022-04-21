@@ -30,7 +30,7 @@ import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
 import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
-import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.apache.commons.lang3.tuple.Pair;
@@ -83,8 +83,8 @@ public class ExchangeClient
 
     private final ConcurrentMap<String, HttpPageBufferClient> allClients = new ConcurrentHashMap<>();
 
-    private boolean snapshotEnabled;
-    private QuerySnapshotManager querySnapshotManager;
+    private boolean recoveryEnabled;
+    private QueryRecoveryManager queryRecoveryManager;
     // Only set for MergeOperator, to capture marker pages
     private MultiInputSnapshotState snapshotState;
 
@@ -158,10 +158,10 @@ public class ExchangeClient
         return Collections.unmodifiableSet(allClients.keySet());
     }
 
-    public void setSnapshotEnabled(QuerySnapshotManager querySnapshotManager)
+    public void setRecoveryEnabled(QueryRecoveryManager queryRecoveryManager)
     {
-        snapshotEnabled = true;
-        this.querySnapshotManager = querySnapshotManager;
+        recoveryEnabled = true;
+        this.queryRecoveryManager = queryRecoveryManager;
     }
 
     void setSnapshotState(MultiInputSnapshotState snapshotState)
@@ -251,9 +251,9 @@ public class ExchangeClient
                 new ExchangeClientCallback(uri),
                 scheduler,
                 pageBufferClientCallbackExecutor,
-                snapshotEnabled,
-                querySnapshotManager,
-                failureDetectorManager);
+                recoveryEnabled,
+                failureDetectorManager,
+                queryRecoveryManager);
         allClients.put(uri, client);
         queuedClients.add(client);
 
@@ -344,7 +344,7 @@ public class ExchangeClient
             return Pair.of(null, null);
         }
 
-        if (!snapshotEnabled) {
+        if (!recoveryEnabled) {
             return Pair.of(postProcessPage(pageBuffer.poll()), null);
         }
         Pair<SerializedPage, String> ret = pollPageImpl(target);
@@ -534,7 +534,7 @@ public class ExchangeClient
 
         long sizeAdjustment = 0;
         if (!pages.isEmpty()) {
-            if (!snapshotEnabled) {
+            if (!recoveryEnabled) {
                 pageBuffer.addAll(pages);
             }
             else {
@@ -611,7 +611,7 @@ public class ExchangeClient
         if (!queuedClients.contains(client)) {
             // Snapshot: Client may have been removed as a result of rescheduling, then don't queue it.
             // Use object identity, instead of .equals, for comparison.
-            if (!snapshotEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
+            if (!recoveryEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
                 queuedClients.add(client);
             }
         }
@@ -623,7 +623,7 @@ public class ExchangeClient
         requireNonNull(client, "client is null");
         // Snapshot: Client may have been removed as a result of rescheduling, then don't add it.
         // Use object identity, instead of .equals, for comparison.
-        if (!snapshotEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
+        if (!recoveryEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
             completedClients.add(client);
         }
         scheduleRequestIfNecessary();

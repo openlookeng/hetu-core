@@ -42,7 +42,7 @@ import io.prestosql.memory.NodeMemoryConfig;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.CommonTableExecutionContext;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -116,7 +116,7 @@ public class SqlTaskManager
     private final SqlTaskIoStats cachedStats = new SqlTaskIoStats();
     private final SqlTaskIoStats finishedTaskStats = new SqlTaskIoStats();
 
-    private final SnapshotUtils snapshotUtils;
+    private final RecoveryUtils recoveryUtils;
 
     @GuardedBy("this")
     private long currentMemoryPoolAssignmentVersion;
@@ -149,7 +149,7 @@ public class SqlTaskManager
             NodeSpillConfig nodeSpillConfig,
             GcMonitor gcMonitor,
             Metadata metadata,
-            SnapshotUtils snapshotUtils)
+            RecoveryUtils recoveryUtils)
     {
         requireNonNull(nodeInfo, "nodeInfo is null");
         requireNonNull(config, "config is null");
@@ -171,9 +171,9 @@ public class SqlTaskManager
         DataSize maxQueryTotalMemoryPerNode = nodeMemoryConfig.getMaxQueryTotalMemoryPerNode();
         DataSize maxQuerySpillPerNode = nodeSpillConfig.getQueryMaxSpillPerNode();
 
-        this.snapshotUtils = requireNonNull(snapshotUtils, "snapshotUtils cannot be null");
+        this.recoveryUtils = requireNonNull(recoveryUtils, "snapshotUtils cannot be null");
         queryContexts = CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(
-                queryId -> createQueryContext(queryId, localMemoryManager, nodeMemoryConfig, localSpillManager, gcMonitor, maxQueryUserMemoryPerNode, maxQueryTotalMemoryPerNode, maxQuerySpillPerNode, snapshotUtils)));
+                queryId -> createQueryContext(queryId, localMemoryManager, nodeMemoryConfig, localSpillManager, gcMonitor, maxQueryUserMemoryPerNode, maxQueryTotalMemoryPerNode, maxQuerySpillPerNode, recoveryUtils)));
 
         this.locationFactory = locationFactory;
         this.nodeInfo = nodeInfo;
@@ -245,7 +245,7 @@ public class SqlTaskManager
             DataSize maxQueryUserMemoryPerNode,
             DataSize maxQueryTotalMemoryPerNode,
             DataSize maxQuerySpillPerNode,
-            SnapshotUtils snapshotUtils)
+            RecoveryUtils recoveryUtils)
     {
         return new QueryContext(
                 queryId,
@@ -257,7 +257,7 @@ public class SqlTaskManager
                 driverYieldExecutor,
                 maxQuerySpillPerNode,
                 localSpillManager.getSpillSpaceTracker(),
-                snapshotUtils);
+                recoveryUtils);
     }
 
     @Override
@@ -569,7 +569,7 @@ public class SqlTaskManager
                 DateTime lastHeartbeat = taskInfo.getLastHeartbeat();
                 if (lastHeartbeat != null && lastHeartbeat.isBefore(oldestAllowedHeartbeat)) {
                     log.info("Failing abandoned task %s (instanceId %s)", taskStatus.getTaskId(), sqlTask.getTaskInstanceId());
-                    if (sqlTask.isSnapshotEnabled()) {
+                    if (sqlTask.isRecoveryEnabled()) {
                         // When a task is abandoned, to be safe, we cancel it and allow recovery.
                         sqlTask.cancel(TaskState.CANCELED_TO_RESUME);
                     }

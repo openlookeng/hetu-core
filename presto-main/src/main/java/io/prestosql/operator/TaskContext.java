@@ -33,6 +33,7 @@ import io.prestosql.memory.QueryContext;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
@@ -112,6 +113,7 @@ public class TaskContext
 
     private final PagesSerdeFactory serdeFactory;
     private final TaskSnapshotManager snapshotManager;
+    private final QueryRecoveryManager queryRecoveryManager;
 
     private final Map<String, Object> taskExtendProperties = new HashMap<>();
 
@@ -128,9 +130,10 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
-            TaskSnapshotManager snapshotManager)
+            TaskSnapshotManager snapshotManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager, queryRecoveryManager);
         taskContext.initialize();
         return taskContext;
     }
@@ -147,7 +150,8 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
-            TaskSnapshotManager snapshotManager)
+            TaskSnapshotManager snapshotManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
         this.gcMonitor = requireNonNull(gcMonitor, "gcMonitor is null");
@@ -164,6 +168,7 @@ public class TaskContext
         this.consumerId = consumerId;
         this.serdeFactory = serdeFactory;
         this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
+        this.queryRecoveryManager = queryRecoveryManager;
     }
 
     // the state change listener is added here in a separate initialize() method
@@ -617,5 +622,10 @@ public class TaskContext
     public PagesSerdeFactory getSerdeFactory()
     {
         return serdeFactory;
+    }
+
+    public QueryRecoveryManager getRecoveryManager()
+    {
+        return queryRecoveryManager;
     }
 }

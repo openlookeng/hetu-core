@@ -22,20 +22,20 @@ import org.testng.annotations.Test;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-public class TestSnapshotConfig
+public class TestRecoveryConfig
 {
     @Test
     public void testDefault()
     {
-        ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(SnapshotConfig.class)
+        ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(RecoveryConfig.class)
                 .setSnapshotProfile(null)
                 .setSpillProfile(null)
                 .setSpillToHdfs(false)
-                .setSnapshotIntervalType(SnapshotConfig.IntervalType.TIME)
+                .setSnapshotIntervalType(RecoveryConfig.IntervalType.TIME)
                 .setSnapshotTimeInterval(new Duration(5, TimeUnit.MINUTES))
                 .setSnapshotSplitCountInterval(1000)
-                .setSnapshotMaxRetries(10)
-                .setSnapshotRetryTimeout(new Duration(10, TimeUnit.MINUTES))
+                .setRecoveryMaxRetries(10)
+                .setRecoveryRetryTimeout(new Duration(10, TimeUnit.MINUTES))
                 .setSnapshotUseKryoSerialization(false));
     }
 
@@ -49,20 +49,20 @@ public class TestSnapshotConfig
                 .put("hetu.internal.snapshot.intervalType", "SPLIT_COUNT")
                 .put("hetu.internal.snapshot.timeInterval", "3m")
                 .put("hetu.internal.snapshot.splitCountInterval", "1000000")
-                .put("hetu.snapshot.maxRetries", "20")
-                .put("hetu.snapshot.retryTimeout", "5m")
+                .put("hetu.recovery.maxRetries", "20")
+                .put("hetu.recovery.retryTimeout", "5m")
                 .put("hetu.snapshot.useKryoSerialization", "true")
                 .build();
 
-        SnapshotConfig expected = new SnapshotConfig()
+        RecoveryConfig expected = new RecoveryConfig()
                 .setSnapshotProfile("snapshot-config-hdfs")
                 .setSpillProfile("spill-config-hdfs")
                 .setSpillToHdfs(true)
-                .setSnapshotIntervalType(SnapshotConfig.IntervalType.SPLIT_COUNT)
+                .setSnapshotIntervalType(RecoveryConfig.IntervalType.SPLIT_COUNT)
                 .setSnapshotTimeInterval(new Duration(3, TimeUnit.MINUTES))
                 .setSnapshotSplitCountInterval(1000000)
-                .setSnapshotMaxRetries(20)
-                .setSnapshotRetryTimeout(new Duration(5, TimeUnit.MINUTES))
+                .setRecoveryMaxRetries(20)
+                .setRecoveryRetryTimeout(new Duration(5, TimeUnit.MINUTES))
                 .setSnapshotUseKryoSerialization(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);

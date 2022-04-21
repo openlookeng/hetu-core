@@ -29,7 +29,7 @@ import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.ExchangeClientSupplier;
 import io.prestosql.server.ForStatementResource;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.BlockEncodingSerde;
 
@@ -99,7 +99,7 @@ public class ExecutingStatementResource
     private final BlockEncodingSerde blockEncodingSerde;
     private final BoundedExecutor responseExecutor;
     private final ScheduledExecutorService timeoutExecutor;
-    private final SnapshotUtils snapshotUtils;
+    private final RecoveryUtils recoveryUtils;
 
     private final ConcurrentMap<QueryId, Query> queries = new ConcurrentHashMap<>();
     private final ScheduledExecutorService queryPurger = newSingleThreadScheduledExecutor(threadsNamed("execution-query-purger"));
@@ -109,7 +109,7 @@ public class ExecutingStatementResource
             QueryManager queryManager,
             ExchangeClientSupplier exchangeClientSupplier,
             BlockEncodingSerde blockEncodingSerde,
-            SnapshotUtils snapshotUtils,
+            RecoveryUtils recoveryUtils,
             @ForStatementResource BoundedExecutor responseExecutor,
             @ForStatementResource ScheduledExecutorService timeoutExecutor)
     {
@@ -118,7 +118,7 @@ public class ExecutingStatementResource
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.responseExecutor = requireNonNull(responseExecutor, "responseExecutor is null");
         this.timeoutExecutor = requireNonNull(timeoutExecutor, "timeoutExecutor is null");
-        this.snapshotUtils = snapshotUtils;
+        this.recoveryUtils = recoveryUtils;
 
         queryPurger.scheduleWithFixedDelay(
                 () -> {
@@ -195,8 +195,8 @@ public class ExecutingStatementResource
 
         query = queries.computeIfAbsent(queryId, id -> {
             ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), ExecutingStatementResource.class.getSimpleName()));
-            if (SystemSessionProperties.isSnapshotEnabled(session)) {
-                exchangeClient.setSnapshotEnabled(snapshotUtils.getOrCreateQuerySnapshotManager(queryId, session));
+            if (SystemSessionProperties.isRecoveryEnabled(session)) {
+                exchangeClient.setRecoveryEnabled(recoveryUtils.getOrCreateRecoveryManager(queryId, session));
             }
             return Query.create(
                     session,

@@ -18,11 +18,12 @@ import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.metadata.SessionPropertyManager;
-import io.prestosql.snapshot.SnapshotConfig;
+import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.utils.HetuConfig;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
 import static io.prestosql.SystemSessionProperties.REUSE_TABLE_SCAN;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
@@ -53,20 +54,21 @@ public final class SessionTestUtils
     static
     {
         // Use a session object that enables snapshot
-        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        RecoveryConfig recoveryConfig = new RecoveryConfig();
         SystemSessionProperties properties = new SystemSessionProperties(
                 new QueryManagerConfig(),
                 new TaskManagerConfig(),
                 new MemoryManagerConfig(),
                 new FeaturesConfig(),
                 new HetuConfig(),
-                snapshotConfig);
+                recoveryConfig);
         TEST_SNAPSHOT_SESSION = testSessionBuilder(new SessionPropertyManager(properties))
                 .setCatalog("tpch")
                 .setSchema(TINY_SCHEMA_NAME)
                 .setClientCapabilities(stream(ClientCapabilities.values())
                         .map(ClientCapabilities::toString)
                         .collect(toImmutableSet()))
+                .setSystemProperty(RECOVERY_ENABLED, "true")
                 .setSystemProperty(SNAPSHOT_ENABLED, "true")
                 .build();
     }

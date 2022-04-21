@@ -23,7 +23,7 @@ import io.prestosql.execution.TaskStateMachine;
 import io.prestosql.memory.context.MemoryReservationHandler;
 import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.TaskContext;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -82,7 +82,7 @@ public class QueryContext
     private long maxTotalMemory;
 
     private final MemoryTrackingContext queryMemoryContext;
-    private final SnapshotUtils snapshotUtils;
+    private final RecoveryUtils recoveryUtils;
 
     @GuardedBy("this")
     private MemoryPool memoryPool;
@@ -100,7 +100,7 @@ public class QueryContext
             ScheduledExecutorService yieldExecutor,
             DataSize maxSpill,
             SpillSpaceTracker spillSpaceTracker,
-            SnapshotUtils snapshotUtils)
+            RecoveryUtils recoveryUtils)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.maxUserMemory = requireNonNull(maxUserMemory, "maxUserMemory is null").toBytes();
@@ -115,7 +115,7 @@ public class QueryContext
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateUserMemory, this::tryUpdateUserMemory), GUARANTEED_MEMORY),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateRevocableMemory, this::tryReserveMemoryNotSupported), 0L),
                 newRootAggregatedMemoryContext(new QueryMemoryReservationHandler(this::updateSystemMemory, this::tryReserveMemoryNotSupported), 0L));
-        this.snapshotUtils = requireNonNull(snapshotUtils, "snapshotUtils is null");
+        this.recoveryUtils = requireNonNull(recoveryUtils, "snapshotUtils is null");
     }
 
     // TODO: This method should be removed, and the correct limit set in the constructor. However, due to the way QueryContext is constructed the memory limit is not known in advance
@@ -279,7 +279,8 @@ public class QueryContext
                 totalPartitions,
                 parent.orElse(null),
                 serdeFactory,
-                new TaskSnapshotManager(taskStateMachine.getTaskId(), resumeCount, snapshotUtils));
+                new TaskSnapshotManager(taskStateMachine.getTaskId(), resumeCount, recoveryUtils),
+                recoveryUtils.getOrCreateRecoveryManager(queryId, session));
         taskContexts.put(taskInstanceId, taskContext);
         return taskContext;
     }

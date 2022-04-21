@@ -121,7 +121,7 @@ import io.prestosql.server.PluginManagerConfig;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.server.SessionPropertyDefaults;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
-import io.prestosql.snapshot.SnapshotConfig;
+import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.Plugin;
@@ -350,7 +350,7 @@ public class LocalQueryRunner
                 new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()),
                 featuresConfig,
                 // new HetuConfig object passed, if split filtering is needed in the runner, a modified HetuConfig object with filter settings manually set must be used.
-                new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig(), new SnapshotConfig())),
+                new SessionPropertyManager(new SystemSessionProperties(new QueryManagerConfig(), taskManagerConfig, new MemoryManagerConfig(), featuresConfig, new HetuConfig(), new RecoveryConfig())),
                 new SchemaPropertyManager(),
                 new TablePropertyManager(),
                 new ColumnPropertyManager(),

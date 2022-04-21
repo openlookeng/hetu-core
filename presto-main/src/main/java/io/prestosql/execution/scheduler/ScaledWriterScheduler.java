@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static io.prestosql.execution.scheduler.ScheduleResult.BlockedReason.WRITER_SCALING;
-import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
+import static io.prestosql.snapshot.RecoveryConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -50,7 +50,7 @@ public class ScaledWriterScheduler
     private final Set<InternalNode> scheduledNodes = new HashSet<>();
     private final AtomicBoolean done = new AtomicBoolean();
     private volatile SettableFuture<?> future = SettableFuture.create();
-    private final boolean isSnapshotEnabled;
+    private final boolean isRecoveryEnabled;
     // Snapshot: when rescheduling, the number of tasks previously scheduled
     private final int initialTaskCount;
 
@@ -61,7 +61,7 @@ public class ScaledWriterScheduler
             NodeSelector nodeSelector,
             ScheduledExecutorService executor,
             DataSize writerMinSize,
-            boolean isSnapshotEnabled,
+            boolean isRecoveryEnabled,
             Integer initialTaskCount)
     {
         this.stage = requireNonNull(stage, "stage is null");
@@ -70,7 +70,7 @@ public class ScaledWriterScheduler
         this.nodeSelector = requireNonNull(nodeSelector, "nodeSelector is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.writerMinSizeBytes = requireNonNull(writerMinSize, "minWriterSize is null").toBytes();
-        this.isSnapshotEnabled = isSnapshotEnabled;
+        this.isRecoveryEnabled = isRecoveryEnabled;
         if (initialTaskCount != null) {
             checkCondition(initialTaskCount <= nodeSelector.selectableNodeCount(),
                     NO_NODES_AVAILABLE,
@@ -103,7 +103,7 @@ public class ScaledWriterScheduler
             return initialTaskCount;
         }
 
-        if (isSnapshotEnabled) {
+        if (isRecoveryEnabled) {
             // Don't exceed max allocation limit
             if (scheduledNodes.size() + 1 > calculateTaskCount(nodeSelector.selectableNodeCount())) {
                 return 0;

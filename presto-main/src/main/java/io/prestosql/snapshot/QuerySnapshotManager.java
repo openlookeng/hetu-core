@@ -20,7 +20,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
-import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryState;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -39,14 +38,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.spi.StandardErrorCode.TOO_MANY_RESUMES;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -58,7 +55,7 @@ public class QuerySnapshotManager
     private static final Logger LOG = Logger.get(QuerySnapshotManager.class);
 
     private final QueryId queryId;
-    private final SnapshotUtils snapshotUtils;
+    private final RecoveryUtils recoveryUtils;
 
     private final Map<StageId, BiConsumer<Boolean, Long>> stageCompleteCallbacks = Collections.synchronizedMap(new LinkedHashMap<>());
     private final Set<TaskId> unfinishedTasks = Sets.newConcurrentHashSet();
@@ -71,16 +68,8 @@ public class QuerySnapshotManager
     private final List<Consumer<RestoreResult>> restoreCompleteListeners = Collections.synchronizedList(new ArrayList<>());
     private final List<RestoreResult> restoreStats = Collections.synchronizedList(new ArrayList<>());
 
-    private final long maxRetry;
-    private final long retryTimeout;
-
     // The snapshot id used for current resume. It's cleared when a resume is successful.
     private OptionalLong lastTriedId = OptionalLong.empty();
-    // If a resume is not finished before the timer expires, it's considered a failure.
-    private Optional<Timer> retryTimer = Optional.empty();
-    // How many numbers resume has been attempted for this query
-    private long retryCount;
-    private Runnable rescheduler; // SqlQueryScheduler will set it.
 
     // Keeps track of relevant snapshotIds.
     // Whenever MarkerAnnouncer decides to initiate a new snapshot, it needs to inform the QuerySnapshotManager about its action.
@@ -91,32 +80,21 @@ public class QuerySnapshotManager
     private long restoringSnapshotId;
 
     private boolean restoreInitiated;
+    Consumer<Boolean> onRecoveryComplete;
+    Function<Void, Boolean> recoveryInProgress;
 
-    public QuerySnapshotManager(QueryId queryId, SnapshotUtils snapshotUtils, Session session)
+    public QuerySnapshotManager(QueryId queryId, RecoveryUtils recoveryUtils, Session session)
     {
         this.queryId = requireNonNull(queryId);
-        this.snapshotUtils = requireNonNull(snapshotUtils);
-        if (session == null) {
-            maxRetry = 0;
-            retryTimeout = 0;
-        }
-        else {
-            this.maxRetry = SystemSessionProperties.getSnapshotMaxRetries(session);
-            this.retryTimeout = SystemSessionProperties.getSnapshotRetryTimeout(session).toMillis();
-        }
+        this.recoveryUtils = requireNonNull(recoveryUtils);
         this.initiatedSnapshotId = Collections.synchronizedList(new ArrayList<>());
         initiatedSnapshotId.add(0L);
         restoringSnapshotId = 0;
     }
 
-    public void setRescheduler(Runnable rescheduler)
-    {
-        this.rescheduler = rescheduler;
-    }
-
     public boolean isCoordinator()
     {
-        return snapshotUtils.isCoordinator();
+        return recoveryUtils.isCoordinator();
     }
 
     // coordinator specified functions
@@ -138,11 +116,6 @@ public class QuerySnapshotManager
         initiatedSnapshotId.add(snapshotId);
     }
 
-    public long getResumeCount()
-    {
-        return retryCount;
-    }
-
     /**
      * Get the successful and complete snapshot id to resume.
      *
@@ -153,14 +126,9 @@ public class QuerySnapshotManager
     public OptionalLong getResumeSnapshotId()
             throws PrestoException
     {
-        if (retryCount >= maxRetry) {
-            throw new PrestoException(TOO_MANY_RESUMES, "Tried to recover query execution for too many times");
-        }
-        retryCount++;
         restoreInitiated = true;
 
         lastTriedId = getResumeSnapshotId(lastTriedId);
-        startSnapshotRestoreTimer();
 
         // Clear entries that are no longer needed after resuming.
         // In particular, unfinishedTasks needs to be cleared in case it contains table-scan tasks that won't be restored.
@@ -175,6 +143,11 @@ public class QuerySnapshotManager
             initiatedSnapshotId.add(0L);
             // Restart query without restore step, update statistics
             updateStatsOnQueryRestart();
+            if (null != onRecoveryComplete) {
+                LOG.info("Notifying about restore completion while restarting the query");
+                onRecoveryComplete.accept(true);
+                onRecoveryComplete = null;
+            }
         }
         else {
             // all snapshotIds including lastTriedId can be reused.
@@ -245,29 +218,10 @@ public class QuerySnapshotManager
         }
     }
 
-    public synchronized boolean hasPendingResume()
-    {
-        if (retryTimer.isPresent()) {
-            LOG.warn("Query %s finished after resume, but resume was not done", queryId.getId());
-            return true;
-        }
-        return false;
-    }
-
-    private synchronized boolean cancelRestoreTimer()
-    {
-        if (!retryTimer.isPresent()) {
-            return false;
-        }
-
-        retryTimer.get().cancel();
-        retryTimer = Optional.empty();
-        return true;
-    }
-
     private void queryRestoreComplete()
     {
-        if (!retryTimer.isPresent()) {
+        LOG.info("queryRestoreComplete() is called!");
+        if (!recoveryInProgress.apply(null)) {
             return;
         }
         // reset to indicate restoring is complete
@@ -278,7 +232,10 @@ public class QuerySnapshotManager
                 info.setEndTime(System.currentTimeMillis());
                 restoreStats.add(restoreResult);
             }
-            cancelRestoreTimer();
+            if (null != onRecoveryComplete) {
+                LOG.info("Notifying about restore completion");
+                onRecoveryComplete.accept(true);
+            }
             // reset restore initiated on successful restore
             restoreInitiated = false;
             if (lastTriedId.isPresent()) {
@@ -293,42 +250,12 @@ public class QuerySnapshotManager
         }
         else {
             LOG.warn("Failed to restore snapshot for %s, snapshot %d", queryId.getId(), restoreResult.getSnapshotId());
-            cancelToResume();
-        }
-    }
-
-    private void startSnapshotRestoreTimer()
-    {
-        if (!lastTriedId.isPresent()) {
-            cancelRestoreTimer();
-            return;
-        }
-
-        // start timer for restoring snapshot
-        TimerTask task = new TimerTask()
-        {
-            public void run()
-            {
-                synchronized (this) {
-                    if (retryTimer.isPresent()) {
-                        LOG.warn("Snapshot restore timed out, failed to restore snapshot for %s, snapshot %s", queryId.getId(), lastTriedId.toString());
-                        retryTimer = Optional.empty();
-                    }
-                    else {
-                        // We must have received the "queryRestoreComplete" signal while the time is triggerd
-                        return;
-                    }
-                }
-                cancelToResume();
+            if (null != onRecoveryComplete) {
+                LOG.info("Notifying about restore failure");
+                onRecoveryComplete.accept(false);
             }
-        };
-        Timer timer = new Timer();
-        timer.schedule(task, retryTimeout);
-
-        synchronized (this) {
-            cancelRestoreTimer();
-            retryTimer = Optional.of(timer);
         }
+        onRecoveryComplete = null;
     }
 
     public void doneQuery(QueryState state)
@@ -348,7 +275,8 @@ public class QuerySnapshotManager
 
         resetForQuery();
 
-        snapshotUtils.removeQuerySnapshotManager(queryId);
+        recoveryUtils.removeQuerySnapshotManager(queryId);
+        recoveryUtils.removeRecoveryManager(queryId);
     }
 
     private void resetForQuery()
@@ -358,7 +286,6 @@ public class QuerySnapshotManager
         captureComponentCounters.clear();
         restoreComponentCounters.clear();
         restoreCompleteListeners.clear();
-        cancelRestoreTimer();
     }
 
     public void addQueryRestoreCompleteListeners(Consumer<RestoreResult> listener)
@@ -447,8 +374,8 @@ public class QuerySnapshotManager
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
 
             try {
-                snapshotUtils.storeSnapshotResult(queryId.getId(), doneResult);
-                snapshotUtils.storeConsolidatedFileList(queryId.getId(), consolidatedFilePaths);
+                recoveryUtils.storeSnapshotResult(queryId.getId(), doneResult);
+                recoveryUtils.storeConsolidatedFileList(queryId.getId(), consolidatedFilePaths);
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
@@ -460,7 +387,7 @@ public class QuerySnapshotManager
     {
         SnapshotComponentCounter<TaskId> counter = captureComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageCaptureCompletion(curTaskId, ids, snapshotId)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageCaptureCompletion(curTaskId, ids, snapshotId), task -> !unfinishedTasks.contains(task)));
         if (counter.updateComponent(taskId, componentState)) {
             SnapshotResult snapshotResult = counter.getSnapshotResult();
             synchronized (captureResults) {
@@ -493,7 +420,7 @@ public class QuerySnapshotManager
         // update queryToRestoredSnapshotComponentCounterMap
         SnapshotComponentCounter<TaskId> counter = restoreComponentCounters.computeIfAbsent(snapshotId, k ->
                 // A snapshot is considered complete if tasks either finished their snapshots or have completed
-                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageRestoreCompletion(curTaskId, ids)));
+                new SnapshotComponentCounter<>(ids -> ids.containsAll(unfinishedTasks), (curTaskId, ids) -> CheckAndNotifyStageRestoreCompletion(curTaskId, ids), null));
 
         if (counter.updateComponent(taskId, componentState)) {
             LOG.debug("Finished restoring snapshot %d for task %s", snapshotId, taskId);
@@ -643,19 +570,9 @@ public class QuerySnapshotManager
         return restoreResult;
     }
 
-    public SnapshotUtils getSnapshotUtils()
+    public RecoveryUtils getSnapshotUtils()
     {
-        return snapshotUtils;
-    }
-
-    // Returns true if cancel-to-resume is triggered; returns false if this was a no-op
-    public synchronized void cancelToResume()
-    {
-        // If rescheduler is null, then the query must be in the process o being (re)scheduled
-        if (rescheduler != null) {
-            rescheduler.run();
-            rescheduler = null;
-        }
+        return recoveryUtils;
     }
 
     public void setRestoreStartTime(long curTime)
@@ -697,5 +614,11 @@ public class QuerySnapshotManager
     public Map<Long, SnapshotInfo> getCaptureResults()
     {
         return captureResults;
+    }
+
+    public void setRecoveryCallbacks(Consumer<Boolean> onRecoveryComplete, Function<Void, Boolean> recoveryProgressCheck)
+    {
+        this.onRecoveryComplete = onRecoveryComplete;
+        this.recoveryInProgress = recoveryProgressCheck;
     }
 }

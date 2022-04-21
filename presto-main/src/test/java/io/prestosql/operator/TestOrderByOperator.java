@@ -25,8 +25,8 @@ import io.prestosql.Session;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.operator.OrderByOperator.OrderByOperatorFactory;
-import io.prestosql.snapshot.SnapshotConfig;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryConfig;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.MarkerPage;
@@ -91,7 +91,7 @@ public class TestOrderByOperator
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
     private DummySpillerFactory spillerFactory;
-    private SnapshotUtils snapshotUtils = NOOP_SNAPSHOT_UTILS;
+    private RecoveryUtils recoveryUtils = NOOP_SNAPSHOT_UTILS;
     private FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
 
     @DataProvider
@@ -396,7 +396,7 @@ public class TestOrderByOperator
     {
         return TestingTaskContext.builder(executor, scheduledExecutor, session)
                 .setMemoryPoolSize(succinctBytes(memoryLimit))
-                .setSnapshotUtils(snapshotUtils)
+                .setSnapshotUtils(recoveryUtils)
                 .build()
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
@@ -427,9 +427,9 @@ public class TestOrderByOperator
         // Initialization
         Path spillPath = Paths.get("/tmp/hetu/snapshot/");
         GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, false, null);
-        SnapshotConfig snapshotConfig = new SnapshotConfig();
-        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
-        snapshotUtils.initialize();
+        RecoveryConfig recoveryConfig = new RecoveryConfig();
+        recoveryUtils = new RecoveryUtils(fileSystemClientManager, recoveryConfig, new InMemoryNodeManager());
+        recoveryUtils.initialize();
 
         List<Page> input1 = rowPagesBuilder(VARCHAR, BIGINT)
                 .row("a", 1L)
@@ -558,11 +558,11 @@ public class TestOrderByOperator
         HetuHdfsFileSystemClient fs = getLocalHdfs();
         when(fileSystemClientManager.getFileSystemClient(any(String.class), any(Path.class))).thenReturn(fs);
         GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, true, "hdfs");
-        SnapshotConfig snapshotConfig = new SnapshotConfig();
-        snapshotConfig.setSpillProfile("hdfs");
-        snapshotConfig.setSpillToHdfs(true);
-        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
-        snapshotUtils.initialize();
+        RecoveryConfig recoveryConfig = new RecoveryConfig();
+        recoveryConfig.setSpillProfile("hdfs");
+        recoveryConfig.setSpillToHdfs(true);
+        recoveryUtils = new RecoveryUtils(fileSystemClientManager, recoveryConfig, new InMemoryNodeManager());
+        recoveryUtils.initialize();
 
         List<Page> input1 = rowPagesBuilder(VARCHAR, BIGINT)
                 .row("a", 1L)

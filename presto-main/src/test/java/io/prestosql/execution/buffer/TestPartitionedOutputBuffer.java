@@ -22,8 +22,8 @@ import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.PageAssertions;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.snapshot.SnapshotStateId;
-import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.MarkerPage;
@@ -295,10 +295,10 @@ public class TestPartitionedOutputBuffer
     public void testRestorePages()
             throws Exception
     {
-        SnapshotUtils snapshotUtils = mock(SnapshotUtils.class);
+        RecoveryUtils recoveryUtils = mock(RecoveryUtils.class);
         ScheduledExecutorService scheduler = newScheduledThreadPool(4, daemonThreadsNamed("test-%s"));
         ScheduledExecutorService scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
-        TaskContext taskContext = createTaskContext(scheduler, scheduledExecutor, TEST_SNAPSHOT_SESSION, snapshotUtils);
+        TaskContext taskContext = createTaskContext(scheduler, scheduledExecutor, TEST_SNAPSHOT_SESSION, recoveryUtils);
         taskContext.getSnapshotManager().setTotalComponents(2);
 
         int firstPartition = 0;
@@ -334,13 +334,13 @@ public class TestPartitionedOutputBuffer
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
         ArgumentCaptor<TaskSnapshotManager> collectorArgument = ArgumentCaptor.forClass(TaskSnapshotManager.class);
         // storeState is called once for each partition
-        verify(snapshotUtils, times(3)).storeState(idArgument.capture(), stateArgument.capture(), collectorArgument.capture());
+        verify(recoveryUtils, times(3)).storeState(idArgument.capture(), stateArgument.capture(), collectorArgument.capture());
         List<SnapshotStateId> ids = idArgument.getAllValues();
         List<Object> states = stateArgument.getAllValues();
         List<TaskSnapshotManager> snapshotManagers = collectorArgument.getAllValues();
-        when(snapshotUtils.loadState(ids.get(0), snapshotManagers.get(0))).thenReturn(Optional.of(states.get(0)));
-        when(snapshotUtils.loadState(ids.get(1), snapshotManagers.get(1))).thenReturn(Optional.of(states.get(1)));
-        when(snapshotUtils.loadState(ids.get(2), snapshotManagers.get(2))).thenReturn(Optional.of(states.get(2)));
+        when(recoveryUtils.loadState(ids.get(0), snapshotManagers.get(0))).thenReturn(Optional.of(states.get(0)));
+        when(recoveryUtils.loadState(ids.get(1), snapshotManagers.get(1))).thenReturn(Optional.of(states.get(1)));
+        when(recoveryUtils.loadState(ids.get(2), snapshotManagers.get(2))).thenReturn(Optional.of(states.get(2)));
 
         buffer = createPartitionedBuffer(
                 createInitialEmptyOutputBuffers(PARTITIONED)
@@ -355,7 +355,7 @@ public class TestPartitionedOutputBuffer
 
         // Resume both partitions
         buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(resume)), channel1);
-        verify(snapshotUtils, times(3)).loadState(anyObject(), anyObject());
+        verify(recoveryUtils, times(3)).loadState(anyObject(), anyObject());
 
         // Newly added page (page2) should be received after the resume marker
         buffer.enqueue(firstPartition, ImmutableList.of(PAGES_SERDE.serialize(page2)), channel1);

@@ -16,8 +16,8 @@ package io.prestosql.testing;
 
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InMemoryNodeManager;
-import io.prestosql.snapshot.SnapshotConfig;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryConfig;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import java.io.IOException;
@@ -29,12 +29,12 @@ import java.util.stream.Stream;
 
 public class TestingSnapshotUtils
 {
-    public static final SnapshotUtils NOOP_SNAPSHOT_UTILS;
+    public static final RecoveryUtils NOOP_SNAPSHOT_UTILS;
 
     static {
-        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        RecoveryConfig recoveryConfig = new RecoveryConfig();
         FileSystemClientManager fileSystemClientManager = new NoopFileSystemClientManager();
-        NOOP_SNAPSHOT_UTILS = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
+        NOOP_SNAPSHOT_UTILS = new RecoveryUtils(fileSystemClientManager, recoveryConfig, new InMemoryNodeManager());
         NOOP_SNAPSHOT_UTILS.initialize();
     }
 

@@ -103,9 +103,9 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.prestosql.SystemSessionProperties.isExchangeCompressionEnabled;
-import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
+import static io.prestosql.SystemSessionProperties.isRecoveryEnabled;
 import static io.prestosql.execution.QueryState.FAILED;
-import static io.prestosql.execution.QueryState.RESCHEDULING;
+import static io.prestosql.execution.QueryState.RECOVERING;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.util.Failures.toFailure;
 import static io.prestosql.util.MoreLists.mappedCopy;
@@ -739,7 +739,7 @@ public class Query
 
     private synchronized void updateQueryState(QueryState newState)
     {
-        if (newState == RESCHEDULING) {
+        if (newState == RECOVERING) {
             // Snapshot: remote task will be rescheduled. Need to reset exchange client so it can be connected to new task.
             exchangeClient.resetForResume();
         }
@@ -851,7 +851,7 @@ public class Query
 
     private SnapshotStats toSnapshotStats(QueryId queryId)
     {
-        if (!isSnapshotEnabled(session) || queryId == null) {
+        if (!isRecoveryEnabled(session) || queryId == null) {
             return null;
         }
         AtomicLong totalCpuTimeMillis = new AtomicLong(0L);

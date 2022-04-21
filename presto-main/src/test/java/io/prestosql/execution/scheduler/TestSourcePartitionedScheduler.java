@@ -39,6 +39,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
@@ -63,6 +64,7 @@ import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.statestore.LocalStateStoreProvider;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
+import io.prestosql.testing.TestingSnapshotUtils;
 import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
 import org.testng.annotations.AfterClass;
@@ -532,7 +534,8 @@ public class TestSourcePartitionedScheduler
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(seedStoreManager)),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
 
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(PARTITIONED)
                 .withBuffer(OUT, 0)

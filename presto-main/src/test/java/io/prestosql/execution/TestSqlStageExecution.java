@@ -25,6 +25,7 @@ import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.seedstore.SeedStoreManager;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.PlanNode;
@@ -121,7 +122,8 @@ public class TestSqlStageExecution
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
-                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(stageId.getQueryId(), NOOP_SNAPSHOT_UTILS, TEST_SESSION),
+                new QueryRecoveryManager(NOOP_SNAPSHOT_UTILS, TEST_SESSION, stageId.getQueryId()));
 
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
