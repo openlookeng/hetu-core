@@ -89,9 +89,9 @@ public class CatalogAccessControlRule
                 return NONE;
             }
             if (value instanceof String) {
-                AccessMode accessMode = modeByName.get(((String) value).toLowerCase(Locale.US));
-                if (accessMode != null) {
-                    return accessMode;
+                AccessMode accessMode1 = modeByName.get(((String) value).toLowerCase(Locale.US));
+                if (accessMode1 != null) {
+                    return accessMode1;
                 }
             }
 
