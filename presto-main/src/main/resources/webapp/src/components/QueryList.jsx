@@ -520,6 +520,7 @@ export class QueryList extends React.Component {
             "timePicker24Hour": true,
             "linkedCalendars": false,
             "autoUpdateInput": false,
+            "timePickerMinutes": true,
             "locale": {
                 format: 'YYYY-MM-DD.HH:mm',
                 separator: ' ~ ',
