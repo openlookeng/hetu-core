@@ -37,6 +37,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -360,7 +361,7 @@ public class TestHttpPageBufferClient
         TestingHttpClient.Processor processor = (input) -> {
             Duration delta = tickerIncrement.get();
             ticker.increment(delta.toMillis(), TimeUnit.MILLISECONDS);
-            throw new RuntimeException("Foo");
+            throw new GeneralSecurityException("Foo");
         };
 
         CyclicBarrier requestComplete = new CyclicBarrier(2);
@@ -429,7 +430,7 @@ public class TestHttpPageBufferClient
         TestingHttpClient.Processor processor = (input) -> {
             Duration delta = tickerIncrement.get();
             ticker.increment(delta.toMillis(), TimeUnit.MILLISECONDS);
-            throw new RuntimeException("Foo");
+            throw new GeneralSecurityException("Foo");
         };
 
         CyclicBarrier requestComplete = new CyclicBarrier(2);
@@ -475,7 +476,7 @@ public class TestHttpPageBufferClient
         TestingHttpClient.Processor processor = (input) -> {
             Duration delta = tickerIncrement.get();
             ticker.increment(delta.toMillis(), TimeUnit.MILLISECONDS);
-            throw new RuntimeException("Foo");
+            throw new GeneralSecurityException("Foo");
         };
 
         CyclicBarrier requestComplete = new CyclicBarrier(2);
