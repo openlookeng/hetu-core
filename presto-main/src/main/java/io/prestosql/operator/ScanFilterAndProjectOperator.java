@@ -493,7 +493,12 @@ public class ScanFilterAndProjectOperator
             page = recordMaterializedBytes(page, sizeInBytes -> processedBytes += sizeInBytes);
 
             // update operator stats
-            processedPositions += page.getPositionCount();
+            if (pageSource.getCompletedPositionCount().isPresent()) {
+                processedPositions = pageSource.getCompletedPositionCount().getAsLong();
+            }
+            else {
+                processedPositions += page.getPositionCount();
+            }
             physicalBytes = pageSource.getCompletedBytes();
             readTimeNanos = pageSource.getReadTimeNanos();
 
