@@ -194,7 +194,7 @@ export class QueryListItem extends React.Component {
                     <div className="col-xs-4">
                         <div className="row stat-row query-header query-header-queryid">
                             <div className="col-xs-9" data-toggle="tooltip" data-placement="bottom" title="Query ID">
-                                <a href={"/ui/query.html?history_"+query.queryId} target="_blank">{query.queryId}</a>
+                                <a href={"../ui/query.html?history_"+query.queryId} target="_blank">{query.queryId}</a>
                             </div>
                             <div className="col-xs-3 query-header-timestamp" data-toggle="tooltip" data-placement="bottom" title="Submit time">
                                 <span>{formatShortTime(new Date(Date.parse(query.createTime)))}</span>
@@ -463,10 +463,9 @@ export class QueryList extends React.Component {
 
     componentDidMount() {
         $.get(`../v1/query/hetuMetastoreType`, function (metaStoreType) {
-            console.log(metaStoreType);
             this.state.metaStoreType = metaStoreType;
             if(this.state.metaStoreType != "jdbc") {
-                alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
+                alert("Page error. Please change the storage type of hetu-metastore to JDBC.");
             }
             this.resetTimer();
         }.bind(this))
@@ -688,6 +687,8 @@ export class QueryList extends React.Component {
 
     render() {
         const { allQueries, currentPage, total, stateFilters, pageSize } = this.state;
+        console.log(allQueries);
+        console.log(typeof (allQueries));
         // let queryList = <DisplayedQueriesList queries={allQueries} />;
         let queryList;
         if (allQueries == null || total === 0) {
@@ -702,6 +703,7 @@ export class QueryList extends React.Component {
             );
         }
         else {
+            console.log(111);
             queryList = <DisplayedQueriesList queries={allQueries} />;
         }
 
