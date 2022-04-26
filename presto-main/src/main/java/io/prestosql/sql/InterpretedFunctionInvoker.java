@@ -19,6 +19,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentProperty;
 import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.ScalarFunctionImplementation;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
 import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.ArgumentType.VALUE_TYPE;
 import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.RETURN_NULL_ON_NULL;
 import static io.prestosql.spi.function.BuiltInScalarFunctionImplementation.NullConvention.USE_NULL_FLAG;
+import static io.prestosql.sql.gen.BytecodeUtils.getAllScalarFunctionImplementationChoices;
 import static java.lang.invoke.MethodHandleProxies.asInterfaceInstance;
 import static java.util.Objects.requireNonNull;
 
@@ -48,7 +50,7 @@ public class InterpretedFunctionInvoker
 
     public Object invoke(FunctionHandle functionHandle, ConnectorSession session, List<Object> arguments)
     {
-        return invoke(functionAndTypeManager.getBuiltInScalarFunctionImplementation(functionHandle), session, arguments);
+        return invoke(functionAndTypeManager.getScalarFunctionImplementation(functionHandle), session, arguments);
     }
 
     /**
@@ -56,8 +58,9 @@ public class InterpretedFunctionInvoker
      * <p>
      * Returns a value in the native container type corresponding to the declared SQL return type
      */
-    private Object invoke(BuiltInScalarFunctionImplementation function, ConnectorSession session, List<Object> arguments)
+    private Object invoke(ScalarFunctionImplementation function, ConnectorSession session, List<Object> arguments)
     {
+        BuiltInScalarFunctionImplementation.ScalarImplementationChoice choice = getAllScalarFunctionImplementationChoices(function).get(0);
         MethodHandle method = function.getMethodHandle();
 
         // handle function on instance method, to allow use of fields
@@ -69,15 +72,15 @@ public class InterpretedFunctionInvoker
         List<Object> actualArguments = new ArrayList<>();
         for (int i = 0; i < arguments.size(); i++) {
             Object argument = arguments.get(i);
-            ArgumentProperty argumentProperty = function.getArgumentProperty(i);
+            ArgumentProperty argumentProperty = choice.getArgumentProperty(i);
             if (argumentProperty.getArgumentType() == VALUE_TYPE) {
-                if (function.getArgumentProperty(i).getNullConvention() == RETURN_NULL_ON_NULL) {
+                if (choice.getArgumentProperty(i).getNullConvention() == RETURN_NULL_ON_NULL) {
                     if (argument == null) {
                         return null;
                     }
                     actualArguments.add(argument);
                 }
-                else if (function.getArgumentProperty(i).getNullConvention() == USE_NULL_FLAG) {
+                else if (choice.getArgumentProperty(i).getNullConvention() == USE_NULL_FLAG) {
                     boolean isNull = argument == null;
                     if (isNull) {
                         argument = Defaults.defaultValue(method.type().parameterType(actualArguments.size()));
@@ -103,14 +106,19 @@ public class InterpretedFunctionInvoker
         }
     }
 
-    private static MethodHandle bindInstanceFactory(MethodHandle method, BuiltInScalarFunctionImplementation implementation)
+    private static MethodHandle bindInstanceFactory(MethodHandle method, ScalarFunctionImplementation implementation)
     {
-        if (!implementation.getInstanceFactory().isPresent()) {
+        if (!(implementation instanceof BuiltInScalarFunctionImplementation)) {
+            return method;
+        }
+
+        BuiltInScalarFunctionImplementation builtInImplementation = (BuiltInScalarFunctionImplementation) implementation;
+        if (!builtInImplementation.getInstanceFactory().isPresent()) {
             return method;
         }
 
         try {
-            return method.bindTo(implementation.getInstanceFactory().get().invoke());
+            return method.bindTo(builtInImplementation.getInstanceFactory().get().invoke());
         }
         catch (Throwable throwable) {
             throw propagate(throwable);

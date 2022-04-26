@@ -17,9 +17,11 @@ package io.prestosql.sql.planner.sanity;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.DefaultRowExpressionTraversalVisitor;
+import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -50,7 +52,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_USER_ERROR;
-import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.isOriginalExpression;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -66,7 +67,7 @@ public class ExternalFunctionPushDownChecker
     public void validate(PlanNode planNode, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
         Set<String> set = new HashSet<>();
-        planNode.accept(new ExternalFunctionFinder(), set);
+        planNode.accept(new ExternalFunctionFinder(metadata.getFunctionAndTypeManager()), set);
         if (set.size() > 0) {
             String allErrorFun = set.stream().map(String::toString).collect(Collectors.joining(", "));
             throw new IllegalExternalFunctionUsageException(
@@ -78,6 +79,18 @@ public class ExternalFunctionPushDownChecker
     private static class ExternalFunctionFinder
             extends InternalPlanVisitor<Void, Set<String>>
     {
+        public static List<CatalogSchemaName> functionNamespaces = new ArrayList<>();
+
+        public ExternalFunctionFinder(FunctionAndTypeManager functionAndTypeManager)
+        {
+            for (String catalog : functionAndTypeManager.getFunctionNamespaceManagers().keySet()) {
+                CatalogSchemaName namespace = new CatalogSchemaName(catalog, "default");
+                if (!functionNamespaces.contains(namespace)) {
+                    functionNamespaces.add(namespace);
+                }
+            }
+        }
+
         @Override
         public Void visitPlan(PlanNode node, Set<String> context)
         {
@@ -282,7 +295,7 @@ public class ExternalFunctionPushDownChecker
 
         private static boolean isDefaultFunction(CallExpression callExpression)
         {
-            return DEFAULT_NAMESPACE.equals(callExpression.getFunctionHandle().getFunctionNamespace());
+            return ExternalFunctionFinder.functionNamespaces.contains(callExpression.getFunctionHandle().getFunctionNamespace());
         }
     }
 

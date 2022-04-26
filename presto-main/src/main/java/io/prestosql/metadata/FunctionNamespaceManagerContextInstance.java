@@ -15,6 +15,7 @@ package io.prestosql.metadata;
 
 import io.prestosql.spi.function.FunctionNamespaceManagerContext;
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.type.TypeManager;
 
 import java.util.Optional;
 
@@ -23,9 +24,12 @@ public class FunctionNamespaceManagerContextInstance
 {
     private final HetuMetastore hetuMetastore;
 
-    public FunctionNamespaceManagerContextInstance(HetuMetastore hetuMetastore)
+    private final TypeManager typeManager;
+
+    public FunctionNamespaceManagerContextInstance(HetuMetastore hetuMetastore, TypeManager typeManager)
     {
         this.hetuMetastore = hetuMetastore;
+        this.typeManager = typeManager;
     }
 
     @Override
@@ -35,5 +39,14 @@ public class FunctionNamespaceManagerContextInstance
             return Optional.empty();
         }
         return Optional.of(hetuMetastore);
+    }
+
+    @Override
+    public Optional<TypeManager> getTypeManager()
+    {
+        if (typeManager == null) {
+            return Optional.empty();
+        }
+        return Optional.of(typeManager);
     }
 }
