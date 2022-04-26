@@ -14,12 +14,18 @@
 package io.prestosql.spi.function;
 
 import io.prestosql.spi.metastore.HetuMetastore;
+import io.prestosql.spi.type.TypeManager;
 
 import java.util.Optional;
 
 public interface FunctionNamespaceManagerContext
 {
     default Optional<HetuMetastore> getHetuMetastore()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Optional<TypeManager> getTypeManager()
     {
         throw new UnsupportedOperationException();
     }
