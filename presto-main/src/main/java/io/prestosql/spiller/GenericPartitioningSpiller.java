@@ -32,6 +32,7 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -43,6 +44,7 @@ import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -218,6 +220,12 @@ public class GenericPartitioningSpiller
     }
 
     @Override
+    public List<Path> getSpilledFilePaths()
+    {
+        return spillers.stream().filter(spiller -> spiller.isPresent()).map(spiller -> spiller.get().getFile()).collect(Collectors.toList());
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         GenericPartitioningSpillerState myState = new GenericPartitioningSpillerState();
@@ -228,6 +236,10 @@ public class GenericPartitioningSpiller
             if (spillers.get(i).isPresent()) {
                 myState.spillers.set(i, spillers.get(i).get().capture(serdeProvider));
             }
+        }
+        myState.pageBuilders = new ArrayList<>(Collections.nCopies(pageBuilders.size(), null));
+        for (int pageBuilderCount = 0; pageBuilderCount < pageBuilders.size(); pageBuilderCount++) {
+            myState.pageBuilders.set(pageBuilderCount, pageBuilders.get(pageBuilderCount).capture(serdeProvider));
         }
         return myState;
     }
@@ -247,6 +259,9 @@ public class GenericPartitioningSpiller
                 this.spillers.set(i, Optional.of(closer.register(spiller)));
             }
         }
+        for (int pageBuilderCount = 0; pageBuilderCount < pageBuilders.size(); pageBuilderCount++) {
+            pageBuilders.get(pageBuilderCount).restore(myState.pageBuilders.get(pageBuilderCount), serdeProvider);
+        }
     }
 
     private static class GenericPartitioningSpillerState
@@ -255,5 +270,6 @@ public class GenericPartitioningSpiller
         Set<Integer> spilledPartitions;
         boolean readingStarted;
         List<Object> spillers;
+        List<Object> pageBuilders;
     }
 }

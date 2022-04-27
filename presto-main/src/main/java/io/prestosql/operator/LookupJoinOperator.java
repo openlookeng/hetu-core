@@ -24,6 +24,7 @@ import io.prestosql.operator.LookupSourceProvider.LookupSourceLease;
 import io.prestosql.operator.PartitionedConsumption.Partition;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
 import io.prestosql.snapshot.SingleInputSnapshotState;
+import io.prestosql.snapshot.Spillable;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -77,7 +79,7 @@ import static java.util.Objects.requireNonNull;
         "partitionGenerator", "spillInProgress", "unspilling", "currentPartition",
         "unspilledLookupSource", "unspilledInputPages", "snapshotState", "afterMemOpFinish"})
 public class LookupJoinOperator
-        implements Operator
+        implements Operator, Spillable
 {
     private final OperatorContext operatorContext;
     // Snapshot: if forked (in a pipeline that starts with a LookupOuterOperator),
@@ -245,6 +247,21 @@ public class LookupJoinOperator
                 && spillInProgress.isDone()
                 && probe == null
                 && outputPage == null;
+    }
+
+    @Override
+    public boolean isSpilled()
+    {
+        return spiller.isPresent();
+    }
+
+    @Override
+    public List<Path> getSpilledFilePaths()
+    {
+        if (isSpilled()) {
+            return spiller.get().getSpilledFilePaths();
+        }
+        return ImmutableList.of();
     }
 
     @Override
