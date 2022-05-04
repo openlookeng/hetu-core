@@ -33,8 +33,6 @@ import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
 import _ from "lodash";
 import ModalDialog from "../queryeditor/components/ModalDialog";
 
-let isShowMore = true;
-
 export class QueryListItem extends React.Component {
     constructor(props) {
         super(props);
@@ -42,58 +40,10 @@ export class QueryListItem extends React.Component {
             show: false,
         }
         this.showModal = this.showModal.bind(this);
+        this.isShowMore = this.isShowMore.bind(this);
     }
 
-    static stripQueryTextWhitespace(queryText) {
-        const lines = queryText.split("\n");
-        let minLeadingWhitespace = -1;
-        for (let i = 0; i < lines.length; i++) {
-            if (minLeadingWhitespace === 0) {
-                break;
-            }
-
-            if (lines[i].trim().length === 0) {
-                continue;
-            }
-
-            const leadingWhitespace = lines[i].search(/\S/);
-
-            if (leadingWhitespace > -1 && ((leadingWhitespace < minLeadingWhitespace) || minLeadingWhitespace === -1)) {
-                minLeadingWhitespace = leadingWhitespace;
-            }
-        }
-
-        let formattedQueryText = "";
-
-        for (let i = 0; i < lines.length; i++) {
-            const trimmedLine = lines[i].substring(minLeadingWhitespace).replace(/\s+$/g, '');
-
-            if (trimmedLine.length > 0) {
-                formattedQueryText += trimmedLine;
-
-                if (i < (lines.length - 1)) {
-                    formattedQueryText += "\n";
-                }
-            }
-        }
-        if (formattedQueryText && formattedQueryText.length > 550) {
-            isShowMore = true;
-        }
-        else {
-            isShowMore = false;
-        }
-
-        return truncateString(formattedQueryText, 550);
-    }
-
-    showModal(e) {
-        let newShow = this.state.show;
-        this.setState({
-            show: !newShow
-        })
-    }
-
-    getAllQueryText(queryText) {
+    static getAllQueryText(queryText) {
         const lines = queryText.split("\n");
         let minLeadingWhitespace = -1;
         for (let i = 0; i < lines.length; i++) {
@@ -127,6 +77,31 @@ export class QueryListItem extends React.Component {
         }
 
         return formattedQueryText;
+    }
+
+    static stripQueryTextWhitespace(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+
+        return truncateString(formattedQueryText, 550);
+    }
+
+    showModal(e) {
+        let newShow = this.state.show;
+        this.setState({
+            show: !newShow
+        })
+    }
+
+    isShowMore(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+        let row = formattedQueryText.split("\n").length;
+
+        if (formattedQueryText && (formattedQueryText.length > 550 || row > 8)) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     render() {
@@ -194,7 +169,7 @@ export class QueryListItem extends React.Component {
                     <div className="col-xs-4">
                         <div className="row stat-row query-header query-header-queryid">
                             <div className="col-xs-9" data-toggle="tooltip" data-placement="bottom" title="Query ID">
-                                <a href={"/ui/query.html?history_"+query.queryId} target="_blank">{query.queryId}</a>
+                                <a href={"../ui/query.html?history_"+query.queryId} target="_blank">{query.queryId}</a>
                             </div>
                             <div className="col-xs-3 query-header-timestamp" data-toggle="tooltip" data-placement="bottom" title="Submit time">
                                 <span>{formatShortTime(new Date(Date.parse(query.createTime)))}</span>
@@ -265,7 +240,7 @@ export class QueryListItem extends React.Component {
                         <div className="row query-row-bottom">
                             <div className="col-xs-12">
                                 <pre className="query-snippet"><code className="sql">{QueryListItem.stripQueryTextWhitespace(query.query)}</code></pre>
-                                {isShowMore ?
+                                {this.isShowMore(query.query) ?
                                     <div className="query-showmore">
                                         <a onClick={this.showModal} style={{color: '#1E90FF',cursor: 'pointer'}}>
                                             <span className="glyphicon glyphicon-arrow-right" style={{color: '#1E90FF'}}/>
@@ -274,7 +249,7 @@ export class QueryListItem extends React.Component {
                                         <ModalDialog onClose={this.showModal} header={getHumanReadableState(query)} footer={""}
                                                      show={this.state.show}>
                                             <div className="modal-querytext">
-                                                {this.getAllQueryText(query.query)}
+                                                {QueryListItem.getAllQueryText(query.query)}
                                             </div>
                                         </ModalDialog>
                                     </div>
@@ -463,10 +438,9 @@ export class QueryList extends React.Component {
 
     componentDidMount() {
         $.get(`../v1/query/hetuMetastoreType`, function (metaStoreType) {
-            console.log(metaStoreType);
             this.state.metaStoreType = metaStoreType;
             if(this.state.metaStoreType != "jdbc") {
-                alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
+                alert("Page error. Please change the storage type of hetu-metastore to JDBC.");
             }
             this.resetTimer();
         }.bind(this))
@@ -520,6 +494,7 @@ export class QueryList extends React.Component {
             "timePicker24Hour": true,
             "linkedCalendars": false,
             "autoUpdateInput": false,
+            "timePickerMinutes": true,
             "locale": {
                 format: 'YYYY-MM-DD.HH:mm',
                 separator: ' ~ ',
@@ -703,7 +678,6 @@ export class QueryList extends React.Component {
         else {
             queryList = <DisplayedQueriesList queries={allQueries} />;
         }
-
 
         return (
             <div>

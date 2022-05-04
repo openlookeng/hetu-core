@@ -32,9 +32,20 @@ import Pagination from 'rc-pagination';
 import Select from "rc-select";
 import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
 import _ from "lodash";
+import ModalDialog from "../queryeditor/components/ModalDialog";
+import {getHumanReadableState} from "../newUtils";
 
 export class QueryListItem extends React.Component {
-    static stripQueryTextWhitespace(queryText) {
+    constructor(props) {
+        super(props);
+        this.state = {
+            show: false,
+        }
+        this.showModal = this.showModal.bind(this);
+        this.isShowMore = this.isShowMore.bind(this);
+    }
+
+    static getAllQueryText(queryText) {
         const lines = queryText.split("\n");
         let minLeadingWhitespace = -1;
         for (let i = 0; i < lines.length; i++) {
@@ -67,7 +78,32 @@ export class QueryListItem extends React.Component {
             }
         }
 
-        return truncateString(formattedQueryText, 300);
+        return formattedQueryText;
+    }
+
+    static stripQueryTextWhitespace(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+
+        return truncateString(formattedQueryText, 550);
+    }
+
+    showModal(e) {
+        let newShow = this.state.show;
+        this.setState({
+            show: !newShow
+        })
+    }
+
+    isShowMore(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+        let row = formattedQueryText.split("\n").length;
+
+        if (formattedQueryText && (formattedQueryText.length > 550 || row > 8)) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     render() {
@@ -189,6 +225,22 @@ export class QueryListItem extends React.Component {
                         <div className="row query-row-bottom">
                             <div className="col-xs-12">
                                 <pre className="query-snippet"><code className="sql">{QueryListItem.stripQueryTextWhitespace(query.query)}</code></pre>
+                                {this.isShowMore(query.query) ?
+                                    <div className="query-showmore">
+                                        <a onClick={this.showModal} style={{color: '#1E90FF',cursor: 'pointer'}}>
+                                            <span className="glyphicon glyphicon-arrow-right" style={{color: '#1E90FF'}}/>
+                                            &nbsp;Show More
+                                        </a>
+                                        <ModalDialog onClose={this.showModal} header={getHumanReadableState(query)} footer={""}
+                                                     show={this.state.show}>
+                                            <div className="modal-querytext">
+                                                {QueryListItem.getAllQueryText(query.query)}
+                                            </div>
+                                        </ModalDialog>
+                                    </div>
+                                    :
+                                    null
+                                }
                             </div>
                         </div>
                     </div>

@@ -477,6 +477,9 @@ pre {
 .modal-querytext {
     margin: 15px;
     word-break: break-all;
+    white-space: pre-line;
+    max-height: 500px;
+    max-width: 780px;
 }
 
 /** Query Monitor Toolbar **/

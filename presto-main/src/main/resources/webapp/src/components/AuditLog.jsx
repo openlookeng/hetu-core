@@ -237,6 +237,7 @@ export class AuditLog extends React.Component {
             "timePicker24Hour": true,
             "linkedCalendars": false,
             "autoUpdateInput": false,
+            "timePickerMinutes": false,
             "timePickerIncrement": 60,
             "locale": {
                 format: pattern,
