@@ -186,7 +186,6 @@ export function initializeSvg(selector: any)
 
 export function getChildren(nodeInfo: any)
 {
-    // TODO: Remove this function by migrating StageDetail to use node JSON representation
     const nodeType = removeNodeTypePackage(nodeInfo["@type"]);
     switch (nodeType) {
         case "OutputNode":
