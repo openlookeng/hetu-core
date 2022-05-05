@@ -38,9 +38,7 @@ public interface SavedQuery
 
     class Position
     {
-        @JsonProperty
         private int row;
-        @JsonProperty
         private int column;
 
         public Position(@JsonProperty("row") int row,
@@ -60,6 +58,18 @@ public interface SavedQuery
         public int getColumn()
         {
             return column;
+        }
+
+        @JsonProperty
+        public void setRow(int row)
+        {
+            this.row = row;
+        }
+
+        @JsonProperty
+        public void setColumn(int column)
+        {
+            this.column = column;
         }
     }
 
@@ -98,13 +108,29 @@ public interface SavedQuery
         {
             return name;
         }
+
+        @JsonProperty
+        public void setLength(int length)
+        {
+            this.length = length;
+        }
+
+        @JsonProperty
+        public void setPosition(Position position)
+        {
+            this.position = position;
+        }
+
+        @JsonProperty
+        public void setName(String name)
+        {
+            this.name = name;
+        }
     }
 
     class QueryWithPlaceholders
     {
-        @JsonProperty
         private String query;
-        @JsonProperty
         private List<QueryPlaceholder> placeholders;
 
         public QueryWithPlaceholders()
@@ -128,6 +154,18 @@ public interface SavedQuery
         public List<QueryPlaceholder> getPlaceholders()
         {
             return placeholders;
+        }
+
+        @JsonProperty
+        public void setQuery(String query)
+        {
+            this.query = query;
+        }
+
+        @JsonProperty
+        public void setPlaceholders(List<QueryPlaceholder> placeholders)
+        {
+            this.placeholders = placeholders;
         }
 
         public static QueryWithPlaceholders fromQuery(String query)

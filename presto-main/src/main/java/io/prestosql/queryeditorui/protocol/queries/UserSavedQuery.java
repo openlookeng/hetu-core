@@ -21,24 +21,18 @@ import java.util.UUID;
 public class UserSavedQuery
         implements SavedQuery
 {
-    @JsonProperty
     private QueryWithPlaceholders queryWithPlaceholders;
 
-    @JsonProperty
     private String user;
 
-    @JsonProperty
     private String name;
 
-    @JsonProperty
     private String description;
 
     private DateTime createdAt;
 
-    @JsonProperty
     private UUID uuid;
 
-    @JsonProperty
     private boolean featured;
 
     public UserSavedQuery()
@@ -97,6 +91,7 @@ public class UserSavedQuery
         return uuid;
     }
 
+    @JsonProperty
     public void setFeatured(boolean featured)
     {
         this.featured = featured;
@@ -117,5 +112,41 @@ public class UserSavedQuery
         else {
             return null;
         }
+    }
+
+    @JsonProperty
+    public void setQueryWithPlaceholders(QueryWithPlaceholders queryWithPlaceholders)
+    {
+        this.queryWithPlaceholders = queryWithPlaceholders;
+    }
+
+    @JsonProperty
+    public void setUser(String user)
+    {
+        this.user = user;
+    }
+
+    @JsonProperty
+    public void setName(String name)
+    {
+        this.name = name;
+    }
+
+    @JsonProperty
+    public void setDescription(String description)
+    {
+        this.description = description;
+    }
+
+    @JsonProperty
+    public void setCreatedAt(DateTime createdAt)
+    {
+        this.createdAt = createdAt;
+    }
+
+    @JsonProperty
+    public void setUuid(UUID uuid)
+    {
+        this.uuid = uuid;
     }
 }
