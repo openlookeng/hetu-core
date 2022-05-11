@@ -46,6 +46,7 @@ headless: true
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
     - [Reliable Execution]({{< relref "./docs/admin/reliable-execution.md" >}})
     - [JDBC Data Source Multi-Split Management]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
+    - [Extension Physical Execution Planner]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
 - [Query Optimizer]("#")
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
