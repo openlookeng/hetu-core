@@ -20,10 +20,11 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
+import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.ExchangeOperator.ExchangeOperatorFactory;
 import io.prestosql.spi.Page;
@@ -87,17 +88,17 @@ public class TestExchangeOperator
         scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
         pageBufferClientCallbackExecutor = Executors.newSingleThreadExecutor();
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), scheduler);
+        FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
 
         exchangeClientSupplier = (systemMemoryUsageListener) -> new ExchangeClient(
                 new DataSize(32, MEGABYTE),
                 new DataSize(10, MEGABYTE),
                 3,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 httpClient,
                 scheduler,
                 systemMemoryUsageListener,
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector(), true, 3);
+                pageBufferClientCallbackExecutor, new FailureDetectorManager(new NoOpFailureDetector(), "60s"));
     }
 
     @AfterClass(alwaysRun = true)

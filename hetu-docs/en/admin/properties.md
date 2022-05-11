@@ -368,35 +368,58 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Increasing the value may improve network throughput if there is high latency. Decreasing the value may improve query performance for large clusters as it reduces skew due to the exchange client buffer holding responses for more tasks (rather than hold more data from fewer tasks).
 
-### `exchange.max-error-duration`
-
-> -   **Type:** `duration`
-> -   **Minimum value:** `1m`
-> -   **Default value:** `7m`
->
-> The maximum amount of time coordinator waits for inter-task related errors to be resolved before it's considered a failure.
-
-### `exchange.is-timeout-failure-detection-enabled`
-
-> -   **Type:** `boolean`
-> -   **Default value:** `true`
->
-> The failure detection mechanism in use. Default is timeout based failure detection. Otherwise, i.e. when this property is set to false, maximum retry based failure detection mechanism is enabled.
->
-
-### `exchange.max-retry-count`
-
-> -   **Type:** `integer`
-> -   **Default value:** `100`
->
-> The maximum number of retry for failed task performed by the coordinator before consulting the failure detector module about the remote node status. If the remote node status is failed as per the failure detector module, it is considered as a permanent failure. This parameter is the minimum count which is required to decide, not necessarily the exact count. Based on the cluster size, load on the cluster the exact count may vary slightly. This property is used only when exchange.is-timeout-failure-detection-enabled is set to false. This value needs to be at least 100 to take effect.
-
 ### `sink.max-buffer-size`
 
 > -   **Type:** `data size`
 > -   **Default value:** `32MB`
 >
 > Output buffer size for task data that is waiting to be pulled by upstream tasks. If the task output is hash partitioned, then the buffer will be shared across all of the partitioned consumers. Increasing this value may improve network throughput for data transferred between stages if the network has high latency or if there are many nodes in the cluster.
+
+## Failure Recovery handling Properties
+
+### `failure.recovery.retry.profile`
+
+> -   **Type:** `String`
+> -   **Default value:** `default`
+>
+> This property defines the failure detection profile used to determine if failure has happened for a http client. The value `<profile-name>` set for this property has to correspond to `<profile-name>.properties` file in `etc/failure-retry-policy/`. In case no such profile is available, and this property is not set, "default" profile is used.
+> For example, `failure.recovery.retry.profile="test"` requires `test.properties` file to be present in `etc/failure-retry-policy`.
+> The file `test.properties` must contain `failure.recovery.retry.type` specified.
+
+
+### `failure.recovery.retry.type`
+
+> -   **Type:** `String`
+> -   **Default value:** `timeout`
+>
+> The failure detection mechanism in use. Default is timeout based failure detection.
+>
+#### `timeout` based failure detection. 
+> Using this mechanism, HTTP client failures are retried for a specific duration before considering it as a permanent failure.
+> Additional properties `max.error.duration` can be defined for this type of failure detection.
+>
+#### `max-retry` based failure detection. 
+> Using this mechanism, HTTP client failures are retried for a specific number of times before considering it as a permanent failure.
+> Additional properties `max.retry.count` and `max.error.duration` can be defined for this type of failure detection. 
+> Using this type of failure detection is configured to be used, `max.retry.count` times retry is performed before consulting the failure detector module. When the remote node is failed as per the failure detector module, HTTP client considers it a permanent failure. Otherwise, i.e. When remote worker node is alive but not sending response, retry happens for `max.error.duration` before considering it as permanent failure.
+
+### `max.error.duration`
+> -   **Type:** `duration`
+> -   **Default value:** `300s`
+>
+> The maximum amount of time coordinator waits for inter-task related errors to be resolved before it's considered a permanent failure.
+
+
+### `max.retry.count`
+
+> -   **Type:** `integer`
+> -   **Default value:** `100`
+>
+> The maximum number of retry for failed task performed by the coordinator before consulting the failure detector module about the remote node status. 
+> This parameter is the minimum count before consulting the failure detection module. Hence, the actual number of failures may vary slightly based on the cluster size, and load on the cluster. 
+> This property is used only for `max-retry` based failure detection profiles. 
+> The minimum value for this parameter is 100.
+
 
 ## Task Properties
 

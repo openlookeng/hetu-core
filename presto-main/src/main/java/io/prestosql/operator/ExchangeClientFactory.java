@@ -16,8 +16,7 @@ package io.prestosql.operator;
 import io.airlift.concurrent.ThreadPoolExecutorMBean;
 import io.airlift.http.client.HttpClient;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
-import io.prestosql.failuredetector.FailureDetector;
+import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
@@ -40,59 +39,47 @@ public class ExchangeClientFactory
 {
     private final DataSize maxBufferedBytes;
     private final int concurrentRequestMultiplier;
-    private final Duration maxErrorDuration;
     private final HttpClient httpClient;
     private final DataSize maxResponseSize;
     private final boolean acknowledgePages;
     private final ScheduledExecutorService scheduler;
     private final ThreadPoolExecutorMBean executorMBean;
     private final ExecutorService pageBufferClientCallbackExecutor;
-    private final FailureDetector failureDetector;
-    private final boolean detectTimeoutFailures;
-    private final int maxRetryCount;
+    private final FailureDetectorManager failureDetectorManager;
 
     @Inject
     public ExchangeClientFactory(
             ExchangeClientConfig config,
             @ForExchange HttpClient httpClient,
             @ForExchange ScheduledExecutorService scheduler,
-            FailureDetector failureDetector)
+            FailureDetectorManager failureDetectorManager)
     {
         this(
                 config.getMaxBufferSize(),
                 config.getMaxResponseSize(),
                 config.getConcurrentRequestMultiplier(),
-                config.getMaxErrorDuration(),
                 config.isAcknowledgePages(),
                 config.getPageBufferClientMaxCallbackThreads(),
                 httpClient,
                 scheduler,
-                failureDetector,
-                config.getDetectTimeoutFailures(),
-                config.getMaxRetryCount());
+                failureDetectorManager);
     }
 
     public ExchangeClientFactory(
             DataSize maxBufferedBytes,
             DataSize maxResponseSize,
             int concurrentRequestMultiplier,
-            Duration maxErrorDuration,
             boolean acknowledgePages,
             int pageBufferClientMaxCallbackThreads,
             HttpClient httpClient,
             ScheduledExecutorService scheduler,
-            FailureDetector failureDetector,
-            boolean detectTimeoutFailures,
-            int maxRetryCount)
+            FailureDetectorManager failureDetectorManager)
     {
         this.maxBufferedBytes = requireNonNull(maxBufferedBytes, "maxBufferedBytes is null");
         this.concurrentRequestMultiplier = concurrentRequestMultiplier;
-        this.maxErrorDuration = requireNonNull(maxErrorDuration, "maxErrorDuration is null");
         this.acknowledgePages = acknowledgePages;
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
-        this.failureDetector = requireNonNull(failureDetector, "failureDetector is null");
-        this.detectTimeoutFailures = detectTimeoutFailures;
-        this.maxRetryCount = maxRetryCount;
+        this.failureDetectorManager = failureDetectorManager;
 
         // Use only 0.75 of the maxResponseSize to leave room for additional bytes from the encoding
         // TODO figure out a better way to compute the size of data that will be transferred over the network
@@ -108,27 +95,6 @@ public class ExchangeClientFactory
         checkArgument(maxBufferedBytes.toBytes() > 0, "maxBufferSize must be at least 1 byte: %s", maxBufferedBytes);
         checkArgument(maxResponseSize.toBytes() > 0, "maxResponseSize must be at least 1 byte: %s", maxResponseSize);
         checkArgument(concurrentRequestMultiplier > 0, "concurrentRequestMultiplier must be at least 1: %s", concurrentRequestMultiplier);
-    }
-
-    public ExchangeClientFactory(
-            DataSize maxBufferedBytes,
-            DataSize maxResponseSize,
-            int concurrentRequestMultiplier,
-            Duration maxErrorDuration,
-            boolean acknowledgePages,
-            int pageBufferClientMaxCallbackThreads,
-            HttpClient httpClient,
-            ScheduledExecutorService scheduler,
-            FailureDetector failureDetector)
-    {
-        this(maxBufferedBytes, maxResponseSize,
-                concurrentRequestMultiplier,
-                maxErrorDuration,
-                acknowledgePages,
-                pageBufferClientMaxCallbackThreads,
-                httpClient, scheduler, failureDetector,
-                ExchangeClientConfig.DETECT_TIMEOUT_FAILURES,
-                ExchangeClientConfig.MAX_RETRY_COUNT);
     }
 
     @PreDestroy
@@ -151,12 +117,11 @@ public class ExchangeClientFactory
                 maxBufferedBytes,
                 maxResponseSize,
                 concurrentRequestMultiplier,
-                maxErrorDuration,
                 acknowledgePages,
                 httpClient,
                 scheduler,
                 systemMemoryContext,
                 pageBufferClientCallbackExecutor,
-                failureDetector, detectTimeoutFailures, maxRetryCount);
+                failureDetectorManager);
     }
 }

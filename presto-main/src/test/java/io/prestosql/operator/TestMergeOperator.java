@@ -34,9 +34,11 @@ import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.FailureDetectorModule;
 import io.prestosql.failuredetector.HeartbeatFailureDetector;
 import io.prestosql.failuredetector.TestHeartbeatFailureDetector;
+import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
 import io.prestosql.metadata.Split;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.Page;
@@ -139,7 +141,8 @@ public class TestMergeOperator
 
         taskBuffers = CacheBuilder.newBuilder().build(CacheLoader.from(TestingTaskBuffer::new));
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), executor);
-        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor, detector);
+        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor, new FailureDetectorManager(detector, "60s"));
+        FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
         orderingCompiler = new OrderingCompiler();
     }
 
