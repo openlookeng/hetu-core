@@ -80,6 +80,10 @@ import io.prestosql.execution.scheduler.LegacyNetworkTopology;
 import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.failuredetector.FailureDetectorManager;
+import io.prestosql.failuredetector.FailureRetryConfig;
+import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
@@ -124,6 +128,7 @@ import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.failuredetector.FailureRetryPolicy;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
@@ -207,6 +212,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -417,6 +423,17 @@ public class LocalQueryRunner
         SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         HttpServerConfig httpServerConfig = new HttpServerConfig();
         httpServerConfig.setHttpEnabled(false);
+
+        FailureRetryConfig cfg = new FailureRetryConfig();
+        cfg.setFailureRetryPolicyProfile("test");
+        Properties prop = new Properties();
+        prop.setProperty(FailureRetryPolicy.FD_RETRY_TYPE, cfg.getFailureRetryPolicyProfile());
+        prop.setProperty(FailureRetryPolicy.MAX_RETRY_COUNT, "10");
+        prop.setProperty(FailureRetryPolicy.MAX_TIMEOUT_DURATION, "60s");
+        FailureDetectorManager.addFrConfigs(cfg.getFailureRetryPolicyProfile(), prop);
+        FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
+        FailureDetectorManager failureDetectorManager = new FailureDetectorManager(cfg, new NoOpFailureDetector());
+
         this.pluginManager = new PluginManager(
                 nodeInfo,
                 new PluginManagerConfig(),
@@ -437,7 +454,8 @@ public class LocalQueryRunner
                 seedStoreManager,
                 fileSystemClientManager,
                 hetuMetaStoreManager,
-                heuristicIndexerManager);
+                heuristicIndexerManager,
+                failureDetectorManager);
 
         connectorManager.addConnectorFactory(globalSystemConnectorFactory);
         connectorManager.createConnection(GlobalSystemConnector.NAME, GlobalSystemConnector.NAME, ImmutableMap.of());

@@ -25,7 +25,9 @@ import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.block.BlockAssertions;
+import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.QueryId;
@@ -65,6 +67,7 @@ public class TestExchangeClient
 {
     private ScheduledExecutorService scheduler;
     private ExecutorService pageBufferClientCallbackExecutor;
+    private FailureDetectorManager failureDetectorManager;
 
     private static final PagesSerde PAGES_SERDE = testingPagesSerde();
 
@@ -73,6 +76,8 @@ public class TestExchangeClient
     {
         scheduler = newScheduledThreadPool(4, daemonThreadsNamed("test-%s"));
         pageBufferClientCallbackExecutor = Executors.newSingleThreadExecutor();
+        failureDetectorManager = new FailureDetectorManager(new NoOpFailureDetector(), "60s");
+        FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
     }
 
     @AfterClass(alwaysRun = true)
@@ -106,12 +111,11 @@ public class TestExchangeClient
                 new DataSize(32, Unit.MEGABYTE),
                 maxResponseSize,
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
 
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
@@ -152,12 +156,11 @@ public class TestExchangeClient
                 new DataSize(32, Unit.MEGABYTE),
                 maxResponseSize,
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
         exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
 
         final String target1 = "target1";
@@ -207,12 +210,11 @@ public class TestExchangeClient
                 new DataSize(32, Unit.MEGABYTE),
                 new DataSize(10, Unit.MEGABYTE),
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 mock(HttpClient.class),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
         exchangeClient.setSnapshotEnabled(NOOP_SNAPSHOT_UTILS.getQuerySnapshotManager(new QueryId("query")));
 
         String origin1 = "location1";
@@ -247,12 +249,11 @@ public class TestExchangeClient
                 new DataSize(32, Unit.MEGABYTE),
                 maxResponseSize,
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
 
         URI location1 = URI.create("http://localhost:8081/foo");
         String instanceId1 = "testing instance id";
@@ -322,12 +323,11 @@ public class TestExchangeClient
                 new DataSize(1, Unit.BYTE),
                 maxResponseSize,
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
 
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
@@ -405,12 +405,11 @@ public class TestExchangeClient
                 new DataSize(1, Unit.BYTE),
                 maxResponseSize,
                 1,
-                new Duration(1, TimeUnit.MINUTES),
                 true,
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, new NoOpFailureDetector());
+                pageBufferClientCallbackExecutor, failureDetectorManager);
         exchangeClient.addLocation(new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 

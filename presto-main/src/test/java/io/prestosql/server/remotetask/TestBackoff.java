@@ -100,7 +100,7 @@ public class TestBackoff
         TestingTicker ticker = new TestingTicker();
         ticker.increment(1, NANOSECONDS);
 
-        Backoff backoff = new Backoff(3, new Duration(30, SECONDS), ticker, ImmutableList.of(new Duration(10, MILLISECONDS)));
+        MaxRetryBackoff backoff = new MaxRetryBackoff(new Duration(30, SECONDS), 10, ticker);
         ticker.increment(10, MICROSECONDS);
         // verify initial state
         assertEquals(backoff.getFailureCount(), 0);
@@ -120,7 +120,7 @@ public class TestBackoff
             ticker.increment(1, SECONDS);
         }
 
-        assertFalse(backoff.maxTried());
+        assertTrue(backoff.maxRetryDone());
         assertFalse(backoff.timeout()); // 30 s should not elapse
 
         ticker.increment(5, SECONDS);
