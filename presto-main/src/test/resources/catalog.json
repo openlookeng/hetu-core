@@ -29,6 +29,9 @@
       "allow": false
     },
     {
+      "catalog": "allowed-absent"
+    },
+    {
       "group": "staff|some_second_group",
       "catalog": "staff-catalog",
       "allow": true
