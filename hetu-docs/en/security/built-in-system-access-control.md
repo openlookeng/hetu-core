@@ -1,4 +1,3 @@
-
 Built-in System Access Control
 ==============================
 
@@ -57,7 +56,10 @@ composed of the following fields:
 
 -   `user` (optional): regex to match against user name. Defaults to `.*`.
 -   `catalog` (optional): regex to match against catalog name. Defaults to `.*`.
--   `allow` (required): boolean indicating whether a user has access to the catalog
+-   ``allow`` (required): string indicating whether a user has access to the catalog.
+    This value can be ``all``, ``read-only`` or ``none``, and defaults to ``none``.
+    Setting this value to ``read-only`` has the same behavior as the ``read-only``
+    system access control plugin.
 
 
 **Note**
@@ -65,7 +67,9 @@ composed of the following fields:
 *By default, all users have access to the `system` catalog. You can override this behavior by adding a rule.*
 
 
-For example, if you want to allow only the user `admin` to access the `mysql` and the `system` catalog, allow all users to access the `hive` catalog, and deny all other access, you can use the following rules:
+For example, if you want to allow only the user ``admin`` to access the``mysql`` and the ``system`` catalog, 
+allow all users to access the ``hive`` catalog, allow the user ``alice`` read-only access to the ``postgresql`` 
+catalog, and deny all other access, you can use the following rules:
 
 ``` json
 {
@@ -73,15 +77,20 @@ For example, if you want to allow only the user `admin` to access the `mysql` an
     {
       "user": "admin",
       "catalog": "(mysql|system)",
-      "allow": true
+      "allow": all
     },
     {
       "catalog": "hive",
-      "allow": true
+      "allow": all
+    },
+    {
+      "user": "alice",
+      "catalog": "postgresql",
+      "allow": "read-only"
     },
     {
       "catalog": "system",
-      "allow": false
+      "allow": none
     }
   ]
 }
@@ -195,6 +204,7 @@ If you want to allow users to use the  extactly same name as their Kerberos prin
 ```
 
 ### Node State Rules
+
 These rules govern the node state info particular users can access. The user is granted access to update a node state based on the first matching rule read from top to bottom. If no rule matches, access is denied. Each rule is
 composed of the following fields:
 
