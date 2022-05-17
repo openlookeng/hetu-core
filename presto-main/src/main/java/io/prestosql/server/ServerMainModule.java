@@ -70,6 +70,8 @@ import io.prestosql.execution.scheduler.NetworkTopology;
 import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.scheduler.NodeSchedulerExporter;
+import io.prestosql.failuredetector.FailureDetectorManager;
+import io.prestosql.failuredetector.FailureRetryConfig;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
@@ -385,6 +387,9 @@ public class ServerMainModule
         jsonCodecBinder(binder).bindJsonCodec(OperatorStats.class);
         jsonCodecBinder(binder).bindJsonCodec(ExecutionFailureInfo.class);
         jaxrsBinder(binder).bind(PagesResponseWriter.class);
+
+        binder.bind(FailureDetectorManager.class).in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(FailureRetryConfig.class);
 
         // exchange client
         binder.bind(ExchangeClientSupplier.class).to(ExchangeClientFactory.class).in(Scopes.SINGLETON);

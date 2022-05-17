@@ -42,6 +42,7 @@ import io.prestosql.eventlistener.EventListenerModule;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollectorModule;
+import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.httpserver.HetuHttpServerInfo;
@@ -144,6 +145,9 @@ public class PrestoServer
             injector.getInstance(PluginManager.class).loadPlugins();
             FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
             fileSystemClientManager.loadFactoryConfigs();
+
+            FailureDetectorManager failureDetectorManager = injector.getInstance(FailureDetectorManager.class);
+            failureDetectorManager.loadFactoryConfigs();
 
             injector.getInstance(SeedStoreManager.class).loadSeedStore();
             if (injector.getInstance(SeedStoreManager.class).isSeedStoreOnYarnEnabled()) {
