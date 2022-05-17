@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.collect.HashMultimap;
@@ -88,7 +89,7 @@ import static java.util.Objects.requireNonNull;
 @ThreadSafe
 public final class SqlStageExecution
 {
-    private static final Logger log = Logger.get(SqlStageExecution.class);
+    private static final Logger LOG = Logger.get(SqlStageExecution.class);
 
     private final StageStateMachine stateMachine;
     private final RemoteTaskFactory remoteTaskFactory;
@@ -334,7 +335,7 @@ public final class SqlStageExecution
 
     public void OnSnapshotXCompleted(boolean capture, long snapshotId)
     {
-        log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
+        LOG.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
         if (!capture) {
             restoreInProgress = false;
             captureSnapshotId = 0;
@@ -604,7 +605,7 @@ public final class SqlStageExecution
 
             TaskState taskState = taskStatus.getState();
             if (taskState == TaskState.RESUMABLE_FAILURE) {
-                log.debug("Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                LOG.debug("Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                 stateMachine.transitionToResumableFailure();
                 return;
             }
@@ -624,14 +625,14 @@ public final class SqlStageExecution
                         index += HttpPageBufferClient.PAGE_TRANSPORT_ERROR_PREFIX.length() + 1;  // point to numeric response code; skip over space
                         int responseCode = Integer.parseInt(message.substring(index, message.indexOf('!', index)));
                         if (responseCode >= 500 || responseCode == HttpStatus.OK.code()) {
-                            log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                            LOG.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                             stateMachine.transitionToResumableFailure();
                             return;
                         }
                     }
                     else if (message.contains(SimpleHttpResponseHandler.EXPECT_200_SAW_5XX)) {
                         // SimpleHttpResponseHandler can also produce errors that are resumable
-                        log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                        LOG.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                         stateMachine.transitionToResumableFailure();
                         return;
                     }
@@ -640,7 +641,7 @@ public final class SqlStageExecution
             }
             else if (taskState == TaskState.ABORTED) {
                 if (isSnapshotEnabled) {
-                    log.debug("Task %s on node %s was aborted prematually. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                    LOG.debug("Task %s on node %s was aborted prematually. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                     stateMachine.transitionToResumableFailure();
                     return;
                 }

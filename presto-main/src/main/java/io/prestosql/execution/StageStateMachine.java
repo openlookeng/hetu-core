@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableList;
@@ -78,7 +79,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 @ThreadSafe
 public class StageStateMachine
 {
-    private static final Logger log = Logger.get(StageStateMachine.class);
+    private static final Logger LOG = Logger.get(StageStateMachine.class);
 
     private final StageId stageId;
     private final URI location;
@@ -119,7 +120,7 @@ public class StageStateMachine
         this.scheduledStats = requireNonNull(schedulerStats, "schedulerStats is null");
 
         stageState = new StateMachine<>("stage " + stageId, executor, PLANNED, TERMINAL_STAGE_STATES);
-        stageState.addStateChangeListener(state -> log.debug("Stage %s is %s", stageId, state));
+        stageState.addStateChangeListener(state -> LOG.debug("Stage %s is %s", stageId, state));
 
         finalStageInfo = new StateMachine<>("final stage " + stageId, executor, Optional.empty());
 
@@ -228,23 +229,23 @@ public class StageStateMachine
         failureCause.compareAndSet(null, Failures.toFailure(throwable));
         boolean failed = stageState.setIf(FAILED, currentState -> !currentState.isDone());
         if (failed) {
-            log.error(throwable, "Stage %s failed", stageId);
+            LOG.error(throwable, "Stage %s failed", stageId);
         }
         else {
-            log.debug(throwable, "Failure after stage %s finished", stageId);
+            LOG.debug(throwable, "Failure after stage %s finished", stageId);
         }
         return failed;
     }
 
     public boolean transitionToResumableFailure()
     {
-        log.debug("Moving stage %s to Resumable Failure state", stageId);
+        LOG.debug("Moving stage %s to Resumable Failure state", stageId);
         return stageState.setIf(RESUMABLE_FAILURE, currentState -> !currentState.isDone());
     }
 
     public boolean transitionToRescheduling()
     {
-        log.debug("Moving stage %s to Rescheduling state", stageId);
+        LOG.debug("Moving stage %s to Rescheduling state", stageId);
         // Force it, even when the stage is in FINISHED state, which was before the resume occurred
         return stageState.forceSet(RESCHEDULING) == RESCHEDULING;
     }

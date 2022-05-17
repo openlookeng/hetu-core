@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution.scheduler;
 
 import com.google.common.base.Supplier;
@@ -55,7 +56,7 @@ import static java.util.Objects.requireNonNull;
 public class TopologyAwareNodeSelector
         implements NodeSelector
 {
-    private static final Logger log = Logger.get(TopologyAwareNodeSelector.class);
+    private static final Logger LOG = Logger.get(TopologyAwareNodeSelector.class);
 
     private final InternalNodeManager nodeManager;
     private final NodeTaskMap nodeTaskMap;
@@ -147,7 +148,7 @@ public class TopologyAwareNodeSelector
             if (!split.isRemotelyAccessible()) {
                 List<InternalNode> candidateNodes = selectExactNodes(nodeMapSlice, split.getAddresses(), includeCoordinator);
                 if (candidateNodes.isEmpty()) {
-                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
+                    LOG.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
                 }
                 InternalNode chosenNode = bestNodeSplitCount(candidateNodes.iterator(), minCandidates, maxPendingSplitsPerTask, assignmentStats);

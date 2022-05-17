@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.plugin.hive;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -198,7 +199,7 @@ import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Cate
 public class HiveMetadata
         implements TransactionalMetadata
 {
-    private static final Logger log = Logger.get(HiveMetadata.class);
+    private static final Logger LOG = Logger.get(HiveMetadata.class);
 
     public static final String PRESTO_VERSION_NAME = "presto_version";
     public static final String PRESTO_QUERY_ID_NAME = "presto_query_id";
@@ -491,7 +492,7 @@ public class HiveMetadata
             properties.put(HiveTableProperties.STORAGE_FORMAT_PROPERTY, format);
         }
         catch (PrestoException ignored) {
-            log.debug("Format is not known error");
+            LOG.debug("Format is not known error");
         }
 
         // Partitioning property
@@ -668,7 +669,7 @@ public class HiveMetadata
         }
         // We want to make sure the query doesn't fail because of star-tree not being able to get last modified time
         catch (Exception e) {
-            log.error("Exception thrown while trying to get modified time", e);
+            LOG.error("Exception thrown while trying to get modified time", e);
             return -1L;
         }
     }
@@ -684,10 +685,10 @@ public class HiveMetadata
                 columns.put(tableName, getTableMetadata(session, tableName).getColumns());
             }
             catch (HiveViewNotSupportedException e) {
-                log.debug("View is not supported error");
+                LOG.debug("View is not supported error");
             }
             catch (TableNotFoundException e) {
-                log.debug("Table disappeared during listing operation error");
+                LOG.debug("Table disappeared during listing operation error");
             }
         }
         return columns.build();
@@ -1445,7 +1446,7 @@ public class HiveMetadata
                     future.get();
                 }
                 catch (InterruptedException | ExecutionException ignore) {
-                    log.debug("Get future error");
+                    LOG.debug("Get future error");
                 }
             });
         }
@@ -3022,13 +3023,13 @@ public class HiveMetadata
                         long subFileIndex = getSnapshotSubFileIndex(fileName, queryId);
                         // Remove any merged files and subfiles that are after the snapshot being resumed to
                         if (subFileIndex < 0 || subFileIndex >= snapshotIndex) {
-                            log.debug("Deleting file resume=true: %s", fileName);
+                            LOG.debug("Deleting file resume=true: %s", fileName);
                             fileSystem.delete(status.getPath());
                         }
                     }
                     else {
                         if (isSnapshotSubFile(fileName, queryId)) {
-                            log.debug("Deleting sub file resume=false: %s", fileName);
+                            LOG.debug("Deleting sub file resume=false: %s", fileName);
                             fileSystem.delete(status.getPath());
                         }
                         else {
@@ -3037,12 +3038,12 @@ public class HiveMetadata
                             // For transaqctional tables, the file's parent folder is part of the output file list
                             if (mergedFileNames.contains(fileName) || mergedFileNames.contains(status.getPath().getParent().getName())) {
                                 String newName = removeSnapshotFileName(fileName, queryId);
-                                log.debug("Renaming merged file resume=false: %s to %s", fileName, newName);
+                                LOG.debug("Renaming merged file resume=false: %s to %s", fileName, newName);
                                 fileSystem.rename(status.getPath(), new Path(folder, newName));
                             }
                             else {
                                 // Remove files that are not part of the final output files. (e.g. those produced by abandoned tasks.)
-                                log.debug("Deleting old merged file resume=false: %s", fileName);
+                                LOG.debug("Deleting old merged file resume=false: %s", fileName);
                                 fileSystem.delete(status.getPath());
                             }
                         }
@@ -3178,7 +3179,7 @@ public class HiveMetadata
         if ((partitionedBy.size() + sortedColumnNames.size() < groupKeyNames.size()) ||
                 (partitionedBy.size() > groupKeyNames.size())) {
             //sorted columns are less than join criteria columns
-            log.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
+            LOG.debug("number of sorted columns " + sortedColumnNames.size() + "are less join column size " + groupKeyNames.size());
             return partialAndFinalAggregationType;
         }
 
@@ -3217,7 +3218,7 @@ public class HiveMetadata
                 boolean bucketedColumnsResult = !singleOrZeroBucketedColumn && (!groupKeyNames.get(numOfComparedKeys).equals(bucketedColumns.get(numOfComparedKeys)));
                 if ((!groupKeyNames.get(numOfCmpKeysAfterPartitionedBy).equals(sortedColumnNames.get(numOfComparedKeys))) ||
                         (!singleOrZeroBucketedColumn && bucketedColumnsResult)) {
-                    if (log.isDebugEnabled()) {
+                    if (LOG.isDebugEnabled()) {
                         final String[] dbgGroupKeyNames = {new String("")};
                         groupKeyNames.stream().forEach(k -> dbgGroupKeyNames[0] = dbgGroupKeyNames[0].concat(k + " , "));
                         final String[] dbgSortedColumnNames = {new String("")};
@@ -3225,9 +3226,9 @@ public class HiveMetadata
                         if ((null != bucketedColumns) && (bucketedColumns.size() > 0)) {
                             final String[] dbgbucketedColumns = {new String("")};
                             bucketedColumns.stream().forEach(k -> dbgbucketedColumns[0] = dbgbucketedColumns[0].concat(k + " , "));
-                            log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames + " bucketedColumns :" + dbgbucketedColumns);
+                            LOG.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames + " bucketedColumns :" + dbgbucketedColumns);
                         }
-                        log.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames);
+                        LOG.debug("Not matching sortedColumnNames: " + dbgSortedColumnNames + " group columns name: " + dbgGroupKeyNames);
                     }
                     return partialAndFinalAggregationType;
                 }

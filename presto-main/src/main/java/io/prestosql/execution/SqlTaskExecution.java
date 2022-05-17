@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.collect.AbstractIterator;
@@ -122,7 +123,7 @@ public class SqlTaskExecution
     // * a driver could belong to pipeline 1 and driver life cycle 42.
     // * another driver could belong to pipeline 3 and task-wide driver life cycle.
 
-    private static final Logger log = Logger.get(SqlTaskExecution.class);
+    private static final Logger LOG = Logger.get(SqlTaskExecution.class);
     private final TaskId taskId;
     private final TaskStateMachine taskStateMachine;
     private final TaskContext taskContext;

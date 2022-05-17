@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.snapshot;
 
 import io.airlift.log.Logger;
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
  */
 public class SnapshotComponentCounter<T>
 {
-    private static final Logger log = Logger.get(SnapshotComponentCounter.class);
+    private static final Logger LOG = Logger.get(SnapshotComponentCounter.class);
 
     // Function to verify if snapshot is complete for query components
     private final Function<Set<T>, Boolean> checkComplete;
@@ -90,7 +91,7 @@ public class SnapshotComponentCounter<T>
             }
             else if (componentMap.size() > totalComponentCount) {
                 String keys = componentMap.keySet().stream().map(Object::toString).collect(Collectors.joining("  \n"));
-                log.warn("BUG: Too many operators for %s. Expecting %d; see %d.\n  %s", stateId, totalComponentCount, componentMap.size(), keys);
+                LOG.warn("BUG: Too many operators for %s. Expecting %d; see %d.\n  %s", stateId, totalComponentCount, componentMap.size(), keys);
                 snapshotResult = SnapshotResult.FAILED;
                 doneResult();
             }

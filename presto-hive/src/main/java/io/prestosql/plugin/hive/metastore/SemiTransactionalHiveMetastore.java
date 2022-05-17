@@ -125,7 +125,7 @@ import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getTimeVar;
 
 public class SemiTransactionalHiveMetastore
 {
-    private static final Logger log = Logger.get(SemiTransactionalHiveMetastore.class);
+    private static final Logger LOG = Logger.get(SemiTransactionalHiveMetastore.class);
 
     private final HiveMetastore delegate;
     private final HiveMetastoreClosure closure;
@@ -1119,7 +1119,7 @@ public class SemiTransactionalHiveMetastore
                             .map(Duration::toMillis)
                             .orElseGet(this::getServerExpectedHeartbeatIntervalMillis);
                     long transactionId = delegate.openTransaction(identity);
-                    log.debug("Using hive transaction %s for query %s", transactionId, queryId);
+                    LOG.debug("Using hive transaction %s for query %s", transactionId, queryId);
 
                     ScheduledFuture<?> heartbeatTask = heartbeatExecutor.scheduleAtFixedRate(
                             () -> delegate.sendTransactionHeartbeat(identity, transactionId),
@@ -1648,7 +1648,7 @@ public class SemiTransactionalHiveMetastore
             }
             catch (PrestoException e) {
                 if (e.getErrorCode().equals(HiveErrorCode.HIVE_CORRUPTED_COLUMN_STATISTICS.toErrorCode())) {
-                    log.warn(
+                    LOG.warn(
                             e,
                             "Corrupted statistics found when altering partition. Table: %s.%s. Partition: %s",
                             partition.getDatabaseName(),
@@ -1778,7 +1778,7 @@ public class SemiTransactionalHiveMetastore
                 }
                 catch (Throwable t) {
                     // ignore
-                    log.debug("Get future(%s) error", future.toString());
+                    LOG.debug("Get future(%s) error", future.toString());
                 }
             }
         }
@@ -2116,7 +2116,7 @@ public class SemiTransactionalHiveMetastore
         if (throwOnCleanupFailure) {
             throw new RuntimeException(format(format, args));
         }
-        log.warn(format, args);
+        LOG.warn(format, args);
     }
 
     private void logCleanupFailure(Throwable t, String format, Object... args)
@@ -2124,7 +2124,7 @@ public class SemiTransactionalHiveMetastore
         if (throwOnCleanupFailure) {
             throw new RuntimeException(format(format, args), t);
         }
-        log.warn(t, format, args);
+        LOG.warn(t, format, args);
     }
 
     private static void asyncRename(
@@ -2242,11 +2242,11 @@ public class SemiTransactionalHiveMetastore
         }
         catch (FileNotFoundException ignored) {
             // path was already removed or never existed
-            log.debug("path may be removed or never existed", ignored);
+            LOG.debug("path may be removed or never existed", ignored);
             return true;
         }
         catch (IOException ignored) {
-            log.error("Hdfs RPC Call Error", ignored);
+            LOG.error("Hdfs RPC Call Error", ignored);
         }
         return false;
     }
@@ -2310,7 +2310,7 @@ public class SemiTransactionalHiveMetastore
             fileSystem = hdfsEnvironment.getFileSystem(context, path);
         }
         catch (IOException ignored) {
-            log.error("Hdfs RPC Call Error", ignored);
+            LOG.error("Hdfs RPC Call Error", ignored);
             return false;
         }
 
@@ -2451,7 +2451,7 @@ public class SemiTransactionalHiveMetastore
             }
         }
         catch (IOException ioe) {
-            log.error("Hdfs RPC Call Error", ioe);
+            LOG.error("Hdfs RPC Call Error", ioe);
             return new RecursiveDeleteResult(false, ImmutableList.of(directory.toString() + "/**"));
         }
 
@@ -2521,7 +2521,7 @@ public class SemiTransactionalHiveMetastore
             }
         }
         catch (IOException ignored) {
-            log.warn(format("move file %s to trash failed and force to delete it.", path.toString()), ignored);
+            LOG.warn(format("move file %s to trash failed and force to delete it.", path.toString()), ignored);
         }
 
         return deleteIfExists(fileSystem, path, false);
@@ -3036,7 +3036,7 @@ public class SemiTransactionalHiveMetastore
                     // Deleting the table when aborting commit has the risk of deleting table not added in this transaction.
                     // Not deleting the table may leave garbage behind. The former is much more dangerous than the latter.
                     // Therefore, the table is not considered added.
-                    log.debug("Create table error(dataBaseName=%s tableName=%s)", newTable.getDatabaseName(), newTable.getTableName());
+                    LOG.debug("Create table error(dataBaseName=%s tableName=%s)", newTable.getDatabaseName(), newTable.getTableName());
                 }
 
                 if (!done) {
@@ -3333,7 +3333,7 @@ public class SemiTransactionalHiveMetastore
                 catch (PartitionNotFoundException e) {
                     // Maybe some one deleted the partition we added.
                     // Anyways, we are good because the partition is not there anymore.
-                    log.debug("Drop partition error(schemaName=%s tableName=%s), may be partition is not there anymore",
+                    LOG.debug("Drop partition error(schemaName=%s tableName=%s), may be partition is not there anymore",
                             schemaName, tableName);
                 }
                 catch (Throwable t) {

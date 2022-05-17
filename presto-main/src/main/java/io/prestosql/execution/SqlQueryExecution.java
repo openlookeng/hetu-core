@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.execution;
 
 import com.google.common.cache.Cache;
@@ -136,7 +137,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class SqlQueryExecution
         implements QueryExecution
 {
-    private static final Logger log = Logger.get(SqlQueryExecution.class);
+    private static final Logger LOG = Logger.get(SqlQueryExecution.class);
 
     private static final OutputBufferId OUTPUT_BUFFER_ID = new OutputBufferId(0);
 
@@ -435,7 +436,7 @@ public class SqlQueryExecution
         }
 
         String queryId = getSession().getQueryId().getId();
-        log.debug("queryId=%s begin to find columnToColumnMapping.", queryId);
+        LOG.debug("queryId=%s begin to find columnToColumnMapping.", queryId);
         PlanNode outputNode = plan.getRoot().getFragment().getRoot();
         Map<String, Set<String>> columnToSymbolMapping = new HashMap<>();
 
@@ -467,7 +468,7 @@ public class SqlQueryExecution
         // save mapping into stateStore
         StateMap<String, Object> mappingStateMap = (StateMap<String, Object>) stateStore.getOrCreateStateCollection(CROSS_REGION_DYNAMIC_FILTERS, StateCollection.Type.MAP);
         mappingStateMap.put(queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING, columnToSymbolMapping);
-        log.debug("queryId=%s, add columnToSymbolMapping into hazelcast success.", queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
+        LOG.debug("queryId=%s, add columnToSymbolMapping into hazelcast success.", queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
     }
 
     @Override
@@ -489,7 +490,7 @@ public class SqlQueryExecution
                 }
                 catch (Throwable e) {
                     // ignore any exception
-                    log.warn("something unexpected happened.. cause: %s", e.getMessage());
+                    LOG.warn("something unexpected happened.. cause: %s", e.getMessage());
                 }
 
                 // plan distribution of query
@@ -509,7 +510,7 @@ public class SqlQueryExecution
                         catch (Throwable e) {
                             fail(e);
                             throwIfInstanceOf(e, Error.class);
-                            log.warn(e, "Encountered error while rescheduling query");
+                            LOG.warn(e, "Encountered error while rescheduling query");
                         }
                     }
                 });
@@ -523,7 +524,7 @@ public class SqlQueryExecution
             catch (Throwable e) {
                 fail(e);
                 throwIfInstanceOf(e, Error.class);
-                log.warn(e, "Encountered error while scheduling query");
+                LOG.warn(e, "Encountered error while scheduling query");
             }
         }
     }
@@ -540,7 +541,7 @@ public class SqlQueryExecution
             throw new RuntimeException(e);
         }
 
-        log.debug("Rescheduling query %s from a resumable task failure.", getQueryId());
+        LOG.debug("Rescheduling query %s from a resumable task failure.", getQueryId());
         PartitioningHandle partitioningHandle = plan.getRoot().getFragment().getPartitioningScheme().getPartitioning().getHandle();
         OutputBuffers rootOutputBuffers = createInitialEmptyOutputBuffers(partitioningHandle)
                 .withBuffer(OUTPUT_BUFFER_ID, BROADCAST_PARTITION_ID)
@@ -563,7 +564,7 @@ public class SqlQueryExecution
             }
         }
         queryScheduler.set(scheduler);
-        log.debug("Restarting query %s from a resumable task failure.", getQueryId());
+        LOG.debug("Restarting query %s from a resumable task failure.", getQueryId());
         scheduler.start();
         stateMachine.transitionToStarting();
     }
@@ -894,7 +895,7 @@ public class SqlQueryExecution
                 source.close();
             }
             catch (Throwable t) {
-                log.warn(t, "Error closing split source");
+                LOG.warn(t, "Error closing split source");
             }
         }
 

@@ -64,7 +64,7 @@ import static java.util.Objects.requireNonNull;
 public class OrcFileWriter
         implements HiveFileWriter
 {
-    private static final Logger log = Logger.get(OrcFileWriter.class);
+    private static final Logger LOG = Logger.get(OrcFileWriter.class);
 
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(OrcFileWriter.class).instanceSize();
     private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
@@ -402,7 +402,7 @@ public class OrcFileWriter
                 rollbackAction.call();
             }
             catch (Exception ignored) {
-                log.warn("RollbackAction error after roc commit error");
+                LOG.warn("RollbackAction error after roc commit error");
             }
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error committing write to Hive", e);
         }

@@ -66,7 +66,7 @@ import static java.util.Objects.requireNonNull;
 public class SimpleNodeSelector
         implements NodeSelector
 {
-    private static final Logger log = Logger.get(SimpleNodeSelector.class);
+    private static final Logger LOG = Logger.get(SimpleNodeSelector.class);
 
     private final InternalNodeManager nodeManager;
     protected final NodeTaskMap nodeTaskMap;
@@ -170,10 +170,10 @@ public class SimpleNodeSelector
                         }
                     }
                 }
-                log.debug("Consumer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+                LOG.debug("Consumer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
             }
             catch (NotImplementedException e) {
-                log.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
+                LOG.error("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
                 throw new UnsupportedOperationException("Not a Hive Split! Other Connector Splits not supported currently. Error: " + e);
             }
         }
@@ -212,7 +212,7 @@ public class SimpleNodeSelector
                     candidateNodes = selectNodes(minCandidates, randomCandidates);
                 }
                 if (candidateNodes.isEmpty()) {
-                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
+                    LOG.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMapSlice.getNodesByHost().keys());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
                 }
 
@@ -321,7 +321,7 @@ public class SimpleNodeSelector
                 }
             }
             if (matched == false) {
-                log.debug("split not matched: " + aSplit);
+                LOG.debug("split not matched: " + aSplit);
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "Producer & consumer splits are not same");
             }
         }
@@ -335,7 +335,7 @@ public class SimpleNodeSelector
         for (Map.Entry<PlanNodeId, TableInfo> entry : tables.entrySet()) {
             QualifiedObjectName qualifiedTableName = entry.getValue().getTableName();
             tableSplitAssignmentInfo.setTableSplitAssignment(qualifiedTableName, producer.getReuseTableScanMappingId(), assignment); //also sets the splitkey info internally
-            log.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
+            LOG.debug("Producer:: Assignment size is " + assignment.size() + " ,Assignment is " + assignment + " ,Assignment Stats is " + assignmentStats);
         }
     }
 

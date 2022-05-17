@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.operator;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -88,7 +89,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public final class HttpPageBufferClient
         implements Closeable
 {
-    private static final Logger log = Logger.get(HttpPageBufferClient.class);
+    private static final Logger LOG = Logger.get(HttpPageBufferClient.class);
     public static final String PAGE_TRANSPORT_ERROR_PREFIX = "Page transport error with response status code";
 
     /**
@@ -370,7 +371,7 @@ public final class HttpPageBufferClient
                             @Override
                             public Void handleException(Request request, Exception exception)
                             {
-                                log.debug(exception, "Acknowledge request failed: %s", uri);
+                                LOG.debug(exception, "Acknowledge request failed: %s", uri);
                                 return null;
                             }
 
@@ -378,7 +379,7 @@ public final class HttpPageBufferClient
                             public Void handle(Request request, Response response)
                             {
                                 if (familyForStatusCode(response.getStatusCode()) != HttpStatus.Family.SUCCESSFUL) {
-                                    log.debug("Unexpected acknowledge response code: %s", response.getStatusCode());
+                                    LOG.debug("Unexpected acknowledge response code: %s", response.getStatusCode());
                                 }
                                 return null;
                             }
@@ -421,7 +422,7 @@ public final class HttpPageBufferClient
             @Override
             public void onFailure(Throwable t)
             {
-                log.debug("Request to %s failed %s", uri, t);
+                LOG.debug("Request to %s failed %s", uri, t);
                 checkNotHoldsLock(this);
 
                 Throwable throwable = rewriteException(t);
@@ -439,7 +440,7 @@ public final class HttpPageBufferClient
                          * if node is otherwise (e.g.active), keep retrying till timeout of maxErrorDuration
                          */
                         FailureDetector.State state = failureDetector.getState(fromUri(uri));
-                        log.debug("failure detector state is " + state.toString());
+                        LOG.debug("failure detector state is " + state.toString());
                         hasFailed = (backoff.maxTried() &&
                                 !FailureDetector.State.ALIVE.equals(state)
                                 || backoff.timeout());
@@ -453,7 +454,7 @@ public final class HttpPageBufferClient
                                 backoff.getFailureRequestTimeTotal().convertTo(SECONDS));
                         if (querySnapshotManager != null) {
                             // Snapshot: recover from remote server errors
-                            log.debug(throwable, "Snapshot: remote task failed with resumable error: %s", message);
+                            LOG.debug(throwable, "Snapshot: remote task failed with resumable error: %s", message);
                             querySnapshotManager.cancelToResume();
                             handleFailure(throwable, resultFuture);
                             return;
@@ -499,7 +500,7 @@ public final class HttpPageBufferClient
             {
                 checkNotHoldsLock(this);
 
-                log.error("Request to delete %s failed %s", location, t);
+                LOG.error("Request to delete %s failed %s", location, t);
                 Throwable throwable = t;
                 if (!(throwable instanceof PrestoException) && backoff.failure()) {
                     String message = format("Error closing remote buffer (%s - %s failures, failure duration %s, total failed request time %s)",
@@ -673,7 +674,7 @@ public final class HttpPageBufferClient
                 if (querySnapshotManager != null && querySnapshotManager.isCoordinator()) {
                     // Snapshot: for internal server errors on the worker, or unexpected OK results, treat as resumable error.
                     if (response.getStatusCode() >= 500 || response.getStatusCode() == HttpStatus.OK.code()) {
-                        log.debug(e.getMessage());
+                        LOG.debug(e.getMessage());
                         querySnapshotManager.cancelToResume();
                         return createEmptyPagesResponse(0, 0, false);
                     }

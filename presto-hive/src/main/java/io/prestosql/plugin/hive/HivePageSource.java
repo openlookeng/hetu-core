@@ -67,7 +67,7 @@ import static java.util.Objects.requireNonNull;
 public class HivePageSource
         implements ConnectorPageSource
 {
-    private static final Logger log = Logger.get(HivePageSource.class);
+    private static final Logger LOG = Logger.get(HivePageSource.class);
 
     private final List<ColumnMapping> columnMappings;
     private final Optional<BucketAdapter> bucketAdapter;
@@ -76,7 +76,6 @@ public class HivePageSource
     private final TypeManager typeManager;
     private final List<Optional<Function<Block, Block>>> coercers;
     private final int rowFilteringThreshold;
-    protected boolean eligibleForRowFiltering;
 
     private final ConnectorPageSource delegate;
 

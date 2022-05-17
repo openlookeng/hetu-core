@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.snapshot;
 
 import com.esotericsoftware.kryo.Kryo;
@@ -76,7 +77,7 @@ public class SnapshotUtils
     // Key is query id; value is number of attempts
     private final Map<String, Long> snapshotsToDelete = new ConcurrentHashMap<>();
     private final ScheduledThreadPoolExecutor deleteSnapshotExecutor = new ScheduledThreadPoolExecutor(1);
-    private static final ThreadLocal<Kryo> kryoPool = ThreadLocal.withInitial(() -> {
+    private static final ThreadLocal<Kryo> KRYO_POOL = ThreadLocal.withInitial(() -> {
         Kryo kryo = new Kryo();
         // Configure the Kryo instance.
         kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
@@ -221,7 +222,7 @@ public class SnapshotUtils
         if (useKryo) {
             // Kryo serialization
             Output output = new Output(outputStream);
-            Kryo kryo = kryoPool.get();
+            Kryo kryo = KRYO_POOL.get();
             kryo.writeClassAndObject(output, state);
             output.flush();
         }
@@ -242,7 +243,7 @@ public class SnapshotUtils
         if (useKryo) {
             // Kryo deserialization
             Input input = new Input(inputStream);
-            Kryo kryo = kryoPool.get();
+            Kryo kryo = KRYO_POOL.get();
             return kryo.readClassAndObject(input);
         }
         else {

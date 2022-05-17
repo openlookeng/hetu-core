@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.sql.planner;
 
 import com.google.common.collect.HashMultimap;
@@ -110,7 +111,7 @@ import static java.util.Objects.requireNonNull;
 
 public class DistributedExecutionPlanner
 {
-    private static final Logger log = Logger.get(DistributedExecutionPlanner.class);
+    private static final Logger LOG = Logger.get(DistributedExecutionPlanner.class);
 
     public enum Mode
     {
@@ -214,7 +215,7 @@ public class DistributedExecutionPlanner
             source.close();
         }
         catch (Throwable t) {
-            log.warn(t, "Error closing split source");
+            LOG.warn(t, "Error closing split source");
         }
     }
 

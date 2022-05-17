@@ -56,7 +56,7 @@ import static java.util.Objects.requireNonNull;
 public class FixedSourcePartitionedScheduler
         implements StageScheduler
 {
-    private static final Logger log = Logger.get(FixedSourcePartitionedScheduler.class);
+    private static final Logger LOG = Logger.get(FixedSourcePartitionedScheduler.class);
 
     private final SqlStageExecution stage;
     private final List<InternalNode> nodes;
@@ -256,7 +256,7 @@ public class FixedSourcePartitionedScheduler
                 sourceScheduler.close();
             }
             catch (Throwable t) {
-                log.warn(t, "Error closing split source");
+                LOG.warn(t, "Error closing split source");
             }
         }
         sourceSchedulers.clear();

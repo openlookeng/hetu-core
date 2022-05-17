@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.plugin.hive;
 
 import com.google.common.base.Strings;
@@ -108,7 +109,7 @@ import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.COMPRESSRESULT;
 
 public class HiveWriterFactory
 {
-    private static Logger log = Logger.get(HiveWriterFactory.class);
+    private static final Logger LOG = Logger.get(HiveWriterFactory.class);
 
     private static final int MAX_BUCKET_COUNT = 100_000;
     private static final int BUCKET_NUMBER_PADDING = Integer.toString(MAX_BUCKET_COUNT - 1).length();
@@ -985,15 +986,15 @@ public class HiveWriterFactory
     private void logContainingFolderInfo(FileSystem fileSystem, Path path, String message, Object... params)
     {
         try {
-            if (log.isDebugEnabled()) {
-                log.debug(message, params);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(message, params);
                 Arrays.stream(fileSystem.listStatus(path.getParent())).forEach(file -> {
-                    log.debug("%d\t%s", file.getLen(), file.getPath());
+                    LOG.debug("%d\t%s", file.getLen(), file.getPath());
                 });
             }
         }
         catch (IOException e) {
-            log.debug(e, "Failed to list folder content for %s: %s", path, e.getMessage());
+            LOG.debug(e, "Failed to list folder content for %s: %s", path, e.getMessage());
         }
     }
 
