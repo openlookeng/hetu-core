@@ -58,7 +58,7 @@ security.refresh-period=1s
 
 -   `user`（可选）：用于匹配用户名的正则表达式。默认为`.*`。
 -   `catalog`（可选）:用于匹配目录名的正则表达式。默认为`.*`。
-- `allow`（必选）: 布尔类型参数，表示用户是否有访问目录的权限
+- `allow`（必选）: 字符串参数，表示用户是否有访问目录的权限。这个值可以是all、read-only或none，默认为none。将此值设置为read-only，其行为与只读的系统访问控制插件相同。
 
 
 **注意**
@@ -74,15 +74,20 @@ security.refresh-period=1s
     {
       "user": "admin",
       "catalog": "(mysql|system)",
-      "allow": true
+      "allow": all
     },
     {
       "catalog": "hive",
-      "allow": true
+      "allow": all
+    },
+    {
+      "user": "alice",
+      "catalog": "postgresql",
+      "allow": "read-only"
     },
     {
       "catalog": "system",
-      "allow": false
+      "allow": none
     }
   ]
 }
