@@ -299,6 +299,45 @@ public class TestHttpPageBufferClient
     }
 
     @Test
+    public void testResumableServerFailures()
+            throws Exception
+    {
+        TestingTicker ticker = new TestingTicker();
+        AtomicReference<Duration> tickerIncrement = new AtomicReference<>(new Duration(0, TimeUnit.SECONDS));
+
+        TestingHttpClient.Processor processor = (input) -> {
+            Duration delta = tickerIncrement.get();
+            ticker.increment(delta.toMillis(), TimeUnit.MILLISECONDS);
+            throw new PageTransportServerException("Foo");
+        };
+
+        CyclicBarrier requestComplete = new CyclicBarrier(2);
+        TestingClientCallback callback = new TestingClientCallback(requestComplete);
+
+        URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
+        HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
+                new DataSize(10, Unit.MEGABYTE),
+                true,
+                new TaskLocation(location, instanceId),
+                callback,
+                scheduler,
+                pageBufferClientCallbackExecutor,
+                false,
+                null, failureDetectorManager);
+
+        assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
+
+        client.scheduleRequest();
+        requestComplete.await(10, TimeUnit.SECONDS);
+        assertEquals(callback.getPages().size(), 0);
+        assertEquals(callback.getCompletedRequests(), 1);
+        assertEquals(callback.getFinishedBuffers(), 0);
+        assertEquals(callback.getFailedBuffers(), 0);
+        assertStatus(client, location, "queued", 0, 1, 1, 1, "not scheduled");
+    }
+
+    @Test
     public void testInvalidResponses()
             throws Exception
     {
