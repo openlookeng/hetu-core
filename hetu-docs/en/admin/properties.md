@@ -377,6 +377,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 
 ## Failure Recovery handling Properties
 
+### Failure Retry Policies
+
 ### `failure.recovery.retry.profile`
 
 > -   **Type:** `String`
@@ -420,6 +422,66 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > This property is used only for `max-retry` based failure detection profiles. 
 > The minimum value for this parameter is 100.
 
+### Gossip Protocol Configurations for Failure Detection
+
+### `failure-detection-protocol`
+
+>- **Type:** String
+>- **Default value:** `heartbeat`
+>
+> This property defines the type of failure detector in use. Default configuration is `heartbeat` failure detector.
+> Gossip protocol can be enabled by specifying this parameter in `config.properties` file, with the value `gossip`.
+> All nodes (i.e. coordinator as well as workers) in a cluster should have this property specified in their respective `etc/config.properties` file.
+
+### `failure-detector.heartbeat-interval`
+
+>- **Type:** Duration
+>- **Default value:** `500ms` (500 miliseconds)
+>
+> This is one of the existing configuration properties, which is used by the gossip protocol.
+> This is the interval of gossip between two nodes in the cluster.
+> In gossip protocol, two workers are expected to gossip with higher frequency than the coordinator and a worker.
+> In `config.properties` for the coordinator, this property can be set with a reasonably higher value, such as `5s` (5 seconds).
+> In workers, this property can be left to use the default value.
+>
+### `failure-detector.gossip.worker-gossip-probe-interval`
+>
+> - **Type:** Duration
+>- **Default value:** `5s` (5 seconds)
+>
+> Gossip protocol uses monitoring tasks (same as the heartbeat failure detector) to keep tab on the other nodes.
+> This property specifies the interval of refreshing the monitoring tasks to trigger worker to worker gossip.
+> This property, if needed to be configured with any other value than the default, should be specified only for the worker nodes.
+> This parameter should have higher value than `failure-detector.heartbeat-interval`.
+>
+### `failure-detector.gossip.coordinator-gossip-probe-interval`
+>
+> - **Type:** Duration
+>- **Default value:** `5s` (5 seconds)
+>
+> Gossip protocol uses monitoring tasks (same as the heartbeat failure detector) to keep tab on the other nodes.
+> This property specifies the interval of refreshing the monitoring tasks to trigger coordinator to worker gossip.
+> This property, if needed to be configured with any other value than the default, should be specified only for the coordinator.
+> This parameter should have higher value than `failure-detector.heartbeat-interval` and `failure-detector.gossip.worker-gossip-probe-interval`.
+>
+### `failure-detector.gossip.coordinator-gossip-collate-interval`
+>
+> - **Type:** Duration
+>- **Default value:** `5s` (2 seconds)
+>
+> This property specifies the interval in which the coordinator collates all the gossips it obtained from all the workers.
+> This property has to be specified only for the coordinator.
+> This parameter should have higher value than `failure-detector.heartbeat-interval`.
+>
+### `failure-detector.gossip.group-size`
+>
+> - **Type:** Integer
+>- **Default value:** `Integer.MAX_VALUE`
+>
+> A worker should gossip with how many other workers in the cluster, is defined by this parameter.
+> Any value higher than the cluster-size (i.e. the number of workers) implies all-to-all gossip.
+> To keep the network overhead low, this value should be reasonably low for a big cluster (e.g. 10 for a cluster size of 100).
+> On each refresh of the worker-monitoring tasks at the coordinator, the coordinator defines the list of worker URIs of size `failure-detector.gossip.group-size` to trigger worker-to-worker gossip.
 
 ## Task Properties
 

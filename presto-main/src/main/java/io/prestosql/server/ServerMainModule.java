@@ -250,11 +250,13 @@ public class ServerMainModule
     {
         ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
 
+        boolean gossip = ServerConfig.isGossip(serverConfig);
+
         if (serverConfig.isCoordinator()) {
-            install(new CoordinatorModule());
+            install(new CoordinatorModule(gossip));
         }
         else {
-            install(new WorkerModule());
+            install(new WorkerModule(gossip));
         }
 
         configBinder(binder).bindConfigDefaults(HttpServerConfig.class, httpServerConfig -> {

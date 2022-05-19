@@ -80,6 +80,8 @@ public class HeartbeatFailureDetector
 {
     private static final Logger log = Logger.get(HeartbeatFailureDetector.class);
 
+    protected Duration monitoringServiceUpdateInterval = new Duration(5, TimeUnit.SECONDS);
+
     private final ServiceSelector selector;
     private final HttpClient httpClient;
     private final NodeInfo nodeInfo;
@@ -145,8 +147,13 @@ public class HeartbeatFailureDetector
                         log.warn(e, "Error updating services");
                     }
                 }
-            }, 0, 5, TimeUnit.SECONDS);
+            }, 0, monitoringServiceUpdateInterval.toMillis(), TimeUnit.MILLISECONDS);
         }
+    }
+
+    protected HttpClient getHttpClient()
+    {
+        return this.httpClient;
     }
 
     @PreDestroy
@@ -169,6 +176,12 @@ public class HeartbeatFailureDetector
                 .filter(MonitoringTask::isFailed)
                 .map(MonitoringTask::getService)
                 .collect(toImmutableSet());
+    }
+
+    public Set<MonitoringTask> getAliveNodes()
+    {
+        waitForServiceStateRefresh();
+        return tasks.values().stream().filter(t -> !getFailed().contains(t)).collect(Collectors.toSet());
     }
 
     @Override
@@ -228,11 +241,16 @@ public class HeartbeatFailureDetector
         return builder.build();
     }
 
+    protected long getCurrentTime()
+    {
+        Map<ServiceDescriptor, Long> waitingTasks = getTasksTimestamp();
+        return waitingTasks.values().stream().mapToLong(t -> t).max().getAsLong();
+    }
+
     @Override
     public void waitForServiceStateRefresh()
     {
-        Map<ServiceDescriptor, Long> waitingTasks = getTasksTimestamp();
-        long currentTime = waitingTasks.values().stream().mapToLong(t -> t).max().getAsLong();
+        long currentTime = getCurrentTime();
         updateMonitoredServices();
         // remove expired tasks
         synchronized (tasks) {
@@ -281,17 +299,7 @@ public class HeartbeatFailureDetector
             disableOfflineTasks(onlineIds);
 
             // 3. create tasks for new services
-            Set<ServiceDescriptor> newServices = online.stream()
-                    .filter(service -> !tasks.keySet().contains(service.getId()))
-                    .collect(toImmutableSet());
-
-            for (ServiceDescriptor service : newServices) {
-                URI uri = getHttpUri(service);
-
-                if (uri != null) {
-                    tasks.put(service.getId(), new MonitoringTask(service, uri));
-                }
-            }
+            createTasksForNewServices(online);
 
             // 4. enable all online tasks (existing plus newly created)
             tasks.values().stream()
@@ -300,7 +308,30 @@ public class HeartbeatFailureDetector
         }
     }
 
-    private Set<ServiceDescriptor> getOnlineServiceDescriptors()
+    private Set<ServiceDescriptor> getNewServices(Set<ServiceDescriptor> online)
+    {
+        return online.stream()
+                .filter(service -> !tasks.keySet().contains(service.getId()))
+                .collect(toImmutableSet());
+    }
+
+    protected void createTasksForNewServices(Set<ServiceDescriptor> online)
+    {
+        Set<ServiceDescriptor> newServices = getNewServices(online);
+        for (ServiceDescriptor service : newServices) {
+            URI uri = getHttpUri(service);
+            if (uri != null) {
+                tasks.put(service.getId(), createNewTask(service, uri));
+            }
+        }
+    }
+
+    protected MonitoringTask createNewTask(ServiceDescriptor service, URI uri)
+    {
+        return new MonitoringTask(service, uri);
+    }
+
+    protected Set<ServiceDescriptor> getOnlineServiceDescriptors()
     {
         return selector.selectAllServices().stream()
                 .filter(descriptor -> !nodeInfo.getNodeId().equals(descriptor.getNodeId()))
@@ -332,7 +363,7 @@ public class HeartbeatFailureDetector
         tasks.keySet().removeAll(expiredIds);
     }
 
-    private URI getHttpUri(ServiceDescriptor descriptor)
+    protected URI getHttpUri(ServiceDescriptor descriptor)
     {
         String url = descriptor.getProperties().get(httpsRequired ? "https" : "http");
         if (url != null) {
@@ -347,28 +378,33 @@ public class HeartbeatFailureDetector
     }
 
     @ThreadSafe
-    private class MonitoringTask
+    protected class MonitoringTask
     {
         private final ServiceDescriptor service;
         private final URI uri;
         private final Stats stats;
 
         @GuardedBy("this")
-        private ScheduledFuture<?> future;
+        protected ScheduledFuture<?> future;
 
         @GuardedBy("this")
-        private Long disabledTimestamp;
+        protected Long disabledTimestamp;
 
         @GuardedBy("this")
-        private Long successTransitionTimestamp;
+        protected Long successTransitionTimestamp;
 
         @GuardedBy("this")
-        private long lastCompleteTimestamp;
+        protected long lastCompleteTimestamp;
 
         @GuardedBy("this")
-        private double lastFailureCount;
+        protected double lastFailureCount;
 
-        private MonitoringTask(ServiceDescriptor service, URI uri)
+        public URI getUri()
+        {
+            return this.uri;
+        }
+
+        public MonitoringTask(ServiceDescriptor service, URI uri)
         {
             this.uri = uri;
             this.service = service;
@@ -433,10 +469,11 @@ public class HeartbeatFailureDetector
             return lastCompleteTimestamp;
         }
 
-        private void ping()
+        protected void ping()
         {
             try {
                 stats.recordStart();
+                log.debug("pinging ..." + uri);
                 httpClient.executeAsync(prepareHead().setUri(uri).build(), new ResponseHandler<Object, Exception>()
                 {
                     @Override
@@ -444,7 +481,6 @@ public class HeartbeatFailureDetector
                     {
                         // ignore error
                         stats.recordFailure(exception);
-
                         // TODO: this will technically cause an NPE in httpClient, but it's not triggered because
                         // we never call get() on the response future. This behavior needs to be fixed in airlift
                         return null;
@@ -463,7 +499,7 @@ public class HeartbeatFailureDetector
             }
         }
 
-        private synchronized void updateState()
+        protected synchronized void updateState()
         {
             // is this an over/under transition?
             if (stats.getRecentFailureRatio() > failureRatioThreshold) {

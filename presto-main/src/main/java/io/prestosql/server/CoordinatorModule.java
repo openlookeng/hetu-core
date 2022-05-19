@@ -100,6 +100,7 @@ import io.prestosql.execution.scheduler.AllAtOnceExecutionPolicy;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
 import io.prestosql.execution.scheduler.PhasedExecutionPolicy;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
+import io.prestosql.failuredetector.CoordinatorGossipFailureDetectorModule;
 import io.prestosql.failuredetector.FailureDetectorModule;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.memory.ForMemoryManager;
@@ -195,6 +196,18 @@ import static org.weakref.jmx.guice.ExportBinder.newExporter;
 public class CoordinatorModule
         extends AbstractConfigurationAwareModule
 {
+    private boolean gossip;
+
+    public CoordinatorModule(boolean gossip)
+    {
+        this.gossip = gossip;
+    }
+
+    public CoordinatorModule()
+    {
+        this(false);
+    }
+
     @Override
     protected void setup(Binder binder)
     {
@@ -231,9 +244,16 @@ public class CoordinatorModule
         jaxrsBinder(binder).bind(WebUiResource.class);
 
         // failure detector
-        binder.install(new FailureDetectorModule());
-        jaxrsBinder(binder).bind(NodeResource.class);
-        jaxrsBinder(binder).bind(WorkerResource.class);
+        if (gossip) {
+            binder.install(new CoordinatorGossipFailureDetectorModule());
+            jaxrsBinder(binder).bind(GossipNodeResource.class);
+            jaxrsBinder(binder).bind(WorkerResource.class);
+        }
+        else {
+            binder.install(new FailureDetectorModule());
+            jaxrsBinder(binder).bind(NodeResource.class);
+            jaxrsBinder(binder).bind(WorkerResource.class);
+        }
         httpClientBinder(binder).bindHttpClient("workerInfo", ForWorkerInfo.class);
 
         // query monitor
