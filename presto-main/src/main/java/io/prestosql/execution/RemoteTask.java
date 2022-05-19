@@ -63,6 +63,10 @@ public interface RemoteTask
 
     void cancelToResume();
 
+    void suspend();
+
+    void resume();
+
     void abort();
 
     int getPartitionedSplitCount();

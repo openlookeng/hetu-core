@@ -445,6 +445,60 @@ public class SqlTask
         return getTaskInfo();
     }
 
+    public TaskInfo suspend(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+                taskExecution = taskHolder.getTaskExecution();
+                if (taskExecution != null) {
+                    taskExecution.suspendTask();
+                }
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
+    public TaskInfo resume(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+                taskExecution = taskHolder.getTaskExecution();
+                if (taskExecution != null) {
+                    taskExecution.resumeTask();
+                }
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
     public ListenableFuture<BufferResult> getTaskResults(OutputBufferId bufferId, long startingSequenceId, DataSize maxSize)
     {
         requireNonNull(bufferId, "bufferId is null");

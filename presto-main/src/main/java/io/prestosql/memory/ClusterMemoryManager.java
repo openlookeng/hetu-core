@@ -58,9 +58,11 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -131,6 +133,7 @@ public class ClusterMemoryManager
     private final StateStoreProvider stateStoreProvider;
     private final HetuConfig hetuConfig;
     private final boolean isBinaryEncoding;
+    private final boolean isSuspendEnabled;
 
     @GuardedBy("this")
     private final Map<String, RemoteNodeMemory> nodes = new LinkedHashMap<>();
@@ -149,6 +152,9 @@ public class ClusterMemoryManager
 
     @GuardedBy("this")
     private QueryId lastKilledQuery;
+
+    @GuardedBy("this")
+    private List<QueryId> lastSuspendedQueries = new LinkedList<>();
 
     @Inject
     public ClusterMemoryManager(
@@ -182,6 +188,7 @@ public class ClusterMemoryManager
         this.coordinatorId = queryIdGenerator.getCoordinatorId();
         this.enabled = serverConfig.isCoordinator();
         this.killOnOutOfMemoryDelay = config.getKillOnOutOfMemoryDelay();
+        this.isSuspendEnabled = config.getSuspendQueryEnabled();
 
         verify(maxQueryMemory.toBytes() <= maxQueryTotalMemory.toBytes(),
                 "maxQueryMemory cannot be greater than maxQueryTotalMemory");
@@ -236,7 +243,9 @@ public class ClusterMemoryManager
         return pools.containsKey(poolId);
     }
 
-    public synchronized void process(Iterable<QueryExecution> runningQueries, Supplier<List<BasicQueryInfo>> allQueryInfoSupplier)
+    public synchronized void process(Iterable<QueryExecution> runningQueries,
+                                     Iterable<QueryExecution> suspendedQueries,
+                                     Supplier<List<BasicQueryInfo>> allQueryInfoSupplier)
     {
         if (!enabled) {
             return;
@@ -314,6 +323,11 @@ public class ClusterMemoryManager
                             log.debug("Last killed query is still not gone: %s", lastKilledQuery);
                         }
                     }
+
+                    if (!outOfMemory) {
+                        /* Try to resume another suspended query */
+                        wakeUpSuspendedQuery(suspendedQueries);
+                    }
                 }
             }
             catch (Exception e) {
@@ -348,6 +362,19 @@ public class ClusterMemoryManager
         updateNodes(assignmentsRequest);
     }
 
+    private synchronized void wakeUpSuspendedQuery(Iterable<QueryExecution> suspendedQuery)
+    {
+        if (!isSuspendEnabled) {
+            return;
+        }
+
+        Optional<QueryExecution> chosenQuery = Streams.stream(suspendedQuery).max(Comparator.comparing(QueryExecution::getCreateTime));
+        if (chosenQuery.isPresent()) {
+            chosenQuery.get().resumeQuery();
+            lastSuspendedQueries.removeIf(queryId -> queryId.equals(chosenQuery.get().getQueryId()));
+        }
+    }
+
     private synchronized void callOomKiller(Iterable<QueryExecution> runningQueries)
     {
         List<QueryMemoryInfo> queryMemoryInfoList = Streams.stream(runningQueries)
@@ -361,13 +388,19 @@ public class ClusterMemoryManager
         Optional<QueryId> chosenQueryId = lowMemoryKiller.chooseQueryToKill(queryMemoryInfoList, nodeMemoryInfos);
         if (chosenQueryId.isPresent()) {
             log.debug("Low memory killer chose %s", chosenQueryId.get());
-            Optional<QueryExecution> chosenQuery = Streams.stream(runningQueries).filter(query -> chosenQueryId.get().equals(query.getQueryId())).collect(toOptional());
+            Optional<QueryExecution> chosenQuery = Streams.stream(runningQueries).filter(query -> !lastSuspendedQueries.contains(query.getQueryId())).filter(query -> chosenQueryId.get().equals(query.getQueryId())).collect(toOptional());
             if (chosenQuery.isPresent()) {
-                // See comments in  isLastKilledQueryGone for why chosenQuery might be absent.
-                chosenQuery.get().fail(new PrestoException(CLUSTER_OUT_OF_MEMORY, "Query killed because the cluster is out of memory. Please try again in a few minutes."));
-                queriesKilledDueToOutOfMemory.incrementAndGet();
-                lastKilledQuery = chosenQueryId.get();
-                logQueryKill(chosenQueryId.get(), nodeMemoryInfos);
+                if (lastSuspendedQueries.size() >= 10 || isSuspendEnabled == false) {
+                    // See comments in  isLastKilledQueryGone for why chosenQuery might be absent.
+                    chosenQuery.get().fail(new PrestoException(CLUSTER_OUT_OF_MEMORY, "Query killed because the cluster is out of memory. Please try again in a few minutes."));
+                    queriesKilledDueToOutOfMemory.incrementAndGet();
+                    lastKilledQuery = chosenQueryId.get();
+                    logQueryKill(chosenQueryId.get(), nodeMemoryInfos);
+                }
+                else {
+                    chosenQuery.get().suspendQuery();
+                    lastSuspendedQueries.add(chosenQueryId.get());
+                }
             }
         }
     }
@@ -375,6 +408,11 @@ public class ClusterMemoryManager
     @GuardedBy("this")
     private boolean isLastKilledQueryGone()
     {
+        /* start killing only after 10 suspended queries */
+        if (lastSuspendedQueries.size() < 10 && isSuspendEnabled) {
+            return true;
+        }
+
         if (lastKilledQuery == null) {
             return true;
         }

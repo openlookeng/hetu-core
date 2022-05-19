@@ -31,6 +31,10 @@ public enum TaskState
      */
     RUNNING(false),
     /**
+     * Task is temporarily.
+     */
+    SUSPENDED(false),
+    /**
      * Task has finished executing and all output has been consumed.
      */
     FINISHED(true),

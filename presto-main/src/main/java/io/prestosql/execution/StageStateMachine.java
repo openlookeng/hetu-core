@@ -65,6 +65,7 @@ import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.StageState.SCHEDULING;
 import static io.prestosql.execution.StageState.SCHEDULING_SPLITS;
+import static io.prestosql.execution.StageState.SUSPENDED;
 import static io.prestosql.execution.StageState.TERMINAL_STAGE_STATES;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
@@ -247,6 +248,12 @@ public class StageStateMachine
         log.debug("Moving stage %s to Rescheduling state", stageId);
         // Force it, even when the stage is in FINISHED state, which was before the resume occurred
         return stageState.forceSet(RESCHEDULING) == RESCHEDULING;
+    }
+
+    public boolean transitionToSuspend()
+    {
+        log.debug("Moving stage %s to Suspended state", stageId);
+        return stageState.setIf(SUSPENDED, currentState -> !currentState.isDone());
     }
 
     /**

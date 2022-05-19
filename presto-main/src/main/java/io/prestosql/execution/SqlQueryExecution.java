@@ -910,6 +910,36 @@ public class SqlQueryExecution
     }
 
     @Override
+    public void suspendQuery()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            stateMachine.transitionToSuspend();
+            if (scheduler != null) {
+                boolean useSnapshot = SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession()) && snapshotManager.isSuccessfulSnapshotExist();
+                scheduler.suspend(useSnapshot);
+            }
+        }
+    }
+
+    @Override
+    public void resumeQuery()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession())) {
+                stateMachine.transitionToRescheduling();
+            }
+            else {
+                if (scheduler != null) {
+                    scheduler.resume();
+                }
+                stateMachine.transitionToResumeRunning();
+            }
+        }
+    }
+
+    @Override
     public void cancelStage(StageId stageId)
     {
         requireNonNull(stageId, "stageId is null");

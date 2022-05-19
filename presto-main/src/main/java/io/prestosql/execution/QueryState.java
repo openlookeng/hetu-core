@@ -43,6 +43,10 @@ public enum QueryState
     /**
      * Query has at least one running task.
      */
+    SUSPENDED(false),
+    /**
+     * Query has at least one running task.
+     */
     RUNNING(false),
     /**
      * Failed tasks will be re-scheduled. Waiting for old stages/tasks to finish.

@@ -119,4 +119,8 @@ public interface QueryManager
     {
         return null;
     }
+
+    void suspendQuery(QueryId queryId);
+
+    void resumeQuery(QueryId queryId);
 }

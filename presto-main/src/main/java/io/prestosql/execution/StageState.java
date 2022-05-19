@@ -42,6 +42,10 @@ public enum StageState
     /**
      * Stage is running.
      */
+    SUSPENDED(false, false),
+    /**
+     * Stage is running.
+     */
     RUNNING(false, false),
     /**
      * Stage has finished executing and all output has been consumed.

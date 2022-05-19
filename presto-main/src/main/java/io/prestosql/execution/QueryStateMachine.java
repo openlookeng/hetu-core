@@ -85,6 +85,7 @@ import static io.prestosql.execution.QueryState.RESCHEDULING;
 import static io.prestosql.execution.QueryState.RESUMING;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.execution.QueryState.STARTING;
+import static io.prestosql.execution.QueryState.SUSPENDED;
 import static io.prestosql.execution.QueryState.TERMINAL_QUERY_STATES;
 import static io.prestosql.execution.QueryState.WAITING_FOR_RESOURCES;
 import static io.prestosql.execution.StageInfo.getAllStages;
@@ -804,12 +805,22 @@ public class QueryStateMachine
 
     public boolean transitionToRescheduling()
     {
-        return queryState.setIf(RESCHEDULING, currentState -> currentState == RUNNING);
+        return queryState.setIf(RESCHEDULING, currentState -> currentState == RUNNING || currentState == SUSPENDED);
     }
 
     public boolean transitionToResuming()
     {
         return queryState.setIf(RESUMING, currentState -> currentState == RESCHEDULING);
+    }
+
+    public boolean transitionToSuspend()
+    {
+        return queryState.setIf(SUSPENDED, currentState -> currentState == RUNNING);
+    }
+
+    public boolean transitionToResumeRunning()
+    {
+        return queryState.setIf(RUNNING, currentState -> currentState == SUSPENDED);
     }
 
     public boolean transitionToFinishing()

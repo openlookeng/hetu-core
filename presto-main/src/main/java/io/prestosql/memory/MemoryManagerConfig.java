@@ -38,6 +38,7 @@ public class MemoryManagerConfig
     private DataSize maxQueryTotalMemory;
     private String lowMemoryKillerPolicy = LowMemoryKillerPolicy.NONE;
     private Duration killOnOutOfMemoryDelay = new Duration(5, MINUTES);
+    private boolean isSuspendQuery;
 
     public String getLowMemoryKillerPolicy()
     {
@@ -92,6 +93,18 @@ public class MemoryManagerConfig
     public MemoryManagerConfig setMaxQueryTotalMemory(DataSize maxQueryTotalMemory)
     {
         this.maxQueryTotalMemory = maxQueryTotalMemory;
+        return this;
+    }
+
+    public boolean getSuspendQueryEnabled()
+    {
+        return this.isSuspendQuery;
+    }
+
+    @Config("query.suspend-query-enabled")
+    public MemoryManagerConfig setSuspendQueryEnabled(boolean isEnabled)
+    {
+        this.isSuspendQuery = isEnabled;
         return this;
     }
 

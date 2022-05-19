@@ -104,6 +104,7 @@ import static io.prestosql.execution.StageState.FINISHED;
 import static io.prestosql.execution.StageState.RESUMABLE_FAILURE;
 import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
+import static io.prestosql.execution.StageState.SUSPENDED;
 import static io.prestosql.execution.scheduler.SourcePartitionedScheduler.newSourcePartitionedSchedulerAsStageScheduler;
 import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -153,6 +154,10 @@ public class SqlQueryScheduler
     private final long createdAt = System.currentTimeMillis();
     // Make sure we only try to resume at most once for each scheduling attempt
     private boolean resumed;
+
+    private AtomicBoolean suspended = new AtomicBoolean();
+
+    private AtomicBoolean unsuspended = new AtomicBoolean();
 
     private final Set<PlanFragmentId> visitedPlanFrags = new HashSet<>();
     private int currentTimerLevel;
@@ -389,6 +394,11 @@ public class SqlQueryScheduler
                         queryStateMachine.transitionToRunning();
                     }
                 }
+                /* Todo(Nitin K): do this when suspend is needed based on intrinsic feedback from stages... check is such a cases exists
+                else if (queryStateMachine.getQueryState() == QueryState.SUSPENDED) {
+                    suspend();
+                }
+                */
             });
         }
 
@@ -843,7 +853,7 @@ public class SqlQueryScheduler
             for (SqlStageExecution stage : stages.values()) {
                 StageState state = stage.getState();
                 // Snapshot: if state is resumable_failure, then state of stage and query will change soon again. Don't treat as an error.
-                if (state != SCHEDULED && state != RUNNING && !state.isDone() && state != RESUMABLE_FAILURE) {
+                if (state != SCHEDULED && state != RUNNING && !state.isDone() && state != RESUMABLE_FAILURE && state != SUSPENDED) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Scheduling is complete, but stage %s is in state %s", stage.getStageId(), state));
                 }
             }
@@ -897,6 +907,22 @@ public class SqlQueryScheduler
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
             stages.values().forEach(SqlStageExecution::abort);
+        }
+    }
+
+    public synchronized void suspend(boolean useSnapshot)
+    {
+        log.info("Suspending query tasks: %s, usingSnapshot: %b", queryStateMachine.getQueryId(), useSnapshot);
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(stage -> stage.suspend(useSnapshot));
+        }
+    }
+
+    public synchronized void resume()
+    {
+        log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::resume);
         }
     }
 

@@ -332,6 +332,23 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::cancelToResume);
     }
 
+    public synchronized void suspend(boolean useSnapshot)
+    {
+        stateMachine.transitionToSuspend();
+        if (useSnapshot) {
+            getAllTasks().forEach(RemoteTask::cancelToResume);
+        }
+        else {
+            getAllTasks().forEach(RemoteTask::suspend);
+        }
+    }
+
+    public synchronized void resume()
+    {
+        stateMachine.transitionToRunning();
+        getAllTasks().forEach(RemoteTask::resume);
+    }
+
     public void OnSnapshotXCompleted(boolean capture, long snapshotId)
     {
         log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
