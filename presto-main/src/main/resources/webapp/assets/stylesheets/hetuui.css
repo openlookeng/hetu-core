@@ -93,6 +93,32 @@ body {
     justify-content: flex-end;
 }
 
+.collect {
+    padding: 5px 280px;
+
+}
+
+.collection-btn {
+    border: 1px solid #d5d8db;
+    width: 50px;
+    height: 30px;
+    background-color: #fcfcfd;
+    border-radius: .25em;
+    margin: 0 10px 10px 10px;
+}
+
+.collection-btn:hover {
+    background-color: #efefef;
+}
+
+.collection-btn:active {
+    background-color: #e8e6e6;
+}
+
+.collection-btn .fa-plus {
+    font-size: 75%;
+}
+
 .hetu-app {
     position: relative;
     top: 0;
@@ -1091,6 +1117,10 @@ button.hetu-form-label-plus:active,button.hetu-form-label-plus:active:hover,butt
     color: #3a8edc;
 }
 
+.collection-btn .icon-center {
+    margin-right: 0px;
+}
+
 .fa-form-label {
     position: relative;
     font-size: 20px;
@@ -1276,4 +1306,8 @@ button.hetu-form-label-plus:active,button.hetu-form-label-plus:active:hover,butt
 
 .contextmenu-icons.remove-favorite {
     color: #fd082d;
+}
+
+.contextmenu-icons.show-catalog {
+    color: #626e86;
 }

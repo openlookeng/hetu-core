@@ -29,6 +29,7 @@ import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.memory.ClusterMemoryManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
+import io.prestosql.queryhistory.QueryHistoryService;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.spi.ErrorType;
 import io.prestosql.spi.PrestoException;
@@ -99,14 +100,16 @@ public class SqlQueryManager
     // LocalStateProvider
     private final StateStoreProvider stateStoreProvider;
     private final SessionPropertyManager sessionPropertyManager;
+    private final QueryHistoryService queryHistoryService;
 
     // Inject LocalStateProvider
     @Inject
-    public SqlQueryManager(ClusterMemoryManager memoryManager, QueryMonitor queryMonitor, EmbedVersion embedVersion, QueryManagerConfig queryManagerConfig, StateStoreProvider stateStoreProvider, SessionPropertyManager sessionPropertyManager)
+    public SqlQueryManager(ClusterMemoryManager memoryManager, QueryMonitor queryMonitor, EmbedVersion embedVersion, QueryManagerConfig queryManagerConfig, StateStoreProvider stateStoreProvider, SessionPropertyManager sessionPropertyManager, QueryHistoryService queryHistoryService)
     {
         this.memoryManager = requireNonNull(memoryManager, "memoryManager is null");
         this.queryMonitor = requireNonNull(queryMonitor, "queryMonitor is null");
         this.embedVersion = requireNonNull(embedVersion, "embedVersion is null");
+        this.queryHistoryService = requireNonNull(queryHistoryService, "embedVersion is null");
 
         this.maxQueryCpuTime = queryManagerConfig.getQueryMaxCpuTime();
 
@@ -274,6 +277,9 @@ public class SqlQueryManager
         queryExecution.addFinalQueryInfoListener(finalQueryInfo -> {
             try {
                 queryMonitor.queryCompletedEvent(finalQueryInfo);
+                if (!(finalQueryInfo.getSession().getSource().map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source)).orElse(false))) {
+                    queryHistoryService.insert(finalQueryInfo);
+                }
             }
             finally {
                 // execution MUST be added to the expiration queue or there will be a leak

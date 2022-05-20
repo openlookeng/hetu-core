@@ -17,13 +17,12 @@ import React, { Fragment } from "react";
 import {
     formatDataSizeBytes,
     formatShortTime,
-    getProgressBarPercentage,
-    getProgressBarTitle,
+    getHumanReadableState,
     getQueryStateColor,
     GLYPHICON_DEFAULT,
     GLYPHICON_HIGHLIGHT,
     truncateString
-} from "../utils";
+} from "../newUtils";
 import Header from "../queryeditor/components/Header";
 import Footer from "../queryeditor/components/Footer";
 import StatusFooter from "../queryeditor/components/StatusFooter";
@@ -32,9 +31,19 @@ import Pagination from 'rc-pagination';
 import Select from "rc-select";
 import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
 import _ from "lodash";
+import ModalDialog from "../queryeditor/components/ModalDialog";
 
 export class QueryListItem extends React.Component {
-    static stripQueryTextWhitespace(queryText) {
+    constructor(props) {
+        super(props);
+        this.state = {
+            show: false,
+        }
+        this.showModal = this.showModal.bind(this);
+        this.isShowMore = this.isShowMore.bind(this);
+    }
+
+    static getAllQueryText(queryText) {
         const lines = queryText.split("\n");
         let minLeadingWhitespace = -1;
         for (let i = 0; i < lines.length; i++) {
@@ -67,26 +76,51 @@ export class QueryListItem extends React.Component {
             }
         }
 
-        return truncateString(formattedQueryText, 300);
+        return formattedQueryText;
+    }
+
+    static stripQueryTextWhitespace(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+
+        return truncateString(formattedQueryText, 550);
+    }
+
+    showModal(e) {
+        let newShow = this.state.show;
+        this.setState({
+            show: !newShow
+        })
+    }
+
+    isShowMore(queryText) {
+        let formattedQueryText = QueryListItem.getAllQueryText(queryText);
+        let row = formattedQueryText.split("\n").length;
+
+        if (formattedQueryText && (formattedQueryText.length > 550 || row > 8)) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     render() {
         const query = this.props.query;
-        const progressBarStyle = { width: getProgressBarPercentage(query) + "%", backgroundColor: getQueryStateColor(query) };
+        const progressBarStyle = {width: 100 + "%", backgroundColor: getQueryStateColor(query) };
 
         const splitDetails = (
             <div className="col-xs-12 tinystat-row">
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Completed splits" data-container="body">
                     <span className="glyphicon glyphicon-ok" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.completedDrivers}
+                    {query.completedDrivers}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Running splits" data-container="body">
                     <span className="glyphicon glyphicon-play" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.queryStats.runningDrivers}
+                    {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.runningDrivers}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Queued splits" data-container="body">
                     <span className="glyphicon glyphicon-pause" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.queryStats.queuedDrivers}
+                    {(query.state === "FINISHED" || query.state === "FAILED") ? 0 : query.queuedDrivers}
                 </span>
             </div>);
 
@@ -94,15 +128,15 @@ export class QueryListItem extends React.Component {
             <div className="col-xs-12 tinystat-row">
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Wall time spent executing the query (not including queued time)" data-container="body">
                     <span className="glyphicon glyphicon-hourglass" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.executionTime}
+                    {query.executionTime}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Total query wall time" data-container="body">
                     <span className="glyphicon glyphicon-time" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.elapsedTime}
+                    {query.elapsedTime}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="CPU time spent by this query" data-container="body">
                     <span className="glyphicon glyphicon-dashboard" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.totalCpuTime}
+                    {query.totalCpuTime}
                 </span>
             </div>);
 
@@ -110,24 +144,24 @@ export class QueryListItem extends React.Component {
             <div className="col-xs-12 tinystat-row">
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Current total reserved memory" data-container="body">
                     <span className="glyphicon glyphicon-scale" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.totalMemoryReservation}
+                    {query.totalMemoryReservation}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Peak total memory" data-container="body">
                     <span className="glyphicon glyphicon-fire" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {query.queryStats.peakTotalMemoryReservation}
+                    {query.peakTotalMemoryReservation}
                 </span>
                 <span className="tinystat" data-toggle="tooltip" data-placement="top" title="Cumulative user memory" data-container="body">
                     <span className="glyphicon glyphicon-equalizer" style={GLYPHICON_HIGHLIGHT} />&nbsp;&nbsp;
-                    {formatDataSizeBytes(query.queryStats.cumulativeUserMemory / 1000.0)}
+                    {formatDataSizeBytes(query.cumulativeUserMemory / 1000.0)}
                 </span>
             </div>);
 
-        let user = (<span>{query.session.user}</span>);
-        if (query.session.principal) {
-            user = (
-                <span>{query.session.user}<span className="glyphicon glyphicon-lock-inverse" style={GLYPHICON_DEFAULT} /></span>
-            );
-        }
+        let user = (<span>{query.user}</span>);
+        // if (query.session.principal) {
+        //     user = (
+        //         <span>{query.user}<span className="glyphicon glyphicon-lock-inverse" style={GLYPHICON_DEFAULT} /></span>
+        //     );
+        // }
 
         return (
             <div className="query">
@@ -135,10 +169,10 @@ export class QueryListItem extends React.Component {
                     <div className="col-xs-4">
                         <div className="row stat-row query-header query-header-queryid">
                             <div className="col-xs-9" data-toggle="tooltip" data-placement="bottom" title="Query ID">
-                                <a href={"" + query.self.replace(/.*\/v1\/query\//, "query.html?")} target="_blank">{query.queryId}</a>
+                                <a href={"../ui/query.html?history_"+query.queryId} target="_blank">{query.queryId}</a>
                             </div>
                             <div className="col-xs-3 query-header-timestamp" data-toggle="tooltip" data-placement="bottom" title="Submit time">
-                                <span>{formatShortTime(new Date(Date.parse(query.queryStats.createTime)))}</span>
+                                <span>{formatShortTime(new Date(Date.parse(query.createTime)))}</span>
                             </div>
                         </div>
                         <div className="row stat-row">
@@ -153,7 +187,7 @@ export class QueryListItem extends React.Component {
                             <div className="col-xs-12">
                                 <span data-toggle="tooltip" data-placement="right" title="Source">
                                     <span className="glyphicon glyphicon-log-in" style={GLYPHICON_DEFAULT} />&nbsp;&nbsp;
-                                    <span>{truncateString(query.session.source, 35)}</span>
+                                    <span>{truncateString(query.source, 35)}</span>
                                 </span>
                             </div>
                         </div>
@@ -161,7 +195,7 @@ export class QueryListItem extends React.Component {
                             <div className="col-xs-12">
                                 <span data-toggle="tooltip" data-placement="right" title="Resource Group">
                                     <span className="glyphicon glyphicon-road" style={GLYPHICON_DEFAULT} />&nbsp;&nbsp;
-                                    <span>{truncateString(query.resourceGroupId ? query.resourceGroupId.join(".") : "n/a", 35)}</span>
+                                    <span>{truncateString(query.resource ? query.resource : "n/a", 35)}</span>
                                 </span>
                             </div>
                         </div>
@@ -179,9 +213,26 @@ export class QueryListItem extends React.Component {
                         <div className="row query-header">
                             <div className="col-xs-12 query-progress-container">
                                 <div className="progress">
-                                    <div className="progress-bar progress-bar-info" role="progressbar" aria-valuenow={getProgressBarPercentage(query)} aria-valuemin="0"
-                                        aria-valuemax="100" style={progressBarStyle}>
-                                        {getProgressBarTitle(query)}
+                                    <div className="progress-bar progress-bar-info" role="progressbar" aria-valuemin="0"
+                                         aria-valuemax="100" style={progressBarStyle}>
+                                        <div className="progress-catalog-schema-container">
+                                            <span className="progress-catalog-schema">
+                                                catalog:
+                                            </span>
+                                            <span className="text-catalog-schema">
+                                                {query.catalog}
+                                            </span>
+                                            &nbsp;&nbsp;
+                                            <span className="progress-catalog-schema">
+                                                schema:
+                                            </span>
+                                            <span className="text-catalog-schema">
+                                                {query.schemata}
+                                            </span>
+                                        </div>
+                                        <div className="progress-state">
+                                            {getHumanReadableState(query)}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -189,6 +240,22 @@ export class QueryListItem extends React.Component {
                         <div className="row query-row-bottom">
                             <div className="col-xs-12">
                                 <pre className="query-snippet"><code className="sql">{QueryListItem.stripQueryTextWhitespace(query.query)}</code></pre>
+                                {this.isShowMore(query.query) ?
+                                    <div className="query-showmore">
+                                        <a onClick={this.showModal} style={{color: '#1E90FF',cursor: 'pointer'}}>
+                                            <span className="glyphicon glyphicon-arrow-right" style={{color: '#1E90FF'}}/>
+                                            &nbsp;Show More
+                                        </a>
+                                        <ModalDialog onClose={this.showModal} header={getHumanReadableState(query)} footer={""}
+                                                     show={this.state.show}>
+                                            <div className="modal-querytext">
+                                                {QueryListItem.getAllQueryText(query.query)}
+                                            </div>
+                                        </ModalDialog>
+                                    </div>
+                                    :
+                                    null
+                                }
                             </div>
                         </div>
                     </div>
@@ -273,14 +340,22 @@ export class QueryList extends React.Component {
             ],
             stateSelectAll: true,
             errorSelectAll: true,
-            searchString: '',
+            searchStringUser: '',
+            searchStringDate:'',
+            searchStringSql:'',
+            searchStringQueryId:'',
+            searchStringResourceGroup:'',
             currentPage: 1,
             pageSize: 10,
             total: 0,
+            queryString: '',
+            queryNums: -1,
+            metaStoreType:''
         };
 
         this.refreshLoop = this.refreshLoop.bind(this);
         this.handleSearchStringChange = this.handleSearchStringChange.bind(this);
+        this.renderDateRangePicker = this.renderDateRangePicker.bind(this);
         this.handleSortClick = this.handleSortClick.bind(this);
         this.refreshData = this.refreshData.bind(this);
         this.onPageChange = this.onPageChange.bind(this);
@@ -302,14 +377,18 @@ export class QueryList extends React.Component {
     }
 
     refreshData() {
-        const { stateFilters, errorTypeFilters, currentSortType, currentSortOrder, searchString,
-            currentPage, pageSize } = this.state;
+        const { stateFilters, errorTypeFilters, currentSortType, currentSortOrder, searchStringUser,searchStringDate,searchStringSql
+            ,searchStringQueryId,searchStringResourceGroup,currentPage, pageSize } = this.state;
         let queryParam = {
             state: stateFilters.join(","),
             failed: errorTypeFilters.join(","),
             sort: currentSortType,
             sortOrder: currentSortOrder,
-            search: searchString,
+            searchUser: searchStringUser,
+            searchDate:searchStringDate,
+            searchSql:searchStringSql,
+            searchQueryId:searchStringQueryId,
+            searchResourceGroup:searchStringResourceGroup,
             pageNum: currentPage,
             pageSize: pageSize,
         }
@@ -318,35 +397,134 @@ export class QueryList extends React.Component {
             queryArray.push(`${key}=${value}`);
         })
         let queryString = queryArray.join("&&");
+        $.get(`../v1/query/queryNums`, function (num) {
+            let queryNum = this.state.queryNums;
+            if(queryNum==num){
 
-        $.get(`../v1/query?${queryString}`, function (queryList) {
-            this.setState({
-                allQueries: queryList.queries,
-                total: queryList.total,
-            });
+            }
+            else {
+                this.state.queryNums = num;
+                $.get(`../v1/query/queryInfo?${queryString}`, function (queryList) {
+                    this.setState({
+                        allQueries: queryList.queries,
+                        total: queryList.total,
+                    });
+                    this.resetTimer();
+                }.bind(this))
+                    .error(function () {
+                        this.resetTimer();
+                    }.bind(this));
+            }
+            this.resetTimer();
+        }.bind(this))
+        if (queryString !== this.state.queryString) {
+            $.get(`../v1/query/queryInfo?${queryString}`, function (queryList) {
+                this.setState({
+                    allQueries: queryList.queries,
+                    total: queryList.total,
+                });
+                this.resetTimer();
+            }.bind(this))
+                .error(function () {
+                    this.resetTimer();
+                }.bind(this));
+        }
+
+        this.setState({
+            queryString : queryString
+        })
+
+    }
+
+    componentDidMount() {
+        $.get(`../v1/query/hetuMetastoreType`, function (metaStoreType) {
+            this.state.metaStoreType = metaStoreType;
+            if(this.state.metaStoreType != "jdbc") {
+                alert("Page error. Please change the storage type of hetu-metastore to JDBC.");
+            }
             this.resetTimer();
         }.bind(this))
             .error(function () {
                 this.resetTimer();
             }.bind(this));
 
-    }
-
-    componentDidMount() {
         this.refreshLoop();
     }
 
     handleSearchStringChange(event) {
         const newSearchString = event.target.value;
-
-        this.setState({
-            currentPage: 1,
-            searchString: newSearchString
-        });
+        if (event.target.name === "User") {
+            this.setState({
+                currentPage: 1,
+                searchStringUser: newSearchString
+            });
+        }
+        else if (event.target.name === "Date"){
+            this.setState({
+                currentPage: 1,
+                searchStringDate: newSearchString
+            });
+        }
+        else if (event.target.name === "Sql"){
+            this.setState({
+                currentPage: 1,
+                searchStringSql: newSearchString
+            });
+        }
+        else if (event.target.name === "QueryId"){
+            this.setState({
+                currentPage: 1,
+                searchStringQueryId: newSearchString
+            });
+        }
+        else if (event.target.name === "ResourceGroup"){
+            this.setState({
+                currentPage: 1,
+                searchStringResourceGroup: newSearchString
+            })
+        }
 
         this.debounceSearch();
     }
 
+    renderDateRangePicker() {
+        let that = this;
+        $('#date-picker').daterangepicker({
+            "timePicker": true,
+            "timePicker24Hour": true,
+            "linkedCalendars": false,
+            "autoUpdateInput": false,
+            "timePickerMinutes": true,
+            "locale": {
+                format: 'YYYY-MM-DD.HH:mm',
+                separator: ' ~ ',
+                applyLabel: "apply",
+                cancelLabel: "clear",
+                resetLabel: "reset",
+            }
+        }, function(start, end, label) {
+
+        });
+
+        $('#date-picker').on('apply.daterangepicker', function(ev, picker) {
+            picker.element.val(picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format));
+            that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('hide.daterangepicker', function(ev, picker) {
+            if(that.state.searchStringDate !== "") {
+                that.state.searchStringDate = picker.startDate.format(picker.locale.format) + picker.locale.separator + picker.endDate.format(picker.locale.format);
+            }
+            setTimeout(that.debounceSearch,0);
+        });
+
+        $('#date-picker').on('cancel.daterangepicker', function(ev, picker) {
+            $('#date-picker').val('');
+            that.state.searchStringDate = "";
+            setTimeout(that.debounceSearch,0);
+        });
+    }
 
     renderSortListItem(sortType, sortText) {
         if (this.state.currentSortType === sortType) {
@@ -382,6 +560,7 @@ export class QueryList extends React.Component {
             currentSortOrder: newSortOrder
         });
         _.defer(this.refreshData);
+        document.getElementById("query-history-sort").setAttribute("class", "input-group-btn open")
     }
 
     renderFilterButton(filterType, filterText) {
@@ -418,13 +597,13 @@ export class QueryList extends React.Component {
             }
             stateSelectAll = newFilters.length == Object.keys(FILTER_TYPE).length ? true : false;
         }
-
         this.setState({
             currentPage: 1,
             stateSelectAll,
             stateFilters: newFilters,
         });
         _.defer(this.refreshData);
+        document.getElementById("query-history-filter").setAttribute("class", "input-group-btn open")
     }
 
     renderErrorTypeListItem(errorType, errorTypeText) {
@@ -468,6 +647,7 @@ export class QueryList extends React.Component {
             errorTypeFilters: newFilters,
         });
         _.defer(this.refreshData);
+        document.getElementById("query-history-error").setAttribute("class", "input-group-btn open")
     }
 
     onPageChange(current, pageSize) {
@@ -482,10 +662,11 @@ export class QueryList extends React.Component {
 
     render() {
         const { allQueries, currentPage, total, stateFilters, pageSize } = this.state;
-        let queryList = <DisplayedQueriesList queries={allQueries} />;
-        if (allQueries.queries === null || total === 0) {
+        // let queryList = <DisplayedQueriesList queries={allQueries} />;
+        let queryList;
+        if (allQueries == null || total === 0) {
             let label = (<div className="loader">Loading...</div>);
-            if (allQueries.queries === null || total === 0) {
+            if (allQueries == null || total === 0) {
                 label = "No queries";
             }
             queryList = (
@@ -493,6 +674,9 @@ export class QueryList extends React.Component {
                     <div className="col-xs-12"><h4>{label}</h4></div>
                 </div>
             );
+        }
+        else {
+            queryList = <DisplayedQueriesList queries={allQueries} />;
         }
 
         return (
@@ -504,11 +688,20 @@ export class QueryList extends React.Component {
                     <NavigationMenu active={"queryhistory"} />
                     <div className="container">
                         <div className="row toolbar-row">
-                            <div className="col-xs-12 toolbar-col">
+                            <div className="col-xs-12 toolbar-col query-history">
                                 <div className="input-group input-group-sm">
-                                    <input type="text" className="form-control form-control-small search-bar" placeholder="User, source, query ID, resource group, or query text"
-                                        onChange={this.handleSearchStringChange} value={this.state.searchString} />
-                                    <div className="input-group-btn">
+                                    <input type="text" className="form-control form-control-small search-bar" placeholder="User" name="User"
+                                           onChange={this.handleSearchStringChange} value={this.state.searchStringUser} />
+                                    <input type="text" id="date-picker" className="form-control form-control-small search-bar" placeholder="Date" name="Date"
+                                           onFocus={this.renderDateRangePicker}  onChange={this.handleSearchStringChange}
+                                           value={this.state.searchStringDate}/>
+                                    <input type="text" className="form-control form-control-small search-bar" placeholder="Sql" name="Sql"
+                                           onChange={this.handleSearchStringChange} value={this.state.searchStringSql} />
+                                    <input type="text" className="form-control form-control-small search-bar" placeholder="QueryId" name="QueryId"
+                                           onChange={this.handleSearchStringChange} value={this.state.searchStringQueryId} />
+                                    <input type="text" className="form-control form-control-small search-bar" placeholder="ResourceGroup" name="ResourceGroup"
+                                            onChange={this.handleSearchStringChange} value={this.state.searchStringResourceGroup}/>
+                                    <div className="input-group-btn" id="query-history-filter">
                                         <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                             State <span className="caret" />
                                         </button>
@@ -527,23 +720,23 @@ export class QueryList extends React.Component {
                                     </div>
                                     &nbsp;
                                     {stateFilters.indexOf(FILTER_TYPE.FAILED) > -1 &&
-                                        <Fragment>
-                                            <div className="input-group-btn">
-                                                <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                                    Failed <span className="caret" />
-                                                </button>
-                                                <ul className="dropdown-menu">
-                                                    {this.renderErrorTypeListItem(SELECT_ALL, "Select All")}
-                                                    {this.renderErrorTypeListItem(ERROR_TYPE.INTERNAL_ERROR, "Internal Error")}
-                                                    {this.renderErrorTypeListItem(ERROR_TYPE.EXTERNAL, "External Error")}
-                                                    {this.renderErrorTypeListItem(ERROR_TYPE.INSUFFICIENT_RESOURCES, "Resources Error")}
-                                                    {this.renderErrorTypeListItem(ERROR_TYPE.USER_ERROR, "User Error")}
-                                                </ul>
-                                            </div>
-                                            &nbsp;
-                                        </Fragment>
+                                    <Fragment>
+                                        <div className="input-group-btn" id="query-history-error">
+                                            <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                                Failed <span className="caret" />
+                                            </button>
+                                            <ul className="dropdown-menu">
+                                                {this.renderErrorTypeListItem(SELECT_ALL, "Select All")}
+                                                {this.renderErrorTypeListItem(ERROR_TYPE.INTERNAL_ERROR, "Internal Error")}
+                                                {this.renderErrorTypeListItem(ERROR_TYPE.EXTERNAL, "External Error")}
+                                                {this.renderErrorTypeListItem(ERROR_TYPE.INSUFFICIENT_RESOURCES, "Resources Error")}
+                                                {this.renderErrorTypeListItem(ERROR_TYPE.USER_ERROR, "User Error")}
+                                            </ul>
+                                        </div>
+                                        &nbsp;
+                                    </Fragment>
                                     }
-                                    <div className="input-group-btn">
+                                    <div className="input-group-btn" id="query-history-sort">
                                         <button type="button" className="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                             Sort <span className="caret" />
                                         </button>
@@ -560,22 +753,20 @@ export class QueryList extends React.Component {
                             </div>
                         </div>
                         {queryList}
-                        {allQueries.length > 0 &&
-                            <Pagination
-                                defaultCurrent={1}
-                                current={currentPage}
-                                total={total}
-                                defaultPageSize={10}
-                                pageSize={pageSize}
-                                onChange={this.onPageChange}
-                                showTotal={total => `Total ${total} queries`}
-                                style={{ marginTop: 10 }}
-                                locale={localeInfo}
-                                showSizeChanger
-                                onShowSizeChange={this.onPageSizeChange}
-                                selectComponentClass={Select}
-                            />
-                        }
+                        <Pagination
+                            defaultCurrent={1}
+                            current={currentPage}
+                            total={total}
+                            defaultPageSize={10}
+                            pageSize={pageSize}
+                            onChange={this.onPageChange}
+                            showTotal={total => `Total ${total} queries`}
+                            style={{ marginTop: 10 }}
+                            locale={localeInfo}
+                            showSizeChanger
+                            onShowSizeChange={this.onPageSizeChange}
+                            selectComponentClass={Select}
+                        />
                     </div>
                 </div>
                 <div className='flex flex-row flex-initial statusFooter'>
@@ -586,6 +777,7 @@ export class QueryList extends React.Component {
                 </div>
             </div>
         );
+
     }
 }
 

@@ -14,9 +14,13 @@
  */
 package io.prestosql.spi.metastore;
 
+import io.prestosql.spi.favorite.FavoriteEntity;
+import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 
 import java.util.List;
 import java.util.Optional;
@@ -205,4 +209,81 @@ public interface HetuMetastore
      * @param value parameter value to put. If value is {@code null}, the given key will be removed from parameter list
      */
     void alterTableParameter(String catalogName, String databaseName, String tableName, String key, String value);
+
+    /**
+     * insert queryHistoryEntity in hetu_query_history table
+     *
+     * @param queryHistoryEntity queryHistory Entity
+     * @param jsonString
+     */
+    void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString);
+
+    /**
+     * delete 100 queryHistoryEntities from hetu_query_history table
+     *
+     */
+    void deleteQueryHistoryBatch();
+
+    /**
+     * get QueryHistory count from hetu_query_history table
+     *
+     * @param
+     * @return count
+     */
+    long getAllQueryHistoryNum();
+
+    /**
+     * get QueryDetail from hetu_query_history table
+     *
+     * @param  queryId
+     * @return QueryDetail
+     */
+    String getQueryDetail(String queryId);
+
+    /**
+     * get all QueryHistories from hetu_query_history table
+     *
+     * @param startNum
+     * @param pageSize
+     * @param user
+     * @param startTime
+     * @param endTime
+     * @param queryId
+     * @param query
+     * @param resourceGroup
+     * @param resource
+     * @param state
+     * @param failed
+     * @param sort
+     * @param sortOrder
+     *
+     * @return QueryHistoryEntities
+     */
+    QueryHistoryResult getQueryHistory(int startNum, int pageSize,
+                                       String user, String startTime, String endTime,
+                                       String queryId, String query, String resourceGroup,
+                                       String resource, List<String> state, List<String> failed,
+                                       String sort, String sortOrder);
+
+    /**
+     * insert favoriteEntity in hetu_favorite table
+     *
+     * @param  favoriteEntity queryHistory Entity
+     */
+    void insertFavorite(FavoriteEntity favoriteEntity);
+
+    /**
+     * delete favoriteEntity
+     *
+     * @param  favoriteEntity
+     */
+    void deleteFavorite(FavoriteEntity favoriteEntity);
+
+    /**
+     * get all favoriteEntities from hetu_favorite table
+     *
+     * @param  user
+     * @return favoriteEntities
+     */
+    FavoriteResult getFavorite(int startNum, int pageSize, String user);
 }

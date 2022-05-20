@@ -28,6 +28,7 @@ import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.LocationFactory;
 import io.prestosql.execution.QueryExecution;
 import io.prestosql.execution.QueryIdGenerator;
@@ -42,6 +43,7 @@ import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.ServerConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.memory.MemoryPoolInfo;
@@ -110,6 +112,7 @@ public class ClusterMemoryManager
     private final ExecutorService listenerExecutor = Executors.newSingleThreadExecutor();
     private final ClusterMemoryLeakDetector memoryLeakDetector = new ClusterMemoryLeakDetector();
     private final InternalNodeManager nodeManager;
+    private final EventListenerManager eventListenerManager;
     private final LocationFactory locationFactory;
     private final HttpClient httpClient;
     private final MBeanExporter exporter;
@@ -154,6 +157,7 @@ public class ClusterMemoryManager
     public ClusterMemoryManager(
             @ForMemoryManager HttpClient httpClient,
             InternalNodeManager nodeManager,
+            EventListenerManager eventListenerManager,
             LocationFactory locationFactory,
             MBeanExporter exporter,
             JsonCodec<MemoryInfo> memoryInfoJsonCodec,
@@ -173,6 +177,7 @@ public class ClusterMemoryManager
         requireNonNull(nodeMemoryConfig, "nodeMemoryConfig is null");
         requireNonNull(serverConfig, "serverConfig is null");
         this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
         this.locationFactory = requireNonNull(locationFactory, "locationFactory is null");
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.exporter = requireNonNull(exporter, "exporter is null");
@@ -531,14 +536,21 @@ public class ClusterMemoryManager
         // Remove nodes that don't exist anymore
         // Make a copy to materialize the set difference
         Set<String> deadNodes = ImmutableSet.copyOf(difference(nodes.keySet(), aliveNodeIds));
+        for (String deadNode : deadNodes) {
+            if (nodes.get(deadNode) == null) {
+                continue;
+            }
+            InternalNode removedNode = nodes.get(deadNode).getNode();
+            eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", removedNode.getInternalUri().toString(), "Remove Node: " + removedNode.getNodeIdentifier(), "Cluster", "WARN"));
+        }
         nodes.keySet().removeAll(deadNodes);
 
         // Add new nodes
         for (InternalNode node : aliveNodes) {
             if (!nodes.containsKey(node.getNodeIdentifier()) && shouldIncludeNode(node)) {
-//                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
-                nodes.put(node.getInternalUri().toString(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
-                allNodes.put(node.getInternalUri().toString(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                nodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                allNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+                eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", node.getInternalUri().toString(), "Add Node: " + node.getNodeIdentifier(), "Cluster", "INFO"));
             }
         }
 

@@ -144,4 +144,51 @@ public interface MetadataTableDao
             + "UNIQUE (resource)\n"
             + ")")
     void createTableLock();
+
+    /**
+     * create table of query_history
+     */
+    @SqlUpdate("CREATE TABLE IF NOT EXISTS hetu_query_history (\n" +
+            "  id BIGINT NOT NULL AUTO_INCREMENT,\n" +
+            "  user varchar(20) NOT NULL,\n" +
+            "  source varchar(30) NOT NULL,\n" +
+            "  queryId varchar(50) NOT NULL,\n" +
+            "  resource varchar(30) NOT NULL,\n" +
+            "  query varchar(1000) NOT NULL,\n" +
+            "  state varchar(30) NOT NULL,\n" +
+            "  failed varchar(30) DEFAULT NULL,\n" +
+            "  createTime varchar(30) DEFAULT NULL,\n" +
+            "  elapsedTime varchar(30) NOT NULL,\n" +
+            "  cpuTime varchar(30) NOT NULL,\n" +
+            "  executionTime varchar(30) NOT NULL,\n" +
+            "  catalog varchar(30) NOT NULL,\n" +
+            "  schemata varchar(30) NOT NULL,\n" +
+            "  currentMemory varchar(30) NOT NULL,\n" +
+            "  cumulativeUserMemory double NOT NULL,\n" +
+            "  jsonString mediumtext NOT NULL,\n" +
+            "  completedDrivers int(11) NOT NULL,\n" +
+            "  runningDrivers int(11) NOT NULL,\n" +
+            "  queuedDrivers int(11) NOT NULL,\n" +
+            "  totalCpuTime varchar(50) NOT NULL,\n" +
+            "  totalMemoryReservation varchar(50) NOT NULL,\n" +
+            "  peakTotalMemoryReservation varchar(50) NOT NULL,\n" +
+            "  PRIMARY KEY (id),\n" +
+            "  UNIQUE KEY query_history_queryId_uindex (queryId)\n" +
+            ")")
+    void createTableQueryHistory();
+
+    /**
+     * create table of hatu_favorite
+     */
+    @SqlUpdate("CREATE TABLE IF NOT EXISTS hetu_favorite (\n" +
+            "  creationTime datetime DEFAULT CURRENT_TIMESTAMP,\n" +
+            "  user varchar(20) NOT NULL,\n" +
+            "  query varchar(600) NOT NULL,\n" +
+            "  catalog varchar(30) NOT NULL,\n" +
+            "  schemata varchar(30) NOT NULL,\n" +
+            "  id BIGINT NOT NULL AUTO_INCREMENT,\n" +
+            "  PRIMARY KEY (id),\n" +
+            "  UNIQUE KEY favorite_uni (user,query,catalog,schemata)\n" +
+            ")")
+    void createTableFavorite();
 }

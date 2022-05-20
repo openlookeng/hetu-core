@@ -21,7 +21,7 @@ class AllRunningQueries
         super(props);
     }
 
-    componentWillMount() {
+    componentDidMount() {
     }
 
     render() {
