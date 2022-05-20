@@ -36,7 +36,7 @@ import io.prestosql.array.IntBigArray;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.array.SliceBigArray;
 import io.prestosql.operator.aggregation.GroupedAccumulator;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockEncodingSerde;
@@ -454,7 +454,7 @@ public class StateCompiler
         Variable obj = capture.getScope().declareVariable(Object.class, "obj");
 
         for (int i = 1; i < definition.getFields().size(); i++) {
-            capture.getBody().append(obj.set(invokeStatic(SnapshotUtils.class, "captureHelper", Object.class, capture.getThis().getField(definition.getFields().get(i)).cast(Object.class), captureSerdeProvider)));
+            capture.getBody().append(obj.set(invokeStatic(RecoveryUtils.class, "captureHelper", Object.class, capture.getThis().getField(definition.getFields().get(i)).cast(Object.class), captureSerdeProvider)));
             capture.getBody().append(myState.invoke("add", boolean.class, obj));
         }
 
@@ -471,7 +471,7 @@ public class StateCompiler
 
         for (int i = 0; i < fields.size(); i++) {
             restore.getBody().append(value.set(restoreState.invoke("get", Object.class, constantInt(i))));
-            restore.getBody().append(value.set(invokeStatic(SnapshotUtils.class, "restoreHelper", Object.class, value, constantClass(fields.get(i).getType()), restoreSerdeProvider)));
+            restore.getBody().append(value.set(invokeStatic(RecoveryUtils.class, "restoreHelper", Object.class, value, constantClass(fields.get(i).getType()), restoreSerdeProvider)));
             restore.getBody().append(restore.getThis().invoke(fields.get(i).getSetterName(), void.class, value.cast(fields.get(i).getType())));
         }
         restore.getBody().ret();

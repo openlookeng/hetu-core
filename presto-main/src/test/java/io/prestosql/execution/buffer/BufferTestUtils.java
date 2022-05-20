@@ -49,7 +49,7 @@ import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
 import static io.prestosql.testing.TestingPagesSerdeFactory.testingPagesSerde;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.testng.Assert.assertEquals;
@@ -292,7 +292,7 @@ public final class BufferTestUtils
                 executor,
                 new DataSize(1, MEGABYTE),
                 new SpillSpaceTracker(new DataSize(1, GIGABYTE)),
-                NOOP_SNAPSHOT_UTILS);
+                NOOP_RECOVERY_UTILS);
         TaskId taskId = TaskId.valueOf("query_id.1.2");
         TaskContext taskContext = queryContext.addTaskContext(
                 new TaskStateMachine(taskId, executor),

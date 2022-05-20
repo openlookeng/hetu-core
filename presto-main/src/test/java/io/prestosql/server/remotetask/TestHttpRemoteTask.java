@@ -100,7 +100,7 @@ import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutp
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.protocol.SmileCodecBinder.smileCodecBinder;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_ERROR;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.lang.Math.min;
 import static java.lang.String.format;
@@ -226,7 +226,7 @@ public class TestHttpRemoteTask
                 new NodeTaskMap.PartitionedSplitCountTracker(i -> {}),
                 true,
                 Optional.empty(),
-                new QuerySnapshotManager(new QueryId("test"), NOOP_SNAPSHOT_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(new QueryId("test"), NOOP_RECOVERY_UTILS, TEST_SESSION));
     }
 
     private static HttpRemoteTaskFactory createHttpRemoteTaskFactory(TestingTaskResource testingTaskResource)

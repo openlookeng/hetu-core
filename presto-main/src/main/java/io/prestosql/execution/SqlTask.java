@@ -97,6 +97,7 @@ public class SqlTask
     private final AtomicReference<TaskHolder> taskHolderReference = new AtomicReference<>(new TaskHolder());
     private final AtomicBoolean needsPlan = new AtomicBoolean(true);
     private final Metadata metadata;
+    private boolean isRecoveryEnabled;
     private boolean isSnapshotEnabled;
 
     public static SqlTask createSqlTask(
@@ -426,6 +427,7 @@ public class SqlTask
                     taskExecution = sqlTaskExecutionFactory.create(taskInstanceId, session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
+                    isRecoveryEnabled = SystemSessionProperties.isRecoveryEnabled(session);
                     isSnapshotEnabled = SystemSessionProperties.isSnapshotEnabled(session);
                 }
             }
@@ -564,8 +566,8 @@ public class SqlTask
         return queryContext;
     }
 
-    public boolean isSnapshotEnabled()
+    public boolean isRecoveryEnabled()
     {
-        return isSnapshotEnabled;
+        return isRecoveryEnabled;
     }
 }

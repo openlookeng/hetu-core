@@ -20,7 +20,7 @@ import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.snapshot.MarkerAnnouncer;
-import io.prestosql.snapshot.SnapshotConfig;
+import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -94,7 +94,7 @@ public class SplitManager
             boolean partOfReuse, PlanNodeId nodeId)
     {
         MarkerAnnouncer announcer = null;
-        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+        if (SystemSessionProperties.isRecoveryEnabled(session)) {
             announcer = getMarkerAnnouncer(session);
             SplitSource splitSource = announcer.getSplitSource(nodeId);
             if (splitSource != null) {
@@ -125,7 +125,7 @@ public class SplitManager
         if (minScheduleSplitBatchSize > 1) {
             splitSource = new BufferingSplitSource(splitSource, minScheduleSplitBatchSize);
         }
-        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+        if (SystemSessionProperties.isRecoveryEnabled(session)) {
             splitSource = announcer.createMarkerSplitSource(splitSource, nodeId);
         }
         return splitSource;
@@ -146,7 +146,10 @@ public class SplitManager
     public MarkerAnnouncer getMarkerAnnouncer(Session session)
     {
         return announcers.computeIfAbsent(session.getQueryId(), queryId -> {
-            if (SystemSessionProperties.getSnapshotIntervalType(session) == SnapshotConfig.IntervalType.TIME) {
+            if (!SystemSessionProperties.isSnapshotEnabled(session)) {
+                return new MarkerAnnouncer();
+            }
+            else if (SystemSessionProperties.getSnapshotIntervalType(session) == RecoveryConfig.IntervalType.TIME) {
                 return new MarkerAnnouncer(SystemSessionProperties.getSnapshotTimeInterval(session));
             }
             else {

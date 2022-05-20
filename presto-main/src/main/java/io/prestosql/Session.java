@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -128,7 +129,8 @@ public final class Session
         this.resourceEstimates = requireNonNull(resourceEstimates, "resourceEstimates is null");
         this.startTime = startTime;
         requireNonNull(systemProperties, "systemProperties is null");
-        if (Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))) {
+        if (Boolean.parseBoolean(systemProperties.get(RECOVERY_ENABLED))
+                || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))) {
             // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
             this.systemProperties = new HashMap<>(systemProperties);
         }
@@ -320,8 +322,7 @@ public final class Session
 
     public void disableSnapshot()
     {
-        // This can only be called if snapshot is currently enabled
-        checkState(Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED)));
+        systemProperties.put(RECOVERY_ENABLED, "false");
         systemProperties.put(SNAPSHOT_ENABLED, "false");
     }
 

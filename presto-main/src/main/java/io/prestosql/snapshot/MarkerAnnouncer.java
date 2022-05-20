@@ -35,7 +35,7 @@ public class MarkerAnnouncer
 {
     private static final Logger LOG = Logger.get(MarkerAnnouncer.class);
 
-    private final SnapshotConfig.IntervalType intervalType;
+    private final RecoveryConfig.IntervalType intervalType;
     private long currentSnapshotId;
 
     // Used when snapshot interval is based on split-count
@@ -63,22 +63,28 @@ public class MarkerAnnouncer
     // restore. (eg. have completed snapshot 1-10, restored to 1, snapshot 11 that's generated after restore is actually 2nd snapshot)
     // It is important for the management of snapshot sub-files written by TableWriterOperator.
     private QuerySnapshotManager snapshotManager;
+    private final boolean captureDisabled;
+
+    public MarkerAnnouncer()
+    {
+        this(true, null, 0L, null);
+    }
 
     public MarkerAnnouncer(Duration timeInterval)
     {
-        this(SnapshotConfig.IntervalType.TIME, 0L, timeInterval);
+        this(false, RecoveryConfig.IntervalType.TIME, 0L, timeInterval);
     }
 
     public MarkerAnnouncer(long splitCountInterval)
     {
-        this(SnapshotConfig.IntervalType.SPLIT_COUNT, splitCountInterval, null);
+        this(false, RecoveryConfig.IntervalType.SPLIT_COUNT, splitCountInterval, null);
     }
 
-    private MarkerAnnouncer(SnapshotConfig.IntervalType intervalType, long splitCountInterval, Duration timeInterval)
+    private MarkerAnnouncer(boolean captureDisabled, RecoveryConfig.IntervalType intervalType, long splitCountInterval, Duration timeInterval)
     {
         this.intervalType = intervalType;
         // Reserve snapshot 0 for special case of "restart from beginning"
-        this.currentSnapshotId = 1L;
+        this.currentSnapshotId = captureDisabled ? 0L : 1L;
         this.querySplitCount = 0L;
         this.splitCountInterval = splitCountInterval;
         this.queryTimeStamp = System.currentTimeMillis();
@@ -87,6 +93,7 @@ public class MarkerAnnouncer
         this.activeSplitSources = new ArrayList<>();
         this.markerSplitSent = new ArrayList<>();
         this.pendingSnapshot = new HashMap<>();
+        this.captureDisabled = captureDisabled;
     }
 
     public void setSnapshotManager(QuerySnapshotManager snapshotManager)
@@ -103,12 +110,12 @@ public class MarkerAnnouncer
     {
         checkArgument(!(splitSource instanceof MarkerSplitSource));
         // Wrap a MarkerSplitSource around the original split source, to add marker generation functionality
-        MarkerSplitSource markerSplitSource = new MarkerSplitSource(splitSource, this);
+        MarkerSplitSource markerSplitSource = new MarkerSplitSource(splitSource, this, captureDisabled);
         allSplitSources.put(nodeId, markerSplitSource);
         activeSplitSources.add(markerSplitSource);
         pendingSnapshot.put(markerSplitSource, new LinkedList<>());
         //Use the timestamp of the last registered splitSource as the query's first significant timestamp
-        if (intervalType == SnapshotConfig.IntervalType.TIME) {
+        if (intervalType == RecoveryConfig.IntervalType.TIME) {
             queryTimeStamp = System.currentTimeMillis();
         }
         return markerSplitSource;
@@ -145,12 +152,14 @@ public class MarkerAnnouncer
 
     private void setupNewSnapshotId()
     {
-        //Reset interval: update the query significant timestamp or reset the split count.
-        queryTimeStamp = System.currentTimeMillis();
-        querySplitCount = 0L;
-        //Move to next snapshot id
-        currentSnapshotId++;
-        markerSplitSent.clear();
+        if (!captureDisabled) {
+            //Reset interval: update the query significant timestamp or reset the split count.
+            queryTimeStamp = System.currentTimeMillis();
+            querySplitCount = 0L;
+            //Move to next snapshot id
+            currentSnapshotId++;
+            markerSplitSent.clear();
+        }
     }
 
     public long currentSnapshotId()
@@ -163,6 +172,9 @@ public class MarkerAnnouncer
     // - Or a new snapshot id was established and the snapshot interval has been reached
     public synchronized OptionalLong shouldGenerateMarker(MarkerSplitSource source)
     {
+        if (captureDisabled) {
+            return OptionalLong.empty();
+        }
         //check for previously uncompleted snapshotId
         Long pendingId = pendingSnapshot.get(source).pollFirst();
         if (pendingId != null) {
@@ -176,8 +188,8 @@ public class MarkerAnnouncer
                 return OptionalLong.empty();
             }
         }
-        else if (!(intervalType == SnapshotConfig.IntervalType.TIME && System.currentTimeMillis() - queryTimeStamp >= timeInterval.toMillis() ||
-                intervalType == SnapshotConfig.IntervalType.SPLIT_COUNT && querySplitCount >= splitCountInterval)) {
+        else if (!(intervalType == RecoveryConfig.IntervalType.TIME && System.currentTimeMillis() - queryTimeStamp >= timeInterval.toMillis() ||
+                intervalType == RecoveryConfig.IntervalType.SPLIT_COUNT && querySplitCount >= splitCountInterval)) {
             // Not already sending markers, and haven't reached threshold
             return OptionalLong.empty();
         }
@@ -225,7 +237,7 @@ public class MarkerAnnouncer
 
     public synchronized void incrementSplitCount(int count)
     {
-        if (intervalType == SnapshotConfig.IntervalType.SPLIT_COUNT) {
+        if (intervalType == RecoveryConfig.IntervalType.SPLIT_COUNT) {
             querySplitCount += count;
         }
     }

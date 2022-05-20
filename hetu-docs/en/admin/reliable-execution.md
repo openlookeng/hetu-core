@@ -11,9 +11,9 @@ To achieve better performance while maintaining execution reliability, the *dist
 
 As of release 1.2.0, openLooKeng supports recovery of tasks and worker node failures.
 
-## Enable Distributed Snapshot
+## Enable Recovery framework
 
-Distributed snapshot is most useful for long running queries. It is disabled by default, and must be enabled and disabled via a session property [`snapshot_enabled`](properties.md#snapshot_enabled). It is recommended that the feature is only enabled for complex queries that require high reliability.
+Recovery framework is most useful for long running queries. It is disabled by default, and must be enabled and disabled via a session property [`recovery_enabled`](properties.md#recovery_enabled). It is recommended that the feature is only enabled for complex queries that require high reliability.
 
 ## Requirements
 
@@ -37,7 +37,7 @@ When a query that does not meet the above requirements is submitted with distrib
 
 ## Detection
 
-Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`query.remote-task.max-error-duration`](properties.md#queryremote-taskmax-error-duration) configuration.
+Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`Failure Recovery handling Properties`](properties.md#Failure Recovery handling Properties) configuration.
 
 ## Storage Considerations
 
@@ -55,7 +55,7 @@ Each query execution may produce multiple snapshots. Contents of these snapshots
 
 The ability to recover from an error and resume from a snapshot does not come for free. Capturing a snapshot, depending on complexity, takes time. Thus it is a trade-off between performance and reliability.
 
-It is suggested to only turn on distributed snapshot when necessary, i.e. for queries that run for a long time. For these types of workloads, the overhead of taking snapshots becomes negligible.
+It is suggested to turn on snapshot capture when necessary, i.e. for queries that run for a long time. For these types of workloads, the overhead of taking snapshots becomes negligible.
 
 ## Snapshot statistics
 
@@ -71,4 +71,4 @@ Additionally, while query is in progress number of capturing snapshots and id of
 
 ## Configurations
 
-Configurations related to distributed snapshot feature can be found in [Properties Reference](properties.md#distributed-snapshot).
+Configurations related to recovery framework feature can be found in [Properties Reference](properties.md#Recovery framework).

@@ -53,7 +53,7 @@ public class TpchSplitManager
         int partNumber = 0;
 
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
-        if (session.isSnapshotEnabled()) {
+        if (session.isRecoveryEnabled()) {
             // Snapshot: Modify splits as needed to all them to be scheduled on any node.
             // This allows them to be processed by a different worker after resume.
             List<HostAddress> addresses = nodes.stream().map(Node::getHostAndPort).collect(Collectors.toList());

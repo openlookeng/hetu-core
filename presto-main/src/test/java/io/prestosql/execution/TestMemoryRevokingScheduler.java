@@ -61,7 +61,7 @@ import static io.prestosql.execution.TaskTestUtils.createTestingPlanner;
 import static io.prestosql.memory.LocalMemoryManager.GENERAL_POOL;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -309,7 +309,7 @@ public class TestMemoryRevokingScheduler
                         scheduledExecutor,
                         new DataSize(1, GIGABYTE),
                         spillSpaceTracker,
-                        NOOP_SNAPSHOT_UTILS),
+                        NOOP_RECOVERY_UTILS),
                 sqlTaskExecutionFactory,
                 executor,
                 Functions.identity(),

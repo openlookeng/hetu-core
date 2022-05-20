@@ -26,18 +26,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * This class contains all configs of snapshot
  */
-public class SnapshotConfig
+public class RecoveryConfig
 {
     // Temporary constant. May make configurable later.
     // Don't use all nodes. Reserve some to be used to schedule tasks from failed nodes
     private static final float MAX_NODE_ALLOCATION = 80 / 100F;
 
+    public static final String RECOVERY_MAX_RETRIES = "hetu.recovery.maxRetries";
+    public static final String RECOVERY_RETRY_TIMEOUT = "hetu.recovery.retryTimeout";
     public static final String SNAPSHOT_PROFILE = "hetu.experimental.snapshot.profile";
     public static final String SNAPSHOT_INTERVAL_TYPE = "hetu.internal.snapshot.intervalType";
     public static final String SNAPSHOT_TIME_INTERVAL = "hetu.internal.snapshot.timeInterval";
     public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "hetu.internal.snapshot.splitCountInterval";
-    public static final String SNAPSHOT_MAX_RETRIES = "hetu.snapshot.maxRetries";
-    public static final String SNAPSHOT_RETRY_TIMEOUT = "hetu.snapshot.retryTimeout";
     public static final String SNAPSHOT_USE_KRYO_SERIALIZATION = "hetu.snapshot.useKryoSerialization";
     public static final String SPILLER_SPILL_PROFILE = "experimental.spiller-spill-profile";
     public static final String SPILLER_SPILL_TO_HDFS = "experimental.spiller-spill-to-hdfs";
@@ -46,11 +46,12 @@ public class SnapshotConfig
     private String spillProfile;
     private boolean spillToHdfs;
 
+    private long recoveryMaxRetries = 10;
+    private Duration recoveryRetryTimeout = new Duration(10, TimeUnit.MINUTES);
+    private boolean isSnapshotCaptureEnabled;
     private IntervalType snapshotIntervalType = IntervalType.TIME;
     private Duration snapshotTimeInterval = new Duration(5, TimeUnit.MINUTES);
     private long snapshotSplitCountInterval = 1_000;
-    private long snapshotMaxRetries = 10;
-    private Duration snapshotRetryTimeout = new Duration(10, TimeUnit.MINUTES);
     private boolean snapshotUseKryoSerialization;
 
     public enum IntervalType
@@ -68,6 +69,34 @@ public class SnapshotConfig
         return (int) (nodeCount * MAX_NODE_ALLOCATION);
     }
 
+    @Min(1)
+    public long getRecoveryMaxRetries()
+    {
+        return recoveryMaxRetries;
+    }
+
+    @Config(RECOVERY_MAX_RETRIES)
+    @ConfigDescription("Recovery max number of retries")
+    public RecoveryConfig setRecoveryMaxRetries(long recoveryMaxRetries)
+    {
+        this.recoveryMaxRetries = recoveryMaxRetries;
+        return this;
+    }
+
+    @NotNull
+    public Duration getRecoveryRetryTimeout()
+    {
+        return recoveryRetryTimeout;
+    }
+
+    @Config(RECOVERY_RETRY_TIMEOUT)
+    @ConfigDescription("Recovery retry timeout")
+    public RecoveryConfig setRecoveryRetryTimeout(Duration recoveryRetryTimeout)
+    {
+        this.recoveryRetryTimeout = recoveryRetryTimeout;
+        return this;
+    }
+
     public String getSnapshotProfile()
     {
         return snapshotProfile;
@@ -75,7 +104,7 @@ public class SnapshotConfig
 
     @Config(SNAPSHOT_PROFILE)
     @ConfigDescription("snapshot profile")
-    public SnapshotConfig setSnapshotProfile(String snapshotProfile)
+    public RecoveryConfig setSnapshotProfile(String snapshotProfile)
     {
         this.snapshotProfile = snapshotProfile;
         return this;
@@ -89,7 +118,7 @@ public class SnapshotConfig
 
     @Config(SNAPSHOT_INTERVAL_TYPE)
     @ConfigDescription("snapshot interval type")
-    public SnapshotConfig setSnapshotIntervalType(IntervalType snapshotIntervalType)
+    public RecoveryConfig setSnapshotIntervalType(IntervalType snapshotIntervalType)
     {
         this.snapshotIntervalType = snapshotIntervalType;
         return this;
@@ -103,7 +132,7 @@ public class SnapshotConfig
 
     @Config(SNAPSHOT_TIME_INTERVAL)
     @ConfigDescription("snapshot time interval")
-    public SnapshotConfig setSnapshotTimeInterval(Duration snapshotTimeInterval)
+    public RecoveryConfig setSnapshotTimeInterval(Duration snapshotTimeInterval)
     {
         this.snapshotTimeInterval = snapshotTimeInterval;
         return this;
@@ -117,37 +146,9 @@ public class SnapshotConfig
 
     @Config(SNAPSHOT_SPLIT_COUNT_INTERVAL)
     @ConfigDescription("snapshot split count interval")
-    public SnapshotConfig setSnapshotSplitCountInterval(long snapshotSplitCountInterval)
+    public RecoveryConfig setSnapshotSplitCountInterval(long snapshotSplitCountInterval)
     {
         this.snapshotSplitCountInterval = snapshotSplitCountInterval;
-        return this;
-    }
-
-    @Min(1)
-    public long getSnapshotMaxRetries()
-    {
-        return snapshotMaxRetries;
-    }
-
-    @Config(SNAPSHOT_MAX_RETRIES)
-    @ConfigDescription("snapshot max number of retries")
-    public SnapshotConfig setSnapshotMaxRetries(long snapshotMaxRetries)
-    {
-        this.snapshotMaxRetries = snapshotMaxRetries;
-        return this;
-    }
-
-    @NotNull
-    public Duration getSnapshotRetryTimeout()
-    {
-        return snapshotRetryTimeout;
-    }
-
-    @Config(SNAPSHOT_RETRY_TIMEOUT)
-    @ConfigDescription("snapshot retry timeout")
-    public SnapshotConfig setSnapshotRetryTimeout(Duration snapshotRetryTimeout)
-    {
-        this.snapshotRetryTimeout = snapshotRetryTimeout;
         return this;
     }
 
@@ -158,7 +159,7 @@ public class SnapshotConfig
 
     @Config(SNAPSHOT_USE_KRYO_SERIALIZATION)
     @ConfigDescription("snapshot use kryo serialization")
-    public SnapshotConfig setSnapshotUseKryoSerialization(boolean snapshotUseKryoSerialization)
+    public RecoveryConfig setSnapshotUseKryoSerialization(boolean snapshotUseKryoSerialization)
     {
         this.snapshotUseKryoSerialization = snapshotUseKryoSerialization;
         return this;
@@ -171,7 +172,7 @@ public class SnapshotConfig
 
     @Config(SPILLER_SPILL_PROFILE)
     @ConfigDescription("spill profile")
-    public SnapshotConfig setSpillProfile(String spillProfile)
+    public RecoveryConfig setSpillProfile(String spillProfile)
     {
         this.spillProfile = spillProfile;
         return this;
@@ -184,7 +185,7 @@ public class SnapshotConfig
 
     @Config(SPILLER_SPILL_TO_HDFS)
     @ConfigDescription("spill to hdfs")
-    public SnapshotConfig setSpillToHdfs(boolean spillToHdfs)
+    public RecoveryConfig setSpillToHdfs(boolean spillToHdfs)
     {
         this.spillToHdfs = spillToHdfs;
         return this;

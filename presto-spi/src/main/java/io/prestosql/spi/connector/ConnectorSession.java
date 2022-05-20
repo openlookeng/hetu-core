@@ -96,6 +96,11 @@ public interface ConnectorSession
     {
     }
 
+    default boolean isRecoveryEnabled()
+    {
+        return false;
+    }
+
     default boolean isSnapshotEnabled()
     {
         return false;

@@ -814,23 +814,23 @@
 >
 > 作为实验性属性，或可以将快照存储在非文件系统位置，如连接器。
 
-### `hetu.snapshot.maxRetries`
+### `hetu.recovery.maxRetries`
 
 > - 类型：`int`
 > - **默认值**：`10`
 >
 > 此属性定义查询的错误恢复尝试的最大次数。达到限制时，查询失败。
 >
-> 也可以使用`snapshot_max_retries`会话属性在每个查询基础上指定。
+> 也可以使用`recovery_max_retries`会话属性在每个查询基础上指定。
 
-### `hetu.snapshot.retryTimeout`
+### `hetu.recovery.retryTimeout`
 
 > - **类型：** `duration`
 > - **默认值：** `10m`（10分钟）
 >
 > 此属性定义系统等待所有任务成功恢复的最大时长。如果在此超时时限内任何任务未就绪，则认为恢复失败，查询将尝试从较早快照恢复（如果可用）。
 >
-> 也可以使用`snapshot_retry_timeout`会话属性在每个查询基础上指定。
+> 也可以使用`recovery_retry_timeout`会话属性在每个查询基础上指定。
 
 ### `hetu.snapshot.useKryoSerialization`
 

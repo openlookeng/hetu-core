@@ -25,7 +25,7 @@ import java.util.OptionalLong;
 import java.util.function.Supplier;
 
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -43,7 +43,7 @@ public class TestMarkerAnnouncer
             throws Exception
     {
         announcer = new MarkerAnnouncer(2);
-        announcer.setSnapshotManager(new QuerySnapshotManager(new QueryId("query"), NOOP_SNAPSHOT_UTILS, TEST_SNAPSHOT_SESSION));
+        announcer.setSnapshotManager(new QuerySnapshotManager(new QueryId("query"), NOOP_RECOVERY_UTILS, TEST_SNAPSHOT_SESSION));
         markerSplitSource1 = announcer.createMarkerSplitSource(mock(SplitSource.class), new PlanNodeId("node1"));
         markerSplitSource2 = announcer.createMarkerSplitSource(mock(SplitSource.class), new PlanNodeId("node2"));
     }

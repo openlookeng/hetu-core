@@ -813,14 +813,14 @@ public final class HttpRemoteTask
         }
 
         ExecutionFailureInfo failureInfo = toFailure(cause);
-        if (SystemSessionProperties.isSnapshotEnabled(session)) {
+        if (SystemSessionProperties.isRecoveryEnabled(session)) {
             if (isResumableFailure(failureInfo)) {
                 // Determine if the failure can be recovered by resuming query from a previous checkpoing
                 taskStatus = failWith(taskStatus, RESUMABLE_FAILURE, ImmutableList.of(failureInfo));
                 taskStatusFetcher.updateTaskStatus(taskStatus);
                 return;
             }
-            log.debug(cause, "Snapshot: remote task %s failed with unresumable error %s", taskStatus.getSelf(), cause);
+            log.debug(cause, "Recovery: remote task %s failed with unresumable error %s", taskStatus.getSelf(), cause);
         }
 
         abort(failWith(taskStatus, FAILED, ImmutableList.of(failureInfo)));

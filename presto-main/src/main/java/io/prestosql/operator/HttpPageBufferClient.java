@@ -33,7 +33,7 @@ import io.airlift.slice.SliceInput;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.failuredetector.FailureDetectorManager;
-import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.failuredetector.FailureRetryPolicy;
 import io.prestosql.spi.failuredetector.IBackoff;
@@ -145,9 +145,9 @@ public final class HttpPageBufferClient
 
     private final Executor pageBufferClientCallbackExecutor;
 
-    private final boolean isSnapshotEnabled;
-    private final QuerySnapshotManager querySnapshotManager;
+    private final boolean isRecoveryEnabled;
     private final FailureRetryPolicy failureRetryPolicy;
+    private final QueryRecoveryManager queryRecoveryManager;
 
     HttpPageBufferClient(
             HttpClient httpClient,
@@ -157,9 +157,9 @@ public final class HttpPageBufferClient
             ClientCallback clientCallback,
             ScheduledExecutorService scheduler,
             Executor pageBufferClientCallbackExecutor,
-            boolean isSnapshotEnabled,
-            QuerySnapshotManager querySnapshotManager,
-            FailureDetectorManager failureDetectorManager)
+            boolean isRecoveryEnabled,
+            FailureDetectorManager failureDetectorManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.maxResponseSize = requireNonNull(maxResponseSize, "maxResponseSize is null");
@@ -173,8 +173,8 @@ public final class HttpPageBufferClient
         requireNonNull(failureDetectorManager, "failure detection manager is null");
         this.failureRetryPolicy = failureDetectorManager.getFailureRetryPolicy(failureDetectorManager.getFailureRetryPolicyUserProfile());
         this.backoff = this.failureRetryPolicy.getBackoff();
-        this.isSnapshotEnabled = isSnapshotEnabled;
-        this.querySnapshotManager = querySnapshotManager;
+        this.isRecoveryEnabled = isRecoveryEnabled;
+        this.queryRecoveryManager = queryRecoveryManager;
     }
 
     @VisibleForTesting
@@ -186,10 +186,10 @@ public final class HttpPageBufferClient
             ClientCallback clientCallback,
             ScheduledExecutorService scheduler,
             Executor pageBufferClientCallbackExecutor,
-            boolean isSnapshotEnabled,
-            QuerySnapshotManager querySnapshotManager,
+            boolean isRecoveryEnabled,
             Ticker ticker,
-            FailureDetectorManager failureDetectorManager)
+            FailureDetectorManager failureDetectorManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.maxResponseSize = requireNonNull(maxResponseSize, "maxResponseSize is null");
@@ -203,8 +203,8 @@ public final class HttpPageBufferClient
         requireNonNull(failureDetectorManager, "failure detection manager is null");
         this.failureRetryPolicy = failureDetectorManager.getFailureRetryPolicy(failureDetectorManager.getFailureRetryPolicyUserProfile(), ticker);
         this.backoff = this.failureRetryPolicy.getBackoff();
-        this.isSnapshotEnabled = isSnapshotEnabled;
-        this.querySnapshotManager = querySnapshotManager;
+        this.isRecoveryEnabled = isRecoveryEnabled;
+        this.queryRecoveryManager = queryRecoveryManager;
     }
 
     public synchronized PageBufferClientStatus getStatus()
@@ -338,7 +338,7 @@ public final class HttpPageBufferClient
                 addInstanceIdHeader(prepareGet())
                         .setHeader(PRESTO_MAX_SIZE, maxResponseSize.toString())
                         .setUri(uri).build(),
-                new PageResponseHandler(querySnapshotManager));
+                new PageResponseHandler(queryRecoveryManager));
 
         future = resultFuture;
         Futures.addCallback(resultFuture, new FutureCallback<PagesResponse>()
@@ -438,10 +438,9 @@ public final class HttpPageBufferClient
                             backoff.getFailureCount(),
                             backoff.getFailureDuration().convertTo(SECONDS),
                             backoff.getFailureRequestTimeTotal().convertTo(SECONDS));
-                    if (querySnapshotManager != null) {
-                        // Snapshot: recover from remote server errors
-                        log.debug(throwable, "Snapshot: remote task failed with resumable error: %s", message);
-                        querySnapshotManager.cancelToResume();
+                    if (queryRecoveryManager != null) {
+                        log.debug(throwable, "Recovery: Failure detected in HttpPageBufferClient");
+                        queryRecoveryManager.startRecovery();
                         handleFailure(throwable, resultFuture);
                         return;
                     }
@@ -454,8 +453,8 @@ public final class HttpPageBufferClient
 
     private synchronized void sendDelete()
     {
-        if (isSnapshotEnabled && taskInstanceId == null) {
-            // Snapshot: Never called remote task successfully. Trying to cancel the task result without a taskInstanceId is dangerous.
+        if (isRecoveryEnabled && taskInstanceId == null) {
+            // Recovery: Never called remote task successfully. Trying to cancel the task result without a taskInstanceId is dangerous.
             // If the task had already been cancelled, this would create a new task with "aborted" state.
             // That prevents scheduling the task on the worker again.
             return;
@@ -589,11 +588,11 @@ public final class HttpPageBufferClient
     public static class PageResponseHandler
             implements ResponseHandler<PagesResponse, RuntimeException>
     {
-        private final QuerySnapshotManager querySnapshotManager;
+        private final QueryRecoveryManager queryRecoveryManager;
 
-        private PageResponseHandler(QuerySnapshotManager querySnapshotManager)
+        private PageResponseHandler(QueryRecoveryManager queryRecoveryManager)
         {
-            this.querySnapshotManager = querySnapshotManager;
+            this.queryRecoveryManager = queryRecoveryManager;
         }
 
         @Override
@@ -662,11 +661,10 @@ public final class HttpPageBufferClient
                 }
             }
             catch (PageTransportErrorException e) {
-                if (querySnapshotManager != null && querySnapshotManager.isCoordinator()) {
-                    // Snapshot: for internal server errors on the worker, or unexpected OK results, treat as resumable error.
+                if (queryRecoveryManager != null && queryRecoveryManager.isCoordinator()) {
                     if (response.getStatusCode() >= 500 || response.getStatusCode() == HttpStatus.OK.code()) {
                         log.debug(e.getMessage());
-                        querySnapshotManager.cancelToResume();
+                        queryRecoveryManager.startRecovery();
                         return createEmptyPagesResponse(0, 0, false);
                     }
                 }
