@@ -22,6 +22,7 @@ import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.failuredetector.NoOpFailureDetector;
+import io.prestosql.failuredetector.WorkerGossipFailureDetectorModule;
 import io.prestosql.queryeditorui.QueryEditorConfig;
 import io.prestosql.server.security.NoOpWebUIAuthenticator;
 import io.prestosql.server.security.WebUIAuthenticator;
@@ -34,10 +35,24 @@ import javax.inject.Singleton;
 
 import static com.google.common.reflect.Reflection.newProxy;
 import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
+import static io.airlift.jaxrs.JaxrsBinder.jaxrsBinder;
 
 public class WorkerModule
         implements Module
 {
+    private boolean gossip;
+
+    public WorkerModule(boolean gossip)
+    {
+        this.gossip = gossip;
+    }
+
+    public WorkerModule()
+    {
+        this(false);
+    }
+
     @Override
     public void configure(Binder binder)
     {
@@ -51,8 +66,16 @@ public class WorkerModule
         // Install no-op transaction manager on workers, since only coordinators manage transactions.
         binder.bind(TransactionManager.class).to(NoOpTransactionManager.class).in(Scopes.SINGLETON);
 
-        // Install no-op failure detector on workers, since only coordinators need global node selection.
-        binder.bind(FailureDetector.class).to(NoOpFailureDetector.class).in(Scopes.SINGLETON);
+        // failure detector
+        if (gossip) {
+            binder.install(new WorkerGossipFailureDetectorModule());
+            jaxrsBinder(binder).bind(GossipStatusResource.class);
+            httpClientBinder(binder).bindHttpClient("workerInfo", ForWorkerInfo.class);
+        }
+        else {
+            // Install no-op failure detector on workers, since only coordinators need global node selection.
+            binder.bind(FailureDetector.class).to(NoOpFailureDetector.class).in(Scopes.SINGLETON);
+        }
 
         // HACK: this binding is needed by SystemConnectorModule, but will only be used on the coordinator
         binder.bind(QueryManager.class).toInstance(newProxy(QueryManager.class, (proxy, method, args) -> {

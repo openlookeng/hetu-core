@@ -40,6 +40,10 @@ public class ServerConfig
     private boolean enhancedErrorReporting = true;
     private Duration httpClientIdleTimeout = new Duration(30, SECONDS);
     private Duration httpClientRequestTimeout = new Duration(10, SECONDS);
+
+    public static final String GOSSIP = "gossip";
+    public static final String HEARTBEAT = "heartbeat";
+    private String failureDetectionProtocol = HEARTBEAT;
     // Main coordinator TODO: remove this when main coordinator election is implemented
 
     private final Set<String> admins = new HashSet<>();
@@ -52,6 +56,20 @@ public class ServerConfig
     public Set<String> getAdmins()
     {
         return ImmutableSet.copyOf(admins);
+    }
+
+    @Config("failure-detection-protocol")
+    public ServerConfig setFailureDetectionProtocol(String protocol)
+    {
+        if (GOSSIP.equalsIgnoreCase(protocol) || HEARTBEAT.equalsIgnoreCase(protocol)) {
+            failureDetectionProtocol = protocol;
+        }
+        return this;
+    }
+
+    public String getFailureDetectionProtocol()
+    {
+        return failureDetectionProtocol;
     }
 
     @Config("openlookeng.admins")
@@ -155,5 +173,11 @@ public class ServerConfig
     public Duration getHttpClientRequestTimeout()
     {
         return httpClientRequestTimeout;
+    }
+
+    public static boolean isGossip(ServerConfig serverConfig)
+    {
+        String protocol = serverConfig.getFailureDetectionProtocol();
+        return ServerConfig.GOSSIP.equalsIgnoreCase(protocol);
     }
 }

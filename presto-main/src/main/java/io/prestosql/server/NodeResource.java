@@ -29,6 +29,11 @@ public class NodeResource
 {
     private final HeartbeatFailureDetector failureDetector;
 
+    protected HeartbeatFailureDetector getFailureDetector()
+    {
+        return this.failureDetector;
+    }
+
     @Inject
     public NodeResource(HeartbeatFailureDetector failureDetector)
     {
