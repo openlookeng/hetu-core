@@ -14,13 +14,17 @@
  */
 package io.hetu.core.metastore.jdbc;
 
+import io.prestosql.spi.favorite.FavoriteEntity;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.ColumnEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
 import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
+import org.jdbi.v3.sqlobject.customizer.BindList;
+import org.jdbi.v3.sqlobject.customizer.Define;
 import org.jdbi.v3.sqlobject.statement.GetGeneratedKeys;
 import org.jdbi.v3.sqlobject.statement.SqlBatch;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
@@ -41,6 +45,8 @@ import java.util.Optional;
 @RegisterBeanMapper(value = TableEntity.class, prefix = "t")
 @RegisterBeanMapper(value = ColumnEntity.class, prefix = "c")
 @RegisterBeanMapper(value = PropertyEntity.class, prefix = "p")
+@RegisterBeanMapper(value = QueryHistoryEntity.class)
+@RegisterBeanMapper(value = FavoriteEntity.class)
 
 public interface JdbcMetadataDao
 {
@@ -467,4 +473,142 @@ public interface JdbcMetadataDao
      */
     @SqlQuery("SELECT id FROM hetu_tab_lock WHERE resource=1")
     Long getLockId();
+
+    /**
+     * insert queryHistoryEntity
+     *
+     * @param  queryHistoryEntity queryHistory Entity
+     */
+    @SqlUpdate("INSERT IGNORE INTO hetu_query_history \n" +
+            "(user,source,queryId,resource,query,state,failed,\n" +
+            "createTime,elapsedTime,cpuTime,executionTime,\n" +
+            "catalog,schemata,currentMemory,cumulativeUserMemory,\n" +
+            "jsonString,completedDrivers,runningDrivers,\n" +
+            "queuedDrivers,totalCpuTime,totalMemoryReservation,\n" +
+            "peakTotalMemoryReservation) \n" +
+            "VALUES (:user,:source,:queryId,:resource,:query,:state,:failed,\n" +
+            ":createTime,:elapsedTime,:cpuTime,:executionTime,\n" +
+            ":catalog,:schemata,:currentMemory,:cumulativeUserMemory,\n" +
+            ":jsonString,:completedDrivers,:runningDrivers,\n" +
+            ":queuedDrivers,:totalCpuTime,:totalMemoryReservation,\n" +
+            ":peakTotalMemoryReservation)")
+    void insertQueryHistory(@BindBean QueryHistoryEntity queryHistoryEntity, @Bind("jsonString") String jsonString);
+
+    /**
+     * delete the oldest 100 queryHistoryEntities
+     *
+     */
+    @SqlUpdate("DELETE FROM hetu_query_history \n" +
+            "WHERE 1=1 \n" +
+            "ORDER BY id \n" +
+            "LIMIT 100")
+    void deleteQueryHistoryBatch();
+
+    /**
+     * get QueryDetail
+     *
+     * @param  queryId
+     * @return QueryDetail
+     */
+    @SqlQuery("SELECT jsonString FROM hetu_query_history WHERE queryId = :queryId")
+    String getQueryDetail(@Bind("queryId") String queryId);
+
+    /**
+     * get all QueryHistory
+     *
+     * @param
+     * @return QueryHistoryEntities
+     */
+    @SqlQuery("SELECT id,user,source,queryId,resource,query,state,failed, " +
+            "createTime,elapsedTime,cpuTime,executionTime," +
+            "catalog,schemata,currentMemory,cumulativeUserMemory," +
+            "completedDrivers,runningDrivers,queuedDrivers,totalCpuTime," +
+            "totalMemoryReservation,peakTotalMemoryReservation " +
+            "FROM hetu_query_history WHERE\n" +
+            "(user like concat(\'%\',:user,\'%\')) AND" +
+            "(:startTime='' or createTime >= :startTime) AND" +
+            "(:endTime='' or createTime <= :endTime) AND" +
+            "(queryId like concat(\'%\',:queryId)) AND" +
+            "(query like concat(\'%\',:query,\'%\')) AND" +
+            "(:resourceGroup='' or resource = :resourceGroup) AND" +
+            "(:resource='' or source = :resource) AND" +
+            "(state in (<state>) ) AND" +
+            "(failed in (<failed>) )" +
+            "ORDER BY <sort> <sortOrder>  LIMIT :startNum , :pageSize")
+    @UseRowReducer(QueryHistoryEntityReducer.class)
+    List<QueryHistoryEntity> getQueryHistory(@Bind("startNum") int startNum, @Bind("pageSize") int pageSize,
+                                             @Bind("user") String user, @Bind("startTime") String startTime, @Bind("endTime") String endTime,
+                                             @Bind("queryId") String queryId, @Bind("query") String query, @Bind("resourceGroup") String resourceGroup,
+                                             @Bind("resource") String resource, @BindList("state") List<String> state, @BindList("failed") List<String> failed,
+                                             @Define("sort") String sort, @Define("sortOrder") String sortOrder);
+
+    /**
+     * get QueryHistory counts
+     *
+     * @param
+     * @return counts
+     */
+    @SqlQuery("SELECT count(*) FROM hetu_query_history WHERE \n" +
+            "(user like concat(\'%\',:user,\'%\')) AND" +
+            "(:startTime='' or createTime >= :startTime) AND" +
+            "(:endTime='' or createTime <= :endTime) AND" +
+            "(queryId like concat(\'%\',:queryId)) AND" +
+            "(query like concat(\'%\',:query,\'%\')) AND" +
+            "(:resourceGroup='' or resource = :resourceGroup) AND" +
+            "(:resource='' or source = :resource) AND" +
+            "(state in (<state>)) AND" +
+            "(failed in (<failed>))")
+    long getQueryHistoryCount(@Bind("user") String user, @Bind("startTime") String startTime, @Bind("endTime") String endTime,
+                              @Bind("queryId") String queryId, @Bind("query") String query, @Bind("resourceGroup") String resourceGroup,
+                              @Bind("resource") String resource, @BindList("state") List<String> state, @BindList("failed") List<String> failed);
+
+    /**
+     * get all QueryHistory counts
+     *
+     * @param
+     * @return counts
+     */
+    @SqlQuery("SELECT count(1) FROM hetu_query_history")
+    long getAllQueryHistoryNum();
+
+    /**
+     * insert favoriteEntity
+     *
+     * @param  favoriteEntity favorite Entity
+     */
+    @SqlUpdate("INSERT IGNORE INTO hetu_favorite \n" +
+            "(creationTime, user, query, catalog, schemata)\n" +
+            "VALUES(DEFAULT, :user, :query, :catalog, :schemata)")
+    void insertFavorite(@BindBean FavoriteEntity favoriteEntity);
+
+    /**
+     * delete favoriteEntity
+     *
+     * @param  favoriteEntity
+     */
+    @SqlUpdate("DELETE FROM hetu_favorite WHERE \n" +
+            " user = :user and query = :query and catalog = :catalog and schemata = :schemata")
+    void deleteFavorite(@BindBean FavoriteEntity favoriteEntity);
+
+    /**
+     * get all favoriteEntity
+     *
+     * @param  user
+     * @return favoriteEntities
+     */
+    @SqlQuery("SELECT id, user, query, catalog, schemata \n" +
+            "FROM hetu_favorite WHERE user = :user \n" +
+            "ORDER BY creationTime desc \n" +
+            "LIMIT :startNum, :pageSize")
+    @UseRowReducer(FavoriteEntityReducer.class)
+    List<FavoriteEntity> getFavorite(@Bind("startNum")int startNum, @Bind("pageSize")int pageSize, @Bind("user")String user);
+
+    /**
+     * get all favoriteEntity
+     *
+     * @param  user
+     * @return favoriteEntities
+     */
+    @SqlQuery("SELECT count(*) FROM hetu_favorite WHERE user = :user")
+    long getFavoriteCount(@Bind("user")String user);
 }

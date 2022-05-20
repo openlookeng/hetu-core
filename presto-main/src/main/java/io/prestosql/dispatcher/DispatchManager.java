@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2020. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -28,6 +29,7 @@ import io.prestosql.execution.QueryTracker;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
+import io.prestosql.queryhistory.QueryHistoryService;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.SessionContext;
@@ -92,6 +94,7 @@ public class DispatchManager
     private StateFetcher stateFetcher;
     private final HetuConfig hetuConfig;
     private final int maxQueryLength;
+    private final QueryHistoryService queryHistoryService;
 
     private final Executor queryExecutor;
 
@@ -113,7 +116,8 @@ public class DispatchManager
             QueryManagerConfig queryManagerConfig,
             DispatchExecutor dispatchExecutor,
             StateStoreProvider stateStoreProvider,
-            HetuConfig hetuConfig)
+            HetuConfig hetuConfig,
+            QueryHistoryService queryHistoryService)
     {
         this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.queryPreparer = requireNonNull(queryPreparer, "queryPreparer is null");
@@ -127,6 +131,7 @@ public class DispatchManager
         // StateStoreProvider and load HetuConfig
         this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
         this.hetuConfig = requireNonNull(hetuConfig, "hetuConfig is null");
+        this.queryHistoryService = requireNonNull(queryHistoryService, "queryHistoryService is null");
         PropertyService.setProperty(HetuConstant.MULTI_COORDINATOR_ENABLED, hetuConfig.isMultipleCoordinatorEnabled());
 
         requireNonNull(queryManagerConfig, "queryManagerConfig is null");
@@ -290,6 +295,10 @@ public class DispatchManager
                         queryTracker.removeQuery(dispatchQuery.getQueryId());
                     }
                     else {
+                        if (!isUiQuery && dispatchQuery.getBasicQueryInfo().getState() == QueryState.FAILED) {
+                            QueryInfo queryInfo = queryHistoryService.toFullQueryInfo(dispatchQuery);
+                            queryHistoryService.insert(queryInfo);
+                        }
                         // execution MUST be added to the expiration queue or there will be a leak
                         queryTracker.expireQuery(dispatchQuery.getQueryId());
                     }

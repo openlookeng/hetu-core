@@ -14,6 +14,8 @@
  */
 import alt from '../alt';
 import CatalogApiUtils from "../utils/CatalogApiUtils";
+import xhrform from "../utils/xhrform";
+import UserStore from "../stores/UserStore";
 
 class CatalogActions {
     constructor() {

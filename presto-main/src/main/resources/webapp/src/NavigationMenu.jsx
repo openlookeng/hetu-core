@@ -42,10 +42,22 @@ export default class NavigationMenu extends React.Component {
                             <div>Nodes</div>
                         </a>
                     </li>
+                    <li className={this.props.active === 'querymonitor' ? "active" : ""}>
+                        <a href={this.props.active === 'querymonitor' ? "#" : "./querymonitor.html"}>
+                            <div><i className="fa fa-desktop"></i></div>
+                            <div>Query Monitor</div>
+                        </a>
+                    </li>
                     <li className={this.props.active === 'queryhistory' ? "active" : ""}>
                         <a href={this.props.active === 'queryhistory' ? "#" : "./queryhistory.html"}>
                             <div><i className="fa fa-history"></i></div>
                             <div>Query History</div>
+                        </a>
+                    </li>
+                    <li className={this.props.active === 'auditlog' ? "active" : ""}>
+                        <a href={this.props.active === 'auditlog' ? "#" : "./auditlog.html"}>
+                            <div><i className="fa fa-file-text-o"></i></div>
+                            <div>Audit Log</div>
                         </a>
                     </li>
                 </ul>

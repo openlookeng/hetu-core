@@ -193,7 +193,6 @@ public class CatalogResource
                                   @Context HttpServletRequest servletRequest)
     {
         CatalogInfo catalogInfo = toCatalogInfo(catalogInfoJson);
-
         try (CatalogFileInputStream configFiles = toCatalogFiles(catalogConfigFileBodyParts, globalConfigFilesBodyParts)) {
             return service.createCatalog(catalogInfo,
                     configFiles,

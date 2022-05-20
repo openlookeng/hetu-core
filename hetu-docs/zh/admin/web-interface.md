@@ -59,3 +59,26 @@ openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可
 > -   **默认值：** `1 DAYS`
 >
 > UI会话超时默认设置为1天。可以通过配置`etc/config.properties`文件中的`hetu.queryeditor-ui.session-timeout`属性修改。
+
+### `hetu.queryhistory.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `1000`
+>
+> openLooKeng储存的历史查询记录最大数量。可以通过配置`etc/config.properties`文件的`hetu.queryhistory.max-count`属性修改。
+
+### `hetu.collectionsql.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `100`
+>
+> 每位用户收藏sql语句条数上限.可以通过配置`etc/config.properties`文件的`hetu.collectionsql.max-count`属性修改。
+
+
+## 备注
+
+收藏sql语句的最大长度默认为600，可通过如下步骤对其进行修改：
+
+1. 根据hetu-metastore.properties文件中jdbc配置信息登录mysql数据库。
+
+2. 选中hetu_favorite表，使用命令`alter table hetu_favorite modify query varchar(2000) not null;`修改收藏语句最大长度为2000。

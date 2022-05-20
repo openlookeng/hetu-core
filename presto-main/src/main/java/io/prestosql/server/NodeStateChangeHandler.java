@@ -18,11 +18,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
+import io.airlift.node.NodeInfo;
 import io.airlift.units.Duration;
+import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.TaskManager;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.metadata.NodeState;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -59,6 +62,8 @@ public class NodeStateChangeHandler
     private final TaskManager sqlTaskManager;
     private final QueryManager sqlQueryManager;
     private final ShutdownAction shutdownAction;
+    private final EventListenerManager eventListenerManager;
+    private final NodeInfo nodeInfo;
 
     private final boolean isCoordinator;
     private final boolean allowTaskOnCoordinator;
@@ -76,7 +81,9 @@ public class NodeStateChangeHandler
             ServerConfig serverConfig,
             NodeSchedulerConfig nodeSchedulerConfig,
             ShutdownAction shutdownAction,
-            LifeCycleManager lifeCycleManager)
+            LifeCycleManager lifeCycleManager,
+            EventListenerManager eventListenerManager,
+            NodeInfo nodeInfo)
     {
         this.sqlTaskManager = requireNonNull(sqlTaskManager, "sqlTaskManager is null");
         this.sqlQueryManager = requireNonNull(sqlQueryManager, "sqlQueryManager is null");
@@ -85,6 +92,8 @@ public class NodeStateChangeHandler
         this.isCoordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
         this.allowTaskOnCoordinator = requireNonNull(nodeSchedulerConfig, "nodeScheulerConfig is null").isIncludeCoordinator();
         this.gracePeriod = serverConfig.getGracePeriod();
+        this.nodeInfo = requireNonNull(nodeInfo, "nodeInfo is null");
+        this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
     }
 
     private synchronized void requestIsolation(boolean forced)
@@ -307,6 +316,8 @@ public class NodeStateChangeHandler
             default:
                 break;
         }
+        eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", nodeInfo.getInternalAddress(),
+                "Updating node " + nodeInfo.getNodeId() + " state from " + state + " to " + newState, "Cluster", "INFO"));
         LOG.info(String.format("Updating node state from %s to %s", state, newState));
         state = newState;
         return true;

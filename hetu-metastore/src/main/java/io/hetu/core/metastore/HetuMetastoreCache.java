@@ -15,11 +15,15 @@
 package io.hetu.core.metastore;
 
 import io.airlift.log.Logger;
+import io.prestosql.spi.favorite.FavoriteEntity;
+import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.metastore.HetuCache;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 
 import java.util.List;
 import java.util.Optional;
@@ -304,6 +308,60 @@ public class HetuMetastoreCache
             tableCache.invalidate(tableKey);
             tablesCache.invalidate(databaseKey);
         }
+    }
+
+    @Override
+    public void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString)
+    {
+        delegate.insertQueryHistory(queryHistoryEntity, jsonString);
+    }
+
+    @Override
+    public void deleteQueryHistoryBatch()
+    {
+        delegate.deleteQueryHistoryBatch();
+    }
+
+    @Override
+    public long getAllQueryHistoryNum()
+    {
+        return delegate.getAllQueryHistoryNum();
+    }
+
+    @Override
+    public String getQueryDetail(String queryId)
+    {
+        return delegate.getQueryDetail(queryId);
+    }
+
+    @Override
+    public QueryHistoryResult getQueryHistory(int startNum, int pageSize,
+                                              String user, String startTime, String endTime,
+                                              String queryId, String query, String resourceGroup,
+                                              String resource, List<String> state, List<String> failed,
+                                              String sort, String sortOrder)
+    {
+        return delegate.getQueryHistory(startNum, pageSize,
+                user, startTime, endTime, queryId, query,
+                resourceGroup, resource, state, failed, sort, sortOrder);
+    }
+
+    @Override
+    public void insertFavorite(FavoriteEntity favoriteEntity)
+    {
+        delegate.insertFavorite(favoriteEntity);
+    }
+
+    @Override
+    public void deleteFavorite(FavoriteEntity favoriteEntity)
+    {
+        delegate.deleteFavorite(favoriteEntity);
+    }
+
+    @Override
+    public FavoriteResult getFavorite(int startNum, int pageSize, String user)
+    {
+        return delegate.getFavorite(startNum, pageSize, user);
     }
 
     @Override

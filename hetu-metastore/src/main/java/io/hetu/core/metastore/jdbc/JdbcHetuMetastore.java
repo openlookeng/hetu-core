@@ -20,11 +20,15 @@ import io.prestosql.spi.connector.CatalogNotFoundException;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableNotFoundException;
+import io.prestosql.spi.favorite.FavoriteEntity;
+import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.metastore.model.CatalogEntity;
 import io.prestosql.spi.metastore.model.ColumnEntity;
 import io.prestosql.spi.metastore.model.DatabaseEntity;
 import io.prestosql.spi.metastore.model.TableEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryEntity;
+import io.prestosql.spi.queryhistory.QueryHistoryResult;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
@@ -430,6 +434,92 @@ public class JdbcHetuMetastore
             Optional<List<PropertyEntity>> tableProps = mapToList(tableEntity.getParameters());
             tableProps.ifPresent(props -> transactionDao.insertTableProperty(tableId, props));
         });
+    }
+
+    @Override
+    public void insertQueryHistory(QueryHistoryEntity queryHistoryEntity, String jsonString)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            transactionDao.insertQueryHistory(queryHistoryEntity, jsonString);
+        });
+    }
+
+    @Override
+    public void deleteQueryHistoryBatch()
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            transactionDao.deleteQueryHistoryBatch();
+        });
+    }
+
+    @Override
+    public long getAllQueryHistoryNum()
+    {
+        long[] ans = new long[1];
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            ans[0] = transactionDao.getAllQueryHistoryNum();
+        });
+        return ans[0];
+    }
+
+    @Override
+    public String getQueryDetail(String queryId)
+    {
+        String[] jsonString = new String[1];
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            jsonString[0] = transactionDao.getQueryDetail(queryId);
+        });
+        return jsonString[0];
+    }
+
+    @Override
+    public QueryHistoryResult getQueryHistory(int startNum, int pageSize,
+                                              String user, String startTime, String endTime,
+                                              String queryId, String query, String resourceGroup,
+                                              String resource, List<String> state, List<String> failed,
+                                              String sort, String sortOrder)
+    {
+        QueryHistoryResult queryHistoryResult = new QueryHistoryResult();
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            queryHistoryResult.setTotal(transactionDao.getQueryHistoryCount(user, startTime, endTime, queryId, query, resourceGroup, resource, state, failed));
+            queryHistoryResult.setQueries(transactionDao.getQueryHistory(startNum, pageSize, user, startTime, endTime, queryId, query, resourceGroup, resource, state, failed, sort, sortOrder));
+        });
+        return queryHistoryResult;
+    }
+
+    @Override
+    public void insertFavorite(FavoriteEntity favoriteEntity)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            transactionDao.insertFavorite(favoriteEntity);
+        });
+    }
+
+    @Override
+    public void deleteFavorite(FavoriteEntity favoriteEntity)
+    {
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            transactionDao.deleteFavorite(favoriteEntity);
+        });
+    }
+
+    @Override
+    public FavoriteResult getFavorite(int startNum, int pageSize, String user)
+    {
+        FavoriteResult favoriteResult = new FavoriteResult();
+        runTransactionWithLock(jdbi, handle -> {
+            JdbcMetadataDao transactionDao = handle.attach(JdbcMetadataDao.class);
+            favoriteResult.setQueries(transactionDao.getFavorite(startNum, pageSize, user));
+            favoriteResult.setTotal(transactionDao.getFavoriteCount(user));
+        });
+        return favoriteResult;
     }
 
     private void getTableColumns(List<Map.Entry<Long, TableEntity>> tableEntries,
