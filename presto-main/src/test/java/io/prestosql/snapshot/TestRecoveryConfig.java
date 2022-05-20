@@ -36,7 +36,8 @@ public class TestRecoveryConfig
                 .setSnapshotSplitCountInterval(1000)
                 .setRecoveryMaxRetries(10)
                 .setRecoveryRetryTimeout(new Duration(10, TimeUnit.MINUTES))
-                .setSnapshotUseKryoSerialization(false));
+                .setSnapshotUseKryoSerialization(false)
+                .setEliminateDuplicateSpillFilesEnabled(false));
     }
 
     @Test
@@ -52,6 +53,7 @@ public class TestRecoveryConfig
                 .put("hetu.recovery.maxRetries", "20")
                 .put("hetu.recovery.retryTimeout", "5m")
                 .put("hetu.snapshot.useKryoSerialization", "true")
+                .put("experimental.eliminate-duplicate-spill-files", "true")
                 .build();
 
         RecoveryConfig expected = new RecoveryConfig()
@@ -63,7 +65,8 @@ public class TestRecoveryConfig
                 .setSnapshotSplitCountInterval(1000000)
                 .setRecoveryMaxRetries(20)
                 .setRecoveryRetryTimeout(new Duration(5, TimeUnit.MINUTES))
-                .setSnapshotUseKryoSerialization(true);
+                .setSnapshotUseKryoSerialization(true)
+                .setEliminateDuplicateSpillFilesEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

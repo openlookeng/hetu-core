@@ -18,6 +18,7 @@ import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
@@ -32,7 +33,10 @@ import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.spiller.SingleStreamSpiller;
 import io.prestosql.spiller.SingleStreamSpillerFactory;
+import io.prestosql.spiller.Spiller;
+import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -43,7 +47,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -53,13 +56,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.whenAllComplete;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.checkSuccess;
 import static io.airlift.concurrent.MoreFutures.getDone;
 import static io.prestosql.SystemSessionProperties.isInnerJoinSpillFilteringEnabled;
@@ -77,7 +81,7 @@ import static java.util.Objects.requireNonNull;
 @RestorableConfig(uncapturedFields = {"lookupSourceFactory", "lookupSourceFactoryDestroyed", "outputChannels",
         "hashChannels", "filterFunctionFactory", "sortChannel", "searchFunctionFactories", "singleStreamSpillerFactory",
         "lookupSourceNotNeeded", "spilledLookupSourceHandle", "spillInProgress", "unspillInProgress", "lookupSourceSupplier", "lookupSourceChecksum",
-        "finishMemoryRevoke", "snapshotState", "lastMarker"})
+        "finishMemoryRevoke", "snapshotState", "lastMarker", "finishInProgress", "spillerFactory"})
 public class HashBuilderOperator
         implements SinkOperator, Spillable
 {
@@ -102,7 +106,10 @@ public class HashBuilderOperator
         private final Map<Lifespan, Integer> partitionIndexManager = new HashMap<>();
 
         private boolean closed;
+        private boolean spillToHdfsEnabled;
+        private SpillerFactory spillerFactory;
 
+        @VisibleForTesting
         public HashBuilderOperatorFactory(
                 int operatorId,
                 PlanNodeId planNodeId,
@@ -117,6 +124,40 @@ public class HashBuilderOperator
                 PagesIndex.Factory pagesIndexFactory,
                 boolean spillEnabled,
                 SingleStreamSpillerFactory singleStreamSpillerFactory)
+        {
+            this(operatorId,
+                    planNodeId,
+                    lookupSourceFactoryManager,
+                    outputChannels,
+                    hashChannels,
+                    preComputedHashChannel,
+                    filterFunctionFactory,
+                    sortChannel,
+                    searchFunctionFactories,
+                    expectedPositions,
+                    pagesIndexFactory,
+                    spillEnabled,
+                    singleStreamSpillerFactory,
+                    null,
+                    false);
+        }
+
+        public HashBuilderOperatorFactory(
+                int operatorId,
+                PlanNodeId planNodeId,
+                JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager,
+                List<Integer> outputChannels,
+                List<Integer> hashChannels,
+                OptionalInt preComputedHashChannel,
+                Optional<JoinFilterFunctionFactory> filterFunctionFactory,
+                Optional<Integer> sortChannel,
+                List<JoinFilterFunctionFactory> searchFunctionFactories,
+                int expectedPositions,
+                PagesIndex.Factory pagesIndexFactory,
+                boolean spillEnabled,
+                SingleStreamSpillerFactory singleStreamSpillerFactory,
+                SpillerFactory spillerFactory,
+                boolean spillToHdfsEnabled)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -134,7 +175,8 @@ public class HashBuilderOperator
             this.pagesIndexFactory = requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
             this.spillEnabled = spillEnabled;
             this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory is null");
-
+            this.spillToHdfsEnabled = spillToHdfsEnabled;
+            this.spillerFactory = spillerFactory;
             this.expectedPositions = expectedPositions;
         }
 
@@ -165,7 +207,9 @@ public class HashBuilderOperator
                     expectedPositions,
                     pagesIndexFactory,
                     spillEnabled,
-                    singleStreamSpillerFactory);
+                    singleStreamSpillerFactory,
+                    spillerFactory,
+                    spillToHdfsEnabled);
         }
 
         @Override
@@ -253,8 +297,10 @@ public class HashBuilderOperator
     private Optional<ListenableFuture<?>> lookupSourceNotNeeded = Optional.empty();
     private final SpilledLookupSourceHandle spilledLookupSourceHandle;
     private Optional<SingleStreamSpiller> spiller = Optional.empty();
+    private Optional<Spiller> genericSpiller = Optional.empty();
     private ListenableFuture<?> spillInProgress = NOT_BLOCKED;
-    private Optional<ListenableFuture<List<Page>>> unspillInProgress = Optional.empty();
+    private SettableFuture<?> finishInProgress;
+    private Optional<ListenableFuture<Integer>> unspillInProgress = Optional.empty();
     @Nullable
     private LookupSourceSupplier lookupSourceSupplier;
     private OptionalLong lookupSourceChecksum = OptionalLong.empty();
@@ -280,6 +326,8 @@ public class HashBuilderOperator
     private MarkerPage lastMarker;
     // If this flag is true, then it was restored from the extra snapshot, and should discard incoming pages.
     private boolean alreadyFinished;
+    private boolean spillToHdfsEnabled;
+    private final SpillerFactory spillerFactory;
 
     public HashBuilderOperator(
             OperatorContext operatorContext,
@@ -294,7 +342,9 @@ public class HashBuilderOperator
             int expectedPositions,
             PagesIndex.Factory pagesIndexFactory,
             boolean spillEnabled,
-            SingleStreamSpillerFactory singleStreamSpillerFactory)
+            SingleStreamSpillerFactory singleStreamSpillerFactory,
+            SpillerFactory spillerFactory,
+            boolean spillToHdfsEnabled)
     {
         requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
 
@@ -327,8 +377,12 @@ public class HashBuilderOperator
         else {
             this.spillBloom = null;
         }
+        this.finishInProgress = SettableFuture.create();
+        this.finishInProgress.set(null);
 
         spilledLookupSourceHandle = new SpilledLookupSourceHandle(spillBloom);
+        this.spillToHdfsEnabled = spillToHdfsEnabled;
+        this.spillerFactory = spillerFactory;
     }
 
     @Override
@@ -348,7 +402,7 @@ public class HashBuilderOperator
     {
         switch (state) {
             case CONSUMING_INPUT:
-                return NOT_BLOCKED;
+                return finishInProgress;
 
             case SPILLING_INPUT:
                 return spillInProgress;
@@ -374,8 +428,7 @@ public class HashBuilderOperator
     @Override
     public boolean needsInput()
     {
-        boolean stateNeedsInput = (state == State.CONSUMING_INPUT)
-                || (state == State.SPILLING_INPUT && spillInProgress.isDone());
+        boolean stateNeedsInput = (state == State.CONSUMING_INPUT || state == State.SPILLING_INPUT) && spillInProgress.isDone() && finishInProgress.isDone();
 
         return stateNeedsInput && !lookupSourceFactoryDestroyed.isDone();
     }
@@ -455,11 +508,14 @@ public class HashBuilderOperator
         checkState(spillEnabled, "Spill not enabled, no revokable memory should be reserved");
 
         if (state == State.CONSUMING_INPUT) {
+            finishInProgress = SettableFuture.create();
             long indexSizeBeforeCompaction = index.getEstimatedSize().toBytes();
             index.compact();
             long indexSizeAfterCompaction = index.getEstimatedSize().toBytes();
             if (indexSizeAfterCompaction < indexSizeBeforeCompaction * INDEX_COMPACTION_ON_REVOCATION_TARGET) {
-                finishMemoryRevoke = Optional.of(() -> {});
+                finishMemoryRevoke = Optional.of(() -> {
+                    finishInProgress.set(null);
+                });
                 return immediateFuture(null);
             }
 
@@ -469,10 +525,12 @@ public class HashBuilderOperator
                 localRevocableMemoryContext.setBytes(0);
                 lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
                 state = State.SPILLING_INPUT;
+                finishInProgress.set(null);
             });
             return spillIndex();
         }
         if (state == State.LOOKUP_SOURCE_BUILT) {
+            finishInProgress = SettableFuture.create();
             finishMemoryRevoke = Optional.of(() -> {
                 if (spillBloom != null) {
                     spillBloom.markReady();
@@ -484,7 +542,11 @@ public class HashBuilderOperator
                 localRevocableMemoryContext.setBytes(0);
                 lookupSourceChecksum = OptionalLong.of(lookupSourceSupplier.checksum());
                 lookupSourceSupplier = null;
+                if (spillToHdfsEnabled) {
+                    getSpiller().closeSessionSpiller();
+                }
                 state = State.INPUT_SPILLED;
+                finishInProgress.set(null);
             });
             return spillIndex();
         }
@@ -500,10 +562,25 @@ public class HashBuilderOperator
     private ListenableFuture<?> spillIndex()
     {
         checkState(!spiller.isPresent(), "Spiller already created");
-        spiller = Optional.of(singleStreamSpillerFactory.create(
-                index.getTypes(),
-                operatorContext.getSpillContext().newLocalSpillContext(),
-                operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName())));
+        checkState(!genericSpiller.isPresent(), "Generic Spiller already created");
+        if (spillToHdfsEnabled) {
+            genericSpiller = Optional.of(spillerFactory.create(
+                    index.getTypes(),
+                    operatorContext.getSpillContext().newLocalSpillContext(),
+                    operatorContext.newAggregateSystemMemoryContext(),
+                    operatorContext.isSnapshotEnabled(),
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+            createSessionSpiller();
+        }
+        else {
+            spiller = Optional.of(singleStreamSpillerFactory.create(
+                    index.getTypes(),
+                    operatorContext.getSpillContext().newLocalSpillContext(),
+                    operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName()),
+                    spillToHdfsEnabled,
+                    operatorContext.isSnapshotEnabled(),
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+        }
         return getSpiller().spill(new AbstractIterator<Page>()
         {
             private Iterator<Page> spillPages = index.getPages();
@@ -532,6 +609,15 @@ public class HashBuilderOperator
     @Override
     public void finish()
     {
+        if (lookupSourceFactoryDestroyed.isDone()) {
+            close();
+            return;
+        }
+
+        if (finishMemoryRevoke.isPresent()) {
+            return;
+        }
+
         if (snapshotState != null && !alreadyFinished && lastMarker != null) {
             // Update alreadyFinished field *before* calling captureState
             alreadyFinished = true;
@@ -646,6 +732,9 @@ public class HashBuilderOperator
         if (spillBloom != null) {
             spillBloom.markReady();
         }
+        if (spillToHdfsEnabled) {
+            getSpiller().closeSessionSpiller();
+        }
         state = State.INPUT_SPILLED;
     }
 
@@ -660,8 +749,27 @@ public class HashBuilderOperator
         verify(spiller.isPresent());
         verify(!unspillInProgress.isPresent());
 
-        localUserMemoryContext.setBytes(getSpiller().getSpilledPagesInMemorySize() + index.getEstimatedSize().toBytes());
-        unspillInProgress = Optional.of(getSpiller().getAllSpilledPages());
+        if (spillToHdfsEnabled) {
+            localUserMemoryContext.setBytes(getGenericSpiller().getSpilledPagesInMemorySize() + index.getEstimatedSize().toBytes());
+            unspillInProgress = Optional.of(getGenericSpiller().getAllSpilledPages(pages -> {
+                for (Page page : pages) {
+                    index.addPage(page);
+                    localUserMemoryContext.setBytes(index.getEstimatedSize().toBytes());
+                }
+                return 0;
+            }));
+        }
+        else {
+            localUserMemoryContext.setBytes(getSpiller().getSpilledPagesInMemorySize() + index.getEstimatedSize().toBytes());
+            ListenableFuture<List<Page>> listenableFuture = getSpiller().getAllSpilledPages();
+            unspillInProgress = Optional.of(whenAllComplete(listenableFuture).call(() -> {
+                for (Page page : getDone(listenableFuture)) {
+                    index.addPage(page);
+                    localUserMemoryContext.setBytes(index.getEstimatedSize().toBytes());
+                }
+                return 0;
+            }, directExecutor()));
+        }
 
         state = State.INPUT_UNSPILLING;
     }
@@ -674,21 +782,7 @@ public class HashBuilderOperator
             return;
         }
 
-        // Use Queue so that Pages already consumed by Index are not retained by us.
-        Queue<Page> pages = new ArrayDeque<>(getDone(unspillInProgress.get()));
-        long memoryRetainedByRemainingPages = pages.stream()
-                .mapToLong(Page::getRetainedSizeInBytes)
-                .sum();
-        localUserMemoryContext.setBytes(memoryRetainedByRemainingPages + index.getEstimatedSize().toBytes());
-
-        while (!pages.isEmpty()) {
-            Page next = pages.remove();
-            index.addPage(next);
-            // There is no attempt to compact index, since unspilled pages are unlikely to have blocks with retained size > logical size.
-            memoryRetainedByRemainingPages -= next.getRetainedSizeInBytes();
-            localUserMemoryContext.setBytes(memoryRetainedByRemainingPages + index.getEstimatedSize().toBytes());
-        }
-
+        getDone(unspillInProgress.get());
         LookupSourceSupplier partition = buildLookupSource();
         lookupSourceChecksum.ifPresent(checksum ->
                 checkState(partition.checksum() == checksum, "Unspilled lookupSource checksum does not match original one"));
@@ -739,6 +833,16 @@ public class HashBuilderOperator
         return spiller.orElseThrow(() -> new IllegalStateException("Spiller not created"));
     }
 
+    private Spiller getGenericSpiller()
+    {
+        return genericSpiller.orElseThrow(() -> new IllegalStateException("Generic Spiller not created"));
+    }
+
+    private void createSessionSpiller()
+    {
+        spiller = Optional.of(genericSpiller.get().createSessionSpiller());
+    }
+
     @Override
     public void close()
     {
@@ -753,6 +857,7 @@ public class HashBuilderOperator
 
         try (Closer closer = Closer.create()) {
             closer.register(index::clear);
+            genericSpiller.ifPresent(closer::register);
             spiller.ifPresent(closer::register);
             closer.register(() -> localUserMemoryContext.setBytes(0));
             closer.register(() -> localRevocableMemoryContext.setBytes(0));
@@ -774,10 +879,21 @@ public class HashBuilderOperator
     }
 
     @Override
+    public boolean isSpillToHdfsEnabled()
+    {
+        return spillToHdfsEnabled;
+    }
+
+    @Override
     public List<Path> getSpilledFilePaths()
     {
         if (isSpilled()) {
-            return ImmutableList.of(spiller.get().getFile());
+            if (spillToHdfsEnabled) {
+                return genericSpiller.get().getSpilledFilePaths(true);
+            }
+            else {
+                return ImmutableList.of(spiller.get().getFile());
+            }
         }
         return ImmutableList.of();
     }
@@ -862,6 +978,15 @@ public class HashBuilderOperator
     }
 
     @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        if (isSpilled()) {
+            return ImmutableList.of(spiller.get().getSpilledFileInfo());
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {
         HashBuilderOperatorState myState = new HashBuilderOperatorState();
@@ -870,17 +995,25 @@ public class HashBuilderOperator
         myState.localRevocableMemoryContext = localRevocableMemoryContext.getBytes();
         myState.index = index.capture(serdeProvider);
         myState.hashCollisionsCounter = hashCollisionsCounter.capture(serdeProvider);
-        myState.state = state.toString();
         myState.alreadyFinished = alreadyFinished;
 
         // Capture spill related to spill
-        if (spiller.isPresent()) {
-            myState.spiller = spiller.get().capture(serdeProvider);
+        if (spillToHdfsEnabled) {
+            if (genericSpiller.isPresent()) {
+                myState.genericSpiller = genericSpiller.get().capture(serdeProvider);
+            }
+        }
+        else {
+            if (spiller.isPresent()) {
+                myState.spiller = spiller.get().capture(serdeProvider);
+            }
         }
 
         if (spillBloom != null) {
             myState.spillBloom = spillBloom.capture();
         }
+        myState.spillToHdfsEnabled = spillToHdfsEnabled;
+        myState.state = state.toString();
         return myState;
     }
 
@@ -898,21 +1031,40 @@ public class HashBuilderOperator
         State oldState = this.state;
         this.state = State.valueOf(myState.state);
         this.alreadyFinished = myState.alreadyFinished;
-
+        this.spillToHdfsEnabled = myState.spillToHdfsEnabled;
         // Restore spill related fields
-        if (myState.spiller != null) {
-            if (!spiller.isPresent()) {
-                spiller = Optional.of(singleStreamSpillerFactory.create(
-                        index.getTypes(),
-                        operatorContext.getSpillContext().newLocalSpillContext(),
-                        operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName())));
+        if (myState.spiller != null || myState.genericSpiller != null) {
+            if (!spiller.isPresent() || !genericSpiller.isPresent()) {
+                if (spillToHdfsEnabled) {
+                    genericSpiller = Optional.of(spillerFactory.create(
+                            index.getTypes(),
+                            operatorContext.getSpillContext().newLocalSpillContext(),
+                            operatorContext.newAggregateSystemMemoryContext(),
+                            operatorContext.isSnapshotEnabled(),
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+
+                    genericSpiller.get().restore(myState.genericSpiller, serdeProvider);
+                    createSessionSpiller();
+                }
+                else {
+                    spiller = Optional.of(singleStreamSpillerFactory.create(
+                            index.getTypes(),
+                            operatorContext.getSpillContext().newLocalSpillContext(),
+                            operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName()),
+                            spillToHdfsEnabled,
+                            operatorContext.isSnapshotEnabled(),
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+
+                    this.spiller.get().restore(myState.spiller, serdeProvider);
+                }
             }
-            this.spiller.get().restore(myState.spiller, serdeProvider);
         }
         if (myState.spillBloom != null) {
             this.spillBloom.restore(myState.spillBloom);
         }
-        if (oldState == State.CONSUMING_INPUT && this.state == State.SPILLING_INPUT) {
+
+        // snapshot markers are allowed only if the state is either CONSUMING_INPUT or SPILLING_INPUT
+        if (oldState == State.CONSUMING_INPUT && (this.state == State.SPILLING_INPUT)) {
             lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
         }
     }
@@ -926,6 +1078,7 @@ public class HashBuilderOperator
     private static class HashBuilderOperatorState
             implements Serializable
     {
+        private Object genericSpiller;
         private Object operatorContext;
         private long localUserMemoryContext;
         private long localRevocableMemoryContext;
@@ -936,7 +1089,7 @@ public class HashBuilderOperator
         private String state;
         private boolean alreadyFinished;
         private Object spiller;
-
+        private boolean spillToHdfsEnabled;
         private Object spillBloom;
     }
 }

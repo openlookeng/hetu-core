@@ -14,6 +14,8 @@
  */
 package io.prestosql.snapshot;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +36,26 @@ public interface Spillable
     }
 
     /**
+     * Determine if spilling to HDFS is enabled.
+     *
+     * @return true if enabled
+     */
+    default boolean isSpillToHdfsEnabled()
+    {
+        return false;
+    }
+
+    /**
      * Get spilled file paths of an object
      *
      * @return spilled file paths
      */
     default List<Path> getSpilledFilePaths()
+    {
+        return new ArrayList<>();
+    }
+
+    default List<Pair<Path, Long>> getSpilledFileInfo()
     {
         return new ArrayList<>();
     }

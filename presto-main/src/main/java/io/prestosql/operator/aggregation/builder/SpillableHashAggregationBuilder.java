@@ -260,7 +260,9 @@ public class SpillableHashAggregationBuilder
             spiller = Optional.of(spillerFactory.create(
                     hashAggregationBuilder.buildTypes(),
                     operatorContext.getSpillContext(),
-                    operatorContext.newAggregateSystemMemoryContext()));
+                    operatorContext.newAggregateSystemMemoryContext(),
+                    operatorContext.isSnapshotEnabled(),
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
         }
 
         // start spilling process with current content of the hashAggregationBuilder builder...
@@ -393,7 +395,9 @@ public class SpillableHashAggregationBuilder
                 spiller = Optional.of(spillerFactory.create(
                         hashAggregationBuilder.buildTypes(),
                         operatorContext.getSpillContext(),
-                        operatorContext.newAggregateSystemMemoryContext()));
+                        operatorContext.newAggregateSystemMemoryContext(),
+                        operatorContext.isSnapshotEnabled(),
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
             }
             this.spiller.get().restore(myState.spiller, serdeProvider);
         }

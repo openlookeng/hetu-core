@@ -14,6 +14,7 @@
 package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.Restorable;
@@ -24,6 +25,8 @@ import java.io.Closeable;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.function.Function;
 
 public interface Spiller
         extends Closeable, Restorable
@@ -48,8 +51,19 @@ public interface Spiller
 
     /**
      * Returns spilled files paths
+     * @param isStoreSpillFiles
      */
-    default List<Path> getSpilledFilePaths()
+    default List<Path> getSpilledFilePaths(boolean isStoreSpillFiles)
+    {
+        return ImmutableList.of();
+    }
+
+    default List<Path> getSpilledFilePathsToStore()
+    {
+        return ImmutableList.of();
+    }
+
+    default List<Pair<Path, Long>> getSpilledFileInfo()
     {
         return ImmutableList.of();
     }
@@ -60,4 +74,22 @@ public interface Spiller
      */
     @Override
     void close();
+
+    default long getSpilledPagesInMemorySize()
+    {
+        return 0;
+    }
+
+    /**
+     * Initiates read of previously spilled pages. The returned {@link Future} will be complete once all pages are read.
+     */
+    default ListenableFuture<Integer> getAllSpilledPages(Function<List<Page>, Integer> processor)
+    {
+        return Futures.immediateFuture(null);
+    }
+
+    default SingleStreamSpiller createSessionSpiller()
+    {
+        return null;
+    }
 }

@@ -51,6 +51,7 @@ import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.MaterializedRow;
 import io.prestosql.testing.TestingTaskContext;
+import org.apache.commons.lang3.tuple.Pair;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
@@ -353,7 +354,8 @@ public class TestHashJoinOperator
         lookupJoinOperatorMapping.put("partitionedConsumption", false);
         lookupJoinOperatorMapping.put("lookupPartitions", false);
         lookupJoinOperatorMapping.put("spiller", null);
-        lookupJoinOperatorMapping.put("savedRows", 0); // Only compare map size
+        lookupJoinOperatorMapping.put("savedRows", 0);
+        lookupJoinOperatorMapping.put("isSingleSessionSpiller", false); // Only compare map size
 
         return lookupJoinOperatorMapping;
     }
@@ -1768,7 +1770,7 @@ public class TestHashJoinOperator
         }
 
         @Override
-        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId)
         {
             return new SingleStreamSpiller()
             {
@@ -1830,6 +1832,12 @@ public class TestHashJoinOperator
 
                 @Override
                 public Path getFile()
+                {
+                    return null;
+                }
+
+                @Override
+                public Pair<Path, Long> getSpilledFileInfo()
                 {
                     return null;
                 }

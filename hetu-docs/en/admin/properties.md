@@ -1005,6 +1005,14 @@ helps with cache affinity scheduling.
 >
 > Enables Kryo based serialization for snapshot, instead of default java serializer.
 
+### `experimental.eliminate-duplicate-spill-files`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables elimination of duplicate spill files storage as part of snapshot capture.
+
+
 
 ## HTTP Client Configurations
 

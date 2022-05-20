@@ -34,9 +34,13 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.airlift.concurrent.MoreFutures.getDone;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -53,28 +57,46 @@ public class GenericSpiller
     private ListenableFuture<?> previousSpill = Futures.immediateFuture(null);
     private final List<SingleStreamSpiller> singleStreamSpillers = new ArrayList<>();
     private final List<AtomicBoolean> spillCommitted = new ArrayList<>();
+    private boolean isSessionSpiller;
+    private final boolean isSnapshotEnabled;
+    private final String queryId;
 
     public GenericSpiller(
             List<Type> types,
             SpillContext spillContext,
             AggregatedMemoryContext aggregatedMemoryContext,
-            SingleStreamSpillerFactory singleStreamSpillerFactory)
+            SingleStreamSpillerFactory singleStreamSpillerFactory,
+            boolean isSnapshotEnabled,
+            String queryId)
     {
         this.types = requireNonNull(types, "types can not be null");
         this.spillContext = requireNonNull(spillContext, "spillContext can not be null");
         this.aggregatedMemoryContext = requireNonNull(aggregatedMemoryContext, "aggregatedMemoryContext can not be null");
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory can not be null");
+        this.isSnapshotEnabled = isSnapshotEnabled;
+        this.queryId = queryId;
     }
 
     @Override
     public ListenableFuture<?> spill(Iterator<Page> pageIterator)
     {
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()));
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId);
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         spillCommitted.add(new AtomicBoolean(true));
         previousSpill = singleStreamSpiller.spill(pageIterator);
         return previousSpill;
+    }
+
+    @Override
+    public SingleStreamSpiller createSessionSpiller()
+    {
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), true, isSnapshotEnabled, queryId);
+        closer.register(singleStreamSpiller);
+        singleStreamSpillers.add(singleStreamSpiller);
+        spillCommitted.add(new AtomicBoolean(true));
+        isSessionSpiller = true;
+        return singleStreamSpiller;
     }
 
     /**
@@ -85,7 +107,7 @@ public class GenericSpiller
     @Override
     public Pair<ListenableFuture<?>, Runnable> spillUnCommit(Iterator<Page> pageIterator)
     {
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()));
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId);
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         AtomicBoolean isCommitted = new AtomicBoolean(false);
@@ -130,9 +152,37 @@ public class GenericSpiller
     }
 
     @Override
-    public List<Path> getSpilledFilePaths()
+    public ListenableFuture<Integer> getAllSpilledPages(Function<List<Page>, Integer> processor)
+    {
+        List<ListenableFuture<List<Page>>> listenableFutureList = singleStreamSpillers.stream().map(SingleStreamSpiller::getAllSpilledPages).collect(Collectors.toList());
+        return Futures.whenAllComplete(listenableFutureList).call(() -> getAllSpilledPages(listenableFutureList, processor), directExecutor());
+    }
+
+    private int getAllSpilledPages(List<ListenableFuture<List<Page>>> listenableFutureList, Function<List<Page>, Integer> processor)
+    {
+        int count = 0;
+        for (ListenableFuture<List<Page>> listenableFuture : listenableFutureList) {
+            processor.apply(getDone(listenableFuture));
+        }
+        return count;
+    }
+
+    @Override
+    public long getSpilledPagesInMemorySize()
+    {
+        return singleStreamSpillers.stream().mapToLong(SingleStreamSpiller::getSpilledPagesInMemorySize).sum();
+    }
+
+    @Override
+    public List<Path> getSpilledFilePaths(boolean isStoreSpillFiles)
     {
         return IntStream.range(0, spillCommitted.size()).filter(i -> spillCommitted.get(i).get()).mapToObj(o -> singleStreamSpillers.get(o).getFile()).collect(toList());
+    }
+
+    @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        return IntStream.range(0, spillCommitted.size()).filter(i -> spillCommitted.get(i).get()).mapToObj(o -> singleStreamSpillers.get(o).getSpilledFileInfo()).collect(toList());
     }
 
     @Override
@@ -145,6 +195,7 @@ public class GenericSpiller
                 myState.singleStreamSpillers.add(s.capture(serdeProvider));
             }
         }
+        myState.isSessionSpiller = isSessionSpiller;
         return myState;
     }
 
@@ -152,8 +203,9 @@ public class GenericSpiller
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
         GenericSpillerState myState = (GenericSpillerState) state;
+        isSessionSpiller = myState.isSessionSpiller;
         for (Object s : myState.singleStreamSpillers) {
-            SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()));
+            SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), isSessionSpiller, isSnapshotEnabled, queryId);
             singleStreamSpiller.restore(s, serdeProvider);
             this.singleStreamSpillers.add(singleStreamSpiller);
             this.spillCommitted.add(new AtomicBoolean(true));
@@ -165,5 +217,6 @@ public class GenericSpiller
             implements Serializable
     {
         List<Object> singleStreamSpillers = new ArrayList<>();
+        private boolean isSessionSpiller;
     }
 }

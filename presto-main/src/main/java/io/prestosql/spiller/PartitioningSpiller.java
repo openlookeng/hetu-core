@@ -14,15 +14,18 @@
 package io.prestosql.spiller;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.Restorable;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 
@@ -52,6 +55,13 @@ public interface PartitioningSpiller
     // TODO getSpilledPages should not need flush last buffer to disk
     Iterator<Page> getSpilledPages(int partition);
 
+    Set<Integer> getSpilledPartitions();
+
+    default ListenableFuture<?> flushPartition(int partition)
+    {
+        return Futures.immediateFuture(null);
+    }
+
     void verifyAllPartitionsRead();
 
     /**
@@ -61,7 +71,12 @@ public interface PartitioningSpiller
     void close()
             throws IOException;
 
-    default List<Path> getSpilledFilePaths()
+    default List<Path> getSpilledFilePaths(boolean isStoreSpillFiles)
+    {
+        return ImmutableList.of();
+    }
+
+    default List<Pair<Path, Long>> getSpilledFileInfo()
     {
         return ImmutableList.of();
     }
@@ -86,5 +101,9 @@ public interface PartitioningSpiller
         {
             return retained;
         }
+    }
+
+    default void closeSessionSpiller(int partition)
+    {
     }
 }

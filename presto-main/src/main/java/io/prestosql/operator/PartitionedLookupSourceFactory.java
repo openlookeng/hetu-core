@@ -33,6 +33,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
@@ -795,6 +796,12 @@ public final class PartitionedLookupSourceFactory
         else if (outer) {
             pendingMarkers.add(new Marker(markerPage, totalDrivers, driverId));
         }
+    }
+
+    @Override
+    public Set<Integer> getSpilledPartitions()
+    {
+        return new HashSet<>(spilledPartitions.keySet());
     }
 
     @Override

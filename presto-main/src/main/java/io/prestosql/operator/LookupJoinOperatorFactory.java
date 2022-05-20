@@ -29,6 +29,7 @@ import java.util.OptionalInt;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.SystemSessionProperties.isSpillToHdfsEnabled;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.INNER;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
 import static java.util.Objects.requireNonNull;
@@ -158,7 +159,8 @@ public class LookupJoinOperatorFactory
                 totalOperatorsCount,
                 probeHashGenerator,
                 partitioningSpillerFactory,
-                () -> joinBridgeManager.probeOperatorFinished(driverContext.getLifespan()));
+                () -> joinBridgeManager.probeOperatorFinished(driverContext.getLifespan()),
+                isSpillToHdfsEnabled(driverContext.getPipelineContext().getTaskContext().getSession()));
     }
 
     @Override

@@ -116,7 +116,7 @@ public class TestBinaryFileSpiller
     public void testFileSpiller()
             throws Exception
     {
-        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext)) {
+        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId")) {
             testSimpleSpiller(spiller);
         }
     }
@@ -137,7 +137,7 @@ public class TestBinaryFileSpiller
 
         Page page = new Page(col1.build(), col2.build(), col3.build());
 
-        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext)) {
+        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId")) {
             testSpiller(types, spiller, ImmutableList.of(page));
         }
     }
@@ -226,7 +226,7 @@ public class TestBinaryFileSpiller
         List<Runnable> runners = new ArrayList<>();
         PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
 
-        Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext);
+        Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId");
         spilledBytes = doSpill(spiller, spilledBytes, runners, spills, 0);
         spillUploadPath.mkdirs();
 
@@ -236,11 +236,11 @@ public class TestBinaryFileSpiller
         for (counter = 1; counter <= runCount; counter++) {
             runners.remove(0).run();
 
-            assertEquals(spiller.getSpilledFilePaths().size(), counter);
+            assertEquals(spiller.getSpilledFilePaths(false).size(), counter);
             assertEquals(runners.size(), runCount - counter);
 
             Object snapshot = spiller.capture(serde);
-            spiller.getSpilledFilePaths().stream().forEach(path -> {
+            spiller.getSpilledFilePaths(false).stream().forEach(path -> {
                 try {
                     Files.copy(path, Paths.get(spillUploadPath.getPath(), path.getFileName().toString()), REPLACE_EXISTING);
                     uploadedFile.add(Paths.get(spillUploadPath.getPath(), path.getFileName().toString()));
@@ -251,7 +251,7 @@ public class TestBinaryFileSpiller
             });
 
             spiller.close();
-            spiller = factory.create(TYPES, bytes -> {}, memoryContext);
+            spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId");
             spiller.restore(snapshot, serde);
             uploadedFile.stream().forEach(path -> {
                 try {

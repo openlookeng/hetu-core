@@ -35,14 +35,16 @@ final class FileHolder
 {
     private final Path filePath;
     private final HetuFileSystemClient fileSystemClient;
+    private final boolean isSpillToHdfsAndSnapshotEnabled;
 
     @GuardedBy("this")
     private boolean deleted;
 
-    public FileHolder(Path filePath, HetuFileSystemClient fileSystemClient)
+    public FileHolder(Path filePath, HetuFileSystemClient fileSystemClient, boolean isSpillToHdfsAndSnapshotEnabled)
     {
         this.filePath = requireNonNull(filePath, "filePath is null");
         this.fileSystemClient = requireNonNull(fileSystemClient, "fileSystemClient is null");
+        this.isSpillToHdfsAndSnapshotEnabled = isSpillToHdfsAndSnapshotEnabled;
     }
 
     public synchronized OutputStream newOutputStream(OpenOption... options)
@@ -68,7 +70,9 @@ final class FileHolder
         deleted = true;
 
         try {
-            fileSystemClient.deleteIfExists(filePath);
+            if (!isSpillToHdfsAndSnapshotEnabled) {
+                fileSystemClient.deleteIfExists(filePath);
+            }
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -78,5 +82,11 @@ final class FileHolder
     public Path getFilePath()
     {
         return filePath;
+    }
+
+    public long getFileSize()
+            throws IOException
+    {
+        return (Long) fileSystemClient.getAttribute(filePath, "size");
     }
 }

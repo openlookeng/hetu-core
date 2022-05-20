@@ -161,6 +161,7 @@ public final class SystemSessionProperties
     public static final String SPILL_THRESHOLD_REUSE_TABLESCAN = "spill_threshold_reuse_tablescan";
     public static final String SORT_BASED_AGGREGATION_ENABLED = "sort_based_aggregation_enabled";
     public static final String PRCNT_DRIVERS_FOR_PARTIAL_AGGR = "prcnt_drivers_for_partial_aggr";
+    public static final String SPILL_TO_HDFS_ENABLED = "spill_to_hdfs_enabled";
     // CTE Optimization configurations
     public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
@@ -178,6 +179,7 @@ public final class SystemSessionProperties
     public static final String SNAPSHOT_SPLIT_COUNT_INTERVAL = "snapshot_split_count_interval";
     public static final String SKIP_ATTACHING_STATS_WITH_PLAN = "skip_attaching_stats_with_plan";
     public static final String SKIP_NON_APPLICABLE_RULES_ENABLED = "skip_non_applicable_rules_enabled";
+    public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "eliminate_duplicate_spill_files";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -836,6 +838,16 @@ public final class SystemSessionProperties
                         EXTENSION_EXECUTION_PLANNER_ENABLED,
                         "extension execution planner enabled",
                         hetuConfig.getExtensionExecutionPlannerEnabled(),
+                        false),
+                booleanProperty(
+                        SPILL_TO_HDFS_ENABLED,
+                        "Enable Spill To HDFS",
+                        featuresConfig.isSpillToHdfs(),
+                        false),
+                booleanProperty(
+                        ELIMINATE_DUPLICATE_SPILL_FILES,
+                        "Eliminates back up of spill files",
+                        recoveryConfig.isEliminateDuplicateSpillFilesEnabled(),
                         false));
     }
 
@@ -1464,5 +1476,15 @@ public final class SystemSessionProperties
     public static String getExtensionExecutionPlannerClassPath(Session session)
     {
         return session.getSystemProperty(EXTENSION_EXECUTION_PLANNER_CLASS_PATH, String.class);
+    }
+
+    public static boolean isSpillToHdfsEnabled(Session session)
+    {
+        return session.getSystemProperty(SPILL_TO_HDFS_ENABLED, Boolean.class);
+    }
+
+    public static boolean isEliminateDuplicateSpillFilesEnabled(Session session)
+    {
+        return session.getSystemProperty(ELIMINATE_DUPLICATE_SPILL_FILES, Boolean.class);
     }
 }

@@ -23,15 +23,21 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.Restorable;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import static io.prestosql.SystemSessionProperties.isEliminateDuplicateSpillFilesEnabled;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -58,6 +64,10 @@ public class SingleInputSnapshotState
     private final Queue<MarkerPage> markers = new LinkedList<>();
     // For recording snapshot memory usage
     private final LocalMemoryContext snapshotMemoryContext;
+    private Map<Path, Long> spillFileSizeMap = new HashMap<>();
+    Map<Long, List<String>> snapshotSpillPaths = new LinkedHashMap<>();
+    private final boolean isEliminateDuplicateSpillFilesEnabled;
+    long lastSnapshotId = -1;
 
     public static SingleInputSnapshotState forOperator(Operator operator, OperatorContext operatorContext)
     {
@@ -67,7 +77,8 @@ public class SingleInputSnapshotState
                 operatorContext.getDriverContext().getSerde(),
                 snapshotId -> SnapshotStateId.forOperator(snapshotId, operatorContext),
                 snapshotId -> SnapshotStateId.forDriverComponent(snapshotId, operatorContext, operatorContext.getOperatorId() + "-spill"),
-                operatorContext.newLocalUserMemoryContext(SingleInputSnapshotState.class.getSimpleName()));
+                operatorContext.newLocalUserMemoryContext(SingleInputSnapshotState.class.getSimpleName()),
+                isEliminateDuplicateSpillFilesEnabled(operatorContext.getDriverContext().getSession()));
     }
 
     SingleInputSnapshotState(Restorable restorable,
@@ -75,7 +86,8 @@ public class SingleInputSnapshotState
                              PagesSerde pagesSerde,
                              Function<Long, SnapshotStateId> snapshotStateIdGenerator,
                              Function<Long, SnapshotStateId> spillStateIdGenerator,
-                             LocalMemoryContext snapshotMemoryContext)
+                             LocalMemoryContext snapshotMemoryContext,
+                             boolean isEliminateDuplicateSpillFilesEnabled)
     {
         this.restorable = requireNonNull(restorable, "restorable is null");
         this.restorableId = String.format("%s (%s)", restorable.getClass().getSimpleName(), snapshotStateIdGenerator.apply(0L).getId());
@@ -84,6 +96,7 @@ public class SingleInputSnapshotState
         this.spillStateIdGenerator = requireNonNull(spillStateIdGenerator, "spillStateIdGenerator is null");
         this.pagesSerde = pagesSerde;
         this.snapshotMemoryContext = snapshotMemoryContext;
+        this.isEliminateDuplicateSpillFilesEnabled = isEliminateDuplicateSpillFilesEnabled;
     }
 
     public void close()
@@ -128,7 +141,7 @@ public class SingleInputSnapshotState
                     restorable.restore(state.get(), pagesSerde);
                     timer.stop();
                     boolean successful = true;
-                    if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
+                    if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled() && !((Spillable) restorable).isSpillToHdfsEnabled()) {
                         Boolean result = loadSpilledFiles(snapshotId, (Spillable) restorable);
                         if (result == null) {
                             snapshotManager.failedToRestore(componentId, true);
@@ -178,8 +191,13 @@ public class SingleInputSnapshotState
         }
         try {
             storeState(componentId);
-            if (restorable instanceof Spillable && ((Spillable) restorable).isSpilled()) {
-                storeSpilledFiles(snapshotId, (Spillable) restorable);
+            if (restorable instanceof Spillable && !((Spillable) restorable).isSpillToHdfsEnabled()) {
+                if (((Spillable) restorable).isSpilled()) {
+                    storeSpilledFiles(snapshotId, (Spillable) restorable, true);
+                }
+                else {
+                    storeSpilledFiles(snapshotId, (Spillable) restorable, false);
+                }
             }
             if (record) {
                 snapshotManager.succeededToCapture(componentId);
@@ -233,13 +251,39 @@ public class SingleInputSnapshotState
         return marker;
     }
 
-    private void storeSpilledFiles(long snapshotId, Spillable spillable)
+    private void storeSpilledFiles(long snapshotId, Spillable spillable, boolean isSpilled)
             throws Exception
     {
-        List<Path> filePaths = spillable.getSpilledFilePaths();
-        SnapshotStateId spillId = spillStateIdGenerator.apply(snapshotId);
-        for (Path path : filePaths) {
-            snapshotManager.storeFile(spillId, path);
+        if (!isEliminateDuplicateSpillFilesEnabled) {
+            List<Path> filePaths = spillable.getSpilledFilePaths();
+            SnapshotStateId spillId = spillStateIdGenerator.apply(snapshotId);
+            for (Path path : filePaths) {
+                snapshotManager.storeFile(spillId, path, 0);
+            }
+        }
+        else {
+            SnapshotStateId spillId = spillStateIdGenerator.apply(snapshotId);
+            snapshotSpillPaths.putIfAbsent(snapshotId, new ArrayList<>());
+            if (isSpilled) {
+                List<Pair<Path, Long>> spilledFilesInfo = spillable.getSpilledFileInfo();
+                for (Pair<Path, Long> spillFileInfo : spilledFilesInfo) {
+                    if (spillFileSizeMap.size() != 0) {
+                        if (spillFileSizeMap.containsKey(spillFileInfo.getLeft())) {
+                            long delta = spillFileInfo.getRight() - spillFileSizeMap.get(spillFileInfo.getLeft());
+                            if (delta != 0) {
+                                snapshotManager.storeFile(spillId, spillFileInfo.getLeft(), spillFileSizeMap.get(spillFileInfo.getLeft()).longValue());
+                                spillFileSizeMap.put(spillFileInfo.getLeft(), spillFileInfo.getRight());
+                                snapshotSpillPaths.get(snapshotId).add(spillFileInfo.getLeft().toString());
+                            }
+                            continue;
+                        }
+                    }
+                    snapshotManager.storeFile(spillId, spillFileInfo.getLeft(), 0);
+                    spillFileSizeMap.put(spillFileInfo.getLeft(), spillFileInfo.getRight());
+                    snapshotSpillPaths.get(snapshotId).add(spillFileInfo.getLeft().toString());
+                }
+            }
+            snapshotManager.storeSpilledPathInfo(spillId, snapshotSpillPaths);
         }
     }
 
@@ -249,10 +293,59 @@ public class SingleInputSnapshotState
     private Boolean loadSpilledFiles(long snapshotId, Spillable spillable)
             throws Exception
     {
-        List<Path> filePaths = spillable.getSpilledFilePaths();
-        SnapshotStateId spillId = spillStateIdGenerator.apply(snapshotId);
-        for (Path path : filePaths) {
-            Boolean result = snapshotManager.loadFile(spillId, path);
+        if (!isEliminateDuplicateSpillFilesEnabled) {
+            List<Path> filePaths = spillable.getSpilledFilePaths();
+            SnapshotStateId spillId = spillStateIdGenerator.apply(snapshotId);
+            for (Path path : filePaths) {
+                Boolean result = snapshotManager.loadFile(spillId, path);
+                if (result == null || !result) {
+                    return result;
+                }
+            }
+        }
+        else {
+            SnapshotStateId lastSpillId = spillStateIdGenerator.apply(snapshotId);
+            List<Path> filePaths = spillable.getSpilledFilePaths();
+            if (filePaths.size() == 0) {
+                return true;
+            }
+            List<Path> loadPaths = new ArrayList<>();
+            if (snapshotId != lastSnapshotId || snapshotSpillPaths.size() == 0) {
+                snapshotSpillPaths = snapshotManager.loadSpilledPathInfo(lastSpillId);
+                lastSnapshotId = snapshotId;
+            }
+            if (snapshotSpillPaths == null) {
+                return null;
+            }
+            Map<Path, List<SnapshotStateId>> snapshotSpillMap = new LinkedHashMap<>();
+
+            for (Long snapshot : snapshotSpillPaths.keySet()) {
+                SnapshotStateId spillId = spillStateIdGenerator.apply(snapshot.longValue());
+                if (snapshotSpillPaths.get(snapshot).size() == 0) {
+                    continue;
+                }
+                for (Path path : filePaths) {
+                    if (snapshotSpillPaths.get(snapshot).contains(path.toString())) {
+                        if (loadPaths.contains(path)) {
+                            SnapshotStateId loadedSpillId = snapshotManager.loadSpilledFile(spillId);
+                            if (loadedSpillId == null) {
+                                return null;
+                            }
+                            snapshotSpillMap.get(path).add(loadedSpillId);
+                        }
+                        else {
+                            SnapshotStateId loadedSpillId = snapshotManager.loadSpilledFile(spillId);
+                            if (loadedSpillId == null) {
+                                return null;
+                            }
+                            snapshotSpillMap.put(path, new LinkedList<>());
+                            snapshotSpillMap.get(path).add(loadedSpillId);
+                            loadPaths.add(path);
+                        }
+                    }
+                }
+            }
+            Boolean result = snapshotManager.loadFiles(snapshotSpillMap);
             if (result == null || !result) {
                 return result;
             }

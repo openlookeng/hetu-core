@@ -185,7 +185,7 @@ public class BenchmarkBinaryFileSpiller
 
         public Spiller createSpiller()
         {
-            return spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext());
+            return spillerFactory.create(TYPES, bytes -> {}, newSimpleAggregatedMemoryContext(), false, "queryId");
         }
     }
 

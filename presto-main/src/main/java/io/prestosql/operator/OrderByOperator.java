@@ -75,6 +75,7 @@ public class OrderByOperator
         private final Optional<SpillerFactory> spillerFactory;
         private final OrderingCompiler orderingCompiler;
         private final boolean spillNonBlocking;
+        private final boolean isSpillToHdfsEnabled;
 
         private boolean closed;
 
@@ -90,7 +91,8 @@ public class OrderByOperator
                 boolean spillEnabled,
                 Optional<SpillerFactory> spillerFactory,
                 OrderingCompiler orderingCompiler,
-                boolean spillNonBlocking)
+                boolean spillNonBlocking,
+                boolean isSpillToHdfsEnabled)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -106,6 +108,7 @@ public class OrderByOperator
             this.orderingCompiler = requireNonNull(orderingCompiler, "orderingCompiler is null");
             checkArgument(!spillEnabled || spillerFactory.isPresent(), "Spiller Factory is not present when spill is enabled");
             this.spillNonBlocking = spillNonBlocking;
+            this.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
         }
 
         @Override
@@ -125,7 +128,8 @@ public class OrderByOperator
                     spillEnabled,
                     spillerFactory,
                     orderingCompiler,
-                    spillNonBlocking);
+                    spillNonBlocking,
+                    isSpillToHdfsEnabled);
         }
 
         @Override
@@ -149,7 +153,8 @@ public class OrderByOperator
                     spillEnabled,
                     spillerFactory,
                     orderingCompiler,
-                    spillNonBlocking);
+                    spillNonBlocking,
+                    isSpillToHdfsEnabled);
         }
     }
 
@@ -198,6 +203,7 @@ public class OrderByOperator
     private boolean secondarySpillRunning;
 
     private boolean primarySpillRunning;
+    private boolean isSpillToHdfsEnabled;
 
     public OrderByOperator(
             OperatorContext operatorContext,
@@ -210,7 +216,8 @@ public class OrderByOperator
             boolean spillEnabled,
             Optional<SpillerFactory> spillerFactory,
             OrderingCompiler orderingCompiler,
-            boolean spillNonBlocking)
+            boolean spillNonBlocking,
+            boolean isSpillToHdfsEnabled)
     {
         requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
 
@@ -235,6 +242,7 @@ public class OrderByOperator
         if (!isSecondarySpillEnabled) {
             spill2InProgress = SettableFuture.create();
         }
+        this.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
     }
 
     @Override
@@ -410,7 +418,9 @@ public class OrderByOperator
             spiller = Optional.of(spillerFactory.get().create(
                     sourceTypes,
                     operatorContext.getSpillContext(),
-                    operatorContext.newAggregateSystemMemoryContext()));
+                    operatorContext.newAggregateSystemMemoryContext(),
+                    operatorContext.isSnapshotEnabled(),
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
         }
         primarySpillRunning = true;
         pageIndex.sort(sortChannels, sortOrder);
@@ -513,10 +523,28 @@ public class OrderByOperator
     }
 
     @Override
+    public boolean isSpillToHdfsEnabled()
+    {
+        return isSpillToHdfsEnabled;
+    }
+
+    @Override
     public List<Path> getSpilledFilePaths()
     {
         if (isSpilled()) {
-            return spiller.get().getSpilledFilePaths();
+            if (isSpillToHdfsEnabled) {
+                return spiller.get().getSpilledFilePaths(true);
+            }
+            return spiller.get().getSpilledFilePaths(false);
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        if (isSpilled()) {
+            return spiller.get().getSpilledFileInfo();
         }
         return ImmutableList.of();
     }
@@ -554,6 +582,7 @@ public class OrderByOperator
         if (spiller.isPresent()) {
             myState.spiller = spiller.get().capture(serdeProvider);
         }
+        myState.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
         return myState;
     }
 
@@ -576,10 +605,13 @@ public class OrderByOperator
                 spiller = Optional.of(spillerFactory.get().create(
                         sourceTypes,
                         operatorContext.getSpillContext(),
-                        operatorContext.newAggregateSystemMemoryContext()));
+                        operatorContext.newAggregateSystemMemoryContext(),
+                        operatorContext.isSnapshotEnabled(),
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
             }
             this.spiller.get().restore(myState.spiller, serdeProvider);
         }
+        this.isSpillToHdfsEnabled = myState.isSpillToHdfsEnabled;
     }
 
     @Override
@@ -601,5 +633,6 @@ public class OrderByOperator
         private Object spiller;
         private boolean primarySpillRunning;
         private boolean secondarySpillRunning;
+        private boolean isSpillToHdfsEnabled;
     }
 }

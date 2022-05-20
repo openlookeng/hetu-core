@@ -59,7 +59,7 @@ public class OrderByBenchmark
                 false,
                 Optional.empty(),
                 new OrderingCompiler(),
-                false);
+                false, false);
 
         return ImmutableList.of(tableScanOperator, limitOperator, orderByOperator);
     }

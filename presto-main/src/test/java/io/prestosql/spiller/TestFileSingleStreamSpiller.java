@@ -176,7 +176,7 @@ public class TestFileSingleStreamSpiller
                 spillProfile,
                 fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
-        SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
+        SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
         FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
 
@@ -186,7 +186,7 @@ public class TestFileSingleStreamSpiller
         assertEquals(memoryContext.getBytes(), 4096);
         spiller.spill(page).get();
         spiller.spill(Iterators.forArray(page, page, page)).get();
-        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
+        Path finalSpillPath = spillToHdfs ? Paths.get(spillerFactory.getSpillPaths().get(0).toString(), "queryId") : spillPath.toPath();
         assertEquals(listFiles(finalSpillPath).stream().filter(path -> path.toString().endsWith(".bin")).count(), 1);
 
         // Assert the spill codec flags match the expected configuration
@@ -314,9 +314,9 @@ public class TestFileSingleStreamSpiller
         Stopwatch spillTimer = Stopwatch.createStarted();
         long numberOfPages = pageSize.equals("1GB") ? 262144 : 512;
         Page page = buildPageBenchmark();
-        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
+        Path finalSpillPath = spillToHdfs ? Paths.get(spillerFactory.getSpillPaths().get(0).toString(), "queryId") : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
-            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
+            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
             FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
             spillers.add(spiller);
@@ -489,9 +489,9 @@ public class TestFileSingleStreamSpiller
         Stopwatch spillTimer = Stopwatch.createStarted();
         long numberOfPages = pageSize.equals("1GB") ? 262144 : 512;
         Page page = buildPageBenchmark();
-        Path finalSpillPath = spillToHdfs ? spillerFactory.getSpillPaths().get(0) : spillPath.toPath();
+        Path finalSpillPath = spillToHdfs ? Paths.get(spillerFactory.getSpillPaths().get(0).toString(), "queryId") : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
-            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext);
+            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
             FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
             spillers.add(spiller);

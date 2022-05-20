@@ -161,13 +161,13 @@ public final class TaskTestUtils
                 new JoinFilterFunctionCompiler(metadata),
                 new IndexJoinLookupStats(),
                 new TaskManagerConfig(),
-                new GenericSpillerFactory((types, spillContext, memoryContext) -> {
+                new GenericSpillerFactory((types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
                     throw new UnsupportedOperationException();
                 }),
-                (types, spillContext, memoryContext) -> {
+                (types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
                     throw new UnsupportedOperationException();
                 },
-                (types, partitionFunction, spillContext, memoryContext) -> {
+                (types, partitionFunction, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
                     throw new UnsupportedOperationException();
                 },
                 new PagesIndex.TestingFactory(false),

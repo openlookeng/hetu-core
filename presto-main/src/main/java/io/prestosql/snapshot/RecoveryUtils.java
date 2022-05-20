@@ -44,6 +44,7 @@ import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -171,13 +172,13 @@ public class RecoveryUtils
         return snapshotStoreClient.loadState(snapshotStateId, dataCollector);
     }
 
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector, long skipBytes)
             throws Exception
     {
         requireNonNull(snapshotStoreClient);
         requireNonNull(sourceFile);
 
-        snapshotStoreClient.storeFile(snapshotStateId, sourceFile, dataCollector);
+        snapshotStoreClient.storeFile(snapshotStateId, sourceFile, dataCollector, skipBytes);
     }
 
     public Boolean loadFile(SnapshotStateId snapshotStateId, Path targetFile, SnapshotDataCollector dataCollector)
@@ -187,6 +188,15 @@ public class RecoveryUtils
         requireNonNull(targetFile);
 
         return snapshotStoreClient.loadFile(snapshotStateId, targetFile, dataCollector);
+    }
+
+    public Boolean loadFiles(Map<Path, List<SnapshotStateId>> snapshotSpillMap, SnapshotDataCollector dataCollector)
+            throws Exception
+    {
+        requireNonNull(snapshotStoreClient);
+        requireNonNull(snapshotSpillMap);
+
+        return snapshotStoreClient.loadFiles(snapshotSpillMap, dataCollector);
     }
 
     public void storeSnapshotResult(String queryId, Map<Long, SnapshotInfo> result)
@@ -365,5 +375,17 @@ public class RecoveryUtils
     public void removeRecoveryManager(QueryId queryId)
     {
         recoveryManagers.remove(queryId);
+    }
+
+    public void storeSpilledPathInfo(SnapshotStateId spillId, Object snapshotSpillPaths)
+            throws IOException
+    {
+        snapshotStoreClient.storeSpilledPathInfo(spillId, snapshotSpillPaths);
+    }
+
+    public Map<Long, List<String>> loadSpilledPathInfo(SnapshotStateId spillId)
+            throws IOException, ClassNotFoundException
+    {
+        return snapshotStoreClient.loadSpilledPathInfo(spillId);
     }
 }

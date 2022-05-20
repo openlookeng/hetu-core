@@ -41,14 +41,17 @@ public class GenericPartitioningSpillerFactory
             List<Type> types,
             PartitionFunction partitionFunction,
             SpillContext spillContext,
-            AggregatedMemoryContext memoryContext)
+            AggregatedMemoryContext memoryContext,
+            boolean isSingleSessionSpiller,
+            boolean isSnapshotEnabled,
+            String queryId)
     {
-        return new GenericPartitioningSpiller(types, partitionFunction, spillContext, memoryContext, singleStreamSpillerFactory, null);
+        return new GenericPartitioningSpiller(types, partitionFunction, spillContext, memoryContext, singleStreamSpillerFactory, null, isSingleSessionSpiller, isSnapshotEnabled, queryId);
     }
 
     @Override
-    public PartitioningSpiller create(List<Type> types, PartitionFunction partitionFunction, SpillContext spillContext, AggregatedMemoryContext memoryContext, BiFunction<Integer, Page, Long> getRawHash)
+    public PartitioningSpiller create(List<Type> types, PartitionFunction partitionFunction, SpillContext spillContext, AggregatedMemoryContext memoryContext, BiFunction<Integer, Page, Long> getRawHash, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId)
     {
-        return new GenericPartitioningSpiller(types, partitionFunction, spillContext, memoryContext, singleStreamSpillerFactory, getRawHash);
+        return new GenericPartitioningSpiller(types, partitionFunction, spillContext, memoryContext, singleStreamSpillerFactory, getRawHash, isSingleSessionSpiller, isSnapshotEnabled, queryId);
     }
 }

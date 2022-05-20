@@ -36,11 +36,8 @@ import javax.annotation.PreDestroy;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -153,17 +150,7 @@ public class FileSingleStreamSpillerFactory
         this.spillPrefetchReadPages = spillPrefetchReadPages;
         this.useKryo = useKryo;
         this.fileSystemClientManager = fileSystemClientManager;
-        if (spillToHdfs) {
-            String uuid = UUID.randomUUID().toString();
-            List<Path> hdfsPaths = new ArrayList<>();
-            for (Path path : spillPaths) {
-                hdfsPaths.add(Paths.get(path.toString(), uuid));
-            }
-            this.spillPaths = ImmutableList.copyOf(hdfsPaths);
-        }
-        else {
-            this.spillPaths = ImmutableList.copyOf(spillPaths);
-        }
+        this.spillPaths = ImmutableList.copyOf(spillPaths);
     }
 
     public synchronized void cleanupOldSpillFiles()
@@ -197,7 +184,7 @@ public class FileSingleStreamSpillerFactory
     }
 
     @Override
-    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId)
     {
         createSpillDirectories();
         Optional<SpillCipher> spillCipher = Optional.empty();
@@ -205,7 +192,7 @@ public class FileSingleStreamSpillerFactory
             spillCipher = Optional.of(new AesSpillCipher());
         }
         PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled, useKryo);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages, useKryo, spillToHdfs, spillProfile, fileSystemClientManager);
+        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages, useKryo, spillToHdfs, spillProfile, fileSystemClientManager, isSingleSessionSpiller, isSnapshotEnabled, queryId);
     }
 
     private synchronized Path getNextSpillPath()

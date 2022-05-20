@@ -41,10 +41,12 @@ public class RecoveryConfig
     public static final String SNAPSHOT_USE_KRYO_SERIALIZATION = "hetu.snapshot.useKryoSerialization";
     public static final String SPILLER_SPILL_PROFILE = "experimental.spiller-spill-profile";
     public static final String SPILLER_SPILL_TO_HDFS = "experimental.spiller-spill-to-hdfs";
+    public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "experimental.eliminate-duplicate-spill-files";
 
     private String snapshotProfile;
     private String spillProfile;
     private boolean spillToHdfs;
+    private boolean eliminateDuplicateSpillFilesEnabled;
 
     private long recoveryMaxRetries = 10;
     private Duration recoveryRetryTimeout = new Duration(10, TimeUnit.MINUTES);
@@ -188,6 +190,19 @@ public class RecoveryConfig
     public RecoveryConfig setSpillToHdfs(boolean spillToHdfs)
     {
         this.spillToHdfs = spillToHdfs;
+        return this;
+    }
+
+    public boolean isEliminateDuplicateSpillFilesEnabled()
+    {
+        return eliminateDuplicateSpillFilesEnabled;
+    }
+
+    @Config(ELIMINATE_DUPLICATE_SPILL_FILES)
+    @ConfigDescription("eliminate back up of duplicate spill files")
+    public RecoveryConfig setEliminateDuplicateSpillFilesEnabled(boolean eliminateDuplicateSpillFilesEnabled)
+    {
+        this.eliminateDuplicateSpillFilesEnabled = eliminateDuplicateSpillFilesEnabled;
         return this;
     }
 }

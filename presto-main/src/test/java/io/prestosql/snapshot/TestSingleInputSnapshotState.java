@@ -27,11 +27,13 @@ import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.testing.assertions.Assert;
+import org.apache.commons.lang3.tuple.Pair;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ScheduledExecutorService;
@@ -78,7 +80,7 @@ public class TestSingleInputSnapshotState
         when(snapshotMemoryContext.trySetBytes(anyLong())).thenReturn(true);
         restorable = new TestingRestorable();
         restorable.state = 100;
-        state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
+        state = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext, false);
     }
 
     private boolean processPage(Page page)
@@ -205,7 +207,7 @@ public class TestSingleInputSnapshotState
     public void testResumeBacktrack()
             throws Exception
     {
-        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext);
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(restorable, snapshotManager, null, TestSingleInputSnapshotState::createSnapshotStateId, TestSingleInputSnapshotState::createSnapshotStateId, snapshotMemoryContext, false);
         singleInputSnapshotState.processPage(regularPage);
         restorable.state++;
         int saved1 = restorable.state;
@@ -223,27 +225,56 @@ public class TestSingleInputSnapshotState
     public void testSaveLoadSpilledFiles()
             throws Exception
     {
+        HashMap<Long, List<String>> spillFileInfo = new HashMap();
+        spillFileInfo.put(1L, ImmutableList.of("path1", "path2"));
         SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(
                 new TestingSpillableRestorable(),
                 snapshotManager,
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                snapshotMemoryContext);
+                snapshotMemoryContext, true);
         singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(1));
-        when(snapshotManager.loadFile(anyObject(), anyObject()))
-                .thenReturn(Boolean.TRUE) // 2 calls for each resume attempt for 2 files
-                .thenReturn(Boolean.TRUE)
-                .thenReturn(Boolean.FALSE) // 1 call for the failure; 2nd call won't happen
-                .thenReturn(null); // 1 call for the failure; 2nd call won't happen
+        when(snapshotManager.loadSpilledPathInfo(anyObject()))
+                .thenReturn(spillFileInfo)
+                .thenReturn(spillFileInfo);
+        when(snapshotManager.loadSpilledFile(anyObject())).thenReturn(createSnapshotStateId(1L));
+        when(snapshotManager.loadFiles(anyObject()))
+                .thenReturn(Boolean.TRUE);
         singleInputSnapshotState.processPage(resume1);
-        singleInputSnapshotState.processPage(resume1);
-        singleInputSnapshotState.processPage(resume1);
-        verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject());
-        verify(snapshotManager, times(4)).loadFile(anyObject(), anyObject());
+        verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject(), eq(0L));
+        verify(snapshotManager, times(1)).loadFiles(anyObject());
         verify(snapshotManager, times(1)).succeededToRestore(anyObject(), eq(0L));
-        verify(snapshotManager, times(2)).failedToRestore(anyObject(), anyBoolean());
+        verify(snapshotManager, times(0)).failedToRestore(anyObject(), anyBoolean());
+    }
+
+    @Test
+    public void testSaveLoadDuplicateSpilledFiles() throws Exception
+    {
+        HashMap<Long, List<String>> spillFileInfo = new HashMap();
+        spillFileInfo.put(1L, ImmutableList.of("path1", "path2"));
+        SingleInputSnapshotState singleInputSnapshotState = new SingleInputSnapshotState(
+                new TestingSpillableRestorable(),
+                snapshotManager,
+                null,
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                TestSingleInputSnapshotState::createSnapshotStateId,
+                snapshotMemoryContext, true);
+        singleInputSnapshotState.processPage(marker1);
+        singleInputSnapshotState.processPage(marker2);
+        when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(1));
+        when(snapshotManager.loadSpilledPathInfo(anyObject()))
+                .thenReturn(spillFileInfo)
+                .thenReturn(spillFileInfo);
+        when(snapshotManager.loadSpilledFile(anyObject())).thenReturn(createSnapshotStateId(1L));
+        when(snapshotManager.loadFiles(anyObject()))
+                .thenReturn(Boolean.TRUE);
+        singleInputSnapshotState.processPage(resume2);
+        verify(snapshotManager, times(2)).storeFile(anyObject(), anyObject(), eq(0L));
+        verify(snapshotManager, times(1)).loadFiles(anyObject());
+        verify(snapshotManager, times(1)).succeededToRestore(anyObject(), eq(0L));
+        verify(snapshotManager, times(0)).failedToRestore(anyObject(), anyBoolean());
     }
 
     @Test
@@ -258,7 +289,7 @@ public class TestSingleInputSnapshotState
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                snapshotMemoryContext);
+                snapshotMemoryContext, false);
         singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadConsolidatedState(anyObject())).thenReturn(Optional.of(0));
         singleInputSnapshotState.processPage(resume1);
@@ -280,7 +311,7 @@ public class TestSingleInputSnapshotState
                 null,
                 TestSingleInputSnapshotState::createSnapshotStateId,
                 TestSingleInputSnapshotState::createSnapshotStateId,
-                snapshotMemoryContext);
+                snapshotMemoryContext, false);
         singleInputSnapshotState.processPage(marker1);
         when(snapshotManager.loadState(anyObject())).thenReturn(Optional.of(0));
         singleInputSnapshotState.processPage(resume1);
@@ -341,6 +372,12 @@ public class TestSingleInputSnapshotState
         public List<Path> getSpilledFilePaths()
         {
             return ImmutableList.of(Paths.get("path1"), Paths.get("path2"));
+        }
+
+        @Override
+        public List<Pair<Path, Long>> getSpilledFileInfo()
+        {
+            return ImmutableList.of(Pair.of(Paths.get("path1"), Long.valueOf(10000)), Pair.of(Paths.get("path2"), Long.valueOf(20000)));
         }
     }
 }

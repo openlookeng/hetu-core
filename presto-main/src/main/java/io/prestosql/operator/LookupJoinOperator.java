@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -34,18 +35,21 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpiller;
 import io.prestosql.spiller.PartitioningSpiller.PartitioningSpillResult;
 import io.prestosql.spiller.PartitioningSpillerFactory;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
@@ -56,6 +60,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.concurrent.MoreFutures.checkSuccess;
 import static io.airlift.concurrent.MoreFutures.getDone;
+import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.prestosql.SystemSessionProperties.isInnerJoinSpillFilteringEnabled;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static io.prestosql.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
@@ -77,7 +82,8 @@ import static java.util.Objects.requireNonNull;
 @RestorableConfig(uncapturedFields = {"probeTypes", "joinProbeFactory", "afterClose", "hashGenerator", "lookupSourceFactory",
         "partitioningSpillerFactory", "lookupSourceProviderFuture", "lookupSourceProvider", "probe", "outputPage",
         "partitionGenerator", "spillInProgress", "unspilling", "currentPartition",
-        "unspilledLookupSource", "unspilledInputPages", "snapshotState", "afterMemOpFinish"})
+        "unspilledLookupSource", "unspilledInputPages", "snapshotState", "afterMemOpFinish", "backUpRestoredPages", "isSpillerRestored",
+        "restoredPartition", "backUpUnspilledMemoryPartitions", "spilledPartitionsList", "unspilledMemoryPartitions"})
 public class LookupJoinOperator
         implements Operator, Spillable
 {
@@ -114,6 +120,7 @@ public class LookupJoinOperator
     private boolean closed;
     private boolean finishing;
     private boolean unspilling;
+    private boolean isSpillerRestored;
     private boolean finished;
     private long joinPosition = -1;
     private int joinSourcePositions;
@@ -128,8 +135,14 @@ public class LookupJoinOperator
     private Optional<Partition<Supplier<LookupSource>>> currentPartition = Optional.empty();
     private Optional<ListenableFuture<Supplier<LookupSource>>> unspilledLookupSource = Optional.empty();
     private Iterator<Page> unspilledInputPages = emptyIterator();
+    private Iterator<Page> unspilledMemoryPartitions = emptyIterator();
+    private Map<Integer, Iterator<Page>> backUpUnspilledMemoryPartitions = new HashMap<>();
+    private Map<Integer, Page> backUpRestoredPages = new HashMap<>();
+    private Integer restoredPartition;
 
     private final SingleInputSnapshotState snapshotState;
+    private boolean isSingleSessionSpiller;
+    private List<Integer> spilledPartitionsList = new ArrayList<>();
 
     public LookupJoinOperator(
             OperatorContext operatorContext,
@@ -143,7 +156,8 @@ public class LookupJoinOperator
             OptionalInt lookupJoinsCount,
             HashGenerator hashGenerator,
             PartitioningSpillerFactory partitioningSpillerFactory,
-            Runnable afterMemOpFinish)
+            Runnable afterMemOpFinish,
+            boolean isSingleSessionSpiller)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.forked = forked;
@@ -169,6 +183,7 @@ public class LookupJoinOperator
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
 
         this.afterMemOpFinish = afterMemOpFinish;
+        this.isSingleSessionSpiller = isSingleSessionSpiller;
     }
 
     @Override
@@ -256,16 +271,39 @@ public class LookupJoinOperator
     }
 
     @Override
+    public boolean isSpillToHdfsEnabled()
+    {
+        return isSingleSessionSpiller;
+    }
+
+    @Override
     public List<Path> getSpilledFilePaths()
     {
         if (isSpilled()) {
-            return spiller.get().getSpilledFilePaths();
+            if (isSingleSessionSpiller) {
+                return spiller.get().getSpilledFilePaths(true);
+            }
+            return spiller.get().getSpilledFilePaths(false);
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        if (isSpilled()) {
+            return spiller.get().getSpilledFileInfo();
         }
         return ImmutableList.of();
     }
 
     @Override
     public void addInput(Page page)
+    {
+        addInput(page, false);
+    }
+
+    private void addInput(Page page, boolean isRestoredPage)
     {
         requireNonNull(page, "page is null");
         checkState(probe == null, "Current page has not been completely processed yet");
@@ -285,6 +323,12 @@ public class LookupJoinOperator
         checkState(tryFetchLookupSourceProvider(), "Not ready to handle input yet");
 
         SpillInfoSnapshot spillInfoSnapshot = lookupSourceProvider.withLease(SpillInfoSnapshot::from);
+        if (isRestoredPage && spillInfoSnapshot.hasSpilled() && spillInfoSnapshot.getSpillMask().test(restoredPartition)) {
+            backUpRestoredPages.put(restoredPartition, page);
+            backUpUnspilledMemoryPartitions.put(restoredPartition, unspilledMemoryPartitions);
+            unspilledMemoryPartitions = emptyIterator();
+            return;
+        }
         addInput(page, spillInfoSnapshot);
     }
 
@@ -293,7 +337,7 @@ public class LookupJoinOperator
         requireNonNull(spillInfoSnapshot, "spillInfoSnapshot is null");
 
         Page newPage = page;
-        if (spillInfoSnapshot.hasSpilled()) {
+        if (restoredPartition == null && spillInfoSnapshot.hasSpilled()) {
             newPage = spillAndMaskSpilledPositions(page,
                     spillInfoSnapshot.getSpillMask(),
                     (spillBypassEnabled) ? (i, j) -> true : spillInfoSnapshot.getSpillMatcher());
@@ -338,7 +382,10 @@ public class LookupJoinOperator
                     getPartitionGenerator(),
                     operatorContext.getSpillContext().newLocalSpillContext(),
                     operatorContext.newAggregateSystemMemoryContext(),
-                    hashGenerator::hashPosition));
+                    hashGenerator::hashPosition,
+                    isSingleSessionSpiller,
+                    operatorContext.isSnapshotEnabled(),
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
         }
 
         PartitioningSpillResult result = spiller.get().partitionAndSpill(page, spillMask, spillMatcher);
@@ -388,6 +435,45 @@ public class LookupJoinOperator
             // We are no longer interested in the build side (the lookupSourceProviderFuture's value).
             addSuccessCallback(lookupSourceProviderFuture, LookupSourceProvider::close);
             lookupSourceProvider = new StaticLookupSourceProvider(new EmptyLookupSource());
+        }
+
+        if (probe == null) {
+            if (unspilledMemoryPartitions.hasNext()) {
+                Page page = unspilledMemoryPartitions.next();
+                addInput(page, true);
+                if (probe == null) {
+                    return null;
+                }
+            }
+            else {
+                restoredPartition = null;
+            }
+        }
+
+        if (isSpillerRestored && finishing) {
+            if (spiller.isPresent()) {
+                Set<Integer> spilledPartitions = spiller.get().getSpilledPartitions();
+                spilledPartitions.removeAll(lookupSourceFactory.getSpilledPartitions());
+                spilledPartitionsList = new ArrayList<>(spilledPartitions);
+                isSpillerRestored = false;
+            }
+        }
+
+        if (probe == null) {
+            if (!spilledPartitionsList.isEmpty()) {
+                restoredPartition = spilledPartitionsList.remove(0);
+                if (isSingleSessionSpiller) {
+                    getFutureValue(spiller.get().flushPartition(restoredPartition));
+                    spiller.get().closeSessionSpiller(restoredPartition);
+                }
+                unspilledMemoryPartitions = spiller.get().getSpilledPages(restoredPartition);
+                if (savedRows.containsKey(restoredPartition)) {
+                    addInput(savedRows.remove(restoredPartition).row, true);
+                }
+                if (probe == null) {
+                    return null;
+                }
+            }
         }
 
         if (probe == null && finishing && !unspilling) {
@@ -442,12 +528,20 @@ public class LookupJoinOperator
             return;
         }
 
+        if (spiller.isPresent() && isSingleSessionSpiller) {
+            if (currentPartition.isPresent()) {
+                int partition = currentPartition.get().number();
+                getFutureValue(spiller.get().flushPartition(partition));
+                spiller.get().closeSessionSpiller(partition);
+            }
+        }
+
         if (lookupPartitions == null) {
             lookupPartitions = getDone(partitionedConsumption).beginConsumption();
         }
 
         if (unspilledInputPages.hasNext()) {
-            addInput(unspilledInputPages.next());
+            addInput(unspilledInputPages.next(), false);
             return;
         }
 
@@ -466,8 +560,27 @@ public class LookupJoinOperator
             statisticsCounter.updateLookupSourcePositions(lookupSource.getJoinPositionCount());
 
             int partition = currentPartition.get().number();
-            unspilledInputPages = spiller.map(spiller -> spiller.getSpilledPages(partition))
-                    .orElse(emptyIterator());
+            if (backUpUnspilledMemoryPartitions.containsKey(partition)) {
+                unspilledInputPages = new AbstractIterator<Page>() {
+                    Iterator<Page> pageIterator = backUpUnspilledMemoryPartitions.remove(partition);
+
+                    @Override
+                    protected Page computeNext()
+                    {
+                        if (backUpRestoredPages.containsKey(partition)) {
+                            return backUpRestoredPages.remove(partition);
+                        }
+                        else if (pageIterator.hasNext()) {
+                            return pageIterator.next();
+                        }
+                        return endOfData();
+                    }
+                };
+            }
+            else {
+                unspilledInputPages = spiller.map(spiller -> spiller.getSpilledPages(partition))
+                        .orElse(emptyIterator());
+            }
 
             Optional.ofNullable(savedRows.remove(partition)).ifPresent(savedRow -> {
                 restoreProbe(
@@ -550,15 +663,28 @@ public class LookupJoinOperator
             boolean currentRowSpilled = spillInfoSnapshot.getSpillMask().test(currentRowPartition);
 
             if (currentRowSpilled) {
-                savedRows.merge(
-                        currentRowPartition,
-                        new SavedRow(currentPage, currentPosition, joinPositionWithinPartition, probePositionProducedRow, joinSourcePositions),
-                        (oldValue, newValue) -> {
-                            throw new IllegalStateException(format("Partition %s is already spilled", currentRowPartition));
-                        });
-                joinSourcePositions = 0;
-                Page unprocessed = pageTail(currentPage, currentPosition + 1);
-                addInput(unprocessed, spillInfoSnapshot);
+                if (restoredPartition != null) {
+                    verify(restoredPartition.equals(currentRowPartition), "restored partition doesn't match");
+                    if (currentPosition > 0) {
+                        backUpRestoredPages.put(restoredPartition, pageTail(currentPage, currentPosition));
+                    }
+                    else {
+                        backUpRestoredPages.put(restoredPartition, currentPage);
+                    }
+                    backUpUnspilledMemoryPartitions.put(restoredPartition, unspilledMemoryPartitions);
+                    unspilledMemoryPartitions = emptyIterator();
+                }
+                else {
+                    savedRows.merge(
+                            currentRowPartition,
+                            new SavedRow(currentPage, currentPosition, joinPositionWithinPartition, probePositionProducedRow, joinSourcePositions),
+                            (oldValue, newValue) -> {
+                                throw new IllegalStateException(format("Partition %s is already spilled", currentRowPartition));
+                            });
+                    joinSourcePositions = 0;
+                    Page unprocessed = pageTail(currentPage, currentPosition + 1);
+                    addInput(unprocessed, spillInfoSnapshot);
+                }
             }
             else {
                 Page remaining = pageTail(currentPage, currentPosition);
@@ -598,7 +724,9 @@ public class LookupJoinOperator
         verify(probe == null);
 
         addInput(probePage, spillInfoSnapshot);
-        verify(probe.advanceNextPosition());
+        if (probe != null) {
+            verify(probe.advanceNextPosition());
+        }
         this.joinPosition = joinPosition;
         this.currentProbePositionProducedRow = currentProbePositionProducedRow;
         this.joinSourcePositions = joinSourcePositions;
@@ -877,6 +1005,7 @@ public class LookupJoinOperator
         for (Map.Entry<Integer, SavedRow> entry : savedRows.entrySet()) {
             myState.savedRows.put(entry.getKey(), entry.getValue().capture(serdeProvider));
         }
+        myState.isSingleSessionSpiller = isSingleSessionSpiller;
         return myState;
     }
 
@@ -918,15 +1047,21 @@ public class LookupJoinOperator
             this.lookupPartitions = null;
         }
 
+        this.isSingleSessionSpiller = myState.isSingleSessionSpiller;
+
         if (myState.spiller != null) {
             if (!spiller.isPresent()) {
                 spiller = Optional.of(partitioningSpillerFactory.create(
                         probeTypes,
                         getPartitionGenerator(),
                         operatorContext.getSpillContext().newLocalSpillContext(),
-                        operatorContext.newAggregateSystemMemoryContext()));
+                        operatorContext.newAggregateSystemMemoryContext(),
+                        isSingleSessionSpiller,
+                        operatorContext.isSnapshotEnabled(),
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
             }
             this.spiller.get().restore(myState.spiller, serdeProvider);
+            this.isSpillerRestored = true;
         }
 
         this.savedRows.clear();
@@ -963,5 +1098,6 @@ public class LookupJoinOperator
 
         private Object spiller;
         private Map<Integer, Object> savedRows;
+        private boolean isSingleSessionSpiller;
     }
 }

@@ -14,7 +14,9 @@
  */
 package io.prestosql.snapshot;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -39,13 +41,19 @@ public interface SnapshotStoreClient
     /**
      * Store file from sourcePath to snapshotStateId of snapshot store
      */
-    void storeFile(SnapshotStateId snapshotStateId, Path sourcePath, SnapshotDataCollector dataCollector)
+    void storeFile(SnapshotStateId snapshotStateId, Path sourcePath, SnapshotDataCollector dataCollector, long skipBytes)
             throws Exception;
 
     /**
      * Load file from snapshotStateId of snapshot store to targetPath
      */
     boolean loadFile(SnapshotStateId snapshotStateId, Path targetPath, SnapshotDataCollector dataCollector)
+            throws Exception;
+
+    /**
+     * Load Spilled Files for all SnapshotStateIds
+     */
+    boolean loadFiles(Map<Path, List<SnapshotStateId>> snapshotSpillMap, SnapshotDataCollector dataCollector)
             throws Exception;
 
     /**
@@ -77,4 +85,10 @@ public interface SnapshotStoreClient
      */
     Set<String> loadConsolidatedFiles(String queryId)
             throws Exception;
+
+    void storeSpilledPathInfo(SnapshotStateId spillId, Object snapshotSpillPaths)
+            throws IOException;
+
+    Map<Long, List<String>> loadSpilledPathInfo(SnapshotStateId spillId)
+            throws IOException, ClassNotFoundException;
 }
