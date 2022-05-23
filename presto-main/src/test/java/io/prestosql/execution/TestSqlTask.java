@@ -236,6 +236,54 @@ public class TestSqlTask
     }
 
     @Test
+    public void testSuspend() throws Exception
+    {
+        SqlTask sqlTask = createInitialTask();
+
+        TaskInfo taskInfo = sqlTask.updateTask(TEST_SESSION,
+                Optional.of(PLAN_FRAGMENT),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                null);
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+
+        taskInfo = sqlTask.getTaskInfo();
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+
+        taskInfo = sqlTask.suspend(TaskState.SUSPENDED);
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.SUSPENDED);
+
+        /* Second suspend should be a no-op */
+        taskInfo = sqlTask.suspend(TaskState.SUSPENDED);
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.SUSPENDED);
+
+        BufferResult results = sqlTask.getTaskResults(OUT, 0, new DataSize(1, MEGABYTE)).get();
+        assertEquals(results.isBufferComplete(), false);
+        assertEquals(results.getSerializedPages().size(), 1);
+        assertEquals(results.getSerializedPages().get(0).getPositionCount(), 1);
+
+        taskInfo = sqlTask.resume(TaskState.RUNNING);
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+
+        for (boolean moreResults = true; moreResults; moreResults = !results.isBufferComplete()) {
+            results = sqlTask.getTaskResults(OUT, results.getToken() + results.getSerializedPages().size(), new DataSize(1, MEGABYTE)).get();
+        }
+        assertEquals(results.getSerializedPages().size(), 0);
+
+        // complete the task by calling abort on it
+        TaskInfo info = sqlTask.abortTaskResults(OUT);
+        assertEquals(info.getOutputBuffers().getState(), BufferState.FINISHED);
+
+        taskInfo = sqlTask.getTaskInfo(taskInfo.getTaskStatus().getState()).get(1, SECONDS);
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+
+        taskInfo = sqlTask.getTaskInfo();
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+    }
+
+    @Test
     public void testBufferCloseOnFinish()
             throws Exception
     {

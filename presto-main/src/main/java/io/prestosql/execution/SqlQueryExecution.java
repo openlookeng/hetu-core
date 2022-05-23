@@ -111,6 +111,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -171,6 +172,7 @@ public class SqlQueryExecution
     private final QuerySnapshotManager snapshotManager;
     private final QueryRecoveryManager queryRecoveryManager;
     private final WarningCollector warningCollector;
+    private final AtomicBoolean suspendedWithRecoveryManager = new AtomicBoolean();
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -880,6 +882,43 @@ public class SqlQueryExecution
     public void cancelQuery()
     {
         stateMachine.transitionToCanceled();
+    }
+
+    @Override
+    public void suspendQuery()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            stateMachine.transitionToSuspend();
+            if (scheduler != null) {
+                boolean useSnapshot = SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession()) && snapshotManager.isSuccessfulSnapshotExist();
+                if (useSnapshot) {
+                    suspendedWithRecoveryManager.set(true);
+                    queryRecoveryManager.suspendQuery();
+                }
+                else {
+                    scheduler.suspend();
+                }
+            }
+        }
+    }
+
+    @Override
+    public void resumeQuery()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession()) && suspendedWithRecoveryManager.get()) {
+                queryRecoveryManager.resumeQuery();
+                suspendedWithRecoveryManager.set(false);
+            }
+            else {
+                if (scheduler != null) {
+                    scheduler.resume();
+                }
+                stateMachine.transitionToResumeRunning();
+            }
+        }
     }
 
     @Override

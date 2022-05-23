@@ -35,6 +35,7 @@ import static io.prestosql.snapshot.RecoveryState.DEFAULT;
 import static io.prestosql.snapshot.RecoveryState.RECOVERY_FAILED;
 import static io.prestosql.snapshot.RecoveryState.RESCHEDULING;
 import static io.prestosql.snapshot.RecoveryState.STOPPING_FOR_RESCHEDULE;
+import static io.prestosql.snapshot.RecoveryState.SUSPENDED;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.StandardErrorCode.TOO_MANY_RESUMES;
 
@@ -85,6 +86,31 @@ public class QueryRecoveryManager
         }
     }
 
+    public synchronized void suspendQuery()
+    {
+        LOG.debug("Suspending query is called!, recoveryState: " + recoveryState);
+        if (recoveryState == DEFAULT || recoveryState == RECOVERY_FAILED) {
+            this.recoveryState = SUSPENDED;
+            if (cancelToResume != null) {
+                cancelToResume.run();
+            }
+        }
+        else {
+            LOG.info("Failure is reported already!, Ignoring..");
+        }
+    }
+
+    public synchronized void resumeQuery()
+    {
+        LOG.debug("Suspending query is called!, recoveryState: " + recoveryState);
+        if (recoveryState == SUSPENDED) {
+            this.recoveryState = STOPPING_FOR_RESCHEDULE;
+        }
+        else {
+            LOG.info("Failure is reported already!, Ignoring..");
+        }
+    }
+
     public boolean isCoordinator()
     {
         return recoveryUtils.isCoordinator();
@@ -93,6 +119,11 @@ public class QueryRecoveryManager
     public RecoveryState getState()
     {
         return recoveryState;
+    }
+
+    public boolean isRecovering()
+    {
+        return (recoveryState == STOPPING_FOR_RESCHEDULE || recoveryState == SUSPENDED);
     }
 
     public synchronized void rescheduleQuery() throws Throwable

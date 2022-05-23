@@ -442,6 +442,18 @@ public class MockRemoteTaskFactory
         }
 
         @Override
+        public void suspend()
+        {
+            taskStateMachine.suspend();
+        }
+
+        @Override
+        public void resume()
+        {
+            taskStateMachine.resume();
+        }
+
+        @Override
         public void abort()
         {
             taskStateMachine.cancel(TaskState.ABORTED);

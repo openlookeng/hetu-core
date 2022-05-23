@@ -94,7 +94,32 @@ public class TestQueryRecoveryManager
     }
 
     @Test
+    public void testSuspendQuery()
+    {
+        queryId = new QueryId("suspend_query");
+        QueryRecoveryManager recoveryManager = new QueryRecoveryManager(recoveryUtils, TEST_SNAPSHOT_SESSION, queryId);
+        assertEquals(recoveryManager.getState(), RecoveryState.DEFAULT);
+
+        Runnable cancelToResume = mock(Runnable.class);
+        recoveryManager.setCancelToResumeCb(cancelToResume);
+        recoveryManager.suspendQuery();
+        verify(cancelToResume).run();
+        assertEquals(recoveryManager.getState(), RecoveryState.SUSPENDED);
+    }
+
+    @Test
     public void testRescheduleSuccess()
+    {
+        recoverTestSuccess(false);
+    }
+
+    @Test
+    public void testSuspendResumeSuccess()
+    {
+        recoverTestSuccess(true);
+    }
+
+    private void recoverTestSuccess(boolean useSuspendResume)
     {
         queryId = new QueryId("reschedule_success");
 
@@ -122,13 +147,22 @@ public class TestQueryRecoveryManager
         querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(1L, SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL)));
 
         // worker failure
-        queryRecoveryManager.startRecovery();
-        assertEquals(queryRecoveryManager.getState(), RecoveryState.STOPPING_FOR_RESCHEDULE);
+        if (useSuspendResume) {
+            queryRecoveryManager.suspendQuery();
+            assertEquals(queryRecoveryManager.getState(), RecoveryState.SUSPENDED);
+        }
+        else {
+            queryRecoveryManager.startRecovery();
+            assertEquals(queryRecoveryManager.getState(), RecoveryState.STOPPING_FOR_RESCHEDULE);
+        }
 
         querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0));
         querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0));
         // Initiate reschedule after stopping current execution
         try {
+            if (useSuspendResume) {
+                queryRecoveryManager.resumeQuery();
+            }
             queryRecoveryManager.rescheduleQuery();
         }
         catch (Throwable t) {

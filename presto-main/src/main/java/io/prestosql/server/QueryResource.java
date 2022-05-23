@@ -343,6 +343,22 @@ public class QueryResource
         queryManager.cancelQuery(queryId);
     }
 
+    @DELETE
+    @Path("{queryId}/suspend")
+    public void suspendQuery(@PathParam("queryId") QueryId queryId)
+    {
+        SecurityRequireNonNull.requireNonNull(queryId, "queryId is null");
+        queryManager.suspendQuery(queryId);
+    }
+
+    @DELETE
+    @Path("{queryId}/resume")
+    public void resumeQuery(@PathParam("queryId") QueryId queryId)
+    {
+        SecurityRequireNonNull.requireNonNull(queryId, "queryId is null");
+        queryManager.resumeQuery(queryId);
+    }
+
     @PUT
     @Path("{queryId}/killed")
     public Response killQuery(@PathParam("queryId") QueryId queryId, String message)

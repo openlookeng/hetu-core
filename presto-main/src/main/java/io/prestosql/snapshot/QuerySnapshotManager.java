@@ -209,6 +209,13 @@ public class QuerySnapshotManager
         return result;
     }
 
+    public boolean isSuccessfulSnapshotExist()
+    {
+        synchronized (captureResults) {
+            return captureResults.entrySet().stream().anyMatch(entry -> entry.getValue().getSnapshotResult() == SnapshotResult.SUCCESSFUL);
+        }
+    }
+
     public void invalidateAllSnapshots()
     {
         synchronized (captureResults) {

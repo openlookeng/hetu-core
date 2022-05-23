@@ -655,6 +655,58 @@ public final class HttpRemoteTask
         scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString());
     }
 
+    @Override
+    public synchronized void suspend()
+    {
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            TaskStatus taskStatus = getTaskStatus();
+            if (taskStatus.getState().isDone()) {
+                return;
+            }
+
+            sendSuspendRequest(taskStatus, TaskState.SUSPENDED, "suspend");
+        }
+    }
+
+    private void sendSuspendRequest(TaskStatus taskStatus, TaskState targetState, String action)
+    {
+        log.debug("Suspend task %s, with target state %s", taskStatus.getTaskId(), targetState);
+
+        // send cancel to task and ignore response
+        HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).appendPath("suspend").addParameter("targetState", targetState.toString());
+        Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
+                .setUri(uriBuilder.build())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
+                .build();
+        scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+    }
+
+    @Override
+    public synchronized void resume()
+    {
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            TaskStatus taskStatus = getTaskStatus();
+            if (taskStatus.getState().isDone()) {
+                return;
+            }
+
+            sendResumeRequest(taskStatus, TaskState.RUNNING, "suspendedToRunning");
+        }
+    }
+
+    private void sendResumeRequest(TaskStatus taskStatus, TaskState targetState, String action)
+    {
+        log.debug("Resume task %s, with target state %s", taskStatus.getTaskId(), targetState);
+
+        // send cancel to task and ignore response
+        HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).appendPath("resume").addParameter("targetState", targetState.toString());
+        Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
+                .setUri(uriBuilder.build())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
+                .build();
+        scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+    }
+
     private synchronized void cleanUpTask(TaskState newState)
     {
         checkState(getTaskStatus().getState().isDone(), "attempt to clean up a task that is not done yet");

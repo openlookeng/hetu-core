@@ -15,6 +15,7 @@ package io.prestosql.execution;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.ThreadPoolExecutorMBean;
@@ -71,6 +72,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getQueryMaxCpuTime;
 import static io.prestosql.execution.QueryState.RUNNING;
+import static io.prestosql.execution.QueryState.SUSPENDED;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.QUERY_EXPIRE;
 import static io.prestosql.utils.StateUtils.isMultiCoordinatorEnabled;
@@ -141,6 +143,7 @@ public class SqlQueryManager
 
             try {
                 enforceCpuLimits();
+                // Todo(Nitin K): patch to suspend query in case cpu limits increase...
             }
             catch (Throwable e) {
                 log.error(e, "Error enforcing query CPU time limits");
@@ -323,6 +326,26 @@ public class SqlQueryManager
     }
 
     @Override
+    public void suspendQuery(QueryId queryId)
+    {
+        requireNonNull(queryId, "queryId is null");
+        log.debug("Suspending query %s", queryId);
+
+        queryTracker.tryGetQuery(queryId)
+                .ifPresent(QueryExecution::suspendQuery);
+    }
+
+    @Override
+    public void resumeQuery(QueryId queryId)
+    {
+        requireNonNull(queryId, "queryId is null");
+        log.debug("Resuming Suspended query %s", queryId);
+
+        queryTracker.tryGetQuery(queryId)
+                .ifPresent(QueryExecution::resumeQuery);
+    }
+
+    @Override
     @Managed
     @Flatten
     public QueryManagerStats getStats()
@@ -350,6 +373,7 @@ public class SqlQueryManager
     private void enforceMemoryLimits()
     {
         List<QueryExecution> runningQueries;
+        List<QueryExecution> suspendedQueries = ImmutableList.of();
         Supplier<List<BasicQueryInfo>> allQueryInfoSupplier;
 
         Map<String, SharedQueryState> queryStates = StateCacheStore.get().getCachedStates(StateStoreConstants.QUERY_STATE_COLLECTION_NAME);
@@ -365,9 +389,13 @@ public class SqlQueryManager
                     .filter(query -> query.getState() == RUNNING)
                     .collect(toImmutableList());
             allQueryInfoSupplier = this::getQueries;
+
+            suspendedQueries = queryTracker.getAllQueries().stream()
+                    .filter(query -> query.getState() == SUSPENDED)
+                    .collect(toImmutableList());
         }
 
-        memoryManager.process(runningQueries, allQueryInfoSupplier);
+        memoryManager.process(runningQueries, suspendedQueries, allQueryInfoSupplier);
 
         // Put the chosen query to kill into state store
         if (isMultiCoordinatorEnabled() && queryStates != null) {
