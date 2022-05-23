@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit;
 
 public class GossipProtocolConfig
 {
-    public static final String GOSSIP_CONFIG_PREFIX = "failure-detector.gossip.";
-    public static final String GOSSIP_GROUP_SIZE = GOSSIP_CONFIG_PREFIX + "group-size";
+    public static final String GOSSIP_CONFIG_PREFIX = "failure-detector.";
+    public static final String GOSSIP_GROUP_SIZE = GOSSIP_CONFIG_PREFIX + "gossip-group-size";
     public static final String CN_GOSSIP_PROBE_INTERVAL = GOSSIP_CONFIG_PREFIX + "coordinator-gossip-probe-interval";
     public static final String WK_GOSSIP_PROBE_INTERVAL = GOSSIP_CONFIG_PREFIX + "worker-gossip-probe-interval";
     public static final String CN_GOSSIP_COLLATE_INTERVAL = GOSSIP_CONFIG_PREFIX + "coordinator-gossip-collate-interval";

@@ -228,7 +228,7 @@ public class CoordinatorGossipFailureDetector
         staleGossip.forEach(s -> gossipTales.remove(s.getKey()));
     }
 
-    private StaticBodyGenerator createBodyGenerator(WhomToGossipInfo info)
+    private StaticBodyGenerator createGossipRequestJsonBodyGenerator(WhomToGossipInfo info)
     {
         return jsonBodyGenerator(whomToGossipInfoCodec, info);
     }
@@ -273,7 +273,7 @@ public class CoordinatorGossipFailureDetector
             gossipTales.put(getService().getNodeId(), currentTime); // put itself
         }
 
-        private void postInitGossipUriList()
+        private void sendGossipUriList()
                 throws Exception
         {
             Set<ServiceDescriptor> online = getOnlineServiceDescriptors();
@@ -291,18 +291,19 @@ public class CoordinatorGossipFailureDetector
             log.debug("CN ping to Wk " + getUri() + "to start gossip ");
             URI reqUri = uriBuilderFrom(getUri()).appendPath(GossipStatusResource.GOSSIP_STATUS).build();
             Request request = setContentTypeHeaders(false, preparePost()).setUri(reqUri)
-                    .setBodyGenerator(createBodyGenerator(this.whomToGossipInfo)).build();
+                    .setBodyGenerator(createGossipRequestJsonBodyGenerator(this.whomToGossipInfo)).build();
             getHttpClient().execute(request, new ResponseHandler<Object, Exception>() {
                 @Override
                 public Object handleException(Request request, Exception exception)
                 {
-                    log.debug("initial ping exception");
+                    log.debug("Triggering gossip for " + getUri() + " failed. Will retry at the next probe..");
                     return null;
                 }
 
                 @Override
                 public Object handle(Request request, Response response)
                 {
+                    log.debug("triggering gossip success!");
                     return null;
                 }
             });
@@ -312,7 +313,7 @@ public class CoordinatorGossipFailureDetector
         public synchronized void enable()
         {
             try {
-                postInitGossipUriList();
+                sendGossipUriList();
             }
             catch (Exception e) {
                 log.error("error while init gossip");
@@ -351,7 +352,7 @@ public class CoordinatorGossipFailureDetector
                         });
             }
             catch (Exception e) {
-                log.warn(e, "Error scheduling request for %s", getUri());
+                log.error(e, "Error scheduling request for %s", getUri());
             }
         }
     }
