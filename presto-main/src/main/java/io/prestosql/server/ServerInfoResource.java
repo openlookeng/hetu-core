@@ -16,8 +16,10 @@ package io.prestosql.server;
 import io.airlift.node.NodeInfo;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.client.ServerInfo;
+import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.metadata.NodeState;
 import io.prestosql.security.AccessControl;
+import io.prestosql.spi.eventlistener.AuditLogEvent;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.security.GroupProvider;
 
@@ -56,21 +58,26 @@ public class ServerInfoResource
     private final AtomicBoolean startupComplete = new AtomicBoolean();
     private final AccessControl accessControl;
     private final GroupProvider groupProvider;
+    private final EventListenerManager eventListenerManager;
+    private final NodeInfo nodeInfo;
 
     @Inject
     public ServerInfoResource(NodeVersion nodeVersion,
-            NodeInfo nodeInfo,
-            ServerConfig serverConfig,
-            NodeStateChangeHandler nodeStateChangeHandler,
-            AccessControl accessControl,
-            GroupProvider groupProvider)
+                              NodeInfo nodeInfo,
+                              ServerConfig serverConfig,
+                              NodeStateChangeHandler nodeStateChangeHandler,
+                              AccessControl accessControl,
+                              GroupProvider groupProvider,
+                              EventListenerManager eventListenerManager)
     {
         this.version = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
+        this.nodeInfo = requireNonNull(nodeInfo, "nodeInfo is null");
         this.coordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
         this.nodeStateChangeHandler = requireNonNull(nodeStateChangeHandler, "nodeStateChangeHandler");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
+        this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
     }
 
     @GET
@@ -125,6 +132,7 @@ public class ServerInfoResource
         }
 
         try {
+            eventListenerManager.eventEnhanced(new AuditLogEvent(servletRequest.getHeader("X-Presto-User"), nodeInfo.getInternalAddress(), state.toString(), "Cluster", "INFO"));
             nodeStateChangeHandler.doStateTransition(state);
             return Response.ok().build();
         }
@@ -159,6 +167,7 @@ public class ServerInfoResource
 
     public void startupComplete()
     {
+        eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", nodeInfo.getInternalAddress(), "Server: " + nodeInfo.getNodeId() + " Start!", "Cluster", "INFO"));
         checkState(startupComplete.compareAndSet(false, true), "Server startup already marked as complete");
     }
 

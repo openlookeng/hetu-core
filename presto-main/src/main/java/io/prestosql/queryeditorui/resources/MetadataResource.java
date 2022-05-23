@@ -36,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 @Path("/api/metadata")
@@ -103,6 +104,18 @@ public class MetadataResource
         String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
         List<List<Object>> preview = previewTableService.getPreview(catalogName, schemaName, tableName, user);
         return Response.ok(preview).build();
+    }
+
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("catalogs")
+    public Response getCatalogs(
+            @Context HttpServletRequest servletRequest)
+            throws ExecutionException
+    {
+        String user = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
+        Set<String> result = schemaService.queryCatalogs(user);
+        return Response.ok(result).build();
     }
 
     @GET

@@ -74,7 +74,6 @@ public class HetuMetaStoreManager
     public void addHetuMetaStoreFactory(HetuMetaStoreFactory hetuMetaStoreFactory)
     {
         requireNonNull(hetuMetaStoreFactory, "hetuMetaStoreFactory is null");
-
         if (hetuMetastoreFactories.putIfAbsent(hetuMetaStoreFactory.getName(), hetuMetaStoreFactory) != null) {
             throw new IllegalArgumentException(format("HetuMetastore '%s' is already registered", hetuMetaStoreFactory.getName()));
         }
@@ -123,5 +122,10 @@ public class HetuMetaStoreManager
     public HetuMetastore getHetuMetastore()
     {
         return hetuMetastore;
+    }
+
+    public String getHetuMetastoreType()
+    {
+        return hetuMetastoreType;
     }
 }

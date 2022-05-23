@@ -25,6 +25,7 @@ import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.discovery.server.EmbeddedDiscoveryModule;
 import io.prestosql.catalog.CatalogModule;
 import io.prestosql.catalog.DynamicCatalogConfig;
+import io.prestosql.catalog.showcatalog.ShowCatalogModule;
 import io.prestosql.client.QueryResults;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.CostCalculator.EstimatedExchanges;
@@ -113,6 +114,7 @@ import io.prestosql.memory.TotalReservationOnBlockedNodesLowMemoryKiller;
 import io.prestosql.metadata.CatalogManager;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
+import io.prestosql.queryhistory.QueryHistoryModule;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -239,6 +241,12 @@ public class CoordinatorModule
 
         // catalog resource
         install(installModuleIf(DynamicCatalogConfig.class, DynamicCatalogConfig::isDynamicCatalogEnabled, new CatalogModule()));
+
+        //showcatalog resourece
+        install(new ShowCatalogModule());
+
+        //QueryHistory Module
+        binder.install(new QueryHistoryModule());
 
         // resource for serving static content
         jaxrsBinder(binder).bind(WebUiResource.class);

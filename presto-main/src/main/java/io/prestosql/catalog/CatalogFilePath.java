@@ -31,6 +31,7 @@ public final class CatalogFilePath
     private final Path propertiesPath;
     private final Path metadataPath;
     private final Path lockPath;
+    private final Path staticPath;
 
     /*
     * baseDirectory
@@ -73,6 +74,7 @@ public final class CatalogFilePath
         this.metadataPath = Paths.get(catalogDirPath.toString(), catalogName + ".metadata");
         // lock files directory
         this.lockPath = Paths.get(catalogBasePath);
+        this.staticPath = Paths.get(baseDirectory, catalogName + ".properties");
     }
 
     public static Path getCatalogBasePath(String baseDirectory)
@@ -103,5 +105,10 @@ public final class CatalogFilePath
     public Path getLockPath()
     {
         return lockPath;
+    }
+
+    public Path getStaticPath()
+    {
+        return staticPath;
     }
 }

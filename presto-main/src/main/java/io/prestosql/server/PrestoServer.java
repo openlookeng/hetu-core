@@ -33,6 +33,7 @@ import io.airlift.node.NodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import io.prestosql.catalog.DynamicCatalogScanner;
 import io.prestosql.catalog.DynamicCatalogStore;
+import io.prestosql.catalog.showcatalog.ShowCatalogStore;
 import io.prestosql.discovery.HetuDiscoveryModule;
 import io.prestosql.dynamicfilter.CrossRegionDynamicFilterListener;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
@@ -164,6 +165,7 @@ public class PrestoServer
             injector.getInstance(StaticFunctionNamespaceStore.class).loadFunctionNamespaceManagers();
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
             injector.getInstance(DynamicCatalogStore.class).loadCatalogStores(fileSystemClientManager);
+            injector.getInstance(ShowCatalogStore.class).loadCatalogStores(fileSystemClientManager);
             injector.getInstance(DynamicCatalogScanner.class).start();
             injector.getInstance(SessionPropertyDefaults.class).loadConfigurationManager();
             injector.getInstance(ResourceGroupManager.class).loadConfigurationManager();

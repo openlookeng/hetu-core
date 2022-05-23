@@ -62,3 +62,25 @@ and statistics about the query is available by clicking the *JSON* link. These v
 > -   **Default value:** `1 DAYS`
 >
 > UI session timeout is set to 1 day as default. This could be overridden via `hetu.queryeditor-ui.session-timeout` of `etc/config.properties`
+
+### `hetu.queryhistory.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `1000`
+>
+> The maximum number of query history stored by openLooKeng. This could be overridden via "hetu.queryhistory.max-count" of "etc/config.properties".
+
+### `hetu.collectionsql.max-count`
+
+> -   **Type:** `int`
+> -   **Default value:** `100`
+>
+> The Maximum number of SQL collected by each user. This could be overridden via "hetu.collectionsql.max-count" of "etc/config.properties".
+
+## Remarks
+
+The max length of the favorite SQL is 600 by default. You can modify it through the following steps:
+
+1. Login MySQL database according to the JDBC configuration of `hetu-metastore.properties`
+
+2. Select table hetu_favorite, execute script `alter table hetu_favorite modify query varchar(2000) not null;` to modify the max length of the favorite SQL.

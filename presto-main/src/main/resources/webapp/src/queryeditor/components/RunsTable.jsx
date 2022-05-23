@@ -26,6 +26,7 @@ import {Cell, Column, Table} from 'fixed-data-table-2';
 import ProgressBar from "./ProgressBar";
 import ModalDialog from "./ModalDialog";
 import UserStore from "../stores/UserStore";
+import CollectionAction from "../actions/CollectionActions";
 
 var classNames = require('classnames');
 let isColumnResizing = false;
@@ -37,7 +38,9 @@ let columnWidths = {
   started: 180,
   duration: 80,
   output: 150,
+  addtocollection: 120,
 };
+let metaStoreType = '';
 
 // State actions
 function getRuns(user) {
@@ -61,7 +64,8 @@ class RunsTable extends React.Component {
       currentErrorMessage: null,
       showModal: false,
       runs: getRuns(this.props.user),
-      user: UserStore.getCurrentUser()
+      user: UserStore.getCurrentUser(),
+      isCollected:[]
     };
     this.getStateFromStore = this.getStateFromStore.bind(this);
     this._onChange = this._onChange.bind(this);
@@ -71,6 +75,7 @@ class RunsTable extends React.Component {
     this.renderErrorDialogFooter = this.renderErrorDialogFooter.bind(this);
     this.rowGetter = this.rowGetter.bind(this);
     this.columnGetter = this.columnGetter.bind(this);
+    this.handleCollection = this.handleCollection.bind(this);
   }
 
   getStateFromStore() {
@@ -83,6 +88,11 @@ class RunsTable extends React.Component {
   }
 
   componentDidMount() {
+    $.get(`../v1/query/hetuMetastoreType`, function (type) {
+      metaStoreType = type;
+      this.setState();
+    }.bind(this))
+
     UserStore.listen(this._onChange);
     RunStore.listen(this._onChange);
   }
@@ -118,7 +128,32 @@ class RunsTable extends React.Component {
     );
   }
 
+  handleCollection(e) {
+    this.setState({
+      isCollected: isCollected
+    })
+    if (this.state.isCollected){
+      // delete
+    }
+    else {
+      CollectionAction.addToCollection()
+    }
+  }
+
   render() {
+    const CollectionButton = ({isCollected}) =>
+        <Cell>
+          {isCollected ?
+              <button className="collection-btn" onClick={this.handleCollection}>
+                <i className="icon fa fa-star"/>
+              </button>
+              :
+              <button className="collection-btn" onClick={this.handleCollection}>
+                <i className="icon fa fa-star-o"/>
+              </button>
+          }
+        </Cell>
+
     if (this.state.runs.length === 0) {
       return this.renderEmptyMessage();
     }
@@ -169,6 +204,11 @@ class RunsTable extends React.Component {
                 cell={({rowIndex}) => <Cell> {this.columnGetter('output', rowIndex)}</Cell>}
                 width={columnWidths.output}
             />
+            <Column
+                header={<Cell>Collect</Cell>}
+                cell={({rowIndex}) => <Cell> {this.columnGetter('collect',rowIndex)}</Cell>}
+                width={columnWidths.addtocollection}
+            />
           </Table>
         </div>);
   }
@@ -195,12 +235,15 @@ class RunsTable extends React.Component {
       return row.duration;
     } else if ("output" == key) {
       return CellRenderers.output(row.output, "output", row, this);
+    } else if ("collect" == key) {
+      return CellRenderers.collect(row.context,row.query,rowIndex,this);
     }
   }
 
   rowGetter(rowIndex) {
     //Show latest on top
     let descIndex = this.state.runs.length - rowIndex - 1;
+    this.state.isCollected.push(0);
     return formatRun(this.state.runs[descIndex], this.state.user);
   }
 
@@ -270,6 +313,36 @@ function toggleModal(component, msg=null) {
     state.showModal = false;
   }
   component.setState(state);
+}
+
+function handleCollection(e,rowIndex,parentObj) {
+  let queryText = e.query;
+  if(queryText.length > 1000) {
+    alert("Error! Your SQL statement is too long! Please shorten it!");
+  }
+  else if(metaStoreType != "jdbc") {
+    alert("Collection failed! Only hetu-metastore storage type configured as JDBC is supported!");
+  }
+  else {
+    let catalog = e.sessionContext.catalog;
+    let schema = e.sessionContext.schema;
+    let state = parentObj.state;
+    if (state.isCollected[rowIndex] == 0) {
+      state.isCollected[rowIndex] = 1
+      CollectionAction.addToCollection(queryText, catalog, schema);
+    } else {
+      state.isCollected[rowIndex] = 0
+      CollectionAction.deleteCollection(queryText, catalog, schema);
+    }
+    parentObj.setState(state);
+  }
+}
+
+function handleDelete(e) {
+  let queryText = e.query;
+  let catalog = e.sessionContext.catalog;
+  let schema = e.sessionContext.schema;
+  CollectionAction.deleteCollection(queryText,catalog,schema);
 }
 
 let CellRenderers = {
@@ -379,12 +452,21 @@ let CellRenderers = {
   },
 
   started(cellData) {
-    // let m = moment.utc(cellData, 'yyyy-mm-ddTHH:MM:ss');
-    // let utc = m.format();
-    // let human = m.format('lll');
-    // return <span title={utc}>{human} UTC</span>;
     return <Moment utc local>{cellData}</Moment>
-  }
+  },
+
+  collect(sessionContext,query,rowIndex,parentObj) {
+    const collection = {sessionContext,query}
+    let descIndex = parentObj.state.runs.length - rowIndex - 1;
+    return (
+        <span>
+            <button className="collection-btn" onClick={() => {handleCollection(collection,descIndex,parentObj)}}>
+              <i className="icon-center fa fa-plus icon"/>
+              <i className="icon-center fa fa-star icon"/>
+            </button>
+        </span>
+    )
+  },
 };
 
 function getProgressFromStats(stats) {
