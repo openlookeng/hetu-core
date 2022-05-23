@@ -86,6 +86,7 @@
         <module>presto-record-decoder</module>
         <module>presto-expressions</module>
         <module>presto-kafka</module>
+        <module>presto-redis</module>
         <module>presto-memory</module>
         <module>presto-orc</module>
         <module>presto-parquet</module>
