@@ -144,8 +144,8 @@ public class TestCoordinatorGossipFailureDetector
     {
         Set<TestServiceDescriptor> online = new HashSet<>();
         try {
-            online.add(new TestServiceDescriptor("fff1", new URI("http://10.1.1.12:8081")));
-            online.add(new TestServiceDescriptor("fff2", new URI("http://10.1.1.12:8082")));
+            online.add(new TestServiceDescriptor("fff1", new URI("http://192.1.1.12:8081")));
+            online.add(new TestServiceDescriptor("fff2", new URI("http://192.1.1.12:8082")));
             List<TestServiceDescriptor> onlineServices = new ArrayList<>(online);
 
             Collections.sort(onlineServices, new Comparator<TestServiceDescriptor>() {

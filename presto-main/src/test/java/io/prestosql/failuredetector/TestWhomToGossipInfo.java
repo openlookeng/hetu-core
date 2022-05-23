@@ -57,10 +57,10 @@ public class TestWhomToGossipInfo
             assertEquals(ws, w.toString());
             assertEquals(w.getUriList().size(), 0);
 
-            WhomToGossipInfo info = new WhomToGossipInfo(new URI("http://10.18.18.225:8080"));
-            info.add(new URI("http://10.18.18.125:8080"));
+            WhomToGossipInfo info = new WhomToGossipInfo(new URI("http://192.18.18.225:8080"));
+            info.add(new URI("http://192.18.18.125:8080"));
 
-            String json1 = "WhomToGossipInfo{uri=http://10.18.18.225:8080,http://10.18.18.125:8080}";
+            String json1 = "WhomToGossipInfo{uri=http://192.18.18.225:8080,http://192.18.18.125:8080}";
             assertEquals(json1, info.toString());
 
             String json = codec.toJson(info);
@@ -69,20 +69,20 @@ public class TestWhomToGossipInfo
             WhomToGossipInfo info2 = codec.fromJson(j);
             assertEquals(info2.toString(), info.toString());
 
-            info.add(new URI("http://10.0.0.1:8080"));
+            info.add(new URI("http://192.0.0.1:8080"));
 
             String infoString = info.toString();
-            assertEquals(infoString, "WhomToGossipInfo{uri=http://10.18.18.225:8080,http://10.18.18.125:8080,http://10.0.0.1:8080}");
+            assertEquals(infoString, "WhomToGossipInfo{uri=http://192.18.18.225:8080,http://192.18.18.125:8080,http://192.0.0.1:8080}");
 
             List<URI> uris = new ArrayList<>();
-            uris.add(new URI("https://10.10.10.10:9090"));
-            uris.add(new URI("https://10.10.11.10:9090"));
-            uris.add(new URI("https://10.10.12.10:9090"));
+            uris.add(new URI("https://192.10.10.10:9090"));
+            uris.add(new URI("https://192.10.11.10:9090"));
+            uris.add(new URI("https://192.10.12.10:9090"));
 
             WhomToGossipInfo newInfo = new WhomToGossipInfo(uris);
-            assertEquals(newInfo.toString(), "WhomToGossipInfo{uri=https://10.10.10.10:9090,https://10.10.11.10:9090,https://10.10.12.10:9090}");
+            assertEquals(newInfo.toString(), "WhomToGossipInfo{uri=https://192.10.10.10:9090,https://192.10.11.10:9090,https://192.10.12.10:9090}");
             json = codec.toJson(newInfo);
-            assertEquals(json, "{\"uri\":\"https://10.10.10.10:9090,https://10.10.11.10:9090,https://10.10.12.10:9090\"}");
+            assertEquals(json, "{\"uri\":\"https://192.10.10.10:9090,https://192.10.11.10:9090,https://192.10.12.10:9090\"}");
         }
         catch (URISyntaxException e) {
             System.out.println(e.getMessage());
@@ -143,8 +143,8 @@ public class TestWhomToGossipInfo
     public void testEqualURI()
     {
         try {
-            URI uri1 = new URI("http://10.1.1.10:8080");
-            URI uri2 = new URI("http://10.1.1.10:8080");
+            URI uri1 = new URI("http://192.1.1.10:8080");
+            URI uri2 = new URI("http://192.1.1.10:8080");
 
             assertTrue(uri1.equals(uri2));
         }
@@ -172,7 +172,7 @@ public class TestWhomToGossipInfo
     @Test
     public void serializationTest()
     {
-        String s = "https://10.10.10.10:9090,https://10.10.11.10:9090,https://10.10.12.10:9090";
+        String s = "https://192.10.10.10:9090,https://192.10.11.10:9090,https://192.10.12.10:9090";
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         for (int i = 0; i < bytes.length; i++) {
             System.out.print(bytes[i]);
