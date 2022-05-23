@@ -48,7 +48,7 @@ import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
+import static io.prestosql.snapshot.RecoveryConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -121,13 +121,13 @@ public class NodePartitioningManager
                 partitioningHandle.getConnectorHandle());
     }
 
-    public NodePartitionMap getNodePartitioningMap(Session session, PartitioningHandle partitioningHandle, boolean isSnapshotEnabled, Integer nodeCount)
+    public NodePartitionMap getNodePartitioningMap(Session session, PartitioningHandle partitioningHandle, boolean isRecoveryEnabled, Integer nodeCount)
     {
         requireNonNull(session, "session is null");
         requireNonNull(partitioningHandle, "partitioningHandle is null");
 
         if (partitioningHandle.getConnectorHandle() instanceof SystemPartitioningHandle) {
-            return ((SystemPartitioningHandle) partitioningHandle.getConnectorHandle()).getNodePartitionMap(session, nodeScheduler, isSnapshotEnabled, nodeCount);
+            return ((SystemPartitioningHandle) partitioningHandle.getConnectorHandle()).getNodePartitionMap(session, nodeScheduler, isRecoveryEnabled, nodeCount);
         }
 
         CatalogName catalogName = partitioningHandle.getConnectorId()
@@ -146,7 +146,7 @@ public class NodePartitioningManager
         else {
             NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, false, null);
             List<InternalNode> nodes;
-            if (isSnapshotEnabled) {
+            if (isRecoveryEnabled) {
                 Integer count = nodeCount;
                 if (count == null) {
                     // Initial schedule: reserve some nodes

@@ -112,8 +112,8 @@ import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.security.PasswordSecurityConfig;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.server.remotetask.HttpLocationFactory;
-import io.prestosql.snapshot.SnapshotConfig;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryConfig;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.block.Block;
@@ -559,9 +559,9 @@ public class ServerMainModule
         // HeuristicIndexerManager
         binder.bind(HeuristicIndexerManager.class).in(Scopes.SINGLETON);
 
-        // SnapshotUtils
-        binder.bind(SnapshotUtils.class).in(Scopes.SINGLETON);
-        configBinder(binder).bindConfig(SnapshotConfig.class);
+        // RecoveryUtils
+        binder.bind(RecoveryUtils.class).in(Scopes.SINGLETON);
+        configBinder(binder).bindConfig(RecoveryConfig.class);
 
         // Spiller
         binder.bind(SpillerFactory.class).to(GenericSpillerFactory.class).in(Scopes.SINGLETON);

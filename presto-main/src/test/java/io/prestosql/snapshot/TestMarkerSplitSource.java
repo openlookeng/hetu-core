@@ -73,7 +73,7 @@ public class TestMarkerSplitSource
     {
         splitSource = mock(SplitSource.class);
         announcer = mock(MarkerAnnouncer.class);
-        markerSource = new MarkerSplitSource(splitSource, announcer);
+        markerSource = new MarkerSplitSource(splitSource, announcer, false);
 
         when(splitSource.getCatalogName()).thenReturn(catalogName);
     }

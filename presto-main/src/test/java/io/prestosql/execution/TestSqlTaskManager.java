@@ -54,8 +54,8 @@ import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
@@ -284,7 +284,7 @@ public class TestSqlTaskManager
                 new NodeSpillConfig(),
                 new TestingGcMonitor(),
                 createTestMetadataManager(),
-                NOOP_SNAPSHOT_UTILS);
+                NOOP_RECOVERY_UTILS);
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, ImmutableSet<ScheduledSplit> splits, OutputBuffers outputBuffers)

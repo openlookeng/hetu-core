@@ -34,6 +34,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.HttpPageBufferClient;
 import io.prestosql.server.remotetask.SimpleHttpResponseHandler;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -78,7 +79,6 @@ import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
-import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -133,6 +133,7 @@ public final class SqlStageExecution
     private PlanNodeId parentId;
 
     private final QuerySnapshotManager snapshotManager;
+    private final QueryRecoveryManager queryRecoveryManager;
     private boolean throttledSchedule;
     private boolean restoreInProgress;
     private long captureSnapshotId;
@@ -150,7 +151,8 @@ public final class SqlStageExecution
             FailureDetector failureDetector,
             SplitSchedulerStats schedulerStats,
             DynamicFilterService dynamicFilterService,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
         requireNonNull(stageId, "stageId is null");
         requireNonNull(location, "location is null");
@@ -171,7 +173,8 @@ public final class SqlStageExecution
                 executor,
                 failureDetector,
                 dynamicFilterService,
-                snapshotManager);
+                snapshotManager,
+                queryRecoveryManager);
         sqlStageExecution.initialize();
         return sqlStageExecution;
     }
@@ -183,7 +186,8 @@ public final class SqlStageExecution
             Executor executor,
             FailureDetector failureDetector,
             DynamicFilterService dynamicFilterService,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager,
+            QueryRecoveryManager queryRecoveryManager)
     {
         this.stateMachine = stateMachine;
         this.remoteTaskFactory = requireNonNull(remoteTaskFactory, "remoteTaskFactory is null");
@@ -193,6 +197,7 @@ public final class SqlStageExecution
         this.failureDetector = requireNonNull(failureDetector, "failureDetector is null");
         this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
         this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
+        this.queryRecoveryManager = requireNonNull(queryRecoveryManager, "recoveryManager is null");
 
         ImmutableMap.Builder<PlanFragmentId, RemoteSourceNode> fragmentToExchangeSource = ImmutableMap.builder();
         for (RemoteSourceNode remoteSourceNode : stateMachine.getFragment().getRemoteSourceNodes()) {
@@ -328,7 +333,7 @@ public final class SqlStageExecution
 
     public synchronized void cancelToResume()
     {
-        stateMachine.transitionToRescheduling();
+        stateMachine.transitionToRecovering();
         getAllTasks().forEach(RemoteTask::cancelToResume);
     }
 
@@ -512,7 +517,7 @@ public final class SqlStageExecution
 
     private String generateInstanceId()
     {
-        return snapshotManager.getResumeCount() + "-" + UUID.randomUUID();
+        return queryRecoveryManager.getResumeCount() + "-" + UUID.randomUUID();
     }
 
     private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, String instanceId, Multimap<PlanNodeId, Split> sourceSplits, OptionalInt totalPartitions)
@@ -600,12 +605,12 @@ public final class SqlStageExecution
                 return;
             }
 
-            boolean isSnapshotEnabled = isSnapshotEnabled(stateMachine.getSession());
+            boolean isRecoveryEnabled = SystemSessionProperties.isRecoveryEnabled(stateMachine.getSession());
 
             TaskState taskState = taskStatus.getState();
             if (taskState == TaskState.RESUMABLE_FAILURE) {
                 log.debug("Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                stateMachine.transitionToResumableFailure();
+                queryRecoveryManager.startRecovery();
                 return;
             }
             if (taskState == TaskState.FAILED) {
@@ -615,7 +620,7 @@ public final class SqlStageExecution
                         .map(ExecutionFailureInfo::toException)
                         .orElse(new PrestoException(GENERIC_INTERNAL_ERROR, "A task failed for an unknown reason"));
                 // Snapshot: if remote task failed because they received unexpecte response (5xx or missing/wrong header), then we treat it as resumable.
-                if (isSnapshotEnabled && failure.getMessage() != null) {
+                if (isRecoveryEnabled && failure.getMessage() != null) {
                     String message = failure.getMessage();
                     // message contains "<HttpPageBufferClient.PAGE_TRANSPORT_ERROR_PREFIX> <code>!"
                     // See HttpPageBufferClient.java, PageResponseHandler#handle() method
@@ -625,23 +630,24 @@ public final class SqlStageExecution
                         int responseCode = Integer.parseInt(message.substring(index, message.indexOf('!', index)));
                         if (responseCode >= 500 || responseCode == HttpStatus.OK.code()) {
                             log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                            stateMachine.transitionToResumableFailure();
+                            queryRecoveryManager.startRecovery();
                             return;
                         }
                     }
                     else if (message.contains(SimpleHttpResponseHandler.EXPECT_200_SAW_5XX)) {
                         // SimpleHttpResponseHandler can also produce errors that are resumable
                         log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                        stateMachine.transitionToResumableFailure();
+                        queryRecoveryManager.startRecovery();
                         return;
                     }
                 }
                 stateMachine.transitionToFailed(failure);
             }
             else if (taskState == TaskState.ABORTED) {
-                if (isSnapshotEnabled) {
+                if (isRecoveryEnabled) {
                     log.debug("Task %s on node %s was aborted prematually. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
-                    stateMachine.transitionToResumableFailure();
+                    //TODO Need to check if we need to check for stage state done or not before calling startrecovery
+                    queryRecoveryManager.startRecovery();
                     return;
                 }
                 // A task should only be in the aborted state if the STAGE is done (ABORTED or FAILED)
@@ -657,7 +663,7 @@ public final class SqlStageExecution
                 }
                 if (finishedTasks.containsAll(allTasks)) {
                     stateMachine.transitionToFinished();
-                    if (isSnapshotEnabled) {
+                    if (isRecoveryEnabled) {
                         // Snapshot: when tasks finish, inform snapshot manager, so they no longer need to be tracked
                         snapshotManager.updateFinishedQueryComponents(finishedTasks);
                     }

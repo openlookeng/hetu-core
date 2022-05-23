@@ -76,8 +76,8 @@ public class ExchangeOperator
             OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, sourceId, ExchangeOperator.class.getSimpleName());
             if (exchangeClient == null) {
                 exchangeClient = exchangeClientSupplier.get(driverContext.getPipelineContext().localSystemMemoryContext());
-                if (addOperatorContext.isSnapshotEnabled()) {
-                    exchangeClient.setSnapshotEnabled(driverContext.getPipelineContext().getTaskContext().getSnapshotManager().getQuerySnapshotManager());
+                if (addOperatorContext.isRecoveryEnabled()) {
+                    exchangeClient.setRecoveryEnabled(driverContext.getPipelineContext().getTaskContext().getRecoveryManager());
                 }
             }
 

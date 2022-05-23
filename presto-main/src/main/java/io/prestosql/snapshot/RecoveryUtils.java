@@ -56,15 +56,15 @@ import static java.util.Objects.requireNonNull;
 /**
  * This is utility class for snapshot
  */
-public class SnapshotUtils
+public class RecoveryUtils
 {
-    private static final Logger LOG = Logger.get(SnapshotUtils.class);
+    private static final Logger LOG = Logger.get(RecoveryUtils.class);
     private static final int CLEANUP_INTERVAL_MINUTES = 3; // 3 minutes
     private static final long DELETION_RETRY_PERIOD = 15L * 60 * 1000; // 15 minutes
 
     private final boolean isCoordinator;
     private final FileSystemClientManager fileSystemClientManager;
-    private final SnapshotConfig snapshotConfig;
+    private final RecoveryConfig recoveryConfig;
     private SnapshotStoreClient snapshotStoreClient;
     //TODO-cp-I2D63N hardcoded 'storeType' and 'rootPath' for now, may change to configurable after done switching to state-store
     private final SnapshotStoreType storeType = SnapshotStoreType.FILESYSTEM;
@@ -73,6 +73,7 @@ public class SnapshotUtils
     String rootPath = "/tmp/hetu/snapshot/";
 
     private final Map<QueryId, QuerySnapshotManager> snapshotManagers = new ConcurrentHashMap<>();
+    private final Map<QueryId, QueryRecoveryManager> recoveryManagers = new ConcurrentHashMap<>();
     // Key is query id; value is number of attempts
     private final Map<String, Long> snapshotsToDelete = new ConcurrentHashMap<>();
     private final ScheduledThreadPoolExecutor deleteSnapshotExecutor = new ScheduledThreadPoolExecutor(1);
@@ -85,11 +86,11 @@ public class SnapshotUtils
     });
 
     @Inject
-    public SnapshotUtils(FileSystemClientManager fileSystemClientManager, SnapshotConfig snapshotConfig, InternalNodeManager nodeManager)
+    public RecoveryUtils(FileSystemClientManager fileSystemClientManager, RecoveryConfig recoveryConfig, InternalNodeManager nodeManager)
     {
         this.isCoordinator = nodeManager.getCurrentNode().isCoordinator();
         this.fileSystemClientManager = requireNonNull(fileSystemClientManager);
-        this.snapshotConfig = requireNonNull(snapshotConfig);
+        this.recoveryConfig = requireNonNull(recoveryConfig);
 
         // When a query finishes abnormally (including being cancelled by the user), we may not be able to delete
         // the snapshot folder, because tasks may be updating snapshot files at the same time.
@@ -113,7 +114,7 @@ public class SnapshotUtils
 
     public String getSnapshotProfile()
     {
-        return snapshotConfig.getSnapshotProfile();
+        return recoveryConfig.getSnapshotProfile();
     }
 
     public void initialize()
@@ -124,14 +125,14 @@ public class SnapshotUtils
     private SnapshotStoreClient buildSnapshotStoreClient()
     {
         if (storeType == SnapshotStoreType.FILESYSTEM) {
-            String profile = snapshotConfig.getSnapshotProfile();
-            String spillProfile = snapshotConfig.getSpillProfile();
-            boolean spillToHdfs = snapshotConfig.isSpillToHdfs();
+            String profile = recoveryConfig.getSnapshotProfile();
+            String spillProfile = recoveryConfig.getSpillProfile();
+            boolean spillToHdfs = recoveryConfig.isSpillToHdfs();
             Path root = Paths.get(rootPath);
             try {
                 HetuFileSystemClient fs = profile == null ?
                         fileSystemClientManager.getFileSystemClient(root) : fileSystemClientManager.getFileSystemClient(profile, root);
-                return new SnapshotFileBasedClient(fs, root, fileSystemClientManager, spillProfile, spillToHdfs, snapshotConfig.isSnapshotUseKryoSerialization());
+                return new SnapshotFileBasedClient(fs, root, fileSystemClientManager, spillProfile, spillToHdfs, recoveryConfig.isSnapshotUseKryoSerialization());
             }
             catch (Exception e) {
                 LOG.warn(e, "Failed to create SnapshotFileBasedClient");
@@ -349,5 +350,20 @@ public class SnapshotUtils
                 LOG.debug("Failed to delete stored snapshot states for %s [age %d ms]: %s", queryId, age, e.getMessage());
             }
         }
+    }
+
+    public QueryRecoveryManager getRecoveryManager(QueryId queryId)
+    {
+        return recoveryManagers.get(queryId);
+    }
+
+    public QueryRecoveryManager getOrCreateRecoveryManager(QueryId queryId, Session session)
+    {
+        return recoveryManagers.computeIfAbsent(queryId, ignore -> new QueryRecoveryManager(this, session, queryId));
+    }
+
+    public void removeRecoveryManager(QueryId queryId)
+    {
+        recoveryManagers.remove(queryId);
     }
 }

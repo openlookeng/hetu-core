@@ -190,7 +190,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, failureDetectorManager);
+                failureDetectorManager, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -277,7 +277,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, failureDetectorManager);
+                failureDetectorManager, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -324,7 +324,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, failureDetectorManager);
+                failureDetectorManager, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -358,7 +358,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, failureDetectorManager);
+                failureDetectorManager, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -429,7 +429,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, failureDetectorManager);
+                failureDetectorManager, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -487,7 +487,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, ticker, failureDetectorManager2);
+                ticker, failureDetectorManager2, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -559,7 +559,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, ticker, failureDetectorManager3);
+                ticker, failureDetectorManager3, null);
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
         for (int i = 0; i < 11; i++) {
@@ -607,7 +607,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                null, ticker, failureDetectorManager1);
+                ticker, failureDetectorManager1, null);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 

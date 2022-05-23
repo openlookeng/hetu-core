@@ -38,6 +38,7 @@ import io.prestosql.operator.TaskLocation;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.BasicQueryStats;
+import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
@@ -72,6 +73,7 @@ import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.execution.BasicStageStats.EMPTY_STAGE_STATS;
@@ -81,14 +83,14 @@ import static io.prestosql.execution.QueryState.FINISHED;
 import static io.prestosql.execution.QueryState.FINISHING;
 import static io.prestosql.execution.QueryState.PLANNING;
 import static io.prestosql.execution.QueryState.QUEUED;
-import static io.prestosql.execution.QueryState.RESCHEDULING;
-import static io.prestosql.execution.QueryState.RESUMING;
+import static io.prestosql.execution.QueryState.RECOVERING;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.execution.QueryState.STARTING;
 import static io.prestosql.execution.QueryState.TERMINAL_QUERY_STATES;
 import static io.prestosql.execution.QueryState.WAITING_FOR_RESOURCES;
 import static io.prestosql.execution.StageInfo.getAllStages;
 import static io.prestosql.memory.LocalMemoryManager.GENERAL_POOL;
+import static io.prestosql.snapshot.RecoveryState.STOPPING_FOR_RESCHEDULE;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.USER_CANCELED;
 import static io.prestosql.util.Failures.toFailure;
@@ -786,8 +788,8 @@ public class QueryStateMachine
             if (currentState.ordinal() < STARTING.ordinal()) {
                 return true;
             }
-            if (currentState == RESUMING) {
-                // Snapshot: Also allow to go from "resuming".
+            if (currentState == RECOVERING) {
+                // Snapshot: Also allow to go from "recovering".
                 // Inform outputManager to reset some fields.
                 outputManager.resetForResume();
                 return true;
@@ -802,14 +804,9 @@ public class QueryStateMachine
         return queryState.setIf(RUNNING, currentState -> currentState.ordinal() < RUNNING.ordinal());
     }
 
-    public boolean transitionToRescheduling()
+    public boolean transitionToRecovering()
     {
-        return queryState.setIf(RESCHEDULING, currentState -> currentState == RUNNING);
-    }
-
-    public boolean transitionToResuming()
-    {
-        return queryState.setIf(RESUMING, currentState -> currentState == RESCHEDULING);
+        return queryState.setIf(RECOVERING, currentState -> currentState == RUNNING);
     }
 
     public boolean transitionToFinishing()
@@ -1048,7 +1045,7 @@ public class QueryStateMachine
         return getAllStages(rootStage).stream()
                 .map(StageInfo::getState)
                 // Snapshot: RESCHEDULING, although a done state for stage, should not be deemed as "scheduled".
-                .allMatch(state -> (state == StageState.RUNNING) || state.isDone() && state != StageState.RESCHEDULING);
+                .allMatch(state -> (state == StageState.RUNNING) || state.isDone() && state != StageState.RECOVERING);
     }
 
     void setRunningAsync(boolean runningAsync)
@@ -1076,16 +1073,27 @@ public class QueryStateMachine
         return finalQueryInfo.get();
     }
 
-    public QueryInfo updateQueryInfo(Optional<StageInfo> stageInfo)
+    public QueryInfo updateQueryInfo(Optional<StageInfo> stageInfo, QueryRecoveryManager queryRecoveryManager)
     {
+        QUERY_STATE_LOG.debug("updateQueryInfo() is called!");
         QueryInfo queryInfo = getQueryInfo(stageInfo);
         if (queryInfo.isFinalQueryInfo()) {
             finalQueryInfo.compareAndSet(Optional.empty(), Optional.of(queryInfo));
         }
-        else if (SystemSessionProperties.isSnapshotEnabled(session)) {
-            if (queryInfo.getState() == RESCHEDULING && queryInfo.areAllStagesDone()) {
-                // Snapsoht: All remote tasks have been cancelled. Can start scheduling new ones.
-                transitionToResuming();
+        else if (SystemSessionProperties.isRecoveryEnabled(session)) {
+            if (queryRecoveryManager != null && queryRecoveryManager.getState() == STOPPING_FOR_RESCHEDULE) {
+                if (queryInfo.areAllStagesDone()) {
+                    QUERY_STATE_LOG.debug("updateQueryInfo,  All stages are done");
+                    transitionToRecovering();
+                    try {
+                        queryRecoveryManager.rescheduleQuery();
+                    }
+                    catch (Throwable e) {
+                        QUERY_STATE_LOG.warn(e, "Encountered error while rescheduling query");
+                        transitionToFailed(e);
+                        throwIfInstanceOf(e, Error.class);
+                    }
+                }
             }
         }
         return queryInfo;

@@ -940,14 +940,21 @@ helps with cache affinity scheduling.
 > Note:
 > For snapshot recovery `query.remote-task.max-error-duration` should be greater than `exchange.max-error-duration`.
 
-## Distributed Snapshot
+## Query Recovery
+
+### `recovery_enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> This session property is used to enable or disable the recovery framework, which enables to restart/resume the query in case of failure.
 
 ### `snapshot_enabled`
 
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
-> This session property is used to enable or disable the distributed snapshot functionality.
+> This session property is enabled to capture snapshots during query execution, when recovery framework is enabled. Without recovery framework enabled this flag has no significance
 
 ### `hetu.experimental.snapshot.profile`
 
@@ -959,23 +966,23 @@ helps with cache affinity scheduling.
 >
 > This is an experimental property. In the future it may be allowed to store snapshots in non-file-system locations, e.g. in a connector.
 
-### `hetu.snapshot.maxRetries`
+### `hetu.recovery.maxRetries`
 
 > -   **Type:** `int`
 > -   **Default value:** `10`
 >
 > This property defines the maximum number of error recovery attempts for a query. When the limit is reached, the query fails.
 >
-> This can also be specified on a per-query basis using the `snapshot_max_retries` session property.
+> This can also be specified on a per-query basis using the `recovery_max_retries` session property.
 
-### `hetu.snapshot.retryTimeout`
+### `hetu.recovery.retryTimeout`
 
 > -   **Type:** `duration`
 > -   **Default value:** `10m` (10 minutes)
 >
 > This property defines the maximum amount of time for the system to wait until all tasks are successfully restored. If any task is not ready within this timeout, then the recovery attempt is considered a failure, and the query will try to resume from an earlier snapshot if available.
 >
-> This can also be specified on a per-query basis using the `snapshot_retry_timeout` session property.
+> This can also be specified on a per-query basis using the `recovery_retry_timeout` session property.
 
 ### `hetu.snapshot.useKryoSerialization`
 

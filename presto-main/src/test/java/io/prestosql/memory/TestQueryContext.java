@@ -41,7 +41,7 @@ import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.memory.LocalMemoryManager.GENERAL_POOL;
 import static io.prestosql.memory.LocalMemoryManager.RESERVED_POOL;
 import static io.prestosql.testing.TestingPagesSerdeFactory.TESTING_SERDE_FACTORY;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
@@ -87,7 +87,7 @@ public class TestQueryContext
                     localQueryRunner.getScheduler(),
                     new DataSize(0, BYTE),
                     new SpillSpaceTracker(new DataSize(0, BYTE)),
-                    NOOP_SNAPSHOT_UTILS);
+                    NOOP_RECOVERY_UTILS);
 
             // Use memory
             queryContext.getQueryMemoryContext().initializeLocalMemoryContexts("test");
@@ -155,6 +155,6 @@ public class TestQueryContext
                 TEST_EXECUTOR,
                 new DataSize(0, BYTE),
                 new SpillSpaceTracker(new DataSize(0, BYTE)),
-                NOOP_SNAPSHOT_UTILS);
+                NOOP_RECOVERY_UTILS);
     }
 }

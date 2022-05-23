@@ -33,25 +33,25 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Test(singleThreaded = true)
-public class TestSnapshotUtils
+public class TestRecoveryUtils
 {
     HetuFileSystemClient fileSystemClient;
-    SnapshotUtils snapshotUtils;
+    RecoveryUtils recoveryUtils;
 
     @BeforeMethod
     public void setup()
             throws Exception
     {
         // Set up snapshot config
-        SnapshotConfig snapshotConfig = new SnapshotConfig();
+        RecoveryConfig recoveryConfig = new RecoveryConfig();
 
         // Set up mock file system client manager
         FileSystemClientManager fileSystemClientManager = mock(FileSystemClientManager.class);
         fileSystemClient = mock(HetuFileSystemClient.class);
         when(fileSystemClientManager.getFileSystemClient(any(Path.class))).thenReturn(fileSystemClient);
 
-        snapshotUtils = new SnapshotUtils(fileSystemClientManager, snapshotConfig, new InMemoryNodeManager());
-        snapshotUtils.initialize();
+        recoveryUtils = new RecoveryUtils(fileSystemClientManager, recoveryConfig, new InMemoryNodeManager());
+        recoveryUtils.initialize();
     }
 
     @Test
@@ -59,9 +59,9 @@ public class TestSnapshotUtils
             throws IOException
     {
         QueryId queryId1 = new QueryId("query1");
-        snapshotUtils.getOrCreateQuerySnapshotManager(queryId1, TEST_SNAPSHOT_SESSION);
+        recoveryUtils.getOrCreateQuerySnapshotManager(queryId1, TEST_SNAPSHOT_SESSION);
         QueryId queryId2 = new QueryId("query2");
-        snapshotUtils.getOrCreateQuerySnapshotManager(queryId2, TEST_SNAPSHOT_SESSION);
+        recoveryUtils.getOrCreateQuerySnapshotManager(queryId2, TEST_SNAPSHOT_SESSION);
 
         when(fileSystemClient.deleteRecursively(anyObject()))
                 .thenReturn(true) // OK to remove query 1
@@ -70,19 +70,19 @@ public class TestSnapshotUtils
                 .thenThrow(new IOException()) // Fail to remove query 1-or-2 (in cleanup)
                 .thenReturn(true); // OK to remove query 1-or-2 (in cleanup)
 
-        snapshotUtils.removeQuerySnapshotManager(queryId1); // OK
+        recoveryUtils.removeQuerySnapshotManager(queryId1); // OK
         verify(fileSystemClient).deleteRecursively(anyObject());
 
-        snapshotUtils.removeQuerySnapshotManager(queryId2); // Fail
+        recoveryUtils.removeQuerySnapshotManager(queryId2); // Fail
         verify(fileSystemClient, times(2)).deleteRecursively(anyObject());
 
-        snapshotUtils.cleanupSnapshots(); // 1 OK 1 Fail
+        recoveryUtils.cleanupSnapshots(); // 1 OK 1 Fail
         verify(fileSystemClient, times(4)).deleteRecursively(anyObject());
 
-        snapshotUtils.cleanupSnapshots(); // OK
+        recoveryUtils.cleanupSnapshots(); // OK
         verify(fileSystemClient, times(6)).deleteRecursively(anyObject());
 
-        snapshotUtils.cleanupSnapshots(); // No-op
+        recoveryUtils.cleanupSnapshots(); // No-op
         verify(fileSystemClient, times(8)).deleteRecursively(anyObject());
     }
 }

@@ -20,7 +20,7 @@ import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
-import io.prestosql.snapshot.SnapshotUtils;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.MarkerPage;
@@ -68,10 +68,10 @@ public class TestPartitionedOutputOperator
     public void testPartitionedOutputOperatorSnapshot()
             throws Exception
     {
-        SnapshotUtils snapshotUtils = mock(SnapshotUtils.class);
+        RecoveryUtils recoveryUtils = mock(RecoveryUtils.class);
         PartitionedOutputBuffer buffer = mock(PartitionedOutputBuffer.class);
 
-        PartitionedOutputOperator operator = createPartitionedOutputOperator(snapshotUtils, buffer);
+        PartitionedOutputOperator operator = createPartitionedOutputOperator(recoveryUtils, buffer);
         operator.getOperatorContext().getDriverContext().getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
         List<Page> input = rowPagesBuilder(BIGINT)
                 .addSequencePage(1, 1)
@@ -86,14 +86,14 @@ public class TestPartitionedOutputOperator
         operator.addInput(input.get(0));
         operator.addInput(marker);
         ArgumentCaptor<Object> stateArgument = ArgumentCaptor.forClass(Object.class);
-        verify(snapshotUtils, times(1)).storeState(anyObject(), stateArgument.capture(), anyObject());
+        verify(recoveryUtils, times(1)).storeState(anyObject(), stateArgument.capture(), anyObject());
         Object snapshot = stateArgument.getValue();
-        when(snapshotUtils.loadState(anyObject(), anyObject())).thenReturn(Optional.of(snapshot));
+        when(recoveryUtils.loadState(anyObject(), anyObject())).thenReturn(Optional.of(snapshot));
         operator.addInput(input.get(1));
         operator.addInput(resume);
 
         operator.addInput(marker2);
-        verify(snapshotUtils, times(2)).storeState(anyObject(), stateArgument.capture(), anyObject());
+        verify(recoveryUtils, times(2)).storeState(anyObject(), stateArgument.capture(), anyObject());
         snapshot = stateArgument.getValue();
         Object snapshotEntry = ((Map<String, Object>) snapshot).get("query/2/1/1/0/0/0");
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingBeforeFinish());
@@ -101,7 +101,7 @@ public class TestPartitionedOutputOperator
         operator.addInput(input.get(1));
         operator.finish();
         operator.addInput(marker3);
-        verify(snapshotUtils, times(3)).storeState(anyObject(), stateArgument.capture(), anyObject());
+        verify(recoveryUtils, times(3)).storeState(anyObject(), stateArgument.capture(), anyObject());
         snapshot = stateArgument.getValue();
         snapshotEntry = ((Map<String, Object>) snapshot).get("query/3/1/1/0/0/0");
         assertEquals(SnapshotTestUtil.toFullSnapshotMapping(snapshotEntry), createExpectedMappingAfterFinish());
@@ -152,7 +152,7 @@ public class TestPartitionedOutputOperator
         return expectedMapping;
     }
 
-    private PartitionedOutputOperator createPartitionedOutputOperator(SnapshotUtils snapshotUtils, PartitionedOutputBuffer buffer)
+    private PartitionedOutputOperator createPartitionedOutputOperator(RecoveryUtils recoveryUtils, PartitionedOutputBuffer buffer)
     {
         PartitionFunction partitionFunction = new LocalPartitionGenerator(new InterpretedHashGenerator(ImmutableList.of(BIGINT), new int[] {0}), PARTITION_COUNT);
         PartitionedOutputOperator.PartitionedOutputFactory operatorFactory = new PartitionedOutputOperator.PartitionedOutputFactory(
@@ -163,15 +163,15 @@ public class TestPartitionedOutputOperator
                 OptionalInt.empty(),
                 buffer,
                 new DataSize(1, GIGABYTE));
-        TaskContext taskContext = createTaskContext(snapshotUtils);
+        TaskContext taskContext = createTaskContext(recoveryUtils);
         return (PartitionedOutputOperator) operatorFactory
                 .createOutputOperator(0, new PlanNodeId("plan-node-0"), TYPES, Function.identity(), taskContext)
                 .createOperator(createDriverContext(taskContext));
     }
 
-    private TaskContext createTaskContext(SnapshotUtils snapshotUtils)
+    private TaskContext createTaskContext(RecoveryUtils recoveryUtils)
     {
-        TaskContext taskContext = TestingTaskContext.builder(EXECUTOR, SCHEDULER, TEST_SNAPSHOT_SESSION, snapshotUtils)
+        TaskContext taskContext = TestingTaskContext.builder(EXECUTOR, SCHEDULER, TEST_SNAPSHOT_SESSION, recoveryUtils)
                 .setMemoryPoolSize(MAX_MEMORY)
                 .build();
         // So that

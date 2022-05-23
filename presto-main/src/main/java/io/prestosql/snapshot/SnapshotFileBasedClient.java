@@ -65,12 +65,12 @@ public class SnapshotFileBasedClient
             throws IOException
     {
         Stopwatch timer = Stopwatch.createStarted();
-        Path file = SnapshotUtils.createStatePath(rootPath, snapshotStateId.getHierarchy());
+        Path file = RecoveryUtils.createStatePath(rootPath, snapshotStateId.getHierarchy());
 
         fsClient.createDirectories(file.getParent());
 
         try (OutputStream outputStream = fsClient.newOutputStream(file)) {
-            SnapshotUtils.serializeState(state, outputStream, useKryo);
+            RecoveryUtils.serializeState(state, outputStream, useKryo);
         }
         timer.stop();
         if (dataCollector != null) {
@@ -89,13 +89,13 @@ public class SnapshotFileBasedClient
     {
         Optional<Object> result;
         Stopwatch timer = Stopwatch.createStarted();
-        Path file = SnapshotUtils.createStatePath(rootPath, snapshotStateId.getHierarchy());
+        Path file = RecoveryUtils.createStatePath(rootPath, snapshotStateId.getHierarchy());
         if (!fsClient.exists(file)) {
             return Optional.empty();
         }
 
         try (InputStream inputStream = fsClient.newInputStream(file)) {
-            result = Optional.of(SnapshotUtils.deserializeState(inputStream, useKryo));
+            result = Optional.of(RecoveryUtils.deserializeState(inputStream, useKryo));
         }
         timer.stop();
         if (dataCollector != null) {
@@ -113,7 +113,7 @@ public class SnapshotFileBasedClient
         Stopwatch timer = Stopwatch.createStarted();
         List<String> hierarchy = new ArrayList<>(snapshotStateId.getHierarchy());
         hierarchy.add(sourceFile.getFileName().toString());
-        Path file = SnapshotUtils.createStatePath(rootPath, hierarchy);
+        Path file = RecoveryUtils.createStatePath(rootPath, hierarchy);
 
         fsClient.createDirectories(file.getParent());
 
@@ -141,7 +141,7 @@ public class SnapshotFileBasedClient
         List<String> hierarchy = new ArrayList<>(snapshotStateId.getHierarchy());
         String fileName = targetPath.getFileName().toString();
         hierarchy.add(fileName);
-        Path file = SnapshotUtils.createStatePath(rootPath, hierarchy);
+        Path file = RecoveryUtils.createStatePath(rootPath, hierarchy);
 
         if (!fsClient.exists(file)) {
             LOG.warn("File: %s does not exist under %s", targetPath.getFileName().toString(), snapshotStateId);
@@ -168,7 +168,7 @@ public class SnapshotFileBasedClient
     public void deleteAll(String queryId)
             throws IOException
     {
-        Path file = SnapshotUtils.createStatePath(rootPath, queryId);
+        Path file = RecoveryUtils.createStatePath(rootPath, queryId);
         fsClient.deleteRecursively(file);
     }
 
@@ -176,7 +176,7 @@ public class SnapshotFileBasedClient
     public void storeSnapshotResult(String queryId, Map<Long, SnapshotInfo> result)
             throws IOException
     {
-        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "result");
+        Path file = RecoveryUtils.createStatePath(rootPath, queryId, "result");
 
         fsClient.createDirectories(file.getParent());
 
@@ -189,7 +189,7 @@ public class SnapshotFileBasedClient
     public Map<Long, SnapshotInfo> loadSnapshotResult(String queryId)
             throws IOException, ClassNotFoundException
     {
-        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "result");
+        Path file = RecoveryUtils.createStatePath(rootPath, queryId, "result");
 
         if (!fsClient.exists(file)) {
             return new LinkedHashMap<>();
@@ -204,7 +204,7 @@ public class SnapshotFileBasedClient
     public Set<String> loadConsolidatedFiles(String queryId)
             throws IOException, ClassNotFoundException
     {
-        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
+        Path file = RecoveryUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
 
         if (!fsClient.exists(file)) {
             return null;
@@ -219,7 +219,7 @@ public class SnapshotFileBasedClient
     public void storeConsolidatedFileList(String queryId, Set<String> path)
             throws IOException
     {
-        Path file = SnapshotUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
+        Path file = RecoveryUtils.createStatePath(rootPath, queryId, "ConsolidatedFileList");
 
         fsClient.createDirectories(file.getParent());
 

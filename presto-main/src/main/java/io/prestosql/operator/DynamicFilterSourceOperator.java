@@ -15,8 +15,8 @@ package io.prestosql.operator;
 
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.snapshot.SingleInputSnapshotState;
-import io.prestosql.snapshot.SnapshotUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -249,7 +249,7 @@ public class DynamicFilterSourceOperator
                     .stream()
                     .map(channel -> values.get(channel)
                             .stream()
-                            .map(value -> SnapshotUtils.captureHelper(value, serdeProvider))
+                            .map(value -> RecoveryUtils.captureHelper(value, serdeProvider))
                             .toArray())
                     .toArray(Object[][]::new);
         }
@@ -276,7 +276,7 @@ public class DynamicFilterSourceOperator
                 Type valueType = channels.get(i).type;
                 Set<?> set = Arrays
                         .stream(myState.values[i])
-                        .map(value -> SnapshotUtils.restoreHelper(value, valueType.getJavaType(), serdeProvider))
+                        .map(value -> RecoveryUtils.restoreHelper(value, valueType.getJavaType(), serdeProvider))
                         .collect(Collectors.toSet());
                 values.get(channels.get(i)).clear();
                 values.get(channels.get(i)).addAll(set);

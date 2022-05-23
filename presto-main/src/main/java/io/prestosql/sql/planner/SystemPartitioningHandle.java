@@ -37,7 +37,7 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.SystemSessionProperties.getHashPartitionCount;
-import static io.prestosql.snapshot.SnapshotConfig.calculateTaskCount;
+import static io.prestosql.snapshot.RecoveryConfig.calculateTaskCount;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.util.Failures.checkCondition;
 import static java.util.Objects.requireNonNull;
@@ -135,7 +135,7 @@ public final class SystemPartitioningHandle
         return partitioning.toString();
     }
 
-    public NodePartitionMap getNodePartitionMap(Session session, NodeScheduler nodeScheduler, boolean isSnapshotEnabled, Integer inputNodeCount)
+    public NodePartitionMap getNodePartitionMap(Session session, NodeScheduler nodeScheduler, boolean isRecoveryEnabled, Integer inputNodeCount)
     {
         NodeSelector nodeSelector = nodeScheduler.createNodeSelector(null, false, null);
         Integer nodeCount = inputNodeCount;
@@ -147,7 +147,7 @@ public final class SystemPartitioningHandle
             nodes = nodeSelector.selectRandomNodes(1);
         }
         else if (partitioning == SystemPartitioning.FIXED) {
-            if (isSnapshotEnabled) {
+            if (isRecoveryEnabled) {
                 if (nodeCount == null) {
                     // Snapshot: don't allocate all nodes
                     nodeCount = Math.min(getHashPartitionCount(session), calculateTaskCount(nodeSelector.selectableNodeCount()));

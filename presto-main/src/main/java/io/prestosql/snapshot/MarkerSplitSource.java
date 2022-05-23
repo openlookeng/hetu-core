@@ -91,11 +91,13 @@ public class MarkerSplitSource
     // Can't use "synchronized" keyword, because the transformer happens in a separate thread,
     // but should be considered as part of the getNextBatch() call.
     private Semaphore lock = new Semaphore(1);
+    private final boolean captureDisabled;
 
-    public MarkerSplitSource(SplitSource source, MarkerAnnouncer announcer)
+    public MarkerSplitSource(SplitSource source, MarkerAnnouncer announcer, boolean captureDisabled)
     {
         this.source = source;
         this.announcer = announcer;
+        this.captureDisabled = captureDisabled;
         allDependencies = new HashSet<>();
         remainingDependencies = new HashSet<>();
         unionSources = new HashSet<>();
@@ -185,10 +187,12 @@ public class MarkerSplitSource
                 return Futures.immediateFuture(batch);
             }
 
-            // Force send last-batch marker
-            long sid = announcer.forceGenerateMarker(this);
-            SplitBatch batch = recordSnapshot(lifespan, false, sid, true);
-            return Futures.immediateFuture(batch);
+            if (!captureDisabled) {
+                // Force send last-batch marker
+                long sid = announcer.forceGenerateMarker(this);
+                SplitBatch batch = recordSnapshot(lifespan, false, sid, true);
+                return Futures.immediateFuture(batch);
+            }
         }
 
         OptionalLong snapshotId = announcer.shouldGenerateMarker(this);
@@ -213,14 +217,18 @@ public class MarkerSplitSource
                 List<Split> splits = batch.getSplits();
                 incrementSplitCount(splits.size());
                 if (batch.isLastBatch()) {
-                    if (splits.size() == 0) {
+                    if (splits.size() == 0 && !captureDisabled) {
                         // Force generate a marker for last batch. Marker can't be mixed with data splits.
                         long sid = announcer.forceGenerateMarker(this);
                         batch = recordSnapshot(lifespan, false, sid, true);
                     }
                     else {
                         // Don't send last-batch signal yet. Next call will generate a marker with last-batch.
-                        batch = new SplitBatch(splits, false);
+                        batch = new SplitBatch(splits, captureDisabled);
+                        if (captureDisabled) {
+                            sentFinalMarker = true;
+                            deactivate();
+                        }
                     }
                 }
             }

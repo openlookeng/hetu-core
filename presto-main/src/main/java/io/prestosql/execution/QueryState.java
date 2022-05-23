@@ -45,13 +45,9 @@ public enum QueryState
      */
     RUNNING(false),
     /**
-     * Failed tasks will be re-scheduled. Waiting for old stages/tasks to finish.
+     * State indicating that recovery is in progress
      */
-    RESCHEDULING(false),
-    /**
-     * Resume execution of rescheduled tasks, after old stages/tasks finish.
-     */
-    RESUMING(false),
+    RECOVERING(false),
     /**
      * Query is finishing (e.g. commit for autocommit queries)
      */

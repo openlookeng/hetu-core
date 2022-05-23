@@ -360,6 +360,7 @@ public class TestHivePageSink
 
         // Mocked necessary but uninteresting methods
         when(connectorSession.isSnapshotEnabled()).thenReturn(true);
+        when(connectorSession.isRecoveryEnabled()).thenReturn(true);
         when(connectorSession.getTaskId()).thenReturn(OptionalInt.of(1));
         when(pageIndexerFactory.createPageIndexer(anyObject())).thenReturn(pageIndexer);
         when(jsonCodec.toJsonBytes(anyObject())).thenReturn(new byte[0]);

@@ -53,8 +53,8 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.testing.LocalQueryRunner.queryRunnerWithInitialTransaction;
+import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
-import static io.prestosql.testing.TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
@@ -103,7 +103,7 @@ public class TestMemoryPools
                 localQueryRunner.getScheduler(),
                 TEN_MEGABYTES,
                 spillSpaceTracker,
-                NOOP_SNAPSHOT_UTILS);
+                NOOP_RECOVERY_UTILS);
         taskContext = createTaskContext(queryContext, localQueryRunner.getExecutor(), session);
         drivers = driversSupplier.get();
     }
