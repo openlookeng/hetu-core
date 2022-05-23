@@ -102,6 +102,9 @@ public class TaskExecutor
     @GuardedBy("this")
     private final List<TaskHandle> tasks;
 
+    @GuardedBy("this")
+    private final List<TaskHandle> suspendedTasks;
+
     /**
      * All splits registered with the task executor.
      */
@@ -123,6 +126,9 @@ public class TaskExecutor
      * Splits running on a thread.
      */
     private final Set<PrioritizedSplitRunner> runningSplits = newConcurrentHashSet();
+
+    @GuardedBy("this")
+    private final Set<PrioritizedSplitRunner> suspendedSplits = new HashSet<>();
 
     /**
      * Splits blocked by the driver.
@@ -208,6 +214,7 @@ public class TaskExecutor
         this.maximumNumberOfDriversPerTask = maximumNumberOfDriversPerTask;
         this.waitingSplits = requireNonNull(splitQueue, "splitQueue is null");
         this.tasks = new LinkedList<>();
+        this.suspendedTasks = new LinkedList<>();
     }
 
     @PostConstruct
@@ -267,6 +274,65 @@ public class TaskExecutor
 
         tasks.add(taskHandle);
         return taskHandle;
+    }
+
+    public synchronized void resumeTask(TaskId taskId)
+    {
+        TaskHandle taskHandle = getTaskHandle(suspendedTasks, taskId);
+        if (taskHandle == null) {
+            log.debug("Task {} does not exist anymore", taskId);
+            return;
+        }
+        try (SetThreadName ignored = new SetThreadName("Task-%s", taskHandle)) {
+            List<PrioritizedSplitRunner> splits;
+
+            suspendedTasks.remove(taskHandle);
+            tasks.add(taskHandle);
+
+            splits = taskHandle.getRunningIntermediateSplits();
+            for (PrioritizedSplitRunner split : splits) {
+                startIntermediateSplit(split);
+                taskHandle.recordIntermediateSplit(split);
+            }
+
+            splits = taskHandle.getQueuedLeafSplits();
+            for (PrioritizedSplitRunner split : splits) {
+                // if task is under the limit for guaranteed splits, start one
+                scheduleTaskIfNecessary(taskHandle);
+                // if globally we have more resources, start more
+                addNewEntrants();
+            }
+        }
+    }
+
+    public synchronized void suspendTask(TaskId taskId)
+    {
+        TaskHandle taskHandle = getTaskHandle(tasks, taskId);
+        if (taskHandle == null) {
+            log.debug("Task {} does not exist anymore", taskId);
+            return;
+        }
+        try (SetThreadName ignored = new SetThreadName("Task-%s", taskHandle)) {
+            List<PrioritizedSplitRunner> splits = taskHandle.suspend();
+
+            tasks.remove(taskHandle);
+            suspendedTasks.add(taskHandle);
+
+            allSplits.removeAll(splits);
+            intermediateSplits.removeAll(splits);
+            blockedSplits.keySet().removeAll(splits);
+            waitingSplits.removeAll(splits);
+        }
+    }
+
+    private synchronized TaskHandle getTaskHandle(List<TaskHandle> taskList, TaskId taskId)
+    {
+        for (TaskHandle task : taskList) {
+            if (task.getTaskId() == taskId) {
+                return task;
+            }
+        }
+        return null;
     }
 
     public void removeTask(TaskHandle taskHandle)

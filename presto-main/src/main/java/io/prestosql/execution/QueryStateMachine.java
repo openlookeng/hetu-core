@@ -86,6 +86,7 @@ import static io.prestosql.execution.QueryState.QUEUED;
 import static io.prestosql.execution.QueryState.RECOVERING;
 import static io.prestosql.execution.QueryState.RUNNING;
 import static io.prestosql.execution.QueryState.STARTING;
+import static io.prestosql.execution.QueryState.SUSPENDED;
 import static io.prestosql.execution.QueryState.TERMINAL_QUERY_STATES;
 import static io.prestosql.execution.QueryState.WAITING_FOR_RESOURCES;
 import static io.prestosql.execution.StageInfo.getAllStages;
@@ -806,7 +807,17 @@ public class QueryStateMachine
 
     public boolean transitionToRecovering()
     {
-        return queryState.setIf(RECOVERING, currentState -> currentState == RUNNING);
+        return queryState.setIf(RECOVERING, currentState -> currentState == RUNNING || currentState == SUSPENDED);
+    }
+
+    public boolean transitionToSuspend()
+    {
+        return queryState.setIf(SUSPENDED, currentState -> currentState == RUNNING);
+    }
+
+    public boolean transitionToResumeRunning()
+    {
+        return queryState.setIf(RUNNING, currentState -> currentState == SUSPENDED);
     }
 
     public boolean transitionToFinishing()

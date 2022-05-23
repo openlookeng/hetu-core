@@ -17,6 +17,7 @@ package io.prestosql.snapshot;
 public enum RecoveryState {
     DEFAULT, // Bootstrapped with necessary callbacks and configs, ready to use
     STOPPING_FOR_RESCHEDULE, // Stopping the query for rescheduling after receiving the failure is in progress
+    SUSPENDED, // Suspend execution for the Query
     RESCHEDULING, // Restarting / Resuming the query based on recovery implementation, Move back to READY state after recovery completed
     RECOVERY_FAILED
 }

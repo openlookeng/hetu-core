@@ -41,6 +41,10 @@ public enum QueryState
      */
     STARTING(false),
     /**
+     * Query has been suspend of its execution state.
+     */
+    SUSPENDED(false),
+    /**
      * Query has at least one running task.
      */
     RUNNING(false),

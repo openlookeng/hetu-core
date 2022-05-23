@@ -33,8 +33,10 @@ import io.prestosql.execution.buffer.OutputBuffer;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.QueryContext;
+import io.prestosql.memory.VoidTraversingQueryContextVisitor;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.CommonTableExecutionContext;
+import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.PipelineContext;
 import io.prestosql.operator.PipelineStatus;
 import io.prestosql.operator.TaskContext;
@@ -70,6 +72,7 @@ import static io.prestosql.connector.DataCenterUtility.loadDCCatalogForUpdateTas
 import static io.prestosql.execution.TaskState.ABORTED;
 import static io.prestosql.execution.TaskState.CANCELED_TO_RESUME;
 import static io.prestosql.execution.TaskState.FAILED;
+import static io.prestosql.execution.TaskState.RUNNING;
 import static io.prestosql.util.Failures.toFailures;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -434,6 +437,90 @@ public class SqlTask
 
             if (taskExecution != null) {
                 taskExecution.addSources(sources);
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
+    public TaskInfo suspend(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+
+                if (taskStateMachine.getState() == RUNNING) {
+                    taskExecution = taskHolder.getTaskExecution();
+                    if (taskExecution != null) {
+                        AtomicLong bytesRevokedAtomic = new AtomicLong();
+                        queryContext.accept(new VoidTraversingQueryContextVisitor<AtomicLong>()
+                        {
+                            @Override
+                            public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
+                            {
+                                if (remainingBytesToRevoke.get() < 0) {
+                                    // exit immediately if no work needs to be done
+                                    return null;
+                                }
+                                return super.visitQueryContext(queryContext, remainingBytesToRevoke);
+                            }
+
+                            @Override
+                            public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
+                            {
+                                if (remainingBytesToRevoke.get() > 0) {
+                                    long revokedBytes = operatorContext.requestMemoryRevoking();
+                                    if (revokedBytes > 0) {
+                                        remainingBytesToRevoke.addAndGet(revokedBytes);
+                                        log.debug("revoked bytes current: %s, total: %s", revokedBytes, remainingBytesToRevoke.get());
+                                    }
+                                }
+                                return null;
+                            }
+                        }, bytesRevokedAtomic);
+
+                        taskExecution.suspendTask();
+                    }
+                }
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
+    public TaskInfo resume(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+                taskExecution = taskHolder.getTaskExecution();
+                if (taskExecution != null) {
+                    taskExecution.resumeTask();
+                }
             }
         }
         catch (Error e) {

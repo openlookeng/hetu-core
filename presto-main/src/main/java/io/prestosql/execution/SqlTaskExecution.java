@@ -836,6 +836,18 @@ public class SqlTaskExecution
         }
     }
 
+    public void suspendTask()
+    {
+        taskExecutor.suspendTask(taskId);
+        taskStateMachine.suspend();
+    }
+
+    public void resumeTask()
+    {
+        taskExecutor.resumeTask(taskId);
+        taskStateMachine.resume();
+    }
+
     // Splits for a particular plan node (all driver groups)
     @NotThreadSafe
     private static class PendingSplitsForPlanNode

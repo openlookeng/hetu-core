@@ -846,7 +846,7 @@ public class SqlQueryScheduler
             for (SqlStageExecution stage : stages.values()) {
                 StageState state = stage.getState();
                 // if state is recovery, then state of stage and query will change soon again. Don't treat as an error.
-                if (state != SCHEDULED && state != RUNNING && !state.isDone() && queryRecoveryManager.getState() != STOPPING_FOR_RESCHEDULE) {
+                if (state != SCHEDULED && state != RUNNING && !state.isDone() && queryRecoveryManager.isRecovering()) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Scheduling is complete, but stage %s is in state %s", stage.getStageId(), state));
                 }
             }
@@ -898,6 +898,22 @@ public class SqlQueryScheduler
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
             stages.values().forEach(SqlStageExecution::abort);
+        }
+    }
+
+    public synchronized void suspend()
+    {
+        log.info("Suspending query tasks: %s, usingSnapshot: %b", queryStateMachine.getQueryId(), false);
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::suspend);
+        }
+    }
+
+    public synchronized void resume()
+    {
+        log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::resume);
         }
     }
 

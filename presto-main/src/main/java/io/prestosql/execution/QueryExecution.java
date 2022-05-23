@@ -84,6 +84,16 @@ public interface QueryExecution
      */
     void addFinalQueryInfoListener(StateChangeListener<QueryInfo> stateChangeListener);
 
+    default void suspendQuery()
+    {
+        // no-op
+    }
+
+    default void resumeQuery()
+    {
+        // no-op
+    }
+
     interface QueryExecutionFactory<T extends QueryExecution>
     {
         T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);

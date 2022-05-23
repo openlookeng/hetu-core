@@ -118,6 +118,20 @@ This section describes the most important config properties that may be used to 
 >
 > This is the amount of memory set aside as headroom/buffer in the JVM heap for allocations that are not tracked by openLooKeng.
 
+### `query.suspend-query-enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enables running query temporary suspension when system is in low resource situation.
+
+### `query.max-suspended-queries`
+
+> -   **Type:** `integer`
+> -   **Default value:** `10`
+>
+> Maximum number of queries to attempt suspension before starting of killing the queries. This property comes in effect only if `query.suspend-query-enabled` is configured `true`
+
 ## Spilling Properties
 
 ### `experimental.spill-enabled`

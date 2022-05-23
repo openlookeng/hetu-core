@@ -258,6 +258,54 @@ public class TaskResource
         return taskStatus;
     }
 
+    @GET
+    @Path("{taskId}/suspend")
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    public TaskInfo suspendTask(
+            @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
+            @QueryParam("targetState") String targetStateStr,
+            @Context UriInfo uriInfo)
+    {
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+
+        TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
+        TaskInfo taskInfo = taskManager.suspendTask(taskId, targetState, taskInstanceId);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+        }
+
+        if (shouldSummarize(uriInfo)) {
+            taskInfo = taskInfo.summarize();
+        }
+        return taskInfo;
+    }
+
+    @GET
+    @Path("{taskId}/resume")
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    public TaskInfo resumeTask(
+            @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
+            @QueryParam("targetState") String targetStateStr,
+            @Context UriInfo uriInfo)
+    {
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+
+        TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
+        TaskInfo taskInfo = taskManager.resumeTask(taskId, targetState, taskInstanceId);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+        }
+
+        if (shouldSummarize(uriInfo)) {
+            taskInfo = taskInfo.summarize();
+        }
+        return taskInfo;
+    }
+
     @DELETE
     @Path("{taskId}")
     @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})

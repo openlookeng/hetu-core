@@ -1384,7 +1384,7 @@ public class HiveMetadata
 
         partitionUpdates = PartitionUpdate.mergePartitionUpdates(partitionUpdates);
 
-        if (session.isSnapshotEnabled()) {
+        if (session.isRecoveryEnabled()) {
             Set<String> mergedFileNames = collectMergedFileNames(partitionUpdates);
             updateSnapshotFiles(session, handle, false, mergedFileNames, OptionalLong.empty());
             // Remove suffix from file names in partition updates

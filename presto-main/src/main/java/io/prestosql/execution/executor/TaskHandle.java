@@ -119,6 +119,20 @@ public class TaskHandle
         return maxDriversPerTask;
     }
 
+    public synchronized List<PrioritizedSplitRunner> suspend()
+    {
+        checkState(!destroyed, "Cannot suspend task as already destroyed");
+        ImmutableList.Builder<PrioritizedSplitRunner> builder = ImmutableList.builder();
+        builder.addAll(runningIntermediateSplits);
+        builder.addAll(runningLeafSplits);
+        builder.addAll(queuedLeafSplits);
+
+        queuedLeafSplits.addAll(runningLeafSplits);
+
+        runningLeafSplits.clear();
+        return builder.build();
+    }
+
     // Returns any remaining splits. The caller must destroy these.
     public synchronized List<PrioritizedSplitRunner> destroy()
     {
@@ -183,6 +197,20 @@ public class TaskHandle
     public int getNextSplitId()
     {
         return nextSplitId.getAndIncrement();
+    }
+
+    public synchronized List<PrioritizedSplitRunner> getQueuedLeafSplits()
+    {
+        ImmutableList.Builder<PrioritizedSplitRunner> builder = ImmutableList.builder();
+        builder.addAll(queuedLeafSplits);
+        return builder.build();
+    }
+
+    public List<PrioritizedSplitRunner> getRunningIntermediateSplits()
+    {
+        ImmutableList.Builder<PrioritizedSplitRunner> builder = ImmutableList.builder();
+        builder.addAll(runningIntermediateSplits);
+        return builder.build();
     }
 
     @Override

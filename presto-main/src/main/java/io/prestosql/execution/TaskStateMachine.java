@@ -26,6 +26,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.execution.TaskState.RUNNING;
+import static io.prestosql.execution.TaskState.SUSPENDED;
 import static io.prestosql.execution.TaskState.TERMINAL_TASK_STATES;
 import static java.util.Objects.requireNonNull;
 
@@ -109,6 +111,16 @@ public class TaskStateMachine
         checkArgument(doneState.isDone(), "doneState %s is not a done state", doneState);
 
         taskState.setIf(doneState, currentState -> !currentState.isDone());
+    }
+
+    public void suspend()
+    {
+        taskState.set(SUSPENDED);
+    }
+
+    public void resume()
+    {
+        taskState.set(RUNNING);
     }
 
     /**
