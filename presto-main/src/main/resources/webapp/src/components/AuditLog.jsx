@@ -135,7 +135,7 @@ export class AuditLog extends React.Component {
             });
             this.resetTimer();
         }.bind(this))
-            .error(function () {
+            .fail(function () {
                 this.resetTimer();
             }.bind(this));
 
