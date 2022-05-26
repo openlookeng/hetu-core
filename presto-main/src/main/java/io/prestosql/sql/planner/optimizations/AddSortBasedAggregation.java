@@ -55,6 +55,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.SystemSessionProperties.isSortBasedAggregationEnabled;
 import static io.prestosql.spi.plan.TableScanNode.getActualColName;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
@@ -80,7 +81,7 @@ public class AddSortBasedAggregation
     @Override
     public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        if (!isSortBasedAggregationEnabled(session)) {
+        if (!isSortBasedAggregationEnabled(session) || isSnapshotEnabled(session)) {
             return plan;
         }
 
