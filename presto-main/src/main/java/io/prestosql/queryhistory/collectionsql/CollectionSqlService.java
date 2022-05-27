@@ -41,7 +41,7 @@ public class CollectionSqlService
         String query = favoriteInfo.getQuery();
         String catalog = favoriteInfo.getCatalog();
         String schema = favoriteInfo.getSchemata();
-        if (hetuMetaStoreManager.getHetuMetastore().getFavorite(1, 1, user).getTotal() == queryHistoryConfig.getMaxCollectionSqlCount()) {
+        if (hetuMetaStoreManager.getHetuMetastore().getFavorite(1, 1, user).getTotal() >= queryHistoryConfig.getMaxCollectionSqlCount()) {
             return false;
         }
         hetuMetaStoreManager.getHetuMetastore().insertFavorite(new FavoriteEntity(user, query, catalog, schema));
