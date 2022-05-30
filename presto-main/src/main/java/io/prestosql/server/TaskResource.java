@@ -258,7 +258,7 @@ public class TaskResource
         return taskStatus;
     }
 
-    @GET
+    @DELETE
     @Path("{taskId}/suspend")
     @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public TaskInfo suspendTask(
@@ -282,7 +282,7 @@ public class TaskResource
         return taskInfo;
     }
 
-    @GET
+    @DELETE
     @Path("{taskId}/resume")
     @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public TaskInfo resumeTask(
