@@ -17,12 +17,24 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.connector.ConnectorFactory;
+import io.prestosql.spi.function.ConnectorConfig;
+import io.prestosql.spi.queryeditorui.ConnectorUtil;
+import io.prestosql.spi.queryeditorui.ConnectorWithProperties;
 import io.prestosql.spi.type.Type;
 
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
 
 import static io.hetu.core.plugin.mongodb.ObjectIdType.OBJECT_ID;
 
+/**
+ * hetu plugin to use mongodb as a data source.
+ */
+@ConnectorConfig(connectorLabel = "MongoDB: Allow access to MongoDB data from openLooKeng",
+        propertiesEnabled = true,
+        docLink = "https://openlookeng.io/docs/docs/connector/mongodb.html",
+        configLink = "https://openlookeng.io/docs/docs/connector/mongodb.html#configuration")
 public class MongoPlugin
         implements Plugin
 {
@@ -42,5 +54,13 @@ public class MongoPlugin
     public Iterable<ConnectorFactory> getConnectorFactories()
     {
         return ImmutableList.of(new MongoConnectorFactory("mongodb"));
+    }
+
+    @Override
+    public Optional<ConnectorWithProperties> getConnectorWithProperties()
+    {
+        ConnectorConfig connectorConfig = MongoPlugin.class.getAnnotation(ConnectorConfig.class);
+        return ConnectorUtil.assembleConnectorProperties(connectorConfig,
+                Arrays.asList(MongoClientConfig.class.getDeclaredMethods()));
     }
 }

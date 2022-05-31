@@ -19,6 +19,7 @@ import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.DefunctConfig;
+import io.prestosql.spi.function.Mandatory;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
@@ -90,6 +91,10 @@ public class MongoClientConfig
         return seeds;
     }
 
+    @Mandatory(name = "mongodb.seeds",
+            description = "List of mongodb servers",
+            defaultValue = "ip:port",
+            required = true)
     @Config("mongodb.seeds")
     public MongoClientConfig setSeeds(String commaSeparatedList)
     {
