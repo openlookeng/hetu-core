@@ -280,7 +280,7 @@ public class QueryContext
                 parent.orElse(null),
                 serdeFactory,
                 new TaskSnapshotManager(taskStateMachine.getTaskId(), resumeCount, recoveryUtils),
-                recoveryUtils.getOrCreateRecoveryManager(queryId, session));
+                recoveryUtils.getRecoveryManager(queryId));
         taskContexts.put(taskInstanceId, taskContext);
         return taskContext;
     }
