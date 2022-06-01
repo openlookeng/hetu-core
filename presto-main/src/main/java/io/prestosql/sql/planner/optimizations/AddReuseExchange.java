@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
 import static io.prestosql.SystemSessionProperties.isColocatedJoinEnabled;
 import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
@@ -78,7 +79,7 @@ public class AddReuseExchange
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
 
-        if (!isReuseTableScanEnabled(session) || isColocatedJoinEnabled(session)) {
+        if (!isReuseTableScanEnabled(session) || isColocatedJoinEnabled(session) || isSnapshotEnabled(session)) {
             return plan;
         }
         else {
