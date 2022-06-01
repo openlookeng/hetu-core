@@ -838,14 +838,24 @@ public class SqlTaskExecution
 
     public void suspendTask()
     {
-        taskExecutor.suspendTask(taskId);
-        taskStateMachine.suspend();
+        if (taskStateMachine.getState() == TaskState.RUNNING) {
+            taskExecutor.suspendTask(taskId);
+            taskStateMachine.suspend();
+        }
+        else {
+            log.warn("Task Suspend requested when its not running: %s", taskStateMachine.getState().toString());
+        }
     }
 
     public void resumeTask()
     {
-        taskExecutor.resumeTask(taskId);
-        taskStateMachine.resume();
+        if (taskStateMachine.getState() == TaskState.SUSPENDED) {
+            taskExecutor.resumeTask(taskId);
+            taskStateMachine.resume();
+        }
+        else {
+            log.warn("Task Resume requested when its not suspended: %s", taskStateMachine.getState().toString());
+        }
     }
 
     // Splits for a particular plan node (all driver groups)

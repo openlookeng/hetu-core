@@ -16,14 +16,65 @@ import React from "react";
 
 import {getProgressBarPercentage, getProgressBarTitle, getQueryStateColor, isQueryEnded} from "../utils";
 
+class SinglePressButton extends React.Component {
+    constructor(props) {
+        super(props)
+
+        this.state = {
+            isButtonDisabled: false,
+            uri: this.props.uri,
+            label: this.props.label
+        }
+    }
+
+    sendRequest() {
+        this.setState({
+            isButtonDisabled: true
+        });
+
+        $.ajax({url: this.state.uri, type: 'DELETE', complete: function(){ this.setState({isButtonDisabled : false}); }});
+    }
+
+    render() {
+        return (
+            <button
+                onClick={() => this.sendRequest()}
+                disabled={this.state.isButtonDisabled}
+                className="btn btn-warning"
+                target="_blank">
+                {this.state.label}
+            </button>
+        )
+    }
+}
+
 export class QueryHeader extends React.Component {
     constructor(props) {
         super(props);
+        this.state = {suspendDisabled : false, resumeDisabled : false};
+    }
+
+    isSuspendable(query) {
+        if (query.state === 'RUNNING') {
+            return true;
+        }
+
+        return false;
+    }
+
+    isResumable(query) {
+        if (query.state === 'SUSPENDED') {
+            return true;
+        }
+
+        return false;
     }
 
     renderProgressBar() {
         const query = this.props.query;
         const progressBarStyle = {width: getProgressBarPercentage(query) + "%", backgroundColor: getQueryStateColor(query)};
+        const showSuspended = this.isSuspendable(query)
+        const showResumable = this.isResumable(query)
 
         if (isQueryEnded(query)) {
             return (
@@ -39,28 +90,40 @@ export class QueryHeader extends React.Component {
         return (
             <table>
                 <tbody>
-                <tr>
-                    <td width="100%">
-                        <div className="progress-large">
-                            <div className="progress-bar progress-bar-info" role="progressbar" aria-valuenow={getProgressBarPercentage(query)} aria-valuemin="0" aria-valuemax="100"
-                                 style={progressBarStyle}>
-                                {getProgressBarTitle(query)}
+                    <tr>
+                        <td width="100%">
+                            <div className="progress-large">
+                                <div className="progress-bar progress-bar-info" role="progressbar" aria-valuenow={getProgressBarPercentage(query)} aria-valuemin="0" aria-valuemax="100"
+                                     style={progressBarStyle}>
+                                    {getProgressBarTitle(query)}
+                                </div>
                             </div>
-                        </div>
-                    </td>
-                    <td>
-                        <a onClick={() => $.ajax({url: '../v1/query/' + query.queryId + '/preempted', type: 'PUT', data: "Preempted via web UI"})} className="btn btn-warning"
-                           target="_blank">
-                            Preempt
-                        </a>
-                    </td>
-                    <td>
-                        <a onClick={() => $.ajax({url: '../v1/query/' + query.queryId + '/killed', type: 'PUT', data: "Killed via web UI"})} className="btn btn-warning"
-                           target="_blank">
-                            Kill
-                        </a>
-                    </td>
-                </tr>
+                        </td>
+                        <td>
+                            <a onClick={() => $.ajax({url: '../v1/query/' + query.queryId + '/preempted', type: 'PUT', data: "Preempted via web UI"})} className="btn btn-warning"
+                               target="_blank">
+                                Preempt
+                            </a>
+                        </td>
+                        <td>
+                            <a onClick={() => $.ajax({url: '../v1/query/' + query.queryId + '/killed', type: 'PUT', data: "Killed via web UI"})} className="btn btn-warning"
+                               target="_blank">
+                                Kill
+                            </a>
+                        </td>
+                        {
+                            showSuspended &&
+                            <td>
+                                <SinglePressButton uri={'../v1/query/' + query.queryId + '/suspend'} label="Suspend" />
+                            </td>
+                        }
+                        {
+                            showResumable &&
+                            <td>
+                                <SinglePressButton uri={'../v1/query/' + query.queryId + '/resume'} label="Resume" />
+                            </td>
+                        }
+                    </tr>
                 </tbody>
             </table>
         );

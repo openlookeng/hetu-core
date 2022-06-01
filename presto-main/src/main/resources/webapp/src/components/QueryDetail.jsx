@@ -621,6 +621,7 @@ const TASK_FILTER = {
     ALL: function () { return true },
     PLANNED: function (state) { return state === 'PLANNED' },
     RUNNING: function (state) { return state === 'RUNNING' },
+    SUSPENDED: function (state) { return state === 'SUSPENDED' },
     FINISHED: function (state) { return state === 'FINISHED' },
     FAILED: function (state) { return state === 'FAILED' || state === 'ABORTED' || state === 'CANCELED' },
 };
@@ -914,6 +915,7 @@ export class QueryDetail extends React.Component {
                                             {this.renderTaskFilterListItem(TASK_FILTER.ALL, "All")}
                                             {this.renderTaskFilterListItem(TASK_FILTER.PLANNED, "Planned")}
                                             {this.renderTaskFilterListItem(TASK_FILTER.RUNNING, "Running")}
+                                            {this.renderTaskFilterListItem(TASK_FILTER.SUSPENDED, "Suspended")}
                                             {this.renderTaskFilterListItem(TASK_FILTER.FINISHED, "Finished")}
                                             {this.renderTaskFilterListItem(TASK_FILTER.FAILED, "Aborted/Canceled/Failed")}
                                         </ul>

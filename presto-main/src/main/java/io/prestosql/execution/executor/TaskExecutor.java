@@ -287,6 +287,8 @@ public class TaskExecutor
             List<PrioritizedSplitRunner> splits;
 
             suspendedTasks.remove(taskHandle);
+
+            taskHandle.resume();
             tasks.add(taskHandle);
 
             splits = taskHandle.getRunningIntermediateSplits();
@@ -568,7 +570,9 @@ public class TaskExecutor
                                     blockedSplits.remove(split);
                                     // reset the level priority to prevent previously-blocked splits from starving existing splits
                                     split.resetLevelPriority();
-                                    waitingSplits.offer(split);
+                                    if (!split.getTaskHandle().isSuspended()) {
+                                        waitingSplits.offer(split);
+                                    }
                                 }, executor);
                             }
                         }

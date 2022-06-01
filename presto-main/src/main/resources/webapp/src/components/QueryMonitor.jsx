@@ -274,6 +274,7 @@ const FILTER_TYPE = {
     PLANNING: "planning",
     STARTING: "starting",
     RUNNING: "running",
+    SUSPENDED: "suspended",
     FINISHING: "finishing",
     FINISHED: "finished",
     FAILED: "failed",
@@ -314,6 +315,7 @@ export class QueryMonitor extends React.Component {
                 FILTER_TYPE.PLANNING,
                 FILTER_TYPE.STARTING,
                 FILTER_TYPE.RUNNING,
+                FILTER_TYPE.SUSPENDED,
                 FILTER_TYPE.FINISHING,
                 FILTER_TYPE.FINISHED,
                 FILTER_TYPE.FAILED],
@@ -574,6 +576,7 @@ export class QueryMonitor extends React.Component {
                                             {this.renderFilterButton(FILTER_TYPE.PLANNING, "Planning")}
                                             {this.renderFilterButton(FILTER_TYPE.STARTING, "Starting")}
                                             {this.renderFilterButton(FILTER_TYPE.RUNNING, "Running")}
+                                            {this.renderFilterButton(FILTER_TYPE.SUSPENDED, "Suspended")}
                                             {this.renderFilterButton(FILTER_TYPE.FINISHING, "Finishing")}
                                             {this.renderFilterButton(FILTER_TYPE.FINISHED, "Finished")}
                                             {this.renderFilterButton(FILTER_TYPE.FAILED, "Failed")}

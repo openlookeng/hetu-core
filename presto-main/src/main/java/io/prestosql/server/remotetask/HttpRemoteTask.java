@@ -176,6 +176,8 @@ public final class HttpRemoteTask
     private final AtomicBoolean aborting = new AtomicBoolean(false);
     private final AtomicBoolean abandoned = new AtomicBoolean(false);
     private final AtomicBoolean cancelledToResume = new AtomicBoolean(false);
+
+    private final AtomicBoolean suspending = new AtomicBoolean(false);
     private final boolean isBinaryEncoding;
     private Optional<PlanNodeId> parent;
 
@@ -678,7 +680,7 @@ public final class HttpRemoteTask
                 .setUri(uriBuilder.build())
                 .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
                 .build();
-        scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+        scheduleAsyncSuspendRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
     }
 
     @Override
@@ -704,7 +706,7 @@ public final class HttpRemoteTask
                 .setUri(uriBuilder.build())
                 .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
                 .build();
-        scheduleAsyncCleanupRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+        scheduleAsyncSuspendRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
     }
 
     private synchronized void cleanUpTask(TaskState newState)
@@ -760,6 +762,16 @@ public final class HttpRemoteTask
     private void scheduleAsyncCleanupRequest(Backoff cleanupBackoff, Request request, String action)
     {
         if (!aborting.compareAndSet(false, true)) {
+            // Do not initiate another round of cleanup requests if one had been initiated.
+            // Otherwise, we can get into an asynchronous recursion here. For example, when aborting a task after REMOTE_TASK_MISMATCH.
+            return;
+        }
+        doScheduleAsyncCleanupRequest(cleanupBackoff, request, action);
+    }
+
+    private void scheduleAsyncSuspendRequest(Backoff cleanupBackoff, Request request, String action)
+    {
+        if (!suspending.compareAndSet(false, true)) {
             // Do not initiate another round of cleanup requests if one had been initiated.
             // Otherwise, we can get into an asynchronous recursion here. For example, when aborting a task after REMOTE_TASK_MISMATCH.
             return;
@@ -849,6 +861,8 @@ public final class HttpRemoteTask
                     // Check for task state is in QueryInfo#areAllStagesDone.
                     taskStatus = TaskStatus.failWith(taskStatus, CANCELED_TO_RESUME, ImmutableList.of());
                 }
+
+                suspending.compareAndSet(true, false);
                 updateTaskInfo(getTaskInfo().withTaskStatus(taskStatus));
             }
         }, executor);
