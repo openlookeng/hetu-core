@@ -390,7 +390,7 @@ public class TestQueryRecoveryManager
 
         try {
             // Keep restore pending till timer expires
-            sleep(2000);
+            sleep(2100);
         }
         catch (Throwable t) {
             fail("Failed to sleep for 2s!");
