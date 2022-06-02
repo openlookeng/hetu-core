@@ -283,13 +283,6 @@ class DisplayedQueriesList extends React.Component {
 const SELECT_ALL = "all";
 
 const FILTER_TYPE = {
-    QUEUED: "queued",
-    WAITING_FOR_RESOURCES: "waiting_for_resources",
-    DISPATCHING: "dispatching",
-    PLANNING: "planning",
-    STARTING: "starting",
-    RUNNING: "running",
-    FINISHING: "finishing",
     FINISHED: "finished",
     FAILED: "failed",
 };
@@ -323,13 +316,6 @@ export class QueryList extends React.Component {
             currentSortType: SORT_TYPE.CREATED,
             currentSortOrder: SORT_ORDER.DESCENDING,
             stateFilters: [
-                FILTER_TYPE.QUEUED,
-                FILTER_TYPE.WAITING_FOR_RESOURCES,
-                FILTER_TYPE.DISPATCHING,
-                FILTER_TYPE.PLANNING,
-                FILTER_TYPE.STARTING,
-                FILTER_TYPE.RUNNING,
-                FILTER_TYPE.FINISHING,
                 FILTER_TYPE.FINISHED,
                 FILTER_TYPE.FAILED],
             errorTypeFilters: [
@@ -707,13 +693,6 @@ export class QueryList extends React.Component {
                                         </button>
                                         <ul className="dropdown-menu dropdown-menu-left">
                                             {this.renderFilterButton(SELECT_ALL, "Select All")}
-                                            {this.renderFilterButton(FILTER_TYPE.QUEUED, "Queued")}
-                                            {this.renderFilterButton(FILTER_TYPE.WAITING_FOR_RESOURCES, "Waiting For Resources")}
-                                            {this.renderFilterButton(FILTER_TYPE.DISPATCHING, "Dispatching")}
-                                            {this.renderFilterButton(FILTER_TYPE.PLANNING, "Planning")}
-                                            {this.renderFilterButton(FILTER_TYPE.STARTING, "Starting")}
-                                            {this.renderFilterButton(FILTER_TYPE.RUNNING, "Running")}
-                                            {this.renderFilterButton(FILTER_TYPE.FINISHING, "Finishing")}
                                             {this.renderFilterButton(FILTER_TYPE.FINISHED, "Finished")}
                                             {this.renderFilterButton(FILTER_TYPE.FAILED, "Failed")}
                                         </ul>
