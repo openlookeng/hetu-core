@@ -1,7 +1,7 @@
 
 # Web界面
 
-openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可以在openLooKeng协调器上通过HTTP协议访问，使用协调器`config_properties`中指定的HTTP端口号。
+openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可以在openLooKeng协调节点上通过HTTP协议访问，使用协调节点`config.properties`中指定的HTTP端口号。
 
 主页有一个查询列表，其中包含诸如唯一查询ID、查询文本、查询状态、完成百分比、用户名和该查询的来源等信息。当前运行的查询位于页面的顶部，紧随其后的是最近完成或失败的查询。
 
