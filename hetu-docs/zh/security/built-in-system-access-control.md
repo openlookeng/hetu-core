@@ -28,7 +28,7 @@ access-control.name=read-only
 基于文件的系统访问控制
 --------------------------------
 
-此插件允许您在文件中设置访问控制规则。要使用该插件，需要添加一个`etc/access-control.properties`文件，其中必需包含两个属性：`Access-control.name`属性，必须等于`file`；`security.config-file`属性，必须等于配置文件所在的位置。例如，配置文件`rules.json`位于`etc`目录，则添加`etc/access-control.properties`文件，内容如下：
+此插件允许您在文件中设置访问控制规则。要使用该插件，需要添加一个`etc/access-control.properties`文件，其中必需包含两个属性：`access-control.name`属性，必须等于`file`；`security.config-file`属性，必须等于配置文件所在的位置。例如，配置文件`rules.json`位于`etc`目录，则添加`etc/access-control.properties`文件，内容如下：
 
 ``` properties
 access-control.name=file
