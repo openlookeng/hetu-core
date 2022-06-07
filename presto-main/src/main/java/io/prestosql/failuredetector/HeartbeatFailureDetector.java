@@ -510,7 +510,7 @@ public class HeartbeatFailureDetector
                 lastCompleteTimestamp = System.nanoTime();
                 lastFailureCount = stats.getRecentFailures();
             }
-            else if (Duration.nanosSince(lastCompleteTimestamp).compareTo(new Duration(1, TimeUnit.SECONDS)) > 0 && stats.getRecentFailures() == lastFailureCount) {
+            else if (Duration.nanosSince(lastCompleteTimestamp).compareTo(new Duration(1, TimeUnit.SECONDS)) > 0 && stats.getRecentFailures() <= lastFailureCount) {
                 lastCompleteTimestamp = System.nanoTime();
             }
         }
