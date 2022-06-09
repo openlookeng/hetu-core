@@ -316,7 +316,7 @@ function toggleModal(component, msg=null) {
 }
 
 function handleCollection(e,rowIndex,parentObj) {
-  let queryText = e.query;
+  let queryText = encodeURIComponent(e.query);
   if(queryText.length > 1000) {
     alert("Error! Your SQL statement is too long! Please shorten it!");
   }
