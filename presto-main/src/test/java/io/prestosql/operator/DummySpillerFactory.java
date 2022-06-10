@@ -40,7 +40,7 @@ public class DummySpillerFactory
     private long spillsCount;
 
     @Override
-    public Spiller create(List<Type> types, SpillContext spillContext, AggregatedMemoryContext memoryContext)
+    public Spiller create(List<Type> types, SpillContext spillContext, AggregatedMemoryContext memoryContext, boolean isSnapshotEnabled, String queryId)
     {
         return new Spiller()
         {

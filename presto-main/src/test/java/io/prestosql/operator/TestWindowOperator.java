@@ -1117,7 +1117,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 spillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), false);
     }
 
     public static WindowOperatorFactory createFactoryUnbounded(
@@ -1147,7 +1147,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 spillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), false);
     }
 
     private DriverContext createDriverContext()
@@ -1162,11 +1162,14 @@ public class TestWindowOperator
 
     private DriverContext createDriverContext(long memoryLimit, Session session)
     {
-        return TestingTaskContext.builder(executor, scheduledExecutor, session)
+        TaskContext taskContext = TestingTaskContext.builder(executor, scheduledExecutor, session)
                 .setMemoryPoolSize(succinctBytes(memoryLimit))
                 .setRecoveryUtils(recoveryUtils)
-                .build()
-                .addPipelineContext(0, true, true, false)
+                .build();
+
+        taskContext.getSnapshotManager().setTotalComponents(1);
+
+        return taskContext.addPipelineContext(0, true, true, false)
                 .addDriverContext();
     }
 
@@ -1177,7 +1180,7 @@ public class TestWindowOperator
                 createTestMetadataManager().getFunctionAndTypeManager().getBlockEncodingSerde(),
                 new SpillerStats(),
                 ImmutableList.of(spillPath),
-                1.0, false, false, false, 1, false, null, fileSystemClientManager);
+                1.0, false, false, false, 1, spillToHdfs, spillProfile, fileSystemClientManager);
         return new GenericSpillerFactory(streamSpillerFactory);
     }
 
@@ -1235,7 +1238,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 genericSpillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), false);
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
@@ -1278,7 +1281,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 genericSpillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), false);
         windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
 
         // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.
@@ -1325,7 +1328,7 @@ public class TestWindowOperator
         Path spillPath = Paths.get("/tmp/hetu/snapshot/");
         HetuHdfsFileSystemClient fs = getLocalHdfs();
         when(fileSystemClientManager.getFileSystemClient(any(String.class), any(Path.class))).thenReturn(fs);
-        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, false, null);
+        GenericSpillerFactory genericSpillerFactory = createGenericSpillerFactory(spillPath, fileSystemClientManager, true, "hdfs");
         RecoveryConfig recoveryConfig = new RecoveryConfig();
         recoveryConfig.setSpillProfile("hdfs");
         recoveryConfig.setSpillToHdfs(true);
@@ -1365,7 +1368,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 genericSpillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), true);
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         WindowOperator windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
@@ -1408,7 +1411,7 @@ public class TestWindowOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 genericSpillerFactory,
-                new OrderingCompiler());
+                new OrderingCompiler(), true);
         windowOperator = (WindowOperator) operatorFactory.createOperator(driverContext);
 
         // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.

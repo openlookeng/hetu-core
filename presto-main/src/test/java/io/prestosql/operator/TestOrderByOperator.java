@@ -142,7 +142,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 Optional.of(spillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, false);
 
         DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult.Builder expectedBuilder = resultBuilder(driverContext.getSession(), DOUBLE);
@@ -182,7 +182,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 Optional.of(spillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, false);
 
         DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), DOUBLE)
@@ -217,7 +217,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 Optional.of(spillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, false);
 
         DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT)
@@ -253,7 +253,7 @@ public class TestOrderByOperator
                 false,
                 Optional.of(spillerFactory),
                 new OrderingCompiler(),
-                false);
+                false, false);
 
         DriverContext driverContext = createDriverContext(0, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT)
@@ -275,6 +275,7 @@ public class TestOrderByOperator
         expectedMapping.put("secondaryMemoryContext", 8844L);
         expectedMapping.put("secondarySpillRunning", false);
         expectedMapping.put("primarySpillRunning", false);
+        expectedMapping.put("isSpillToHdfsEnabled", false);
         return expectedMapping;
     }
 
@@ -300,7 +301,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 spillEnabled,
                 Optional.of(spillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, false);
 
         DriverContext driverContext = createDriverContext(memoryLimit, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
@@ -336,7 +337,7 @@ public class TestOrderByOperator
                 true,
                 Optional.of(spillerFactory),
                 new OrderingCompiler(),
-                true);
+                true, false);
 
         DriverContext driverContext = createDriverContext(8, TEST_SESSION);
         MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT)
@@ -358,6 +359,7 @@ public class TestOrderByOperator
         expectedMapping.put("secondaryMemoryContext", 0L);
         expectedMapping.put("secondarySpillRunning", false);
         expectedMapping.put("primarySpillRunning", false);
+        expectedMapping.put("isSpillToHdfsEnabled", false);
         return expectedMapping;
     }
 
@@ -387,7 +389,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 false,
                 Optional.of(spillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, false);
 
         toPages(operatorFactory, driverContext, input);
     }
@@ -459,7 +461,7 @@ public class TestOrderByOperator
                 true,
                 Optional.of(genericSpillerFactory),
                 new OrderingCompiler(),
-                false);
+                false, false);
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         driverContext.getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
@@ -496,7 +498,7 @@ public class TestOrderByOperator
                 true,
                 Optional.of(genericSpillerFactory),
                 new OrderingCompiler(),
-                false);
+                false, false);
         orderByOperator = (OrderByOperator) operatorFactory.createOperator(driverContext);
 
         // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.
@@ -591,7 +593,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 Optional.of(genericSpillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, true);
 
         DriverContext driverContext = createDriverContext(defaultMemoryLimit, TEST_SNAPSHOT_SESSION);
         driverContext.getPipelineContext().getTaskContext().getSnapshotManager().setTotalComponents(1);
@@ -627,7 +629,7 @@ public class TestOrderByOperator
                 new PagesIndex.TestingFactory(false),
                 true,
                 Optional.of(genericSpillerFactory),
-                new OrderingCompiler(), false);
+                new OrderingCompiler(), false, true);
         orderByOperator = (OrderByOperator) operatorFactory.createOperator(driverContext);
 
         // Step6: restore to 'capture1', the spiller should contains the reference of the first 2 pages for now.

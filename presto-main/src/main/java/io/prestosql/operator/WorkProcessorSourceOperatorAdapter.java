@@ -419,7 +419,9 @@ public class WorkProcessorSourceOperatorAdapter
                     if (totalPageSize(pageSpilledList) >= (spillThreshold / 2)) {
                         if (!reuseExchangeTableScanMappingIdState.getSpiller().isPresent()) {
                             Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(projectionTypes, operatorContext.getSpillContext(),
-                                    operatorContext.newAggregateSystemMemoryContext()));
+                                    operatorContext.newAggregateSystemMemoryContext(),
+                                    operatorContext.isSnapshotEnabled(),
+                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
                             reuseExchangeTableScanMappingIdState.setSpiller(spillObject);
                         }
 

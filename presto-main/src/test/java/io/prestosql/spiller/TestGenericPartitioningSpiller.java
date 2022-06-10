@@ -110,7 +110,7 @@ public class TestGenericPartitioningSpiller
                 TYPES,
                 new FourFixedPartitionsPartitionFunction(0),
                 mockSpillContext(),
-                mockMemoryContext(scheduledExecutor))) {
+                mockMemoryContext(scheduledExecutor), false, false, "")) {
             RowPagesBuilder builder = RowPagesBuilder.rowPagesBuilder(TYPES);
             builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
             builder.addSequencePage(10, FIRST_PARTITION_START, -5, 0, 5);
@@ -166,13 +166,13 @@ public class TestGenericPartitioningSpiller
                 TYPES,
                 new ModuloPartitionFunction(0, 4),
                 mockSpillContext(),
-                mockMemoryContext(scheduledExecutor))) {
+                mockMemoryContext(scheduledExecutor), false, false, "")) {
             Page page = SequencePageBuilder.createSequencePage(TYPES, 10, FIRST_PARTITION_START, 5, 10, 15);
             PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, partition -> true);
             assertEquals(spillResult.getRetained().getPositionCount(), 0);
             getFutureValue(spillResult.getSpillingFuture());
 
-            // We get the iterator but we do not exhaust it, so that close happens during reading
+            // We get the iterator but we do not exhaust it, so that closeSession happens during reading
             readingInProgress = spiller.getSpilledPages(0);
         }
 
@@ -198,7 +198,7 @@ public class TestGenericPartitioningSpiller
                 types,
                 new ModuloPartitionFunction(0, partitionCount),
                 mockSpillContext(),
-                memoryContext)) {
+                memoryContext, false, false, "")) {
             for (int i = 0; i < 50_000; i++) {
                 Page page = SequencePageBuilder.createSequencePage(types, partitionCount, 0);
                 PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, partition -> true);

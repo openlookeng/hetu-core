@@ -39,6 +39,8 @@ import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NO
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType;
 import static io.prestosql.sql.analyzer.FeaturesConfig.RedistributeWritesType.RANDOM;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PATH;
+import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_PROFILE;
+import static io.prestosql.sql.analyzer.FeaturesConfig.SPILLER_SPILL_TO_HDFS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.SPILL_ENABLED;
 import static io.prestosql.sql.analyzer.RegexLibrary.JONI;
 import static io.prestosql.sql.analyzer.RegexLibrary.RE2J;
@@ -206,7 +208,7 @@ public class TestFeaturesConfig
                 .put("experimental.spill-order-by", "false")
                 .put("experimental.spill-window-operator", "false")
                 .put("experimental.aggregation-operator-unspill-memory-limit", "100MB")
-                .put("experimental.spiller-spill-path", "/tmp/custom/spill/path1")
+                .put("experimental.spiller-spill-path", "/tmp/hetu/snapshot")
                 .put("experimental.spiller-spill-profile", "hdfs")
                 .put("experimental.spiller-spill-to-hdfs", "true")
                 .put("experimental.spiller-threads", "42")
@@ -312,7 +314,7 @@ public class TestFeaturesConfig
                 .setSpillOrderBy(false)
                 .setSpillWindowOperator(false)
                 .setAggregationOperatorUnspillMemoryLimit(DataSize.valueOf("100MB"))
-                .setSpillerSpillPaths("/tmp/custom/spill/path1")
+                .setSpillerSpillPaths("/tmp/hetu/snapshot")
                 .setSpillToHdfs(true)
                 .setSpillProfile("hdfs")
                 .setSpillerThreads(42)
@@ -382,6 +384,20 @@ public class TestFeaturesConfig
     public void testValidateSpillConfiguredIfEnabled()
     {
         new ConfigurationFactory(ImmutableMap.of(SPILL_ENABLED, "true"))
+                .build(FeaturesConfig.class);
+    }
+
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*\\Q" + SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true and path should be /tmp/hetu/snapshot\\E.*")
+    public void testValidateSpillToHdfsIfWrongPathConfigured()
+    {
+        new ConfigurationFactory(ImmutableMap.of(SPILL_ENABLED, "true", SPILLER_SPILL_TO_HDFS, "true", SPILLER_SPILL_PROFILE, "spill_profile", SPILLER_SPILL_PATH, "/abc/def"))
+                .build(FeaturesConfig.class);
+    }
+
+    @Test
+    public void testValidateSpillToHdfsPathIfConfigured()
+    {
+        new ConfigurationFactory(ImmutableMap.of(SPILL_ENABLED, "true", SPILLER_SPILL_TO_HDFS, "true", SPILLER_SPILL_PROFILE, "spill_profile", SPILLER_SPILL_PATH, "/tmp/hetu/snapshot"))
                 .build(FeaturesConfig.class);
     }
 }

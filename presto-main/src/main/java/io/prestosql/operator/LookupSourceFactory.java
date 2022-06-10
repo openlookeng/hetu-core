@@ -22,6 +22,7 @@ import io.prestosql.spi.type.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -102,6 +103,11 @@ public interface LookupSourceFactory
     }
 
     default void restoreJoinPositions(Object state)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Set<Integer> getSpilledPartitions()
     {
         throw new UnsupportedOperationException();
     }

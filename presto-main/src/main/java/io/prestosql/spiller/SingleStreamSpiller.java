@@ -16,6 +16,7 @@ package io.prestosql.spiller;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.snapshot.Restorable;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.io.Closeable;
 import java.nio.file.Path;
@@ -70,6 +71,8 @@ public interface SingleStreamSpiller
 
     Path getFile();
 
+    Pair<Path, Long> getSpilledFileInfo();
+
     default void commit()
     {
         /* do nothing */
@@ -78,5 +81,10 @@ public interface SingleStreamSpiller
     default boolean isCommitted()
     {
         return true;
+    }
+
+    default void closeSessionSpiller()
+    {
+        /* do nothing */
     }
 }

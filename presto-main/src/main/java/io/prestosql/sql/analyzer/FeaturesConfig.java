@@ -906,10 +906,10 @@ public class FeaturesConfig
         return this;
     }
 
-    @AssertTrue(message = SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true")
+    @AssertTrue(message = SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true and path should be /tmp/hetu/snapshot")
     public boolean isSpillerSpillPathConfiguredIfSpillToHdfsEnabled()
     {
-        return !isSpillToHdfs() || spillerSpillPaths.size() == 1;
+        return !isSpillToHdfs() || (spillerSpillPaths.size() == 1 && spillerSpillPaths.get(0).toString().equals("/tmp/hetu/snapshot"));
     }
 
     @AssertTrue(message = SPILLER_SPILL_PROFILE + " must be configured when " + SPILLER_SPILL_TO_HDFS + " is set to true")

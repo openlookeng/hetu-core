@@ -14,6 +14,7 @@
 package io.prestosql.spiller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Futures;
@@ -27,6 +28,7 @@ import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -34,11 +36,14 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -54,7 +59,7 @@ import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
 @RestorableConfig(uncapturedFields = {"types", "partitionFunction", "closer",
-        "spillerFactory", "spillContext", "memoryContext", "pageBuilders", "getRawHash"})
+        "spillerFactory", "spillContext", "memoryContext", "getRawHash"})
 public class GenericPartitioningSpiller
         implements PartitioningSpiller
 {
@@ -67,10 +72,14 @@ public class GenericPartitioningSpiller
 
     private final List<PageBuilder> pageBuilders;
     private final List<Optional<SingleStreamSpiller>> spillers;
+    private List<List<Optional<SingleStreamSpiller>>> backUpSpillers;
     private final BiFunction<Integer, Page, Long> getRawHash;
 
     private boolean readingStarted;
     private final Set<Integer> spilledPartitions = new HashSet<>();
+    private boolean isSingleSessionSpiller;
+    private final boolean isSnapshotEnabled;
+    private final String queryId;
 
     public GenericPartitioningSpiller(
             List<Type> types,
@@ -78,7 +87,10 @@ public class GenericPartitioningSpiller
             SpillContext spillContext,
             AggregatedMemoryContext memoryContext,
             SingleStreamSpillerFactory spillerFactory,
-            BiFunction<Integer, Page, Long> getRawHash)
+            BiFunction<Integer, Page, Long> getRawHash,
+            boolean isSingleSessionSpiller,
+            boolean isSnapshotEnabled,
+            String queryId)
     {
         requireNonNull(spillContext, "spillContext is null");
 
@@ -94,12 +106,17 @@ public class GenericPartitioningSpiller
 
         ImmutableList.Builder<PageBuilder> tmpPageBuilders = ImmutableList.builder();
         spillers = new ArrayList<>(partitionCount);
+        backUpSpillers = new ArrayList<>(partitionCount);
         for (int partition = 0; partition < partitionCount; partition++) {
             tmpPageBuilders.add(new PageBuilder(types));
             spillers.add(Optional.empty());
+            backUpSpillers.add(null);
         }
         this.pageBuilders = tmpPageBuilders.build();
         this.getRawHash = getRawHash;
+        this.isSingleSessionSpiller = isSingleSessionSpiller;
+        this.isSnapshotEnabled = isSnapshotEnabled;
+        this.queryId = queryId;
     }
 
     @Override
@@ -108,7 +125,45 @@ public class GenericPartitioningSpiller
         readingStarted = true;
         getFutureValue(flush(partition));
         spilledPartitions.remove(partition);
-        return getSpiller(partition).getSpilledPages();
+        if (isSingleSessionSpiller) {
+            List<Iterator<Page>> pageIteratorList = new ArrayList<>();
+            if (backUpSpillers.get(partition) != null) {
+                for (Optional<SingleStreamSpiller> singleStreamSpiller : backUpSpillers.get(partition)) {
+                    if (singleStreamSpiller.isPresent()) {
+                        pageIteratorList.add(singleStreamSpiller.get().getSpilledPages());
+                    }
+                }
+            }
+            pageIteratorList.add(getSpiller(partition).getSpilledPages());
+            return new AbstractIterator<Page>() {
+                Iterator<Page> pageIterator;
+                private Queue<Iterator<Page>> queue = new LinkedList<>(pageIteratorList);
+
+                @Override
+                protected Page computeNext()
+                {
+                    if (pageIterator == null && !queue.isEmpty()) {
+                        pageIterator = queue.poll();
+                    }
+                    while (pageIterator != null) {
+                        if (pageIterator.hasNext()) {
+                            Page page = pageIterator.next();
+                            return page;
+                        }
+                        if (!queue.isEmpty()) {
+                            pageIterator = queue.poll();
+                        }
+                        else {
+                            pageIterator = null;
+                        }
+                    }
+                    return endOfData();
+                }
+            };
+        }
+        else {
+            return getSpiller(partition).getSpilledPages();
+        }
     }
 
     @Override
@@ -144,7 +199,7 @@ public class GenericPartitioningSpiller
         for (int position = 0; position < page.getPositionCount(); position++) {
             int partition = partitionFunction.getPartition(page, position);
 
-            if (!spillPartitionMask.test(partition)) {
+            if (!spillPartitionMask.test(partition) && !spilledPartitions.contains(partition)) {
                 unspilledPositions.add(position);
                 continue;
             }
@@ -206,10 +261,15 @@ public class GenericPartitioningSpiller
     {
         Optional<SingleStreamSpiller> spiller = spillers.get(partition);
         if (!spiller.isPresent()) {
-            spiller = Optional.of(closer.register(spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()))));
+            spiller = Optional.of(closer.register(spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId)));
             spillers.set(partition, spiller);
         }
         return spiller.get();
+    }
+
+    public Set<Integer> getSpilledPartitions()
+    {
+        return spilledPartitions;
     }
 
     @Override
@@ -220,9 +280,44 @@ public class GenericPartitioningSpiller
     }
 
     @Override
-    public List<Path> getSpilledFilePaths()
+    public List<Path> getSpilledFilePaths(boolean isStoreSpillFiles)
     {
-        return spillers.stream().filter(spiller -> spiller.isPresent()).map(spiller -> spiller.get().getFile()).collect(Collectors.toList());
+        if (isSingleSessionSpiller) {
+            return Arrays.asList(backUpSpillers.stream()
+                            .filter(list -> list != null)
+                            .flatMap(list -> list.stream()
+                                    .filter(spiller -> spiller.isPresent())
+                                    .map(spiller -> spiller.get().getFile()))
+                            .collect(Collectors.toList()),
+                    spillers.stream()
+                            .filter(spiller -> spiller.isPresent())
+                            .map(spiller -> spiller.get().getFile())
+                            .collect(Collectors.toList()))
+                    .stream()
+                    .flatMap(list -> list.stream())
+                    .collect(Collectors.toList());
+        }
+        else {
+            return spillers.stream().filter(spiller -> spiller.isPresent()).map(spiller -> spiller.get().getFile()).collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        return spillers.stream().filter(spiller -> spiller.isPresent()).map(spiller -> spiller.get().getSpilledFileInfo()).collect(Collectors.toList());
+    }
+
+    @Override
+    public void closeSessionSpiller(int partition)
+    {
+        spillers.get(partition).ifPresent(spiller -> spiller.closeSessionSpiller());
+    }
+
+    @Override
+    public ListenableFuture<?> flushPartition(int partition)
+    {
+        return flush(partition);
     }
 
     @Override
@@ -237,10 +332,22 @@ public class GenericPartitioningSpiller
                 myState.spillers.set(i, spillers.get(i).get().capture(serdeProvider));
             }
         }
+        myState.backUpSpillers = new ArrayList<>(Collections.nCopies(backUpSpillers.size(), null));
+        for (int i = 0; i < backUpSpillers.size(); i++) {
+            if (backUpSpillers.get(i) != null) {
+                myState.backUpSpillers.set(i, new LinkedList<>());
+                for (Optional<SingleStreamSpiller> singleStreamSpiller : backUpSpillers.get(i)) {
+                    if (singleStreamSpiller.isPresent()) {
+                        myState.backUpSpillers.get(i).add(singleStreamSpiller.get().capture(serdeProvider));
+                    }
+                }
+            }
+        }
         myState.pageBuilders = new ArrayList<>(Collections.nCopies(pageBuilders.size(), null));
         for (int pageBuilderCount = 0; pageBuilderCount < pageBuilders.size(); pageBuilderCount++) {
             myState.pageBuilders.set(pageBuilderCount, pageBuilders.get(pageBuilderCount).capture(serdeProvider));
         }
+        myState.isSingleSessionSpiller = isSingleSessionSpiller;
         return myState;
     }
 
@@ -252,11 +359,34 @@ public class GenericPartitioningSpiller
         for (int partition : myState.spilledPartitions) {
             this.spilledPartitions.add(partition);
         }
+        this.isSingleSessionSpiller = myState.isSingleSessionSpiller;
+
+        for (int i = 0; i < backUpSpillers.size(); i++) {
+            if (myState.backUpSpillers.get(i) != null) {
+                backUpSpillers.set(i, new LinkedList<>());
+                for (Object singleStreamSpiller : myState.backUpSpillers.get(i)) {
+                    SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
+                    spiller.restore(singleStreamSpiller, serdeProvider);
+                    backUpSpillers.get(i).add(Optional.of(closer.register(spiller)));
+                }
+            }
+        }
+
         for (int i = 0; i < spillers.size(); i++) {
             if (myState.spillers.get(i) != null) {
-                SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()));
+                SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
                 spiller.restore(myState.spillers.get(i), serdeProvider);
-                this.spillers.set(i, Optional.of(closer.register(spiller)));
+                if (isSingleSessionSpiller) {
+                    if (backUpSpillers.get(i) == null) {
+                        backUpSpillers.set(i, new LinkedList<>());
+                    }
+                    backUpSpillers.get(i).add(Optional.of(closer.register(spiller)));
+                    SingleStreamSpiller newSpiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
+                    this.spillers.set(i, Optional.of(closer.register(newSpiller)));
+                }
+                else {
+                    this.spillers.set(i, Optional.of(closer.register(spiller)));
+                }
             }
         }
         for (int pageBuilderCount = 0; pageBuilderCount < pageBuilders.size(); pageBuilderCount++) {
@@ -271,5 +401,7 @@ public class GenericPartitioningSpiller
         boolean readingStarted;
         List<Object> spillers;
         List<Object> pageBuilders;
+        List<List<Object>> backUpSpillers;
+        boolean isSingleSessionSpiller;
     }
 }

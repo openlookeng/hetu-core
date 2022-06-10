@@ -34,8 +34,8 @@ public class GenericSpillerFactory
     }
 
     @Override
-    public Spiller create(List<Type> types, SpillContext localSpillContext, AggregatedMemoryContext aggregatedMemoryContext)
+    public Spiller create(List<Type> types, SpillContext localSpillContext, AggregatedMemoryContext aggregatedMemoryContext, boolean isSnapshotEnabled, String queryId)
     {
-        return new GenericSpiller(types, localSpillContext, aggregatedMemoryContext, singleStreamSpillerFactory);
+        return new GenericSpiller(types, localSpillContext, aggregatedMemoryContext, singleStreamSpillerFactory, isSnapshotEnabled, queryId);
     }
 }

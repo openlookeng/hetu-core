@@ -28,21 +28,27 @@ public interface PartitioningSpillerFactory
             List<Type> types,
             PartitionFunction partitionFunction,
             SpillContext spillContext,
-            AggregatedMemoryContext memoryContext);
+            AggregatedMemoryContext memoryContext,
+            boolean isSingleSessionSpiller,
+            boolean isSnapshotEnabled,
+            String queryId);
 
     default PartitioningSpiller create(
             List<Type> types,
             PartitionFunction partitionFunction,
             SpillContext spillContext,
             AggregatedMemoryContext memoryContext,
-            BiFunction<Integer, Page, Long> getRawHash)
+            BiFunction<Integer, Page, Long> getRawHash,
+            boolean isSingleSessionSpiller,
+            boolean isSnapshotEnabled,
+            String queryId)
     {
-        return create(types, partitionFunction, spillContext, memoryContext);
+        return create(types, partitionFunction, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId);
     }
 
     static PartitioningSpillerFactory unsupportedPartitioningSpillerFactory()
     {
-        return (types, partitionFunction, spillContext, memoryContext) -> {
+        return (types, partitionFunction, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
             throw new UnsupportedOperationException();
         };
     }

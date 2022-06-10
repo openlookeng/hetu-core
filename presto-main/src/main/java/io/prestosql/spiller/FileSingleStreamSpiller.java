@@ -40,6 +40,8 @@ import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.spiller.SpillCipher;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.crypto.Cipher;
@@ -73,8 +75,10 @@ import static java.util.Objects.requireNonNull;
 @NotThreadSafe
 
 @RestorableConfig(uncapturedFields = {"closer", "serde",
-        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress", "cipherIV", "spillCipher", "fileSystemClientManager", "fileSystemClient", "spillPath"})
+        "spillerStats", "localSpillContext", "memoryContext", "executor", "spillInProgress", "cipherIV", "spillCipher", "fileSystemClientManager", "fileSystemClient",
+        "spillPath", "output", "oldState", "closed", "outputStream", "sessionTargetFile", "useSessionDirectSerde"})
 public class FileSingleStreamSpiller
+        extends FileSingleSessionStreamSpiller
         implements SingleStreamSpiller
 {
     @VisibleForTesting
@@ -106,6 +110,10 @@ public class FileSingleStreamSpiller
     // Snapshot: capture page sizes that are used to update localSpillContext and spillerStats during resume
     private List<Long> pageSizeList = new LinkedList<>();
     private final int spillPrefetchReadPages;
+    private FileSingleStreamSpillerState oldState;
+    private boolean isSingleSessionSpiller;
+    private long targetFileSize = Long.MAX_VALUE;
+    private final boolean isSnapshotEnabled;
 
     public FileSingleStreamSpiller(
             PagesSerde serde,
@@ -121,15 +129,24 @@ public class FileSingleStreamSpiller
             boolean useKryo,
             boolean spillToHdfs,
             String spillProfile,
-            FileSystemClientManager fileSystemClientManager)
+            FileSystemClientManager fileSystemClientManager,
+            boolean isSingleSessionSpiller,
+            boolean isSnapshotEnabled,
+            String queryId)
     {
         this.serde = requireNonNull(serde, "serde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
-        this.spillPath = spillPath;
+        if (spillToHdfs) {
+            this.spillPath = Paths.get(spillPath.toString(), queryId);
+        }
+        else {
+            this.spillPath = spillPath;
+        }
         this.spillProfile = spillProfile;
         this.fileSystemClientManager = requireNonNull(fileSystemClientManager, "fileSystemClient is null");
         this.spillToHdfs = spillToHdfs;
+        this.isSnapshotEnabled = isSnapshotEnabled;
         this.localSpillContext = spillContext.newLocalSpillContext();
         this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
         if (requireNonNull(spillCipher, "spillCipher is null").isPresent()) {
@@ -163,6 +180,21 @@ public class FileSingleStreamSpiller
         this.useKryo = useKryo;
         this.compressionEnabled = compressionEnabled;
         this.spillCipher = spillCipher;
+        this.isSingleSessionSpiller = isSingleSessionSpiller;
+        if (isSingleSessionSpiller) {
+            super.setTargetFile(getTargetFile(), useDirectSerde);
+            try {
+                if (useDirectSerde) {
+                    super.setOutputStream(getStreamForWriting(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE));
+                }
+                else {
+                    super.setOutput(new OutputStreamSliceOutput(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE));
+                }
+            }
+            catch (IOException e) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create output Stream", e);
+            }
+        }
     }
 
     @Override
@@ -171,12 +203,37 @@ public class FileSingleStreamSpiller
         requireNonNull(pageIterator, "pageIterator is null");
         checkNoSpillInProgress();
         if (useDirectSerde) {
-            spillInProgress = executor.submit(() -> writePagesDirect(pageIterator));
+            spillInProgress = executor.submit(() -> {
+                if (isSingleSessionSpiller) {
+                    Stats stats = super.writePagesDirect(writable, pageIterator, serde);
+                    setStats(stats);
+                }
+                else {
+                    writePagesDirect(pageIterator);
+                }
+            });
         }
         else {
-            spillInProgress = executor.submit(() -> writePages(pageIterator));
+            spillInProgress = executor.submit(() -> {
+                if (isSingleSessionSpiller) {
+                    Stats stats = super.writePages(writable, pageIterator, serde);
+                    setStats(stats);
+                }
+                else {
+                    writePages(pageIterator);
+                }
+            });
         }
         return spillInProgress;
+    }
+
+    private void setStats(Stats stats)
+    {
+        spilledPagesInMemorySize += stats.getTotalSpilledPagesInMemorySize();
+        localSpillContext.updateBytes(stats.getTotalBytesWritten());
+        spillerStats.addToTotalSpilledBytes(stats.getTotalSpilledBytes());
+        pageSizeList.addAll(stats.getPageSizesList());
+        localSpillContext.updateWriteTime(stats.getTotalWriteTime());
     }
 
     @Override
@@ -198,7 +255,7 @@ public class FileSingleStreamSpiller
         return executor.submit(() -> ImmutableList.copyOf(getSpilledPages()));
     }
 
-    private void writePages(Iterator<Page> pageIterator)
+    void writePages(Iterator<Page> pageIterator)
     {
         checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
         try (SliceOutput output = new OutputStreamSliceOutput(getOutputStreamBasedOnSpillLocation(), BUFFER_SIZE)) {
@@ -221,7 +278,7 @@ public class FileSingleStreamSpiller
         }
     }
 
-    private OutputStream getStreamForWriting(OutputStream outputStream, int bufferSize) throws IOException
+    protected OutputStream getStreamForWriting(OutputStream outputStream, int bufferSize) throws IOException
     {
         OutputStream tmpOutputStream = outputStream;
         if (spillCipher.isPresent()) {
@@ -290,9 +347,23 @@ public class FileSingleStreamSpiller
         return (input) -> !((InputStreamSliceInput) input).isReadable();
     }
 
+    private Predicate<InputStream> getSessionDirectStreamEndOfData()
+    {
+        if (useKryo) {
+            return (input) -> (((Input) input).end() || ((Input) input).position() >= targetFileSize);
+        }
+
+        return (input) -> (!((InputStreamSliceInput) input).isReadable() || ((InputStreamSliceInput) input).position() >= targetFileSize);
+    }
+
+    private Predicate<InputStream> getSessionStreamEndOfData()
+    {
+        return (input) -> (!((InputStreamSliceInput) input).isReadable() || ((InputStreamSliceInput) input).position() >= targetFileSize);
+    }
+
     private Iterator<Page> readPages()
     {
-        checkState(writable, "Repeated reads are disallowed to prevent potential resource leaks");
+        checkState(writable, "Repeated reads are disallowed to prevent potential resource leaks ");
         writable = false;
 
         try {
@@ -300,10 +371,20 @@ public class FileSingleStreamSpiller
             Iterator<Page> pages;
 
             if (useDirectSerde) {
-                pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData(), spillPrefetchReadPages);
+                if (spillToHdfs) {
+                    pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getSessionDirectStreamEndOfData(), spillPrefetchReadPages);
+                }
+                else {
+                    pages = PagesSerdeUtil.readPagesDirect(serde, getStreamForReading(input, BUFFER_SIZE), getStreamEndOfData(), spillPrefetchReadPages);
+                }
             }
             else {
-                pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE), spillPrefetchReadPages);
+                if (spillToHdfs) {
+                    pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE), spillPrefetchReadPages, getSessionStreamEndOfData());
+                }
+                else {
+                    pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE), spillPrefetchReadPages);
+                }
             }
             return closeWhenExhausted(pages, input, localSpillContext);
         }
@@ -377,9 +458,26 @@ public class FileSingleStreamSpiller
         return targetFile.getFilePath();
     }
 
+    @Override
+    public Pair<Path, Long> getSpilledFileInfo()
+    {
+        return ImmutablePair.of(targetFile.getFilePath(), oldState.targetFileSize);
+    }
+
+    @Override
+    public void closeSessionSpiller()
+    {
+        super.closeSession();
+    }
+
+    private FileHolder getTargetFile()
+    {
+        return targetFile;
+    }
+
     private void createSpillFiles() throws IOException
     {
-        this.targetFile = closer.register(new FileHolder(fileSystemClient.createTemporaryFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX), fileSystemClient));
+        this.targetFile = closer.register(new FileHolder(fileSystemClient.createTemporaryFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX), fileSystemClient, (spillToHdfs && isSnapshotEnabled)));
     }
 
     private OutputStream getOutputStreamBasedOnSpillLocation() throws IOException
@@ -405,6 +503,22 @@ public class FileSingleStreamSpiller
         state.useKryo = this.useKryo;
         state.spillToHdfs = this.spillToHdfs;
         state.spillProfile = this.spillProfile;
+        while (!spillInProgress.isDone()) {
+            // wait till spilling is completed
+        }
+        if (isSingleSessionSpiller) {
+            state.targetFileSize = super.getTargetFileSize();
+        }
+        else {
+            try {
+                state.targetFileSize = this.targetFile.getFileSize();
+            }
+            catch (IOException e) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to get target file size", e);
+            }
+        }
+        this.oldState = state;
+        state.isSingleSessionSpiller = this.isSingleSessionSpiller;
         return state;
     }
 
@@ -417,12 +531,19 @@ public class FileSingleStreamSpiller
             this.spilledPagesInMemorySize = myState.spilledPagesInMemorySize;
             this.pageSizeList = myState.pageSizeList;
             this.targetFile.close();
+            this.isSingleSessionSpiller = myState.isSingleSessionSpiller;
+            this.spillToHdfs = myState.spillToHdfs;
             this.spillProfile = myState.spillProfile;
             Path path = Paths.get(myState.targetFile);
             this.fileSystemClient = getFileSystem(path, spillToHdfs, spillProfile, fileSystemClientManager);
-            // Actual file content is restored after this returns, in SingleInputSnapshotState.loadSpilledFiles
-            fileSystemClient.deleteIfExists(path);
-            this.targetFile = closer.register(new FileHolder(fileSystemClient.createFile(path), fileSystemClient));
+            if (spillToHdfs) {
+                this.targetFile = closer.register(new FileHolder(path, fileSystemClient, true));
+            }
+            else {
+                // Actual file content is restored after this returns, in SingleInputSnapshotState.loadSpilledFiles
+                fileSystemClient.deleteIfExists(path);
+                this.targetFile = closer.register(new FileHolder(fileSystemClient.createFile(path), fileSystemClient, false));
+            }
             for (Long pageSize : pageSizeList) {
                 // restore localSpillContext and spillerStats
                 this.localSpillContext.updateBytes(pageSize);
@@ -431,7 +552,9 @@ public class FileSingleStreamSpiller
             this.compressionEnabled = myState.compressionEnabled;
             this.useDirectSerde = myState.useDirectSerde;
             this.useKryo = myState.useKryo;
-            this.spillToHdfs = myState.spillToHdfs;
+            if (spillToHdfs) {
+                this.targetFileSize = myState.targetFileSize;
+            }
         }
         catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -445,10 +568,12 @@ public class FileSingleStreamSpiller
         private long spilledPagesInMemorySize;
         private List<Long> pageSizeList;
         private String targetFile;
+        private long targetFileSize;
         private boolean compressionEnabled;
         private boolean useDirectSerde;
         private boolean useKryo;
         private boolean spillToHdfs;
         private String spillProfile;
+        private boolean isSingleSessionSpiller;
     }
 }

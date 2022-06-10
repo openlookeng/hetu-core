@@ -107,7 +107,7 @@ public class SnapshotFileBasedClient
     }
 
     @Override
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, SnapshotDataCollector dataCollector, long skipBytes)
             throws IOException
     {
         Stopwatch timer = Stopwatch.createStarted();
@@ -120,6 +120,7 @@ public class SnapshotFileBasedClient
         try (OutputStream outputStream = fsClient.newOutputStream(file);
                 HetuFileSystemClient spillFs = getSpillerFileSystemClient(sourceFile);
                 InputStream inputStream = spillFs.newInputStream(sourceFile)) {
+            ByteStreams.skipFully(inputStream, skipBytes);
             ByteStreams.copy(inputStream, outputStream);
         }
         timer.stop();
@@ -159,6 +160,48 @@ public class SnapshotFileBasedClient
         if (dataCollector != null) {
             Long size = (Long) fsClient.getAttribute(file, "size");
             dataCollector.updateSnapshotRestoreSize(size.longValue());
+            dataCollector.updateSnapshotRestoreCpuTime(timer.elapsed(TimeUnit.MILLISECONDS));
+        }
+        return true;
+    }
+
+    @Override
+    public boolean loadFiles(Map<Path, List<SnapshotStateId>> snapshotSpillMap, SnapshotDataCollector dataCollector)
+            throws Exception
+    {
+        Stopwatch timer = Stopwatch.createStarted();
+
+        for (Map.Entry<Path, List<SnapshotStateId>> snapshotSpillMapEntry : snapshotSpillMap.entrySet()) {
+            Path targetPath = snapshotSpillMapEntry.getKey();
+
+            targetPath.getParent().toFile().mkdirs();
+
+            try (HetuFileSystemClient spillFs = getSpillerFileSystemClient(targetPath);
+                    OutputStream outputStream = spillFs.newOutputStream(targetPath)) {
+                for (SnapshotStateId snapshotStateId : snapshotSpillMapEntry.getValue()) {
+                    List<String> hierarchy = new ArrayList<>(snapshotStateId.getHierarchy());
+                    String fileName = targetPath.getFileName().toString();
+                    hierarchy.add(fileName);
+                    Path file = RecoveryUtils.createStatePath(rootPath, hierarchy);
+
+                    if (!fsClient.exists(file)) {
+                        LOG.warn("File: %s does not exist under %s", targetPath.getFileName().toString(), snapshotStateId);
+                        return false;
+                    }
+
+                    try (InputStream inputStream = fsClient.newInputStream(file)) {
+                        ByteStreams.copy(inputStream, outputStream);
+                    }
+                    Long size;
+                    if (dataCollector != null) {
+                        size = (Long) fsClient.getAttribute(file, "size");
+                        dataCollector.updateSnapshotRestoreSize(size.longValue());
+                    }
+                }
+            }
+        }
+        timer.stop();
+        if (dataCollector != null) {
             dataCollector.updateSnapshotRestoreCpuTime(timer.elapsed(TimeUnit.MILLISECONDS));
         }
         return true;
@@ -225,6 +268,38 @@ public class SnapshotFileBasedClient
 
         try (ObjectOutputStream oos = new ObjectOutputStream(fsClient.newOutputStream(file))) {
             oos.writeObject(path);
+        }
+    }
+
+    @Override
+    public void storeSpilledPathInfo(SnapshotStateId spillId, Object snapshotSpillPaths)
+            throws IOException
+    {
+        List<String> hierarchy = new ArrayList<>(spillId.getHierarchy());
+        hierarchy.add("snapshotSpillPaths");
+        Path file = RecoveryUtils.createStatePath(rootPath, hierarchy);
+
+        fsClient.createDirectories(file.getParent());
+
+        try (ObjectOutputStream oos = new ObjectOutputStream(fsClient.newOutputStream(file))) {
+            oos.writeObject(snapshotSpillPaths);
+        }
+    }
+
+    @Override
+    public Map<Long, List<String>> loadSpilledPathInfo(SnapshotStateId spillId)
+            throws IOException, ClassNotFoundException
+    {
+        List<String> hierarchy = new ArrayList<>(spillId.getHierarchy());
+        hierarchy.add("snapshotSpillPaths");
+        Path file = RecoveryUtils.createStatePath(rootPath, hierarchy);
+
+        if (!fsClient.exists(file)) {
+            return null;
+        }
+
+        try (ObjectInputStream ois = new ObjectInputStream(fsClient.newInputStream(file))) {
+            return (Map<Long, List<String>>) ois.readObject();
         }
     }
 

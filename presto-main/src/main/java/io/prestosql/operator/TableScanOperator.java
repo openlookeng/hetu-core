@@ -528,7 +528,8 @@ public class TableScanOperator
                     if (totalPageSize(pageSpilledList) >= (spillThreshold / 2)) {
                         if (!reuseExchangeTableScanMappingIdState.getSpiller().isPresent()) {
                             Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(types, operatorContext.getSpillContext(),
-                                    operatorContext.newAggregateSystemMemoryContext()));
+                                    operatorContext.newAggregateSystemMemoryContext(), operatorContext.isSnapshotEnabled(),
+                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
                             reuseExchangeTableScanMappingIdState.setSpiller(spillObject);
                         }
 

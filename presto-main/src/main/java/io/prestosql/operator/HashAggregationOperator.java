@@ -70,7 +70,7 @@ public class HashAggregationOperator
                     false,
                     new DataSize(0, MEGABYTE),
                     new DataSize(0, MEGABYTE),
-                    (types, spillContext, memoryContext) -> {
+                    (types, spillContext, memoryContext, isSnapshotEnabled, queryId) -> {
                         throw new UnsupportedOperationException();
                     },
                     joinCompiler,

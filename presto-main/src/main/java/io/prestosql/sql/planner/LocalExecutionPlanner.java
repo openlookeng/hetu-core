@@ -276,6 +276,7 @@ import static io.prestosql.SystemSessionProperties.isSpillEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillForOuterJoinEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillOrderBy;
 import static io.prestosql.SystemSessionProperties.isSpillReuseExchange;
+import static io.prestosql.SystemSessionProperties.isSpillToHdfsEnabled;
 import static io.prestosql.SystemSessionProperties.isSpillWindowOperator;
 import static io.prestosql.dynamicfilter.DynamicFilterCacheManager.createCacheKey;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
@@ -1352,7 +1353,8 @@ public class LocalExecutionPlanner
                     pagesIndexFactory,
                     isSpillEnabled(session) && isSpillWindowOperator(session),
                     spillerFactory,
-                    orderingCompiler);
+                    orderingCompiler,
+                    isSpillToHdfsEnabled(session));
 
             return new PhysicalOperation(operatorFactory, outputMappings.build(), context, source);
         }
@@ -1403,6 +1405,7 @@ public class LocalExecutionPlanner
 
             boolean spillEnabled = isSpillEnabled(context.getSession()) && isSpillOrderBy(context.getSession());
             boolean spillNonBlocking = isNonBlockingSpillOrderby(context.getSession());
+            boolean isSpillToHdfsEnabled = isSpillToHdfsEnabled(context.getSession());
 
             OperatorFactory operator = new OrderByOperatorFactory(
                     context.getNextOperatorId(),
@@ -1416,7 +1419,8 @@ public class LocalExecutionPlanner
                     spillEnabled,
                     Optional.of(spillerFactory),
                     orderingCompiler,
-                    spillNonBlocking);
+                    spillNonBlocking,
+                    isSpillToHdfsEnabled);
 
             return new PhysicalOperation(operator, source.getLayout(), context, source);
         }
@@ -2773,7 +2777,9 @@ public class LocalExecutionPlanner
                     10_000,
                     pagesIndexFactory,
                     spillAllowed && taskCount > 1,
-                    singleStreamSpillerFactory);
+                    singleStreamSpillerFactory,
+                    spillerFactory,
+                    isSpillToHdfsEnabled(context.getSession()));
 
             factoriesBuilder.add(hashBuilderOperatorFactory);
 

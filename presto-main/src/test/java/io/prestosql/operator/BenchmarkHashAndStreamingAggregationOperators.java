@@ -159,7 +159,7 @@ public class BenchmarkHashAndStreamingAggregationOperators
         private OperatorFactory createHashAggregationOperatorFactory(Optional<Integer> hashChannel)
         {
             JoinCompiler joinCompiler = new JoinCompiler(createTestMetadataManager());
-            SpillerFactory spillerFactory = (types, localSpillContext, aggregatedMemoryContext) -> null;
+            SpillerFactory spillerFactory = (types, localSpillContext, aggregatedMemoryContext, isSnapshotEnabled, queryId) -> null;
 
             return new HashAggregationOperatorFactory(
                     0,

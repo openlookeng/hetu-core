@@ -44,6 +44,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.Spiller;
 import io.prestosql.spiller.SpillerFactory;
 import io.prestosql.sql.gen.OrderingCompiler;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
@@ -98,6 +99,7 @@ public class WindowOperator
         private final boolean spillEnabled;
         private final SpillerFactory spillerFactory;
         private final OrderingCompiler orderingCompiler;
+        private final boolean isSpillToHdfsEnabled;
 
         public WindowOperatorFactory(
                 int operatorId,
@@ -114,7 +116,8 @@ public class WindowOperator
                 PagesIndex.Factory pagesIndexFactory,
                 boolean spillEnabled,
                 SpillerFactory spillerFactory,
-                OrderingCompiler orderingCompiler)
+                OrderingCompiler orderingCompiler,
+                boolean isSpillToHdfsEnabled)
         {
             requireNonNull(sourceTypes, "sourceTypes is null");
             requireNonNull(planNodeId, "planNodeId is null");
@@ -147,6 +150,7 @@ public class WindowOperator
             this.spillEnabled = spillEnabled;
             this.spillerFactory = spillerFactory;
             this.orderingCompiler = orderingCompiler;
+            this.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
         }
 
         @Override
@@ -169,7 +173,8 @@ public class WindowOperator
                     pagesIndexFactory,
                     spillEnabled,
                     spillerFactory,
-                    orderingCompiler);
+                    orderingCompiler,
+                    isSpillToHdfsEnabled);
         }
 
         @Override
@@ -196,7 +201,8 @@ public class WindowOperator
                     pagesIndexFactory,
                     spillEnabled,
                     spillerFactory,
-                    orderingCompiler);
+                    orderingCompiler,
+                    isSpillToHdfsEnabled);
         }
     }
 
@@ -216,6 +222,7 @@ public class WindowOperator
     private final PagesIndexWithHashStrategies inMemoryPagesIndexWithHashStrategies;
 
     private final SingleInputSnapshotState snapshotState;
+    private boolean isSpillToHdfsEnabled;
 
     public WindowOperator(
             OperatorContext operatorContext,
@@ -231,7 +238,8 @@ public class WindowOperator
             PagesIndex.Factory pagesIndexFactory,
             boolean spillEnabled,
             SpillerFactory spillerFactory,
-            OrderingCompiler orderingCompiler)
+            OrderingCompiler orderingCompiler,
+            boolean isSpillToHdfsEnabled)
     {
         requireNonNull(operatorContext, "operatorContext is null");
         requireNonNull(outputChannels, "outputChannels is null");
@@ -329,6 +337,7 @@ public class WindowOperator
         }
 
         windowInfo = new WindowInfo.DriverWindowInfoBuilder();
+        this.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
         operatorContext.setInfoSupplier(this::getWindowInfo);
     }
 
@@ -899,7 +908,9 @@ public class WindowOperator
                 spiller = Optional.of(spillerFactory.create(
                         sourceTypes,
                         operatorContext.getSpillContext(),
-                        operatorContext.newAggregateSystemMemoryContext()));
+                        operatorContext.newAggregateSystemMemoryContext(),
+                        operatorContext.isSnapshotEnabled(),
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
             }
 
             verify(inMemoryPagesIndexWithHashStrategies.pagesIndex.getPositionCount() > 0);
@@ -1086,7 +1097,9 @@ public class WindowOperator
                     this.spiller = Optional.of(spillerFactory.create(
                             sourceTypes,
                             operatorContext.getSpillContext(),
-                            operatorContext.newAggregateSystemMemoryContext()));
+                            operatorContext.newAggregateSystemMemoryContext(),
+                            operatorContext.isSnapshotEnabled(),
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
                 }
                 this.spiller.get().restore(myState.spiller, serdeProvider);
             }
@@ -1263,10 +1276,28 @@ public class WindowOperator
     }
 
     @Override
+    public boolean isSpillToHdfsEnabled()
+    {
+        return isSpillToHdfsEnabled;
+    }
+
+    @Override
     public List<Path> getSpilledFilePaths()
     {
         if (isSpilled()) {
-            return spillablePagesToPagesIndexes.get().spiller.get().getSpilledFilePaths();
+            if (isSpillToHdfsEnabled) {
+                return spillablePagesToPagesIndexes.get().spiller.get().getSpilledFilePaths(true);
+            }
+            return spillablePagesToPagesIndexes.get().spiller.get().getSpilledFilePaths(false);
+        }
+        return ImmutableList.of();
+    }
+
+    @Override
+    public List<Pair<Path, Long>> getSpilledFileInfo()
+    {
+        if (isSpilled()) {
+            return spillablePagesToPagesIndexes.get().spiller.get().getSpilledFileInfo();
         }
         return ImmutableList.of();
     }
@@ -1293,6 +1324,7 @@ public class WindowOperator
         for (int i = 0; i < windowFunctions.size(); i++) {
             myState.windowFunctions[i] = windowFunctions.get(i).capture(serdeProvider);
         }
+        myState.isSpillToHdfsEnabled = isSpillToHdfsEnabled;
         return myState;
     }
 
@@ -1308,6 +1340,7 @@ public class WindowOperator
         for (int i = 0; i < myState.windowFunctions.length; i++) {
             this.windowFunctions.get(i).restore(myState.windowFunctions[i], serdeProvider);
         }
+        this.isSpillToHdfsEnabled = myState.isSpillToHdfsEnabled;
     }
 
     @Override
@@ -1325,5 +1358,6 @@ public class WindowOperator
         private Object windowInfo;
         private Object inMemoryPagesIndexWithHashStrategies;
         private Object[] windowFunctions;
+        private boolean isSpillToHdfsEnabled;
     }
 }

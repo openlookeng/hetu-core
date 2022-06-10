@@ -77,6 +77,11 @@ public class TaskSnapshotManager
         return resumeCount;
     }
 
+    public TaskId getTaskId()
+    {
+        return taskId;
+    }
+
     public QuerySnapshotManager getQuerySnapshotManager()
     {
         return recoveryUtils.getQuerySnapshotManager(taskId.getQueryId());
@@ -195,10 +200,10 @@ public class TaskSnapshotManager
         return loadedValue;
     }
 
-    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile)
+    public void storeFile(SnapshotStateId snapshotStateId, Path sourceFile, long skipBytes)
             throws Exception
     {
-        recoveryUtils.storeFile(snapshotStateId, sourceFile, this);
+        recoveryUtils.storeFile(snapshotStateId, sourceFile, this, skipBytes);
         // store dummy value
         Map<String, Object> map = storeCache.computeIfAbsent(snapshotStateId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
         map.put(snapshotStateId.toString(), snapshotStateId.toString());
@@ -217,6 +222,22 @@ public class TaskSnapshotManager
             return null;
         }
         return recoveryUtils.loadFile(SnapshotStateId.fromString((String) loadedValue.get()), targetFile, this);
+    }
+
+    public Boolean loadFiles(Map<Path, List<SnapshotStateId>> snapshotSpillMap)
+            throws Exception
+    {
+        return recoveryUtils.loadFiles(snapshotSpillMap, this);
+    }
+
+    public SnapshotStateId loadSpilledFile(SnapshotStateId snapshotStateId)
+            throws Exception
+    {
+        Optional<Object> loadedValue = loadWithBacktrack(snapshotStateId);
+        if (!loadedValue.isPresent() || loadedValue.get() == NO_STATE) {
+            return null;
+        }
+        return SnapshotStateId.fromString((String) loadedValue.get());
     }
 
     private OptionalLong getPreviousSnapshotIdIfComplete(Map<Long, SnapshotInfo> snapshotToSnapshotResultMap, long snapshotId)
@@ -459,5 +480,25 @@ public class TaskSnapshotManager
     public String toString()
     {
         return String.format(Locale.ENGLISH, "%s, with total component %d", taskId, totalComponents);
+    }
+
+    public void storeSpilledPathInfo(SnapshotStateId spillId, Object snapshotSpillPaths)
+            throws Exception
+    {
+        recoveryUtils.storeSpilledPathInfo(spillId, snapshotSpillPaths);
+        Map<String, Object> map = storeCache.computeIfAbsent(spillId.getSnapshotId(), (x) -> Collections.synchronizedMap(new HashMap<>()));
+        map.put(spillId.toString(), spillId.toString());
+    }
+
+    public Map<Long, List<String>> loadSpilledPathInfo(SnapshotStateId spillId)
+            throws Exception
+    {
+        Optional<Object> loadedValue = loadWithBacktrack(spillId);
+        if (!loadedValue.isPresent() || loadedValue.get() == NO_STATE) {
+            return null;
+        }
+        else {
+            return recoveryUtils.loadSpilledPathInfo(SnapshotStateId.fromString((String) loadedValue.get()));
+        }
     }
 }

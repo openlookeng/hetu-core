@@ -184,6 +184,11 @@ public class PagesSerdeUtil
         return new PageReader(serde, sliceInput);
     }
 
+    public static Iterator<Page> readPages(GenericPagesSerde serde, SliceInput sliceInput, int spillPrefetchReadPages, Predicate<InputStream> eof)
+    {
+        return new PageReader(serde, sliceInput, spillPrefetchReadPages, eof);
+    }
+
     public static Iterator<Page> readPagesDirect(GenericPagesSerde serde, InputStream input, Predicate<InputStream> eof, int spillPrefetchReadPages)
     {
         return new PageReaderDirect(serde, input, eof, spillPrefetchReadPages);
@@ -195,30 +200,44 @@ public class PagesSerdeUtil
         private final GenericPagesSerde serde;
         private final SliceInput input;
         private final int spillPrefetchReadPages;
+        Predicate<InputStream> eof;
         LinkedList<Page> prefetchedPages;
 
         PageReader(GenericPagesSerde serde, SliceInput input)
         {
-            this(serde, input, DEFAULT_NUM_PAGES_PREFETCH);
+            this(serde, input, DEFAULT_NUM_PAGES_PREFETCH, null);
         }
 
-        PageReader(GenericPagesSerde serde, SliceInput input, int spillPrefetchReadPages)
+        PageReader(GenericPagesSerde serde, SliceInput sliceInput, int spillPrefetchReadPages)
+        {
+            this(serde, sliceInput, spillPrefetchReadPages, null);
+        }
+
+        PageReader(GenericPagesSerde serde, SliceInput input, int spillPrefetchReadPages, Predicate<InputStream> eof)
         {
             this.serde = requireNonNull(serde, "serde is null");
             this.input = requireNonNull(input, "input is null");
             checkArgument(spillPrefetchReadPages > 0, "spillPrefetchReadPages cannot be less then 1");
             this.prefetchedPages = new LinkedList<>();
             this.spillPrefetchReadPages = spillPrefetchReadPages;
+            this.eof = eof;
         }
 
         @Override
         protected Page computeNext()
         {
-            if (!input.isReadable() && prefetchedPages.size() == 0) {
-                return endOfData();
+            if (eof != null) {
+                if (eof.test(input) && prefetchedPages.size() == 0) {
+                    return endOfData();
+                }
+            }
+            else {
+                if (!input.isReadable() && prefetchedPages.size() == 0) {
+                    return endOfData();
+                }
             }
             if (prefetchedPages.size() == 0) {
-                for (int i = 0; i < spillPrefetchReadPages && input.isReadable(); i++) {
+                for (int i = 0; i < spillPrefetchReadPages && (eof != null ? !eof.test(input) : input.isReadable()); i++) {
                     prefetchedPages.add(serde.deserialize(readSerializedPage(input)));
                 }
             }

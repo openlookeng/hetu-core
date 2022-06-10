@@ -164,7 +164,7 @@ public class TestTaskSnapshotManager
         fileWriter.close();
 
         SnapshotStateId snapshotStateId = new SnapshotStateId(1, taskId, "component1");
-        snapshotManager.storeFile(snapshotStateId, sourcePath);
+        snapshotManager.storeFile(snapshotStateId, sourcePath, 0);
         snapshotManager.succeededToCapture(snapshotStateId);
 
         Path targetPath = Paths.get(SNAPSHOT_FILE_SYSTEM_DIR + "/target/spill-test.txt");
@@ -207,7 +207,7 @@ public class TestTaskSnapshotManager
         querySnapshotManager.setRecoveryCallbacks(this::onRecoveryComplete, this::isRecoveryInProgress);
 
         SnapshotStateId id4save = new SnapshotStateId(2, taskId, "component1");
-        snapshotManager.storeFile(id4save, sourcePath);
+        snapshotManager.storeFile(id4save, sourcePath, 0);
         snapshotManager.succeededToCapture(id4save);
 
         SnapshotStateId id4load = new SnapshotStateId(3, taskId, "component1");
@@ -504,7 +504,7 @@ public class TestTaskSnapshotManager
             String firstStr = "first string";
             fw1.write(firstStr);
             SnapshotStateId stateId = SnapshotStateId.forOperator(firstSnapshotId, taskId1, 3, 4, 5);
-            snapshotManager.storeFile(stateId, firstFile.toPath());
+            snapshotManager.storeFile(stateId, firstFile.toPath(), 0);
             snapshotManager.succeededToCapture(stateId);
         }
 
@@ -515,7 +515,7 @@ public class TestTaskSnapshotManager
             String secondStr = "second string";
             fw2.write(secondStr);
             SnapshotStateId secondId = SnapshotStateId.forOperator(2L, taskId1, 3, 4, 5);
-            snapshotManager.storeFile(secondId, secondFile.toPath());
+            snapshotManager.storeFile(secondId, secondFile.toPath(), 0);
             snapshotManager.succeededToCapture(secondId);
             querySnapshotManager.snapshotInitiated(firstSnapshotId);
             querySnapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(firstSnapshotId, SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL)));
