@@ -161,10 +161,10 @@ public final class TaskTestUtils
                 new JoinFilterFunctionCompiler(metadata),
                 new IndexJoinLookupStats(),
                 new TaskManagerConfig(),
-                new GenericSpillerFactory((types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
+                new GenericSpillerFactory((types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId, isSpillToHdfs) -> {
                     throw new UnsupportedOperationException();
                 }),
-                (types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
+                (types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId, isSpillToHdfs) -> {
                     throw new UnsupportedOperationException();
                 },
                 (types, partitionFunction, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {

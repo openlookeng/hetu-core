@@ -305,6 +305,6 @@ public class SnapshotFileBasedClient
 
     private HetuFileSystemClient getSpillerFileSystemClient(Path filePath) throws IOException
     {
-        return !spillToHdfs && spillProfile == null ? fileSystemClientManager.getFileSystemClient(filePath) : fileSystemClientManager.getFileSystemClient(spillProfile, filePath);
+        return !spillToHdfs || spillProfile == null ? fileSystemClientManager.getFileSystemClient(filePath) : fileSystemClientManager.getFileSystemClient(spillProfile, filePath);
     }
 }

@@ -41,6 +41,7 @@ import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.SystemSessionProperties.isSpillToHdfsEnabled;
 import static io.prestosql.operator.WorkProcessor.ProcessState.blocked;
 import static io.prestosql.operator.WorkProcessor.ProcessState.finished;
 import static io.prestosql.operator.WorkProcessor.ProcessState.ofResult;
@@ -421,7 +422,7 @@ public class WorkProcessorSourceOperatorAdapter
                             Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(projectionTypes, operatorContext.getSpillContext(),
                                     operatorContext.newAggregateSystemMemoryContext(),
                                     operatorContext.isSnapshotEnabled(),
-                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled(operatorContext.getSession())));
                             reuseExchangeTableScanMappingIdState.setSpiller(spillObject);
                         }
 

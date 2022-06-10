@@ -123,7 +123,7 @@ public class TestFileSingleStreamSpillerFactory
         Page page = buildPage();
         List<SingleStreamSpiller> spillers = new ArrayList<>();
         for (int i = 0; i < 10; ++i) {
-            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId");
+            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId", false, null);
             getUnchecked(singleStreamSpiller.spill(page));
             spillers.add(singleStreamSpiller);
         }
@@ -161,7 +161,7 @@ public class TestFileSingleStreamSpillerFactory
                 null,
                 fileSystemClientManager);
 
-        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId");
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId", false, null);
     }
 
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No free space available for spill")
@@ -183,7 +183,7 @@ public class TestFileSingleStreamSpillerFactory
                 "hdfs",
                 fileSystemClientManager);
         when(fileSystemClientManager.getFileSystemClient("hdfs", spillerFactory.getSpillPaths().get(0))).thenReturn(getLocalHdfs(spillerFactory.getSpillPaths().get(0).toString()));
-        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId");
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId", true, spillPath1.toPath());
     }
 
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No spill paths configured")
@@ -204,10 +204,10 @@ public class TestFileSingleStreamSpillerFactory
                 false,
                 null,
                 fileSystemClientManager);
-        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId");
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId", false, null);
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "No spill paths configured")
+    @Test(expectedExceptions = RuntimeException.class)
     public void throwIfNoSpillPathsWhenSpillToHdfsEnabled()
     {
         List<Path> spillPaths = emptyList();
@@ -225,7 +225,7 @@ public class TestFileSingleStreamSpillerFactory
                 true,
                 "hdfs",
                 fileSystemClientManager);
-        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId");
+        spillerFactory.create(types, bytes -> {}, newSimpleAggregatedMemoryContext().newLocalMemoryContext("test"), false, false, "queryId", true);
     }
 
     @Test

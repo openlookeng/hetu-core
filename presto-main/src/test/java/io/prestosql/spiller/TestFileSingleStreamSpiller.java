@@ -176,7 +176,7 @@ public class TestFileSingleStreamSpiller
                 spillProfile,
                 fileSystemClientManager);
         LocalMemoryContext memoryContext = newSimpleAggregatedMemoryContext().newLocalMemoryContext("test");
-        SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
+        SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId", spillToHdfs, spillPath.toPath());
         assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
         FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
 
@@ -316,7 +316,7 @@ public class TestFileSingleStreamSpiller
         Page page = buildPageBenchmark();
         Path finalSpillPath = spillToHdfs ? Paths.get(spillerFactory.getSpillPaths().get(0).toString(), "queryId") : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
-            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
+            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId", spillToHdfs, spillPath.toPath());
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
             FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
             spillers.add(spiller);
@@ -491,7 +491,7 @@ public class TestFileSingleStreamSpiller
         Page page = buildPageBenchmark();
         Path finalSpillPath = spillToHdfs ? Paths.get(spillerFactory.getSpillPaths().get(0).toString(), "queryId") : spillPath.toPath();
         for (int j = 1; j <= fileCount; j++) {
-            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId");
+            SingleStreamSpiller singleStreamSpiller = spillerFactory.create(TYPES, bytes -> {}, memoryContext, false, false, "queryId", spillToHdfs, spillPath.toPath());
             assertTrue(singleStreamSpiller instanceof FileSingleStreamSpiller);
             FileSingleStreamSpiller spiller = (FileSingleStreamSpiller) singleStreamSpiller;
             spillers.add(spiller);

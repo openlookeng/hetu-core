@@ -14,6 +14,7 @@
 package io.prestosql;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.execution.QueryManagerConfig;
@@ -182,6 +183,8 @@ public final class SystemSessionProperties
     public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "eliminate_duplicate_spill_files";
 
     private final List<PropertyMetadata<?>> sessionProperties;
+
+    private static Logger log = Logger.get(SystemSessionProperties.class);
 
     public SystemSessionProperties()
     {
@@ -839,11 +842,26 @@ public final class SystemSessionProperties
                         "extension execution planner enabled",
                         hetuConfig.getExtensionExecutionPlannerEnabled(),
                         false),
-                booleanProperty(
+                new PropertyMetadata<>(
                         SPILL_TO_HDFS_ENABLED,
                         "Enable Spill To HDFS",
+                        BOOLEAN,
+                        Boolean.class,
                         featuresConfig.isSpillToHdfs(),
-                        false),
+                        false,
+                        value -> {
+                            boolean spillToHdfs = (Boolean) value;
+                            if (spillToHdfs && (featuresConfig.getSpillProfile() == null || featuresConfig.getSpillProfile().isEmpty())) {
+                                throw new PrestoException(
+                                        INVALID_SESSION_PROPERTY,
+                                        format("%s cannot be set to true; no spill profile is configured", SPILL_TO_HDFS_ENABLED));
+                            }
+                            if (spillToHdfs) {
+                                log.warn("Spiller path configured by user is ignored and /tmp/hetu/snapshot is used by default");
+                            }
+                            return spillToHdfs;
+                        },
+                        value -> value),
                 booleanProperty(
                         ELIMINATE_DUPLICATE_SPILL_FILES,
                         "Eliminates back up of spill files",

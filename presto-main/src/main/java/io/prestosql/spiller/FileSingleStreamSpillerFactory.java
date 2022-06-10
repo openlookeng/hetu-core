@@ -36,6 +36,7 @@ import javax.annotation.PreDestroy;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -184,7 +185,12 @@ public class FileSingleStreamSpillerFactory
     }
 
     @Override
-    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId)
+    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs)
+    {
+        return create(types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId, isSpillToHdfs, null);
+    }
+
+    public synchronized SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs, Path spillToHdfsPath)
     {
         createSpillDirectories();
         Optional<SpillCipher> spillCipher = Optional.empty();
@@ -192,7 +198,22 @@ public class FileSingleStreamSpillerFactory
             spillCipher = Optional.of(new AesSpillCipher());
         }
         PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled, useKryo);
-        return new FileSingleStreamSpiller(serde, executor, getNextSpillPath(), spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages, useKryo, spillToHdfs, spillProfile, fileSystemClientManager, isSingleSessionSpiller, isSnapshotEnabled, queryId);
+        Path spillPath;
+        if (spillToHdfsPath != null) {
+            spillPath = getHdfsSpillPath(spillToHdfsPath);
+        }
+        else {
+            spillPath = isSpillToHdfs ? Paths.get("/tmp/hetu/snapshot") : getNextSpillPath();
+        }
+        return new FileSingleStreamSpiller(serde, executor, spillPath, spillerStats, spillContext, memoryContext, spillCipher, spillCompressionEnabled, spillDirectSerdeEnabled, spillPrefetchReadPages, useKryo, isSpillToHdfs, spillProfile, fileSystemClientManager, isSingleSessionSpiller, isSnapshotEnabled, queryId);
+    }
+
+    private synchronized Path getHdfsSpillPath(Path spillToHdfsPath)
+    {
+        if (hasEnoughDiskSpace(spillToHdfsPath)) {
+            return spillToHdfsPath;
+        }
+        throw new PrestoException(OUT_OF_SPILL_SPACE, "No free space available for spill");
     }
 
     private synchronized Path getNextSpillPath()

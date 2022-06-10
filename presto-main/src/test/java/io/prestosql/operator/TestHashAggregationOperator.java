@@ -993,7 +993,7 @@ public class TestHashAggregationOperator
             implements SpillerFactory
     {
         @Override
-        public Spiller create(List<Type> types, SpillContext spillContext, AggregatedMemoryContext memoryContext, boolean isSnapshotEnabled, String queryId)
+        public Spiller create(List<Type> types, SpillContext spillContext, AggregatedMemoryContext memoryContext, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs)
         {
             return new Spiller()
             {

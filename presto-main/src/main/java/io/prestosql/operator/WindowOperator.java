@@ -910,7 +910,7 @@ public class WindowOperator
                         operatorContext.getSpillContext(),
                         operatorContext.newAggregateSystemMemoryContext(),
                         operatorContext.isSnapshotEnabled(),
-                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled));
             }
 
             verify(inMemoryPagesIndexWithHashStrategies.pagesIndex.getPositionCount() > 0);
@@ -1099,7 +1099,7 @@ public class WindowOperator
                             operatorContext.getSpillContext(),
                             operatorContext.newAggregateSystemMemoryContext(),
                             operatorContext.isSnapshotEnabled(),
-                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled));
                 }
                 this.spiller.get().restore(myState.spiller, serdeProvider);
             }
