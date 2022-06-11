@@ -11,11 +11,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive;
+package io.hetu.core.plugin.mpp;
 
-public interface HiveSplitLoader
+import com.google.common.collect.ImmutableList;
+import io.prestosql.plugin.hive.HivePlugin;
+import io.prestosql.spi.connector.ConnectorFactory;
+
+import java.util.Optional;
+
+public class MppPlugin
+        extends HivePlugin
 {
-    void start(HiveSplitSource splitSource);
+    public MppPlugin()
+    {
+        super("mpp");
+    }
 
-    void stop();
+    @Override
+    public Iterable<ConnectorFactory> getConnectorFactories()
+    {
+        return ImmutableList.of(new MppConnectorFactory("mpp", MppPlugin.class.getClassLoader(), Optional.empty()));
+    }
 }
