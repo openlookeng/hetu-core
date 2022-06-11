@@ -420,7 +420,7 @@ public class OrderByOperator
                     operatorContext.getSpillContext(),
                     operatorContext.newAggregateSystemMemoryContext(),
                     operatorContext.isSnapshotEnabled(),
-                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled));
         }
         primarySpillRunning = true;
         pageIndex.sort(sortChannels, sortOrder);
@@ -607,7 +607,7 @@ public class OrderByOperator
                         operatorContext.getSpillContext(),
                         operatorContext.newAggregateSystemMemoryContext(),
                         operatorContext.isSnapshotEnabled(),
-                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled));
             }
             this.spiller.get().restore(myState.spiller, serdeProvider);
         }

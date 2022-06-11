@@ -116,7 +116,7 @@ public class TestBinaryFileSpiller
     public void testFileSpiller()
             throws Exception
     {
-        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId")) {
+        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId", false)) {
             testSimpleSpiller(spiller);
         }
     }
@@ -137,7 +137,7 @@ public class TestBinaryFileSpiller
 
         Page page = new Page(col1.build(), col2.build(), col3.build());
 
-        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId")) {
+        try (Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId", false)) {
             testSpiller(types, spiller, ImmutableList.of(page));
         }
     }
@@ -226,7 +226,7 @@ public class TestBinaryFileSpiller
         List<Runnable> runners = new ArrayList<>();
         PagesSerde serde = TestingPagesSerdeFactory.testingPagesSerde();
 
-        Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId");
+        Spiller spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId", false);
         spilledBytes = doSpill(spiller, spilledBytes, runners, spills, 0);
         spillUploadPath.mkdirs();
 
@@ -251,7 +251,7 @@ public class TestBinaryFileSpiller
             });
 
             spiller.close();
-            spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId");
+            spiller = factory.create(TYPES, bytes -> {}, memoryContext, false, "queryId", false);
             spiller.restore(snapshot, serde);
             uploadedFile.stream().forEach(path -> {
                 try {

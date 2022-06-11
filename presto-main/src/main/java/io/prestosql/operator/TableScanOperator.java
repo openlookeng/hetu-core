@@ -68,6 +68,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
+import static io.prestosql.SystemSessionProperties.isSpillToHdfsEnabled;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
@@ -529,7 +530,7 @@ public class TableScanOperator
                         if (!reuseExchangeTableScanMappingIdState.getSpiller().isPresent()) {
                             Optional<Spiller> spillObject = Optional.of(spillerFactory.get().create(types, operatorContext.getSpillContext(),
                                     operatorContext.newAggregateSystemMemoryContext(), operatorContext.isSnapshotEnabled(),
-                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled(operatorContext.getSession())));
                             reuseExchangeTableScanMappingIdState.setSpiller(spillObject);
                         }
 

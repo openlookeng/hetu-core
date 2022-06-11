@@ -387,10 +387,10 @@ public class TestFeaturesConfig
                 .build(FeaturesConfig.class);
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*\\Q" + SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true and path should be /tmp/hetu/snapshot\\E.*")
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".*\\Q" + SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + "\\E.*")
     public void testValidateSpillToHdfsIfWrongPathConfigured()
     {
-        new ConfigurationFactory(ImmutableMap.of(SPILL_ENABLED, "true", SPILLER_SPILL_TO_HDFS, "true", SPILLER_SPILL_PROFILE, "spill_profile", SPILLER_SPILL_PATH, "/abc/def"))
+        new ConfigurationFactory(ImmutableMap.of(SPILL_ENABLED, "true", SPILLER_SPILL_TO_HDFS, "true", SPILLER_SPILL_PROFILE, "spill_profile", SPILLER_SPILL_PATH, "/abc/def,/abc/def/ghi"))
                 .build(FeaturesConfig.class);
     }
 

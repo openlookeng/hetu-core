@@ -27,13 +27,13 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -64,7 +64,7 @@ public class SingleInputSnapshotState
     private final Queue<MarkerPage> markers = new LinkedList<>();
     // For recording snapshot memory usage
     private final LocalMemoryContext snapshotMemoryContext;
-    private Map<Path, Long> spillFileSizeMap = new HashMap<>();
+    private Map<Path, Long> spillFileSizeMap = new ConcurrentHashMap<>();
     Map<Long, List<String>> snapshotSpillPaths = new LinkedHashMap<>();
     private final boolean isEliminateDuplicateSpillFilesEnabled;
     long lastSnapshotId = -1;

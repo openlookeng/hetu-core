@@ -45,6 +45,7 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
+import static io.prestosql.SystemSessionProperties.isSpillToHdfsEnabled;
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static java.lang.Math.max;
 
@@ -262,7 +263,7 @@ public class SpillableHashAggregationBuilder
                     operatorContext.getSpillContext(),
                     operatorContext.newAggregateSystemMemoryContext(),
                     operatorContext.isSnapshotEnabled(),
-                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled(operatorContext.getSession())));
         }
 
         // start spilling process with current content of the hashAggregationBuilder builder...
@@ -397,7 +398,7 @@ public class SpillableHashAggregationBuilder
                         operatorContext.getSpillContext(),
                         operatorContext.newAggregateSystemMemoryContext(),
                         operatorContext.isSnapshotEnabled(),
-                        operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                        operatorContext.getDriverContext().getTaskId().getQueryId().toString(), isSpillToHdfsEnabled(operatorContext.getSession())));
             }
             this.spiller.get().restore(myState.spiller, serdeProvider);
         }

@@ -21,11 +21,11 @@ import java.util.List;
 
 public interface SingleStreamSpillerFactory
 {
-    SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId);
+    SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs);
 
     static SingleStreamSpillerFactory unsupportedSingleStreamSpillerFactory()
     {
-        return (types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId) -> {
+        return (types, spillContext, memoryContext, isSingleSessionSpiller, isSnapshotEnabled, queryId, isSpillToHdfs) -> {
             throw new UnsupportedOperationException();
         };
     }

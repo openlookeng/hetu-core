@@ -261,7 +261,7 @@ public class GenericPartitioningSpiller
     {
         Optional<SingleStreamSpiller> spiller = spillers.get(partition);
         if (!spiller.isPresent()) {
-            spiller = Optional.of(closer.register(spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId)));
+            spiller = Optional.of(closer.register(spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId, isSingleSessionSpiller)));
             spillers.set(partition, spiller);
         }
         return spiller.get();
@@ -365,7 +365,7 @@ public class GenericPartitioningSpiller
             if (myState.backUpSpillers.get(i) != null) {
                 backUpSpillers.set(i, new LinkedList<>());
                 for (Object singleStreamSpiller : myState.backUpSpillers.get(i)) {
-                    SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
+                    SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId, isSingleSessionSpiller);
                     spiller.restore(singleStreamSpiller, serdeProvider);
                     backUpSpillers.get(i).add(Optional.of(closer.register(spiller)));
                 }
@@ -374,14 +374,14 @@ public class GenericPartitioningSpiller
 
         for (int i = 0; i < spillers.size(); i++) {
             if (myState.spillers.get(i) != null) {
-                SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
+                SingleStreamSpiller spiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId, isSingleSessionSpiller);
                 spiller.restore(myState.spillers.get(i), serdeProvider);
                 if (isSingleSessionSpiller) {
                     if (backUpSpillers.get(i) == null) {
                         backUpSpillers.set(i, new LinkedList<>());
                     }
                     backUpSpillers.get(i).add(Optional.of(closer.register(spiller)));
-                    SingleStreamSpiller newSpiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId);
+                    SingleStreamSpiller newSpiller = spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext(GenericPartitioningSpiller.class.getSimpleName()), isSingleSessionSpiller, isSnapshotEnabled, queryId, isSingleSessionSpiller);
                     this.spillers.set(i, Optional.of(closer.register(newSpiller)));
                 }
                 else {

@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.configuration.DefunctConfig;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MaxDataSize;
@@ -906,10 +907,14 @@ public class FeaturesConfig
         return this;
     }
 
-    @AssertTrue(message = SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS + " is set to true and path should be /tmp/hetu/snapshot")
+    @AssertTrue(message = SPILLER_SPILL_PATH + " must be only contain single path when " + SPILLER_SPILL_TO_HDFS)
     public boolean isSpillerSpillPathConfiguredIfSpillToHdfsEnabled()
     {
-        return !isSpillToHdfs() || (spillerSpillPaths.size() == 1 && spillerSpillPaths.get(0).toString().equals("/tmp/hetu/snapshot"));
+        Logger log = Logger.get(FeaturesConfig.class);
+        if (spillToHdfs) {
+            log.warn("Spiller path configured by user is ignored and /tmp/hetu/snapshot is used by default");
+        }
+        return !isSpillToHdfs() || (spillerSpillPaths.size() == 1);
     }
 
     @AssertTrue(message = SPILLER_SPILL_PROFILE + " must be configured when " + SPILLER_SPILL_TO_HDFS + " is set to true")

@@ -569,7 +569,7 @@ public class HashBuilderOperator
                     operatorContext.getSpillContext().newLocalSpillContext(),
                     operatorContext.newAggregateSystemMemoryContext(),
                     operatorContext.isSnapshotEnabled(),
-                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), spillToHdfsEnabled));
             createSessionSpiller();
         }
         else {
@@ -579,7 +579,7 @@ public class HashBuilderOperator
                     operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName()),
                     spillToHdfsEnabled,
                     operatorContext.isSnapshotEnabled(),
-                    operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                    operatorContext.getDriverContext().getTaskId().getQueryId().toString(), spillToHdfsEnabled));
         }
         return getSpiller().spill(new AbstractIterator<Page>()
         {
@@ -1041,7 +1041,7 @@ public class HashBuilderOperator
                             operatorContext.getSpillContext().newLocalSpillContext(),
                             operatorContext.newAggregateSystemMemoryContext(),
                             operatorContext.isSnapshotEnabled(),
-                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString(), spillToHdfsEnabled));
 
                     genericSpiller.get().restore(myState.genericSpiller, serdeProvider);
                     createSessionSpiller();
@@ -1053,7 +1053,7 @@ public class HashBuilderOperator
                             operatorContext.newLocalSystemMemoryContext(HashBuilderOperator.class.getSimpleName()),
                             spillToHdfsEnabled,
                             operatorContext.isSnapshotEnabled(),
-                            operatorContext.getDriverContext().getTaskId().getQueryId().toString()));
+                            operatorContext.getDriverContext().getTaskId().getQueryId().toString(), spillToHdfsEnabled));
 
                     this.spiller.get().restore(myState.spiller, serdeProvider);
                 }

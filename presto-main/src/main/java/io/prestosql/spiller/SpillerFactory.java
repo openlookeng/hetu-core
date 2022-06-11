@@ -21,5 +21,5 @@ import java.util.List;
 
 public interface SpillerFactory
 {
-    Spiller create(List<Type> types, SpillContext localSpillContext, AggregatedMemoryContext aggregatedMemoryContext, boolean isSnapshotEnabled, String queryId);
+    Spiller create(List<Type> types, SpillContext localSpillContext, AggregatedMemoryContext aggregatedMemoryContext, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs);
 }

@@ -60,6 +60,7 @@ public class GenericSpiller
     private boolean isSessionSpiller;
     private final boolean isSnapshotEnabled;
     private final String queryId;
+    private final boolean isSpillToHdfs;
 
     public GenericSpiller(
             List<Type> types,
@@ -67,7 +68,8 @@ public class GenericSpiller
             AggregatedMemoryContext aggregatedMemoryContext,
             SingleStreamSpillerFactory singleStreamSpillerFactory,
             boolean isSnapshotEnabled,
-            String queryId)
+            String queryId,
+            boolean isSpillToHdfs)
     {
         this.types = requireNonNull(types, "types can not be null");
         this.spillContext = requireNonNull(spillContext, "spillContext can not be null");
@@ -75,12 +77,13 @@ public class GenericSpiller
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory can not be null");
         this.isSnapshotEnabled = isSnapshotEnabled;
         this.queryId = queryId;
+        this.isSpillToHdfs = isSpillToHdfs;
     }
 
     @Override
     public ListenableFuture<?> spill(Iterator<Page> pageIterator)
     {
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId);
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId, isSpillToHdfs);
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         spillCommitted.add(new AtomicBoolean(true));
@@ -91,7 +94,7 @@ public class GenericSpiller
     @Override
     public SingleStreamSpiller createSessionSpiller()
     {
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), true, isSnapshotEnabled, queryId);
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), true, isSnapshotEnabled, queryId, isSpillToHdfs);
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         spillCommitted.add(new AtomicBoolean(true));
@@ -107,7 +110,7 @@ public class GenericSpiller
     @Override
     public Pair<ListenableFuture<?>, Runnable> spillUnCommit(Iterator<Page> pageIterator)
     {
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId);
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), false, isSnapshotEnabled, queryId, isSpillToHdfs);
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         AtomicBoolean isCommitted = new AtomicBoolean(false);
@@ -205,7 +208,7 @@ public class GenericSpiller
         GenericSpillerState myState = (GenericSpillerState) state;
         isSessionSpiller = myState.isSessionSpiller;
         for (Object s : myState.singleStreamSpillers) {
-            SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), isSessionSpiller, isSnapshotEnabled, queryId);
+            SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, spillContext, aggregatedMemoryContext.newLocalMemoryContext(GenericSpiller.class.getSimpleName()), isSessionSpiller, isSnapshotEnabled, queryId, isSpillToHdfs);
             singleStreamSpiller.restore(s, serdeProvider);
             this.singleStreamSpillers.add(singleStreamSpiller);
             this.spillCommitted.add(new AtomicBoolean(true));

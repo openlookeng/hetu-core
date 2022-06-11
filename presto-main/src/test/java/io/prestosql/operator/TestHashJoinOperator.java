@@ -1770,7 +1770,7 @@ public class TestHashJoinOperator
         }
 
         @Override
-        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId)
+        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext, boolean isSingleSessionSpiller, boolean isSnapshotEnabled, String queryId, boolean isSpillToHdfs)
         {
             return new SingleStreamSpiller()
             {
