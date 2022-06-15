@@ -78,6 +78,18 @@ public class AuditLogResource
         this.eventListenerManager = requireNonNull(eventListenerManager, "eventListenerManager is null");
     }
 
+    @GET
+    @Path("/isAdmin")
+    public String isAdmin(@Context HttpServletResponse response,
+                          @Context HttpServletRequest servletRequest)
+    {
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
+        if (filterUser.isPresent()) {
+            return filterUser.get();
+        }
+        return "admin";
+    }
+
     @POST
     @Path("/{type}")
     public void getAuditLog(
@@ -92,14 +104,14 @@ public class AuditLogResource
         //if the user is admin, don't filter results by user.
         Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
-        if (filterUser.isPresent()) {
-            response.setStatus(Response.SC_FORBIDDEN);
-            return;
-        }
         String inputUsername = emptyToNull(username);
         String inputBeginTime = emptyToNull(beginTime);
         String inputEndTime = emptyToNull(endTime);
         String inputLevel = emptyToNull(level);
+
+        if (filterUser.isPresent()) {  // if the user is not admin, only search himself auditLog
+            inputUsername = filterUser.get();
+        }
 
         List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
         if (logFiles.isEmpty()) {
@@ -148,15 +160,14 @@ public class AuditLogResource
         Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
 
         String sessionUser = AccessControlUtil.getUser(accessControl, new HttpRequestSessionContext(servletRequest, groupProvider));
-
-        if (filterUser.isPresent()) {
-            response.setStatus(Response.SC_FORBIDDEN);
-            return;
-        }
         String inputUsername = emptyToNull(username);
         String inputBeginTime = emptyToNull(beginTime);
         String inputEndTime = emptyToNull(endTime);
         String inputLevel = emptyToNull(level);
+
+        if (filterUser.isPresent()) {  // if the user is not admin, only search himself auditLog
+            inputUsername = sessionUser;
+        }
 
         List<String> logFiles = getLogFiles(type, inputBeginTime, inputEndTime, inputUsername, inputLevel);
         if (logFiles.isEmpty()) {
