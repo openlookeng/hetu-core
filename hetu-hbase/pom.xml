@@ -14,7 +14,7 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <dep.log4j.version>2.17.1</dep.log4j.version>
+        <dep.log4j.version>2.17.2</dep.log4j.version>
         <version.annotations>13.0</version.annotations>
         <version.validation-api>2.0.1.Final</version.validation-api>
         <version.commons-lang3>3.10</version.commons-lang3>
@@ -249,7 +249,7 @@
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-webapp</artifactId>
-            <version>9.4.43.v20210629</version>
+            <version>9.4.46.v20220331</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
