@@ -296,7 +296,7 @@ public class DispatchManager
                     }
                     else {
                         if (!isUiQuery && dispatchQuery.getBasicQueryInfo().getState() == QueryState.FAILED) {
-                            QueryInfo queryInfo = queryHistoryService.toFullQueryInfo(dispatchQuery);
+                            QueryInfo queryInfo = QueryHistoryService.toFullQueryInfo(dispatchQuery);
                             queryHistoryService.insert(queryInfo);
                         }
                         // execution MUST be added to the expiration queue or there will be a leak

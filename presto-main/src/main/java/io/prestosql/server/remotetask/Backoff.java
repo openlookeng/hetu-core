@@ -72,11 +72,13 @@ public class Backoff
                 .toArray();
     }
 
+    @Override
     public synchronized long getFailureCount()
     {
         return failureCount;
     }
 
+    @Override
     public synchronized Duration getFailureDuration()
     {
         if (firstFailureTime == 0) {
@@ -86,16 +88,19 @@ public class Backoff
         return new Duration(value, NANOSECONDS);
     }
 
+    @Override
     public synchronized Duration getFailureRequestTimeTotal()
     {
         return new Duration(max(0, failureRequestTimeTotal), NANOSECONDS);
     }
 
+    @Override
     public synchronized void startRequest()
     {
         lastRequestStart = ticker.read();
     }
 
+    @Override
     public synchronized void success()
     {
         lastRequestStart = 0;
@@ -118,6 +123,7 @@ public class Backoff
      * @return true if the failure is considered permanent
      * min retried and maxErrorDuration is passed.
      */
+    @Override
     public synchronized boolean failure()
     {
         long now = ticker.read();
@@ -143,6 +149,7 @@ public class Backoff
         return failureDuration >= maxFailureIntervalNanos;
     }
 
+    @Override
     public synchronized long getBackoffDelayNanos()
     {
         int tmpFailureCount = (int) min(backoffDelayIntervalsNanos.length, getFailureCount());

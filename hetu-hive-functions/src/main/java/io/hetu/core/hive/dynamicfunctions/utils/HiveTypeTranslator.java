@@ -197,7 +197,7 @@ public class HiveTypeTranslator
             if (charLength <= HiveChar.MAX_CHAR_LENGTH) {
                 return getCharTypeInfo(charLength);
             }
-            throw new PrestoException(NOT_SUPPORTED, String.format("Unsupported Hive type: %s." +
+            throw new PrestoException(NOT_SUPPORTED, String.format(Locale.ROOT, "Unsupported Hive type: %s." +
                             " Supported CHAR types: CHAR(<=%d).",
                     type, HiveChar.MAX_CHAR_LENGTH));
         }

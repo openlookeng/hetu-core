@@ -29,6 +29,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 @State(Scope.Thread)
@@ -43,7 +44,7 @@ public class BenchmarkBloomFilter
     {
         BloomFilter bf = new BloomFilter(1024 * 1024, 0.1);
         for (int i = 0; i < (1024 * 1024); i++) {
-            bf.add(("item-" + i).getBytes());
+            bf.add(("item-" + i).getBytes(StandardCharsets.UTF_8));
         }
     }
 

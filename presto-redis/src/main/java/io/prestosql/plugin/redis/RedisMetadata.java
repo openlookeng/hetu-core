@@ -120,6 +120,7 @@ public class RedisMetadata
                 keyName);
     }
 
+    @Override
     public ConnectorTableMetadata getTableMetadata(final ConnectorSession session, final ConnectorTableHandle tableHandle)
     {
         SchemaTableName schemaTableName = ((RedisTableHandle) tableHandle).toSchemaTableName();
@@ -217,6 +218,7 @@ public class RedisMetadata
         return ((RedisColumnHandle) columnHandle).getColumnMetadata();
     }
 
+    @Override
     public boolean usesLegacyTableLayouts()
     {
         return false;
