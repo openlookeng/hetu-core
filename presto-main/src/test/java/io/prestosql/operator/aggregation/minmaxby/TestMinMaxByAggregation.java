@@ -90,8 +90,6 @@ public class TestMinMaxByAggregation
                 null,
                 createBooleansBlock(null, null),
                 createDoublesBlock(1.0, 2.0));
-        InternalAggregationFunction unknownValue = METADATA.getFunctionAndTypeManager().getAggregateFunctionImplementation(
-                new Signature(QualifiedObjectName.valueOfDefaultFunction("min_by"), AGGREGATE, parseTypeSignature(StandardTypes.DOUBLE), parseTypeSignature(StandardTypes.DOUBLE), parseTypeSignature(UnknownType.NAME)));
         assertAggregation(
                 unknownKey,
                 null,
@@ -109,8 +107,6 @@ public class TestMinMaxByAggregation
                 null,
                 createBooleansBlock(null, null),
                 createDoublesBlock(1.0, 2.0));
-        InternalAggregationFunction unknownValue = METADATA.getFunctionAndTypeManager().getAggregateFunctionImplementation(
-                new Signature(QualifiedObjectName.valueOfDefaultFunction("max_by"), AGGREGATE, parseTypeSignature(StandardTypes.DOUBLE), parseTypeSignature(StandardTypes.DOUBLE), parseTypeSignature(UnknownType.NAME)));
         assertAggregation(
                 unknownKey,
                 null,
