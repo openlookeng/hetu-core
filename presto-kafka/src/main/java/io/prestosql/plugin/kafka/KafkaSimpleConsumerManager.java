@@ -20,11 +20,14 @@ import io.airlift.log.Logger;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.NodeManager;
 import kafka.javaapi.consumer.SimpleConsumer;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Properties;
 
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -43,6 +46,14 @@ public class KafkaSimpleConsumerManager
     private final int connectTimeoutMillis;
     private final int bufferSizeBytes;
 
+    private final boolean kerberosOn;
+    private final String loginConfig;
+    private final String krb5Conf;
+    private final String groupId;
+    private final String securityProtocol;
+    private final String saslMechanism;
+    private final String saslKerberosServiceName;
+
     @Inject
     public KafkaSimpleConsumerManager(
             KafkaConnectorConfig kafkaConnectorConfig,
@@ -55,6 +66,14 @@ public class KafkaSimpleConsumerManager
         this.bufferSizeBytes = toIntExact(kafkaConnectorConfig.getKafkaBufferSize().toBytes());
 
         this.consumerCache = CacheBuilder.newBuilder().build(CacheLoader.from(this::createConsumer));
+
+        this.kerberosOn = kafkaConnectorConfig.isKerberosOn();
+        this.loginConfig = kafkaConnectorConfig.getLoginConfig();
+        this.krb5Conf = kafkaConnectorConfig.getKrb5Conf();
+        this.groupId = kafkaConnectorConfig.getGroupId();
+        this.securityProtocol = kafkaConnectorConfig.getSecurityProtocol();
+        this.saslMechanism = kafkaConnectorConfig.getSaslMechanism();
+        this.saslKerberosServiceName = kafkaConnectorConfig.getSaslKerberosServiceName();
     }
 
     @PreDestroy
@@ -76,6 +95,12 @@ public class KafkaSimpleConsumerManager
         return consumerCache.getUnchecked(host);
     }
 
+    public KafkaConsumer<ByteBuffer, ByteBuffer> getSaslConsumer(HostAddress host)
+    {
+        requireNonNull(host, "host is null");
+        return createSaslConsumer(host);
+    }
+
     private SimpleConsumer createConsumer(HostAddress host)
     {
         log.info("Creating new Consumer for %s", host);
@@ -84,5 +109,31 @@ public class KafkaSimpleConsumerManager
                 connectTimeoutMillis,
                 bufferSizeBytes,
                 "presto-kafka-" + nodeManager.getCurrentNode().getNodeIdentifier());
+    }
+
+    private KafkaConsumer<ByteBuffer, ByteBuffer> createSaslConsumer(HostAddress host)
+    {
+        log.info("Creating new SaslConsumer for %s", host);
+        Properties props = new Properties();
+        if (kerberosOn) {
+            System.setProperty("java.security.auth.login.config", loginConfig);
+            System.setProperty("java.security.krb5.conf", krb5Conf);
+            props.put("security.protocol", securityProtocol);
+            props.put("sasl.mechanism", saslMechanism);
+            props.put("sasl.kerberos.service.name", saslKerberosServiceName);
+        }
+
+        try {
+            props.put("bootstrap.servers", host.toString());
+            props.put("enable.auto.commit", "false");
+            props.put("key.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
+            props.put("value.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
+            props.put("group.id", groupId);
+        }
+        catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        return new KafkaConsumer<>(props);
     }
 }

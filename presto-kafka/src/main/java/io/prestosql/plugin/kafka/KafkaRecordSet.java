@@ -27,11 +27,13 @@ import io.prestosql.spi.connector.RecordSet;
 import io.prestosql.spi.type.Type;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
-import kafka.javaapi.FetchResponse;
-import kafka.javaapi.consumer.SimpleConsumer;
-import kafka.message.MessageAndOffset;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -109,9 +111,9 @@ public class KafkaRecordSet
         private long totalBytes;
         private long totalMessages;
         private long cursorOffset = split.getStart();
-        private Iterator<MessageAndOffset> messageAndOffsetIterator;
+        private Iterator<ConsumerRecord<ByteBuffer, ByteBuffer>> recordIterator;
         private final AtomicBoolean reported = new AtomicBoolean();
-
+        private KafkaConsumer<ByteBuffer, ByteBuffer> leaderKafkaConsumer;
         private final FieldValueProvider[] currentRowValues = new FieldValueProvider[columnHandles.size()];
 
         KafkaRecordCursor()
@@ -147,19 +149,19 @@ public class KafkaRecordSet
                 // Create a fetch request
                 openFetchRequest();
 
-                while (messageAndOffsetIterator.hasNext()) {
-                    MessageAndOffset currentMessageAndOffset = messageAndOffsetIterator.next();
-                    long messageOffset = currentMessageAndOffset.offset();
+                while (recordIterator.hasNext()) {
+                    ConsumerRecord<ByteBuffer, ByteBuffer> record = recordIterator.next();
+                    long messageOffset = record.offset();
 
                     if (messageOffset >= split.getEnd()) {
                         return endOfData(); // Past our split end. Bail.
                     }
 
                     if (messageOffset >= cursorOffset) {
-                        return nextRow(currentMessageAndOffset);
+                        return nextRow(record);
                     }
                 }
-                messageAndOffsetIterator = null;
+                recordIterator = null;
             }
         }
 
@@ -173,21 +175,21 @@ public class KafkaRecordSet
             return false;
         }
 
-        private boolean nextRow(MessageAndOffset messageAndOffset)
+        private boolean nextRow(ConsumerRecord<ByteBuffer, ByteBuffer> record)
         {
-            cursorOffset = messageAndOffset.offset() + 1; // Cursor now points to the next message.
-            totalBytes += messageAndOffset.message().payloadSize();
+            cursorOffset = record.offset() + 1; // Cursor now points to the next message.
+            totalBytes += record.serializedValueSize();
             totalMessages++;
 
             byte[] keyData = EMPTY_BYTE_ARRAY;
             byte[] messageData = EMPTY_BYTE_ARRAY;
-            ByteBuffer key = messageAndOffset.message().key();
+            ByteBuffer key = record.key();
             if (key != null) {
                 keyData = new byte[key.remaining()];
                 key.get(keyData);
             }
 
-            ByteBuffer message = messageAndOffset.message().payload();
+            ByteBuffer message = record.value();
             if (message != null) {
                 messageData = new byte[message.remaining()];
                 message.get(messageData);
@@ -206,7 +208,7 @@ public class KafkaRecordSet
                             currentRowValuesMap.put(columnHandle, longValueProvider(totalMessages));
                             break;
                         case PARTITION_OFFSET_FIELD:
-                            currentRowValuesMap.put(columnHandle, longValueProvider(messageAndOffset.offset()));
+                            currentRowValuesMap.put(columnHandle, longValueProvider(record.offset()));
                             break;
                         case MESSAGE_FIELD:
                             currentRowValuesMap.put(columnHandle, bytesValueProvider(messageData));
@@ -305,12 +307,15 @@ public class KafkaRecordSet
         @Override
         public void close()
         {
+            if (leaderKafkaConsumer != null) {
+                leaderKafkaConsumer.close();
+            }
         }
 
         private void openFetchRequest()
         {
             try {
-                if (messageAndOffsetIterator == null) {
+                if (recordIterator == null) {
                     log.debug("Fetching %d bytes from offset %d (%d - %d). %d messages read so far", KAFKA_READ_BUFFER_SIZE, cursorOffset, split.getStart(), split.getEnd(), totalMessages);
                     FetchRequest req = new FetchRequestBuilder()
                             .clientId("presto-worker-" + Thread.currentThread().getName())
@@ -319,16 +324,14 @@ public class KafkaRecordSet
 
                     // TODO - this should look at the actual node this is running on and prefer
                     // that copy if running locally. - look into NodeInfo
-                    SimpleConsumer consumer = consumerManager.getConsumer(split.getLeader());
-
-                    FetchResponse fetchResponse = consumer.fetch(req);
-                    if (fetchResponse.hasError()) {
-                        short errorCode = fetchResponse.errorCode(split.getTopicName(), split.getPartitionId());
-                        log.warn("Fetch response has error: %d", errorCode);
-                        throw new RuntimeException("could not fetch data from Kafka, error code is '" + errorCode + "'");
+                    if (leaderKafkaConsumer == null) {
+                        leaderKafkaConsumer = consumerManager.getSaslConsumer(split.getLeader());
                     }
-
-                    messageAndOffsetIterator = fetchResponse.messageSet(split.getTopicName(), split.getPartitionId()).iterator();
+                    TopicPartition topicPartition = new TopicPartition(split.getTopicName(), split.getPartitionId());
+                    leaderKafkaConsumer.assign(Collections.singletonList(topicPartition));
+                    leaderKafkaConsumer.seek(topicPartition, cursorOffset);
+                    ConsumerRecords<ByteBuffer, ByteBuffer> records = leaderKafkaConsumer.poll(500);
+                    recordIterator = records.records(topicPartition).iterator();
                 }
             }
             catch (Exception e) { // Catch all exceptions because Kafka library is written in scala and checked exceptions are not declared in method signature.

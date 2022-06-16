@@ -87,6 +87,48 @@ openLooKeng必须仍然能够连接到群集的所有节点，即使这里只指
 
 此属性是可选的；默认值为`true`。
 
+### `kerberos.on`
+
+是否开启kerberos认证，适用于开启了kerberos认证的集群。
+
+此属性是可选的；默认值为`false`。
+
+### `java.security.auth.login.config`
+
+Kafka的jaas_conf路径，也就是java认证和授权的相关文件，文件中存放的是认证和授权信息。
+
+此属性是可选的；默认值为``。
+
+### `java.security.krb5.conf`
+
+存放krb5.conf文件的路径，要注意全局配置中也需要配置此选项，例如部署后在jvm.config中配置。
+
+此属性是可选的；默认值为``。
+
+### `group.id`
+
+kafka的groupId。
+
+此属性是可选的；默认值为``。
+
+### `security.protocol`
+
+Kafka的安全协议。
+
+此属性是可选的；默认值为`SASL_PLAINTEXT`。
+
+### `sasl.mechanism`
+
+sasl机制，被用于客户端连接安全的机制。
+
+此属性是可选的；默认值为`GSSAPI`。
+
+### `sasl.kerberos.service.name`
+
+kafka运行时的kerberos principal name。
+
+此属性是可选的；默认值为`kafka`。
+
 ## 内部列
 
 对于每个已定义的表，连接器维护以下列：
