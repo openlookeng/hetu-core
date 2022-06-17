@@ -480,6 +480,7 @@ pre {
     white-space: pre-line;
     max-height: 500px;
     max-width: 780px;
+    overflow: auto;
 }
 
 /** Query Monitor Toolbar **/

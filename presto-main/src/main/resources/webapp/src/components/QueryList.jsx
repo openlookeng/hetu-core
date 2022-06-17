@@ -75,6 +75,7 @@ export class QueryListItem extends React.Component {
                 }
             }
         }
+        console.log(formattedQueryText.length);
 
         return formattedQueryText;
     }

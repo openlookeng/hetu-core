@@ -154,7 +154,7 @@ public interface MetadataTableDao
             "  source varchar(30) NOT NULL,\n" +
             "  queryId varchar(50) NOT NULL,\n" +
             "  resource varchar(30) NOT NULL,\n" +
-            "  query varchar(1000) NOT NULL,\n" +
+            "  query varchar(10000) NOT NULL,\n" +
             "  state varchar(30) NOT NULL,\n" +
             "  failed varchar(30) DEFAULT NULL,\n" +
             "  createTime varchar(30) DEFAULT NULL,\n" +

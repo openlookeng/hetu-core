@@ -26,11 +26,14 @@ import MultiSelect from 'react-simple-multi-select';
 import Select from "rc-select";
 import Pagination from "rc-pagination";
 import localeInfo from "../node_modules/rc-pagination/es/locale/en_US";
+import UserStore from "../queryeditor/stores/UserStore";
+import UserActions from "../queryeditor/actions/UserActions";
 
 export class AuditLog extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
+            user: '',
             auditlog:{},
             searchStringUser: '',
             searchStringDate:'',
@@ -132,6 +135,16 @@ export class AuditLog extends React.Component {
         $.get(`../v1/audit/pattern`, function (pattern) {
             this.setState({
                 dateRangePickerPattern: pattern
+            });
+            this.resetTimer();
+        }.bind(this))
+            .fail(function () {
+                this.resetTimer();
+            }.bind(this));
+
+        $.get(`../v1/audit/isAdmin`, function (user) {
+            this.setState({
+                user: user
             });
             this.resetTimer();
         }.bind(this))
@@ -365,7 +378,6 @@ export class AuditLog extends React.Component {
         })
         let downloadString = downloadArray.join("&&");
 
-
         return (
             <div>
                 <div className='flex flex-row flex-initial header'>
@@ -377,8 +389,13 @@ export class AuditLog extends React.Component {
                         <div className="log toolbar-log">
                             <div className="col-xs-12 toolbar-audit">
                                 <div className="input-group-audit">
-                                    <input type="text" className="form-control form-control-auditlog search-bar" placeholder="User" name="User"
-                                           onChange={this.handleSearchStringChange} value={this.state.searchStringUser} />
+                                    {this.state.user == "admin" ?
+                                        <input type="text" className="form-control form-control-auditlog search-bar" placeholder="User" name="User"
+                                               onChange={this.handleSearchStringChange} value={this.state.searchStringUser}/>
+                                        :
+                                        <input type="text" className="form-control form-control-auditlog search-bar" placeholder="User" name="User"
+                                               onChange={this.handleSearchStringChange} value={this.state.user} readOnly="readOnly"/>
+                                    }
                                     <input type="text" id="date-picker" className="form-control form-control-auditlog search-bar" placeholder="Date" name="Date"
                                            onFocus={this.renderDateRangePicker}  onChange={this.handleSearchStringChange} value={this.state.searchStringDate}/>
                                     <select id="loglevel" className="selectpicker" data-style="select" onChange={this.handleSearchStringChange} value={this.state.searchStringLogLevel} name="LogLevel" >
@@ -389,6 +406,8 @@ export class AuditLog extends React.Component {
                                         <option value="Sql">Sql</option>
                                         <option value="WebUi">WebUI</option>
                                         <option value="Cluster">Cluster</option>
+
+
                                     </select>
                                     <a href={"../v1/audit/download?"+downloadString} target="_blank" className="btn"> Download <i className="icon fa fa-download"/> </a>
                                 </div>
