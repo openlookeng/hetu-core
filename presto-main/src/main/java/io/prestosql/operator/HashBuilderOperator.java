@@ -967,14 +967,6 @@ public class HashBuilderOperator
                 }
             }
         }
-
-        private class SpillBloomState
-                implements Serializable
-        {
-            boolean isReady;
-            int counter;
-            List<Object> blooms = new ArrayList<>();
-        }
     }
 
     @Override
@@ -1091,5 +1083,13 @@ public class HashBuilderOperator
         private Object spiller;
         private boolean spillToHdfsEnabled;
         private Object spillBloom;
+    }
+
+    private static class SpillBloomState
+            implements Serializable
+    {
+        boolean isReady;
+        int counter;
+        List<Object> blooms = new ArrayList<>();
     }
 }
