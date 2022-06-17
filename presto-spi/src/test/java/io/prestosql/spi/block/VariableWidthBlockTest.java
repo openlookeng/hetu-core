@@ -88,7 +88,7 @@ public class VariableWidthBlockTest
 
         BloomFilter bf = new BloomFilter(size, 0.01);
         for (int i = 0; i < 100; i++) {
-            bf.test(("value" + rnd.nextLong()).getBytes());
+            bf.test(("value" + rnd.nextLong()).getBytes(StandardCharsets.UTF_8));
         }
         return bf;
     }

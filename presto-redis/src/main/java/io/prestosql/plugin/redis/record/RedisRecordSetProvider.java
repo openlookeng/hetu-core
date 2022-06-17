@@ -54,6 +54,7 @@ public class RedisRecordSetProvider
         this.jedisManager = requireNonNull(jedisManager, "jedisManager is null");
     }
 
+    @Override
     public RecordSet getRecordSet(
             final ConnectorTransactionHandle transaction,
             final ConnectorSession session,

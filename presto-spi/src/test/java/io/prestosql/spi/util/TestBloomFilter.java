@@ -77,7 +77,7 @@ public class TestBloomFilter
 
         int negativeCount = 0;
         for (int i = 0; i < COUNT; i++) {
-            if (!pbf.test(("abc" + i).getBytes())) {
+            if (!pbf.test(("abc" + i).getBytes(StandardCharsets.UTF_8))) {
                 negativeCount++;
             }
         }

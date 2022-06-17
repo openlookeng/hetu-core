@@ -75,6 +75,7 @@ public final class BuiltInScalarFunctionImplementation
         this.choices = ImmutableList.copyOf(choices);
     }
 
+    @Override
     public boolean isNullable()
     {
         return choices.get(0).isNullable();
@@ -85,6 +86,7 @@ public final class BuiltInScalarFunctionImplementation
         return choices.get(0).argumentProperties.get(argumentIndex);
     }
 
+    @Override
     public MethodHandle getMethodHandle()
     {
         return choices.get(0).methodHandle;

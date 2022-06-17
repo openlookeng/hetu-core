@@ -28,10 +28,12 @@ public abstract class AbstractFailureRetryPolicy
         this.backoff = backoff;
     }
 
+    @Override
     public IBackoff getBackoff()
     {
         return this.backoff;
     }
 
+    @Override
     public abstract boolean hasFailed(HostAddress address);
 }
