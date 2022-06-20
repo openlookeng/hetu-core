@@ -35,6 +35,10 @@
    > openLooKeng微信群：请添加openLooKeng小助手微信号：openLooKengoss，小助手会拉您入群  
    > openLooKeng B站： https://space.bilibili.com/627629884 
 
+8. openLooKeng基于Trino哪个版本进行开发？
+
+   > 基于Trino 316版本进行开发。
+
 ## 功能
 
 1. openLooKeng目前支持哪些连接器?

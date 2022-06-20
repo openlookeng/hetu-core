@@ -1,5 +1,8 @@
 # Hudi  Connector
 
+### Release Notes
+Currently Hudi only supports version 0.7.0.
+
 ### Hudi Introduction
 
 Apache Hudi is a fast growing data lake storage system that helps organizations build and manage petabyte-scale data lakes. Hudi enables storing vast amounts of data on top of existing DFS compatible storage while also enabling stream processing in addition to typical batch-processing. This is made possible by providing two new primitives. Specifically,
