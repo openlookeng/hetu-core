@@ -889,15 +889,16 @@ public class SqlQueryExecution
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             SqlQueryScheduler scheduler = queryScheduler.get();
-            stateMachine.transitionToSuspend();
             if (scheduler != null) {
-                boolean useSnapshot = SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession()) && snapshotManager.isSuccessfulSnapshotExist();
+                boolean useSnapshot = SystemSessionProperties.isRecoveryEnabled(stateMachine.getSession());
                 if (useSnapshot) {
+                    stateMachine.transitionToSuspend();
                     suspendedWithRecoveryManager.set(true);
                     queryRecoveryManager.suspendQuery();
                 }
                 else {
-                    scheduler.suspend();
+                    // if both snapshot and recovery are disabled.
+                    throw new PrestoException(NOT_SUPPORTED, "Either Snapshot or Recovery should be enabled to suspend Query");
                 }
             }
         }
@@ -908,7 +909,7 @@ public class SqlQueryExecution
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             SqlQueryScheduler scheduler = queryScheduler.get();
-            if (SystemSessionProperties.isSnapshotEnabled(stateMachine.getSession()) && suspendedWithRecoveryManager.get()) {
+            if (SystemSessionProperties.isRecoveryEnabled(stateMachine.getSession()) && suspendedWithRecoveryManager.get()) {
                 queryRecoveryManager.resumeQuery();
                 suspendedWithRecoveryManager.set(false);
             }

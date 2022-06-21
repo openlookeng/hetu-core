@@ -302,7 +302,8 @@ public class StateFetcher
                 oldQueryInfo.getPreparedQuery(),
                 oldQueryInfo.getQueryStats(),
                 ErrorType.INTERNAL_ERROR,
-                QUERY_EXPIRE.toErrorCode());
+                QUERY_EXPIRE.toErrorCode(),
+                oldQueryInfo.isRecoveryEnabled());
 
         SharedQueryState newState = new SharedQueryState(
                 newQueryInfo,

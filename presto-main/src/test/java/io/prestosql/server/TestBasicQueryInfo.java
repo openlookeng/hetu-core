@@ -130,7 +130,7 @@ public class TestBasicQueryInfo
                         ImmutableSet.of(),
                         Optional.empty(),
                         false,
-                        Optional.empty(), false));
+                        Optional.empty(), false, false));
 
         assertEquals(basicInfo.getQueryId().getId(), "0");
         assertEquals(basicInfo.getState(), RUNNING);

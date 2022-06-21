@@ -162,6 +162,7 @@ public class QueryStateMachine
     private final WarningCollector warningCollector;
 
     private final AtomicBoolean isRunningAsync = new AtomicBoolean();
+    private final boolean recoveryEnabled;
 
     private QueryStateMachine(
             String query,
@@ -193,6 +194,7 @@ public class QueryStateMachine
         this.finalQueryInfo = new StateMachine<>("finalQueryInfo-" + queryId, executor, Optional.empty());
         this.outputManager = new QueryOutputManager(executor);
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(getSession());
     }
 
     /**
@@ -404,7 +406,8 @@ public class QueryStateMachine
                 preparedQuery,
                 queryStats,
                 errorCode == null ? null : errorCode.getType(),
-                errorCode);
+                errorCode,
+                recoveryEnabled);
     }
 
     @VisibleForTesting
@@ -458,7 +461,8 @@ public class QueryStateMachine
                 output.get(),
                 completeInfo,
                 Optional.of(resourceGroup),
-                isRunningAsync.get());
+                isRunningAsync.get(),
+                recoveryEnabled);
     }
 
     private QueryStats getQueryStats(Optional<StageInfo> rootStage)
@@ -1161,7 +1165,8 @@ public class QueryStateMachine
                 queryInfo.getInputs(),
                 queryInfo.getOutput(),
                 queryInfo.isCompleteInfo(),
-                queryInfo.getResourceGroupId(), false);
+                queryInfo.getResourceGroupId(), false,
+                queryInfo.isRecoveryEnabled());
         finalQueryInfo.compareAndSet(finalInfo, Optional.of(prunedQueryInfo));
     }
 

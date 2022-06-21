@@ -159,7 +159,8 @@ public class MockManagedQueryExecution
                         ImmutableSet.of(),
                         OptionalDouble.of(queryProgress)),
                 null,
-                null);
+                null,
+                false);
     }
 
     // set ResourceGroupId for query
