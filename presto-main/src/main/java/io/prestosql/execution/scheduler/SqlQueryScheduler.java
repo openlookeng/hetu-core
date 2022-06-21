@@ -260,6 +260,9 @@ public class SqlQueryScheduler
         OutputBufferId rootBufferId = Iterables.getOnlyElement(rootOutputBuffers.getBuffers().keySet());
         visitedPlanFrags.add(plan.getFragment().getId());
         final boolean isRecoveryEnabled = SystemSessionProperties.isRecoveryEnabled(session);
+        if (isResumeScheduler) {
+            nodeScheduler.refreshNodeStates();
+        }
         List<SqlStageExecution> stageExecutions = createStages(
                 (fragmentId, tasks, noMoreExchangeLocations) -> updateQueryOutputLocations(queryStateMachine, rootBufferId, tasks, noMoreExchangeLocations),
                 new AtomicInteger(),
@@ -470,9 +473,6 @@ public class SqlQueryScheduler
             CatalogName catalogName = splitSource.getCatalogName();
             if (isInternalSystemConnector(catalogName)) {
                 catalogName = null;
-            }
-            if (isResumeScheduler) {
-                nodeScheduler.refreshNodeStates();
             }
             NodeSelector nodeSelector = nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes);
             if (isRecoveryEnabled) {
