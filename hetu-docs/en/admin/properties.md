@@ -1035,3 +1035,12 @@ helps with cache affinity scheduling.
 > After the configured time elapsed and no response received, then client connection consider that to be failure in submission of request.
 >
 > (Note: this parameter should be configured with higher time when in high load environment)
+
+## Connector Properties configuration
+
+### `case-insensitive-name-matching`
+>
+> -    **Type:** `boolean`
+> -    **Default value:** `false`
+>
+> Case-insensitive matching between database and collection names. The default is case sensitive.

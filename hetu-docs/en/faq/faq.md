@@ -40,6 +40,10 @@
    >
    > openLooKeng Bilibili channel:  https://space.bilibili.com/627629884   
 
+8. Which version of Trino is openLooKeng developed on?
+
+   > Based on Trino 316 version development.
+
 ## Functions
 
 1. What connectors does the openLooKeng support?
