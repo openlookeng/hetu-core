@@ -29,16 +29,22 @@ kafka.nodes=host1:port,host2:port
 
 配置属性包括：
 
-| 属性名称| 说明|
-|:----------|:----------|
-| `kafka.table-names`| 目录提供的所有表列表|
-| `kafka.default-schema`| 表的默认模式名|
-| `kafka.nodes`| Kafka集群节点列表|
-| `kafka.connect-timeout`| 连接Kafka集群超时|
-| `kafka.buffer-size`| Kafka读缓冲区大小|
-| `kafka.table-description-dir`| 包含主题描述文件的目录|
-| `kafka.hide-internal-columns`| 控制内部列是否是表模式的一部分|
-
+| 属性名称| 说明                                 |
+|:----------|:-----------------------------------|
+| `kafka.table-names`| 目录提供的所有表列表                         |
+| `kafka.default-schema`| 表的默认模式名                            |
+| `kafka.nodes`| Kafka集群节点列表                        |
+| `kafka.connect-timeout`| 连接Kafka集群超时                        |
+| `kafka.buffer-size`| Kafka读缓冲区大小                        |
+| `kafka.table-description-dir`| 包含主题描述文件的目录                        |
+| `kafka.hide-internal-columns`| 控制内部列是否是表模式的一部分                    |
+| `kerberos.on`| 是否开启Kerberos认证                     |
+| `java.security.auth.login.config`| kafka_client_jass.conf路径           |
+| `java.security.krb5.conf`| krb5.conf文件路径                      |
+| `group.id`| kafka的groupID                      |
+| `security.protocol`| Kafka的安全认证协议                       |
+| `sasl.mechanism`| sasl机制                             |
+| `sasl.kerberos.service.name`| kafka服务运行时的kerberos principal name |
 ### `kafka.table-names`
 
 此目录提供的所有表的逗号分隔列表。表名可以是非限定的（简单名称），并将被放入默认模式（见下文）中，或者用模式名称（`<schema-name>.<table-name>`）限定。

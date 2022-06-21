@@ -129,6 +129,8 @@ public class KafkaSimpleConsumerManager
             props.put("key.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
             props.put("value.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
             props.put("group.id", groupId);
+            props.put("session.timeout.ms", connectTimeoutMillis);
+            props.put("receive.buffer.bytes", bufferSizeBytes);
         }
         catch (ClassNotFoundException e) {
             e.printStackTrace();
