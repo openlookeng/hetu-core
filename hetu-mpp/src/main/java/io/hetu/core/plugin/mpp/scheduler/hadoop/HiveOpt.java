@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -47,10 +47,10 @@ public class HiveOpt
             logger.info("Finished create hive foreign table");
         }
         catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
         catch (SQLException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
     }
 }

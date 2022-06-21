@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -32,6 +32,7 @@ public class Scheduler
     public static Logger logger = Logger.get(Scheduler.class);
     public MppConfig mppConfig;
     public Queue<Map.Entry<String, String>> gdsQueue;
+    private Queue<Map.Entry<String, String>> tmpQueue;
 
     @Inject
     public Scheduler(MppConfig mppConfig)
@@ -48,11 +49,11 @@ public class Scheduler
             gdsServer.split("\\|");
             gdsMaps.put(gdsServer.split("\\|")[0], gdsServer.split("\\|")[1]);
         }
-        Queue<Map.Entry<String, String>> gdsQueue = new LinkedList<>();
+        tmpQueue = new LinkedList<>();
         for (Map.Entry<String, String> entry : gdsMaps.entrySet()) {
-            gdsQueue.add(entry);
+            tmpQueue.add(entry);
         }
-        return gdsQueue;
+        return tmpQueue;
     }
 
     public Map.Entry getGDS()
@@ -64,7 +65,7 @@ public class Scheduler
                     Thread.sleep(1000);
                 }
                 catch (InterruptedException e) {
-                    e.printStackTrace();
+                    logger.error(e.getMessage());
                 }
             }
             else {
@@ -76,8 +77,6 @@ public class Scheduler
     public void prepareHiveExternalTable(Map<String, String> schemas, String schemaName, String tableName)
     {
         logger.info("Get schemainfo from gaussDB by table name");
-//        String hivedbName = gaussdbSchema;
-//        String hiveSchemaInfo = schemas.get("hiveSchema");
         String tblIdentifier = schemaName + "." + tableName;
 
         logger.info("Create hive foreign table using alluxio path by hiveserver2 service");

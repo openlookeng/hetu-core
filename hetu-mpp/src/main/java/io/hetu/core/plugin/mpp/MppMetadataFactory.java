@@ -76,6 +76,7 @@ public class MppMetadataFactory
     protected final int hmsWriteBatchSize;
     private Scheduler scheduler;
     private MppConfig mppConfig;
+    SemiTransactionalHiveMetastore semiTransactionalHiveMetastore;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -203,7 +204,7 @@ public class MppMetadataFactory
     @Override
     public HiveMetadata get()
     {
-        SemiTransactionalHiveMetastore metastore = new SemiTransactionalHiveMetastore(
+        semiTransactionalHiveMetastore = new SemiTransactionalHiveMetastore(
                 hdfsEnvironment,
                 CachingHiveMetastore.memoizeMetastore(this.metastore, perTransactionCacheMaximumSize), // per-transaction cache
                 renameExecution,
@@ -217,7 +218,7 @@ public class MppMetadataFactory
                 hmsWriteBatchSize);
 
         return new MppMetadata(
-                metastore,
+                semiTransactionalHiveMetastore,
                 hdfsEnvironment,
                 partitionManager,
                 writesToNonManagedTablesEnabled,
@@ -228,8 +229,8 @@ public class MppMetadataFactory
                 partitionUpdateCodec,
                 typeTranslator,
                 prestoVersion,
-                new MetastoreHiveStatisticsProvider(metastore, statsCache, samplePartitionCache),
-                accessControlMetadataFactory.create(metastore),
+                new MetastoreHiveStatisticsProvider(semiTransactionalHiveMetastore, statsCache, samplePartitionCache),
+                accessControlMetadataFactory.create(semiTransactionalHiveMetastore),
                 autoVacuumEnabled,
                 vacuumDeltaNumThreshold,
                 vacuumDeltaPercentThreshold,

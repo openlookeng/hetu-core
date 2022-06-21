@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -98,21 +98,5 @@ public class Util
             hType = "character varying(" + columnSize + ")";
         }
         return hType;
-    }
-
-    public static String getGaussDBTable(String statement)
-    {
-        statement = statement.replaceAll("[\\t\\n\\r]", " ").replaceAll("\\,", " ,");
-        if (Pattern.matches(".*\\/\\*\\*gds\\*\\*\\/.*", statement)) {
-            statement = statement.replaceAll("\\/\\*\\*gds\\*\\*\\/", "");
-
-            String[] tokens = statement.split(" ");
-            for (String token : tokens) {
-                if (Pattern.matches("gaussdb\\..*", token)) {
-                    return token;
-                }
-            }
-        }
-        return null;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -58,6 +58,7 @@ public class GsussDBOptThread
                             String dropSQL, String createSQL, String insertSQL,
                             String gaussdbSchema, String tableName, String hiveDb, String parentThreadName)
     {
+        super.setName("GsussDBOptThread");
         this.gdsQueue = gdsQueue;
         this.gdsServer = gdsServer;
         this.driver = driver;
@@ -75,23 +76,21 @@ public class GsussDBOptThread
 
     public Connection getConnection(String username, String passwd)
     {
-        String driver = this.driver;
-        String jdbcUrl = this.jdbcUrl;
         Connection conn = null;
         try {
-            Class.forName(driver).getConstructor().newInstance();
+            Class.forName(this.driver).getConstructor().newInstance();
         }
         catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
             return null;
         }
 
         try {
-            conn = DriverManager.getConnection(jdbcUrl, username, passwd);
+            conn = DriverManager.getConnection(this.jdbcUrl, username, passwd);
             logger.info("Connection succeed!");
         }
         catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
             return null;
         }
         return conn;
@@ -102,19 +101,20 @@ public class GsussDBOptThread
         Statement stmt = null;
         try {
             stmt = conn.createStatement();
-            boolean rc = stmt.execute(sql);
-            stmt.close();
+            stmt.execute(sql);
         }
         catch (SQLException e) {
+            logger.error(e.getMessage());
+        }
+        finally {
             if (stmt != null) {
                 try {
                     stmt.close();
                 }
-                catch (SQLException e1) {
-                    e1.printStackTrace();
+                catch (SQLException throwables) {
+                    logger.error(throwables.getMessage());
                 }
             }
-            e.printStackTrace();
         }
     }
 
@@ -127,12 +127,10 @@ public class GsussDBOptThread
             optTable(conn, dropSQL);
             optTable(conn, createSQL);
             optTable(conn, insertSQL);
-//            List<String> runningThreadList = Const.runningThreadMap.get(gaussdbSchema + "." + tableName);
             List<String> runningThreadList = Const.runningThreadMap.get(hiveDb + "." + tableName);
             synchronized (TableMoveLock.getLock(gaussdbSchema + "." + tableName)) {
                 for (String threadName : runningThreadList) {
                     Const.tableStatus.put(hiveDb + "." + tableName, 1, threadName);
-//                    Const.tableStatus.put(gaussdbSchema + "." + tableName, 1, threadName);
                     Const.runningThreadMap.removeThread(hiveDb + "." + tableName, threadName);
                 }
             }
@@ -143,7 +141,7 @@ public class GsussDBOptThread
             conn.close();
         }
         catch (SQLException e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
         }
     }
 }

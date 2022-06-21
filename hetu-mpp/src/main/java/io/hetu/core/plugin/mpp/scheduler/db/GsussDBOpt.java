@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -25,7 +25,6 @@ import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,7 +51,7 @@ public class GsussDBOpt
             Class.forName(driver).getConstructor().newInstance();
         }
         catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
             return null;
         }
 
@@ -61,31 +60,10 @@ public class GsussDBOpt
             logger.info("GaussDB Connection succeed!");
         }
         catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e.getMessage());
             return null;
         }
         return conn;
-    }
-
-    public static void executeSql(Connection conn, String sql)
-    {
-        Statement stmt = null;
-        try {
-            stmt = conn.createStatement();
-            boolean rc = stmt.execute(sql);
-            stmt.close();
-        }
-        catch (SQLException e) {
-            if (stmt != null) {
-                try {
-                    stmt.close();
-                }
-                catch (SQLException e1) {
-                    e1.printStackTrace();
-                }
-            }
-            e.printStackTrace();
-        }
     }
 
     public static Map<String, String> getSchemas(MppConfig mppConfig, String catalog, String schema, String tableName)
@@ -142,7 +120,7 @@ public class GsussDBOpt
                 conn.close();
             }
             catch (SQLException e) {
-                e.printStackTrace();
+                logger.error(e.getMessage());
             }
             return schemas;
         }

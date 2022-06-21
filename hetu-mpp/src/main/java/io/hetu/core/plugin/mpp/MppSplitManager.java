@@ -220,7 +220,7 @@ public class MppSplitManager
                     logger.info("Waitting to complete GDS process transporting data to alluxio");
                 }
                 catch (InterruptedException e) {
-                    e.printStackTrace();
+                    logger.error(e.getMessage());
                 }
                 recode = Const.tableStatus.get(tblIdentifier);
             }

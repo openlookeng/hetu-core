@@ -131,7 +131,6 @@ public class MppMetadata
         String schemaName = mppConfig.getHiveDb();
         String tblName = tableName.getTableName();
         String threadName = Const.tableStatus.getThreadName();
-//        Optional<Table> table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         Optional<Table> table = metastore.getTable(new HiveIdentity(session), schemaName, tableName.getTableName());
         String tblIdentifier = schemaName + "." + tblName;
         logger.info("Mpp scheduler for " + tblIdentifier + " started");
@@ -143,7 +142,6 @@ public class MppMetadata
             if (Const.etlInfoMap.containsKey(tblIdentifier) && Const.tableStatus.tableStatusKeysExists(tblIdentifier)) {
 //                have etled at least onece
                 if (mppConfig.isEtlReuse()) {
-//                    scheduler.prepare(gdsServer, schemas, schemaName, tblName, false);
                     logger.info("Hive(Mpp) table " + tblIdentifier + " existed and reuse it");
                 }
                 else {
@@ -156,9 +154,7 @@ public class MppMetadata
 //                or have etled and still etling
 //                or just create and etling
 //                  we can use two strategies to judge: rules and time interval
-//                ETLInfo etlInfo = Const.etlInfoMap.get(tblIdentifier);
                 if (Const.tableStatus.tableStatusKeysExists(tblIdentifier)) {
-//                        scheduler.prepare(gdsServer, schemas, schemaName, tblName, false);
                     logger.info("[2]Hive(MPP) " + tblIdentifier + " Table is existed and is etling by others and reuse it!");
                 }
                 else {
@@ -168,7 +164,6 @@ public class MppMetadata
             }
         }
 
-//        table = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), tableName.getTableName());
         table = metastore.getTable(new HiveIdentity(session), schemaName, tableName.getTableName());
 
         // we must not allow system tables due to how permissions are checked in SystemTableAwareAccessControl
