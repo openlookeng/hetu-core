@@ -7,7 +7,7 @@ Overview
 
 Apache Ranger delivers a comprehensive approach to security for a Hadoop cluster. It provides a centralized platform to define, administer and manage security policies consistently across Hadoop components. Check [Apache Ranger Wiki](https://cwiki.apache.org/confluence/display/RANGER/Index) for detail introduction and user guide.
 
-[openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) is a ranger plugin for openLooKeng to enable, monitor and manage comprehensive data security.
+[openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) is developed based on Ranger 2.1.0, which is a ranger plugin for openLooKeng to enable, monitor and manage comprehensive data security.
 
 Build Process
 -------------------------
