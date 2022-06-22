@@ -83,6 +83,7 @@ import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
+import static io.prestosql.util.Failures.WORKER_NODE_ERROR;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
@@ -649,6 +650,12 @@ public final class SqlStageExecution
                     else if (message.contains(SimpleHttpResponseHandler.EXPECT_200_SAW_5XX)) {
                         // SimpleHttpResponseHandler can also produce errors that are resumable
                         log.debug(failure, "Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
+                        queryRecoveryManager.startRecovery();
+                        return;
+                    }
+                    else if (message.contains(WORKER_NODE_ERROR)) {
+                        // Handling timeout interaction between worker - to - worker.
+                        log.debug(failure, "WorkerToWorker interaction timeout. Task %s on node %s failed but is resumable. Triggering rescheduling.", taskStatus.getTaskId(), taskStatus.getNodeId());
                         queryRecoveryManager.startRecovery();
                         return;
                     }
