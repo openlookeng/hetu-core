@@ -115,6 +115,20 @@
 > 
 > 此属性是在JVM堆中为openLooKeng不跟踪的分配留作裕量/缓冲区的内存量。
 
+### `query.suspend-query-enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 系统资源不足时，临时挂起运行中的查询。
+
+### `query.max-suspended-queries`
+
+> -   **类型：** `integer`
+> -   **默认值：** `10`
+>
+> 终止查询之前，查询挂起尝试的最大次数。仅当`query.suspend-query-enabled`设置为`true`时，此属性才生效。
+
 ## 溢出属性
 
 ### `experimental.spill-enabled`
@@ -340,35 +354,124 @@
 > 
 > 如果网络延迟较高，增大该值可以提高网络吞吐量。减小该值可以提高大型集群的查询性能，因为它减少了由于交换客户端缓冲区保存了较多任务（而不是保存较少任务中的较多数据）的响应而导致的倾斜。
 
-### `exchange.max-error-duration`
-
-> - **类型：** `duration`
-> - **最小值：** `1m`
-> - **默认值：** `7m`
-> 
-> 交换错误最大缓冲时间，超过该时限则查询失败。
-
-### `exchange.is-timeout-failure-detection-enabled`
-
-> -   **类型：** `boolean`
-> -   **默认值：** `true`
->
-> 正在使用的故障检测机制。默认值是基于超时的故障检测。但是，当该属性设置为`false`时，启用基于最大重试次数的故障检测机制。
-
-### `exchange.max-retry-count`
-
-> -   **类型：** `integer`
-> -   **默认值：** `10`
->
-> Coordinator在将失败任务视为永久失败之前对其执行的最大重试次数。仅当`exchange.is-timeout-failure-detection-enabled`设置为`false`时，才使用此属性。
-
 ### `sink.max-buffer-size`
 
 > - **类型：** `data size`
 > - **默认值：** `32MB`
 > 
-> 上游任务等待拉取任务数据的输出缓冲区大小。如果任务输出是经过哈希分区的，那么缓冲区将在所有分区的使用者之间共享。如果网络延迟较高或集群中有多个节点，增加此值可以提高在阶段之间传输的数据的网络吞吐量。
-
+>等待上游任务拉取的任务数据的输出缓冲区大小。如果任务输出是哈希分区的，则缓冲区将在所有分区的消费者之间共享。如果网络延迟高或集群中有许多节点，则增加此值可以提高阶段之间传输数据的网络吞吐量。
+ 
+ ## 故障恢复处理属性
+ 
+ ### 失败重试策略
+ 
+ ### `failure.recovery.retry.profile`
+ 
+ > -   **类型：** `string`
+ > -   **默认值：** `default`
+ >
+ > 此属性定义用于确定HTTP客户端上是否发生故障的故障检测配置文件。此属性的值`<profile-name>`必须对应`etc/failure-retry-policy/`路径中的`<profile-name>.properties`文件。如果没有此类配置文件可用，并且未设置此属性，则使用“default”配置文件。
+ > 例如，`failure.recovery.retry.profile="test"`要求`test.properties`文件存在于`etc/failure-retry-policy`路径中。
+ > `test.properties`文件必须包含指定的`failure.recovery.retry.type`。
+ 
+ 
+ ### `failure.recovery.retry.type`
+ 
+ > -   **类型：** `string`
+ > -   **默认值：** `timeout`
+ >
+ > 此属性用来设置正在使用的故障检测机制。默认值是基于`timeout`的故障检测。
+ 
+ #### 基于`timeout`的故障检测
+ 
+ > 如果使用此机制，HTTP客户端故障将在指定时间段内重试，重试失败则被视为永久故障。
+ >
+ > 可以为此类故障检测定义`max.error.duration`属性。
+ 
+ #### 基于`max-retry`的故障检测
+ 
+ > 如果使用此机制，HTTP客户端故障将在被视为永久故障之前重试指定次数。
+ > 可以为此类故障检测定义`max.retry.count`和`max.error.duration`属性。
+ > 在这种类型的故障检测中，在查询故障检测模块之前，会执行`max.retry.count`次重试。当故障检测器模块检测到远程节点发生故障时，HTTP客户端将此故障视为永久故障。否则，例如，当远程工作节点处于活动状态但没有响应时，在`max.error.duration`指定的时间段内重试，重试失败则被视为永久故障。
+ 
+ ### `max.error.duration`
+ 
+ > -   **类型：** `duration`
+ > -   **默认值：** `300s`
+ >
+ > 被视为永久故障前，协调器等待解决任务间相关错误的最长时间。
+ 
+ ### `max.retry.count`
+ 
+ > -   **类型：** `integer`
+ > -   **默认值：** `100`
+ >
+ > 协调器在向故障检测器模块查询远程节点状态之前，对失败任务执行的最大重试次数。
+ > 此属性指定查询失败检测模块之前的最小重试次数。因此，实际故障数量可能会因为集群大小和集群负载而略有不同。
+ > 此属性仅用于基于`max-retry`的故障检测配置文件。
+ > 最小值为100。
+ 
+ ### 故障检测Gossip协议配置
+ 
+ ### `failure-detection-protocol`
+ 
+ >- **类型：** `string`
+ >- **默认值：** `heartbeat`
+ >
+ >此属性定义正在使用的故障检测器的类型。默认配置为`heartbeat`故障检测器。
+ >在`config.properties`文件中，将此属性配置为`gossip`，可以启用Gossip协议。
+ >集群中的所有节点（即协调器和工作节点）都应在其各自的`etc/config.properties`文件中指定此属性。
+ 
+ ### `failure-detector.heartbeat-interval`
+ 
+ >- **类型：** `duration`
+ >- **默认值：** `500ms` （500毫秒）
+ >
+ >集群中两个节点之间的消息散播间隔。
+ >在Gossip协议中，两个工作节点间的消息散播频率高于协调器和一个工作节点间。
+ >在协调器的`config.properties`文件中，可以为此属性配置一个较大的值，例如`5s`（5秒）。
+ >在工作节点中，可以使用默认值。
+ 
+ ### `failure-detector.worker-gossip-probe-interval`
+ 
+ >- **类型：** `duration`
+ >- **默认值：** `5s`（5秒）
+ >
+ >Gossip协议使用监控任务（与`heartbeat`故障检测器相同）来监控其他节点。
+ >此属性指定监控任务刷新间隔，以触发工作节点消息散播。
+ >仅可以为工作节点指定默认值以外的任何其他值。
+ >该属性的值必须大于`failure-detector.heartbeat-interval`的值。
+ 
+ ### `failure-detector.coordinator-gossip-probe-interval`
+ 
+ >- **类型：** `duration`
+ >- **默认值：** `5s`（5秒）
+ >
+ >Gossip协议使用监控任务（与heartbeat故障检测器相同）来监控其他节点。
+ >此属性指定监控任务刷新间隔，以触发协调器参与工作节点消息散播。
+ >仅可以为协调器指定默认值以外的任何其他值。
+ >该属性的值必须大于`failure-detector.heartbeat-interval`和`failure-detector.worker-gossip-probe-interval`的值。
+ 
+ ### `failure-detector.coordinator-gossip-collate-interval`
+ 
+ >- **类型：** `duration`
+ >- **默认值：** `2s`（2秒）
+ >
+ >此属性指定协调器整理从所有工作节点获得的所有散播消息的间隔。
+ >此属性只支持为协调器配置。
+ >该属性的值必须大于`failure-detector.heartbeat-interval`的值。
+ 
+ ### `failure-detector.gossip-group-size`
+ 
+ >- **类型：** `integer`
+ >- **默认值：** `Integer.MAX_VALUE`
+ >
+ >此属性定义单个工作节点在集群中散播消息的工作节点数量。
+ >任何大于集群大小（即工作节点数量）的值都意味着all-to-all消息散播。
+ >要保持较低的网络开销，针对大型集群，请将此属性设置为一个较小的值（例如，100工作节点的集群设置为10）。
+ >每次刷新协调器上的工作节点监视任务时，协调器都会定义工作节点URI列表，其大小由`failure-detector.gossip-group-size`指定，以触发worker-to-worker消息散播。
+ >
+>
 ## 任务属性
 
 ### `task.concurrency`
@@ -795,18 +898,25 @@
 > 
 > 远程任务错误最大缓冲时间，超过该时限则查询失败。
 
-## 分布式快照
+## 查询恢复
+
+### `recovery_enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 此会话属性用于启用或禁用恢复框架，该框架在发生故障时启用或禁用查询重启/恢复。
 
 ### `snapshot_enabled`
 
-> - 类型：`boolean`
-> - **默认值**：`false`
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
 >
-> 此会话属性用于启用或禁用分布式快照功能。
+> 启用恢复框架时，启用此会话属性可以在查询执行期间捕获快照。如果未启用恢复框架，则此属性不生效。
 
 ### `hetu.experimental.snapshot.profile`
 
-> - 类型：`string`
+> - **类型：**`string`
 >
 > 此属性定义用于存储快照的[文件系统](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。具体细节请参考[文件系统](../develop/filesystem.md)相关章节。
 >
@@ -816,21 +926,21 @@
 
 ### `hetu.recovery.maxRetries`
 
-> - 类型：`int`
-> - **默认值**：`10`
+> - **类型：** `integer`
+> - **默认值：** `10`
 >
-> 此属性定义查询的错误恢复尝试的最大次数。达到限制时，查询失败。
+> 此属性定义查询错误恢复尝试的最大次数。当达到限制时，查询失败。
 >
-> 也可以使用`recovery_max_retries`会话属性在每个查询基础上指定。
+> 也可以使用`recovery_max_retries`会话属性为每个查询指定此属性。
 
 ### `hetu.recovery.retryTimeout`
 
 > - **类型：** `duration`
 > - **默认值：** `10m`（10分钟）
 >
-> 此属性定义系统等待所有任务成功恢复的最大时长。如果在此超时时限内任何任务未就绪，则认为恢复失败，查询将尝试从较早快照恢复（如果可用）。
+> 此属性定义系统等待所有任务成功恢复的最长时间。如果在此时间内有任何任务未就绪，则恢复尝试将被视为失败，查询将尝试从较早的快照恢复（如果可用）。
 >
-> 也可以使用`recovery_retry_timeout`会话属性在每个查询基础上指定。
+> 也可以使用`recovery_retry_timeout`会话属性为每个查询指定此属性。
 
 ### `hetu.snapshot.useKryoSerialization`
 

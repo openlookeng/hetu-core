@@ -378,8 +378,6 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Maximum size of a response returned from an exchange request. The response will be placed in the exchange client buffer which is shared across all concurrent requests for the exchange.
 >
->
->
 > Increasing the value may improve network throughput if there is high latency. Decreasing the value may improve query performance for large clusters as it reduces skew due to the exchange client buffer holding responses for more tasks (rather than hold more data from fewer tasks).
 
 ### `sink.max-buffer-size`
