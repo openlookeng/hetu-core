@@ -71,4 +71,4 @@ Additionally, while query is in progress number of capturing snapshots and id of
 
 ## Configurations
 
-Configurations related to recovery framework feature can be found in [Properties Reference](properties.md#Recovery framework).
+Configurations related to recovery framework feature can be found in [Properties Reference](properties.md#Query Recovery).
