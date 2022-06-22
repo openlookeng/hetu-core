@@ -97,6 +97,7 @@ import static io.prestosql.SystemSessionProperties.getConcurrentLifespansPerNode
 import static io.prestosql.SystemSessionProperties.getWriterMinSize;
 import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
 import static io.prestosql.execution.BasicStageStats.aggregateBasicStageStats;
+import static io.prestosql.execution.QueryState.RECOVERING;
 import static io.prestosql.execution.SqlStageExecution.createSqlStageExecution;
 import static io.prestosql.execution.StageState.ABORTED;
 import static io.prestosql.execution.StageState.CANCELED;
@@ -106,7 +107,6 @@ import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
 import static io.prestosql.execution.scheduler.SourcePartitionedScheduler.newSourcePartitionedSchedulerAsStageScheduler;
 import static io.prestosql.snapshot.RecoveryConfig.calculateTaskCount;
-import static io.prestosql.snapshot.RecoveryState.STOPPING_FOR_RESCHEDULE;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.connector.CatalogName.isInternalSystemConnector;
@@ -859,7 +859,7 @@ public class SqlQueryScheduler
             RuntimeException closeError = new RuntimeException();
             for (StageScheduler scheduler : stageSchedulers.values()) {
                 try {
-                    if (queryRecoveryManager.getState() != STOPPING_FOR_RESCHEDULE) {
+                    if (queryStateMachine.getQueryState() != RECOVERING && !queryRecoveryManager.isRecovering()) {
                         scheduler.close();
                     }
                 }
