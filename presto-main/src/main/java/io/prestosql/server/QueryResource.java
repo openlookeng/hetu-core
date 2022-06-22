@@ -506,7 +506,7 @@ public class QueryResource
                 ImmutableSet.of(),
                 Optional.empty(),
                 true,
-                info.getResourceGroupId(), false);
+                info.getResourceGroupId(), false, false);
     }
 
     private BasicQueryInfo getBasicQueryInfo(QueryId queryId)

@@ -55,7 +55,7 @@ export class QueryHeader extends React.Component {
     }
 
     isSuspendable(query) {
-        if (query.state === 'RUNNING') {
+        if (query.state === 'RUNNING' && query.recoveryEnabled === true) {
             return true;
         }
 
@@ -63,7 +63,7 @@ export class QueryHeader extends React.Component {
     }
 
     isResumable(query) {
-        if (query.state === 'SUSPENDED') {
+        if (query.state === 'SUSPENDED' && query.recoveryEnabled === true) {
             return true;
         }
 

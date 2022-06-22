@@ -174,6 +174,6 @@ public class TestQueryStateInfo
                 ImmutableSet.of(),
                 Optional.empty(),
                 false,
-                Optional.empty(), false);
+                Optional.empty(), false, false);
     }
 }

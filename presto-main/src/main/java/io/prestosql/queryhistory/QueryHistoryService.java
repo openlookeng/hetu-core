@@ -318,6 +318,7 @@ public class QueryHistoryService
                 ImmutableSet.of(),
                 Optional.empty(),
                 true,
-                info.getResourceGroupId(), false);
+                info.getResourceGroupId(), false,
+                false);
     }
 }

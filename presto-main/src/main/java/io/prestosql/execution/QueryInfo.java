@@ -75,6 +75,7 @@ public class QueryInfo
     private final boolean completeInfo;
     private final Optional<ResourceGroupId> resourceGroupId;
     private final boolean runningAsync;
+    private final boolean recoveryEnabled;
 
     @JsonCreator
     public QueryInfo(
@@ -107,7 +108,8 @@ public class QueryInfo
             @JsonProperty("output") Optional<Output> output,
             @JsonProperty("completeInfo") boolean completeInfo,
             @JsonProperty("resourceGroupId") Optional<ResourceGroupId> resourceGroupId,
-            @JsonProperty("runningAsync") boolean runningAsync)
+            @JsonProperty("runningAsync") boolean runningAsync,
+            @JsonProperty("recoveryEnabled") boolean recoveryEnabled)
     {
         requireNonNull(queryId, "queryId is null");
         requireNonNull(session, "session is null");
@@ -162,6 +164,7 @@ public class QueryInfo
         this.completeInfo = completeInfo;
         this.resourceGroupId = resourceGroupId;
         this.runningAsync = runningAsync;
+        this.recoveryEnabled = recoveryEnabled;
     }
 
     @JsonProperty
@@ -192,6 +195,12 @@ public class QueryInfo
     public boolean isScheduled()
     {
         return scheduled;
+    }
+
+    @JsonProperty
+    public boolean isRecoveryEnabled()
+    {
+        return recoveryEnabled;
     }
 
     @JsonProperty

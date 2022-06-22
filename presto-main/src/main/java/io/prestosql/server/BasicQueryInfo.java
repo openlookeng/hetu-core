@@ -56,6 +56,7 @@ public class BasicQueryInfo
     private final BasicQueryStats queryStats;
     private final ErrorType errorType;
     private final ErrorCode errorCode;
+    private final boolean recoveryEnabled;
 
     @JsonCreator
     public BasicQueryInfo(
@@ -70,7 +71,8 @@ public class BasicQueryInfo
             @JsonProperty("preparedQuery") Optional<String> preparedQuery,
             @JsonProperty("queryStats") BasicQueryStats queryStats,
             @JsonProperty("errorType") ErrorType errorType,
-            @JsonProperty("errorCode") ErrorCode errorCode)
+            @JsonProperty("errorCode") ErrorCode errorCode,
+            @JsonProperty("recoveryEnabled") boolean recoveryEnabled)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.session = requireNonNull(session, "session is null");
@@ -84,6 +86,7 @@ public class BasicQueryInfo
         this.query = requireNonNull(query, "query is null");
         this.preparedQuery = requireNonNull(preparedQuery, "preparedQuery is null");
         this.queryStats = requireNonNull(queryStats, "queryStats is null");
+        this.recoveryEnabled = recoveryEnabled;
     }
 
     public BasicQueryInfo(QueryInfo queryInfo)
@@ -99,7 +102,8 @@ public class BasicQueryInfo
                 queryInfo.getPreparedQuery(),
                 new BasicQueryStats(queryInfo.getQueryStats()),
                 queryInfo.getErrorType(),
-                queryInfo.getErrorCode());
+                queryInfo.getErrorCode(),
+                queryInfo.isRecoveryEnabled());
     }
 
     public static BasicQueryInfo immediateFailureQueryInfo(Session session, String query, URI self, Optional<ResourceGroupId> resourceGroupId, ErrorCode errorCode)
@@ -116,7 +120,8 @@ public class BasicQueryInfo
                 Optional.empty(),
                 immediateFailureQueryStats(),
                 errorCode == null ? null : errorCode.getType(),
-                errorCode);
+                errorCode,
+                false);
     }
 
     @JsonProperty
@@ -191,6 +196,12 @@ public class BasicQueryInfo
     public ErrorCode getErrorCode()
     {
         return errorCode;
+    }
+
+    @JsonProperty
+    public boolean isRecoveryEnabled()
+    {
+        return recoveryEnabled;
     }
 
     @Override
