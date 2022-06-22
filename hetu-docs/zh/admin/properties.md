@@ -612,7 +612,7 @@
 
 ## 启发式索引属性
 
-启发式索引是外部索引模块，可用于过滤连接器级别的行。 位图，Bloom和MinMaxIndex是openLooKeng提供的索引列表。 到目前为止，位图索引支持使用ORC存储格式的表支持蜂巢连接器。
+启发式索引是外部索引模块，可用于过滤连接器级别的行。 位图，Bloom和MinMaxIndex是openLooKeng提供的索引列表。 到目前为止，位图索引支持Hive连接器的ORC存储格式的表。
 
 ### `hetu.heuristicindex.filter.enabled`
 
