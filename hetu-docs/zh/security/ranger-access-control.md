@@ -7,7 +7,7 @@ Ranger 访问控制
 
 Apache Ranger 为 Hadoop 集群提供了一种全面的安全框架，以跨组件的、一致性的方式进行定义、授权、管理安全策略。Ranger 详细介绍和用户指导可以参考[Apache Ranger Wiki](https://cwiki.apache.org/confluence/display/RANGER/Index )。
 
-[openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) 是为 openLooKeng 开发的 Ranger 插件，用于全面的数据安全监控和权限管理。
+[openlookeng-ranger-plugin](https://gitee.com/openlookeng/openlookeng-ranger-plugin) 基于Ranger 2.1.0版本进行开发，是为 openLooKeng 开发的 Ranger 插件，用于全面的数据安全监控和权限管理。
 
 编译过程
 -------------------------
