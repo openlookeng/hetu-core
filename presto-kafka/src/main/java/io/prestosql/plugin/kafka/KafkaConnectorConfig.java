@@ -108,7 +108,7 @@ public class KafkaConnectorConfig
     /**
      * whether to use kerberos
      */
-    private boolean kerberosOn;
+    private String kerberosOn;
 
     public String getKrb5Conf()
     {
@@ -206,7 +206,7 @@ public class KafkaConnectorConfig
         return this;
     }
 
-    public boolean isKerberosOn()
+    public String isKerberosOn()
     {
         return kerberosOn;
     }
@@ -216,7 +216,7 @@ public class KafkaConnectorConfig
             defaultValue = "false",
             required = true)
     @Config("kerberos.on")
-    public KafkaConnectorConfig setKerberosOn(boolean kerberosOn)
+    public KafkaConnectorConfig setKerberosOn(String kerberosOn)
     {
         this.kerberosOn = kerberosOn;
         return this;

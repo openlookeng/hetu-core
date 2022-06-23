@@ -32,13 +32,13 @@ public class TestKafkaConnectorConfig
                 .setDefaultSchema("default")
                 .setTableNames("")
                 .setTableDescriptionDir(new File("etc/kafka/"))
-                .setGroupId("test")
-                .setKerberosOn(false)
-                .setSecurityProtocol("SASL_PLAINTEXT")
-                .setKrb5Conf("/etc/krb5.conf")
-                .setLoginConfig("/etc/kafka_client_jaas.conf")
-                .setSaslKerberosServiceName("kafka")
-                .setSaslMechanism("GSSAPI")
+                .setGroupId(null)
+                .setKerberosOn(null)
+                .setSecurityProtocol(null)
+                .setKrb5Conf(null)
+                .setLoginConfig(null)
+                .setSaslKerberosServiceName(null)
+                .setSaslMechanism(null)
                 .setHideInternalColumns(true));
     }
 
@@ -74,7 +74,7 @@ public class TestKafkaConnectorConfig
                 .setLoginConfig("/etc/kafka_client_jaas.conf")
                 .setSaslKerberosServiceName("kafka")
                 .setSaslMechanism("GSSAPI")
-                .setKerberosOn(false)
+                .setKerberosOn("false")
                 .setSecurityProtocol("SASL_PLAINTEXT")
                 .setHideInternalColumns(false);
 

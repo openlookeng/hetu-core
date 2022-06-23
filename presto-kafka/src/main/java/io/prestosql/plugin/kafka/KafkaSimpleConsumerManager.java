@@ -47,7 +47,7 @@ public class KafkaSimpleConsumerManager
     private final int connectTimeoutMillis;
     private final int bufferSizeBytes;
 
-    private final boolean kerberosOn;
+    private final String kerberosOn;
     private final String loginConfig;
     private final String krb5Conf;
     private String groupId;
@@ -116,7 +116,7 @@ public class KafkaSimpleConsumerManager
     {
         log.info("Creating new SaslConsumer for %s", host);
         Properties props = new Properties();
-        if (kerberosOn) {
+        if ("true".equalsIgnoreCase(kerberosOn)) {
             System.setProperty("java.security.auth.login.config", loginConfig);
             System.setProperty("java.security.krb5.conf", krb5Conf);
             props.put("security.protocol", securityProtocol);
