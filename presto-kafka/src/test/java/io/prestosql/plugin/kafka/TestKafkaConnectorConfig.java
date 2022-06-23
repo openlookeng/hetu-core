@@ -31,7 +31,7 @@ public class TestKafkaConnectorConfig
                 .setKafkaBufferSize("64kB")
                 .setDefaultSchema("default")
                 .setTableNames("")
-                .setTableDescriptionDir(new File("etc/kafka/")).setGroupId("ccc")
+                .setTableDescriptionDir(new File("etc/kafka/"))
                 .setHideInternalColumns(true));
     }
 
@@ -46,7 +46,6 @@ public class TestKafkaConnectorConfig
                 .put("kafka.connect-timeout", "1h")
                 .put("kafka.buffer-size", "1MB")
                 .put("kafka.hide-internal-columns", "false")
-                .put("group.id", "bbb")
                 .build();
 
         KafkaConnectorConfig expected = new KafkaConnectorConfig()
@@ -56,7 +55,11 @@ public class TestKafkaConnectorConfig
                 .setNodes("localhost:12345, localhost:23456")
                 .setKafkaConnectTimeout("1h")
                 .setKafkaBufferSize("1MB")
-                .setGroupId("aaa")
+                .setGroupId("test")
+                .setKrb5Conf("/etc/krb5.conf")
+                .setLoginConfig("/etc/kafka_client_jaas.conf")
+                .setSaslKerberosServiceName("kafka")
+                .setSaslMechanism("GSSAPI")
                 .setHideInternalColumns(false);
 
         ConfigAssertions.assertFullMapping(properties, expected);
