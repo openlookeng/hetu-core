@@ -120,9 +120,10 @@ public class KafkaConnectorConfig
             defaultValue = "",
             required = false)
     @Config("java.security.krb5.conf")
-    public void setKrb5Conf(String krb5Conf)
+    public KafkaConnectorConfig setKrb5Conf(String krb5Conf)
     {
         this.krb5Conf = krb5Conf;
+        return this;
     }
 
     public String getLoginConfig()
@@ -135,9 +136,10 @@ public class KafkaConnectorConfig
             defaultValue = "",
             required = false)
     @Config("java.security.auth.login.config")
-    public void setLoginConfig(String loginConfig)
+    public KafkaConnectorConfig setLoginConfig(String loginConfig)
     {
         this.loginConfig = loginConfig;
+        return this;
     }
 
     public String getGroupId()
@@ -147,12 +149,13 @@ public class KafkaConnectorConfig
 
     @Mandatory(name = "group.id",
             description = "group.id",
-            defaultValue = "",
+            defaultValue = "test",
             required = false)
     @Config("group.id")
-    public void setGroupId(String groupId)
+    public KafkaConnectorConfig setGroupId(String groupId)
     {
         this.groupId = groupId;
+        return this;
     }
 
     public String getSecurityProtocol()
@@ -165,9 +168,10 @@ public class KafkaConnectorConfig
             defaultValue = "SASL_PLAINTEXT",
             required = false)
     @Config("security.protocol")
-    public void setSecurityProtocol(String securityProtocol)
+    public KafkaConnectorConfig setSecurityProtocol(String securityProtocol)
     {
         this.securityProtocol = securityProtocol;
+        return this;
     }
 
     public String getSaslMechanism()
@@ -180,9 +184,10 @@ public class KafkaConnectorConfig
             defaultValue = "GSSAPI",
             required = false)
     @Config("sasl.mechanism")
-    public void setSaslMechanism(String saslMechanism)
+    public KafkaConnectorConfig setSaslMechanism(String saslMechanism)
     {
         this.saslMechanism = saslMechanism;
+        return this;
     }
 
     public String getSaslKerberosServiceName()
@@ -195,9 +200,10 @@ public class KafkaConnectorConfig
             defaultValue = "kafka",
             required = false)
     @Config("sasl.kerberos.service.name")
-    public void setSaslKerberosServiceName(String saslKerberosServiceName)
+    public KafkaConnectorConfig setSaslKerberosServiceName(String saslKerberosServiceName)
     {
         this.saslKerberosServiceName = saslKerberosServiceName;
+        return this;
     }
 
     public boolean isKerberosOn()
@@ -210,9 +216,10 @@ public class KafkaConnectorConfig
             defaultValue = "false",
             required = true)
     @Config("kerberos.on")
-    public void setKerberosOn(boolean kerberosOn)
+    public KafkaConnectorConfig setKerberosOn(boolean kerberosOn)
     {
         this.kerberosOn = kerberosOn;
+        return this;
     }
 
     @NotNull

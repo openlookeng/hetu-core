@@ -107,7 +107,7 @@ Kafka的jaas_conf路径，也就是java认证和授权的相关文件，文件�
 
 ### `java.security.krb5.conf`
 
-存放krb5.conf文件的路径，要注意全局配置中也需要配置此选项，例如部署后在jvm.config中配置。
+存放krb5.conf文件的路径，要注意全局配置中也需要配置此选项，例如部署后在jvm.config中配置,而在开发中需要在启动PrestoServer时使用"-D"参数配置。
 
 此属性是可选的；默认值为``。
 

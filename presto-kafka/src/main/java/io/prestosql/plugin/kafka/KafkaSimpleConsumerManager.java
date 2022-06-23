@@ -28,6 +28,7 @@ import javax.inject.Inject;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -49,7 +50,7 @@ public class KafkaSimpleConsumerManager
     private final boolean kerberosOn;
     private final String loginConfig;
     private final String krb5Conf;
-    private final String groupId;
+    private String groupId;
     private final String securityProtocol;
     private final String saslMechanism;
     private final String saslKerberosServiceName;
@@ -128,12 +129,15 @@ public class KafkaSimpleConsumerManager
             props.put("enable.auto.commit", "false");
             props.put("key.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
             props.put("value.deserializer", Class.forName("org.apache.kafka.common.serialization.ByteBufferDeserializer"));
+            if (groupId == null) {
+                groupId = UUID.randomUUID().toString();
+            }
             props.put("group.id", groupId);
             props.put("session.timeout.ms", connectTimeoutMillis);
             props.put("receive.buffer.bytes", bufferSizeBytes);
         }
         catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            log.error(e, "failed to create kafka consumer");
         }
 
         return new KafkaConsumer<>(props);
