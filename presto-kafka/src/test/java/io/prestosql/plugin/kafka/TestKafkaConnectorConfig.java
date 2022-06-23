@@ -52,12 +52,12 @@ public class TestKafkaConnectorConfig
                 .put("kafka.buffer-size", "1MB")
                 .put("kafka.hide-internal-columns", "false")
                 .put("group.id", "test")
-                .put("java.security.auth.login.config","/etc/kafka_client_jaas.conf")
-                .put("java.security.krb5.conf","/etc/krb5.conf")
-                .put("kerberos.on","false")
-                .put("sasl.kerberos.service.name","kafka")
-                .put("sasl.mechanism","GSSAPI")
-                .put("security.protocol","SASL_PLAINTEXT")
+                .put("java.security.auth.login.config", "/etc/kafka_client_jaas.conf")
+                .put("java.security.krb5.conf", "/etc/krb5.conf")
+                .put("kerberos.on", "false")
+                .put("sasl.kerberos.service.name", "kafka")
+                .put("sasl.mechanism", "GSSAPI")
+                .put("security.protocol", "SASL_PLAINTEXT")
                 .build();
 
         KafkaConnectorConfig expected = new KafkaConnectorConfig()
