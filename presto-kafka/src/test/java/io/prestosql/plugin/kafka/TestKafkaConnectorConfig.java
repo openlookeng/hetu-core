@@ -32,6 +32,11 @@ public class TestKafkaConnectorConfig
                 .setDefaultSchema("default")
                 .setTableNames("")
                 .setTableDescriptionDir(new File("etc/kafka/"))
+                .setGroupId("test")
+                .setKrb5Conf("/etc/krb5.conf")
+                .setLoginConfig("/etc/kafka_client_jaas.conf")
+                .setSaslKerberosServiceName("kafka")
+                .setSaslMechanism("GSSAPI")
                 .setHideInternalColumns(true));
     }
 
