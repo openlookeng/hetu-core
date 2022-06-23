@@ -95,7 +95,7 @@ openLooKeng必须仍然能够连接到群集的所有节点，即使这里只指
 
 ### `kerberos.on`
 
-是否开启kerberos认证，适用于开启了kerberos认证的集群。
+是否开启kerberos认证，适用于开启了kerberos认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证。
 
 此属性是可选的；默认值为`false`。
 
