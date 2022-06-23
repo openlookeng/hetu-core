@@ -51,6 +51,7 @@ public class TestKafkaConnectorConfig
                 .put("kafka.connect-timeout", "1h")
                 .put("kafka.buffer-size", "1MB")
                 .put("kafka.hide-internal-columns", "false")
+                .put("group.id", "bbb")
                 .build();
 
         KafkaConnectorConfig expected = new KafkaConnectorConfig()
