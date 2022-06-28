@@ -949,6 +949,13 @@
 >
 > 为快照启用基于Kryo的序列化，而不是默认的Java序列化。
 
+### `experimental.eliminate-duplicate-spill-files`
+ 
+ > -   **类型：** `boolean`
+ > -   **默认值：** `false`
+ >
+ > 快照捕获时，允许消除重复溢出文件写盘。
+
 ## HTTP客户端属性配置
 
 ### `http.client.idle-timeout`
