@@ -1871,4 +1871,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.7</tag>
+  </scm>
 </project>
