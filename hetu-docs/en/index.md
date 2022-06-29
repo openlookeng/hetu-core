@@ -219,6 +219,7 @@ headless: true
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
 - [Release Notes]("#")
+    - [1.7.0 (30 Jun 2022)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})
     - [1.6.1 (27 Apr 2022)]({{< relref "./docs/releasenotes/releasenotes-1.6.1.md" >}})
     - [1.6.0 (30 Mar 2022)]({{< relref "./docs/releasenotes/releasenotes-1.6.0.md" >}})
     - [1.5.0 (30 Dec 2021)]({{< relref "./docs/releasenotes/releasenotes-1.5.0.md" >}})
