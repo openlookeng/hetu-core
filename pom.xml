@@ -10,7 +10,7 @@
 
     <groupId>io.hetu.core</groupId>
     <artifactId>presto-root</artifactId>
-    <version>1.7.0-SNAPSHOT</version>
+    <version>1.8.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -1871,8 +1871,4 @@
             </build>
         </profile>
     </profiles>
-
-  <scm>
-    <tag>branch-1.7</tag>
-  </scm>
 </project>
