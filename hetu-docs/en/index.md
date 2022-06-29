@@ -84,7 +84,7 @@ headless: true
     - [JMX]({{< relref "./docs/connector/jmx.md" >}})
     - [Kafka]({{< relref "./docs/connector/kafka.md" >}})
     - [Kafka Connector Tutorial]({{< relref "./docs/connector/kafka-tutorial.md" >}})
-    - [Redis] ({{< relref "./docs/connector/redis.md" >}})
+    - [Redis]({{< relref "./docs/connector/redis.md" >}})
     - [Local File]({{< relref "./docs/connector/localfile.md" >}})
     - [Memory]({{< relref "./docs/connector/memory.md" >}})
     - [MongoDB]({{< relref "./docs/connector/mongodb.md" >}})
