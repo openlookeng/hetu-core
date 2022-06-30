@@ -1,7 +1,7 @@
-#Extension Physical Execution Planner
+# Extension Physical Execution Planner
 This section describes how to add an extension physical execution planner in openLooKeng. With the extension physical execution planner, openLooKeng can utilize other operator acceleration libraries to speed up the execution of SQL statements.
 
-##Configuration
+## Configuration
 To enable extension physical execution feature, the following configs must be added in
 `config.properties`：
 
@@ -18,7 +18,7 @@ The above attributes are described below:
 - `extension_execution_planner_class_path`: Set the package path of extension physical execution generated class in jar。
 
 
-##Usage
+## Usage
 The below command can control the enablement of extension physical execution feature in WebUI or Cli while running openLooKeng:
 ```
 set session extension_execution_planner_enabled=true/false

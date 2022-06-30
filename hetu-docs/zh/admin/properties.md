@@ -425,7 +425,7 @@
  ### `failure-detector.heartbeat-interval`
  
  >- **类型：** `duration`
- >- **默认值：** `500ms` （500毫秒）
+ >- **默认值：** `500ms`
  >
  >集群中两个节点之间的消息散播间隔。
  >在Gossip协议中，两个工作节点间的消息散播频率高于协调器和一个工作节点间。
@@ -435,7 +435,7 @@
  ### `failure-detector.worker-gossip-probe-interval`
  
  >- **类型：** `duration`
- >- **默认值：** `5s`（5秒）
+ >- **默认值：** `5s`
  >
  >Gossip协议使用监控任务（与`heartbeat`故障检测器相同）来监控其他节点。
  >此属性指定监控任务刷新间隔，以触发工作节点消息散播。
@@ -445,7 +445,7 @@
  ### `failure-detector.coordinator-gossip-probe-interval`
  
  >- **类型：** `duration`
- >- **默认值：** `5s`（5秒）
+ >- **默认值：** `5s`
  >
  >Gossip协议使用监控任务（与heartbeat故障检测器相同）来监控其他节点。
  >此属性指定监控任务刷新间隔，以触发协调器参与工作节点消息散播。
@@ -455,7 +455,7 @@
  ### `failure-detector.coordinator-gossip-collate-interval`
  
  >- **类型：** `duration`
- >- **默认值：** `2s`（2秒）
+ >- **默认值：** `2s`
  >
  >此属性指定协调器整理从所有工作节点获得的所有散播消息的间隔。
  >此属性只支持为协调器配置。
