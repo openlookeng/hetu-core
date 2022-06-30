@@ -39,7 +39,8 @@ kafka.nodes=host1:port,host2:port
 | `kafka.table-description-dir`| 包含主题描述文件的目录                        |
 | `kafka.hide-internal-columns`| 控制内部列是否是表模式的一部分                    |
 | `kerberos.on`| 是否开启Kerberos认证                     |
-| `java.security.auth.login.config`| kafka_client_jass.conf路径           |
+| `user.password.auth.on`| 是否开启kafka用户密码认证                    |
+| `sasl.jaas.config`| 认证相关信息                             |
 | `java.security.krb5.conf`| krb5.conf文件路径                      |
 | `group.id`| kafka的groupID                      |
 | `security.protocol`| Kafka的安全认证协议                       |
@@ -95,13 +96,21 @@ openLooKeng必须仍然能够连接到群集的所有节点，即使这里只指
 
 ### `kerberos.on`
 
-是否开启kerberos认证，适用于开启了kerberos认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证。
+是否开启kerberos认证，适用于开启了kerberos认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证，且该项与`user.password.auth.on`仅能选择一个，若两者均为true，则`user.password.auth.on`将覆盖`kerberos.on`且会异常。
 
 此属性是可选的；默认值为`false`。
 
-### `java.security.auth.login.config`
+### `user.password.auth.on`
 
-Kafka的jaas_conf路径，也就是java认证和授权的相关文件，文件中存放的是认证和授权信息。
+是否开启用户密码认证，适用于开启了用户密码认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证，且该项与`kerberos.on`仅能选择一个，若两者均为true，则`user.password.auth.on`将覆盖`kerberos.on`且会异常。
+若使用用户密码认证，需要在jvm配置中增加-Djava.ext.dirs=$JAVA_HOME/jre/lib/ext:/Users/mac/apps/lib，其中/Users/mac/apps/lib下需要放置kafka-client.jar，否则会报出 loginModule not found的相关异常
+此属性是可选的；默认值为`false`。
+
+### `sasl.jaas.config`
+
+Kafka的认证相关信息。
+对于kerberos认证，可能的值为：sasl.jaas.config= com.sun.security.auth.module.Krb5LoginModule required useKeyTab=true useTicketCache=true serviceName=kafka keyTab=\"/Users/mac/Desktop/user01.keytab\" principal=\"user01@EXAMPLE.COM\";
+对于用户密码认证，可能的值为：sasl.jaas.config= org.apache.kafka.common.security.plain.PlainLoginModule required username=\"producer\" password=\"producerpwd\";
 
 此属性是可选的；默认值为``。
 

@@ -54,6 +54,7 @@ public class KafkaSimpleConsumerManager
     private final String securityProtocol;
     private final String saslMechanism;
     private final String saslKerberosServiceName;
+    private final String userPasswordOn;
 
     @Inject
     public KafkaSimpleConsumerManager(
@@ -69,6 +70,7 @@ public class KafkaSimpleConsumerManager
         this.consumerCache = CacheBuilder.newBuilder().build(CacheLoader.from(this::createConsumer));
 
         this.kerberosOn = kafkaConnectorConfig.isKerberosOn();
+        this.userPasswordOn = kafkaConnectorConfig.getUserPasswordOn();
         this.loginConfig = kafkaConnectorConfig.getLoginConfig();
         this.krb5Conf = kafkaConnectorConfig.getKrb5Conf();
         this.groupId = kafkaConnectorConfig.getGroupId();
@@ -117,11 +119,16 @@ public class KafkaSimpleConsumerManager
         log.info("Creating new SaslConsumer for %s", host);
         Properties props = new Properties();
         if ("true".equalsIgnoreCase(kerberosOn)) {
-            System.setProperty("java.security.auth.login.config", loginConfig);
+            props.put("sasl.jaas.config", loginConfig);
             System.setProperty("java.security.krb5.conf", krb5Conf);
             props.put("security.protocol", securityProtocol);
             props.put("sasl.mechanism", saslMechanism);
             props.put("sasl.kerberos.service.name", saslKerberosServiceName);
+        }
+        else if ("true".equalsIgnoreCase(userPasswordOn)) {
+            props.put("sasl.jaas.config", loginConfig);
+            props.put("security.protocol", securityProtocol);
+            props.put("sasl.mechanism", saslMechanism);
         }
 
         try {

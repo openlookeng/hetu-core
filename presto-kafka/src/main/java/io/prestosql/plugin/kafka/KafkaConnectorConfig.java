@@ -109,6 +109,26 @@ public class KafkaConnectorConfig
      * whether to use kerberos
      */
     private String kerberosOn;
+    /**
+     * whether to use user and password
+     */
+    private String userPasswordOn;
+
+    public String getUserPasswordOn()
+    {
+        return userPasswordOn;
+    }
+
+    @Mandatory(name = "user.password.auth.on",
+            description = "user.password.auth.on",
+            defaultValue = "",
+            required = false)
+    @Config("user.password.auth.on")
+    public KafkaConnectorConfig setUserPasswordOn(String userPasswordOn)
+    {
+        this.userPasswordOn = userPasswordOn;
+        return this;
+    }
 
     public String getKrb5Conf()
     {
@@ -131,11 +151,11 @@ public class KafkaConnectorConfig
         return loginConfig;
     }
 
-    @Mandatory(name = "java.security.auth.login.config",
-            description = "java.security.auth.login.config",
+    @Mandatory(name = "sasl.jaas.config",
+            description = "sasl.jaas.config",
             defaultValue = "",
             required = false)
-    @Config("java.security.auth.login.config")
+    @Config("sasl.jaas.config")
     public KafkaConnectorConfig setLoginConfig(String loginConfig)
     {
         this.loginConfig = loginConfig;
@@ -214,7 +234,7 @@ public class KafkaConnectorConfig
     @Mandatory(name = "kerberos.on",
             description = "whether to use kerberos",
             defaultValue = "false",
-            required = true)
+            required = false)
     @Config("kerberos.on")
     public KafkaConnectorConfig setKerberosOn(String kerberosOn)
     {

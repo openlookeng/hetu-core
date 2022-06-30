@@ -36,6 +36,7 @@ public class TestKafkaConnectorConfig
                 .setKerberosOn(null)
                 .setSecurityProtocol(null)
                 .setKrb5Conf(null)
+                .setUserPasswordOn(null)
                 .setLoginConfig(null)
                 .setSaslKerberosServiceName(null)
                 .setSaslMechanism(null)
@@ -54,9 +55,15 @@ public class TestKafkaConnectorConfig
                 .put("kafka.buffer-size", "1MB")
                 .put("kafka.hide-internal-columns", "false")
                 .put("group.id", "test")
-                .put("java.security.auth.login.config", "/etc/kafka_client_jaas.conf")
+                .put("sasl.jaas.config", "com.sun.security.auth.module.Krb5LoginModule required" +
+                        " useKeyTab=true" +
+                        " useTicketCache=true" +
+                        " serviceName=kafka" +
+                        " keyTab=\"/Users/mac/Desktop/user01.keytab\"" +
+                        " principal=\"user01@EXAMPLE.COM\";")
                 .put("java.security.krb5.conf", "/etc/krb5.conf")
                 .put("kerberos.on", "false")
+                .put("user.password.auth.on", "false")
                 .put("sasl.kerberos.service.name", "kafka")
                 .put("sasl.mechanism", "GSSAPI")
                 .put("security.protocol", "SASL_PLAINTEXT")
@@ -71,10 +78,16 @@ public class TestKafkaConnectorConfig
                 .setKafkaBufferSize("1MB")
                 .setGroupId("test")
                 .setKrb5Conf("/etc/krb5.conf")
-                .setLoginConfig("/etc/kafka_client_jaas.conf")
+                .setLoginConfig("com.sun.security.auth.module.Krb5LoginModule required" +
+                        " useKeyTab=true" +
+                        " useTicketCache=true" +
+                        " serviceName=kafka" +
+                        " keyTab=\"/Users/mac/Desktop/user01.keytab\"" +
+                        " principal=\"user01@EXAMPLE.COM\";")
                 .setSaslKerberosServiceName("kafka")
                 .setSaslMechanism("GSSAPI")
                 .setKerberosOn("false")
+                .setUserPasswordOn("false")
                 .setSecurityProtocol("SASL_PLAINTEXT")
                 .setHideInternalColumns(false);
 
