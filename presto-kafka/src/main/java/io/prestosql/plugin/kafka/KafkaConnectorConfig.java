@@ -70,6 +70,178 @@ public class KafkaConnectorConfig
      */
     private boolean hideInternalColumns = true;
 
+    /**
+     * the path of krb5.conf ,used for develop
+     */
+    private String krb5Conf;
+
+    /**
+     * the path of kafka_client_jaas_conf
+     */
+    private String loginConfig;
+
+    /**
+     * whether use subject creds only
+     */
+    private String useSubjectCredsOnly;
+
+    /**
+     * the group id of kafka
+     */
+    private String groupId;
+
+    /**
+     * the security protocol of kafka
+     */
+    private String securityProtocol;
+
+    /**
+     * the sasl mechanism of kafka
+     */
+    private String saslMechanism;
+
+    /**
+     * the sasl kerberos service name of kafka
+     */
+    private String saslKerberosServiceName;
+
+    /**
+     * whether to use kerberos
+     */
+    private String kerberosOn;
+    /**
+     * whether to use user and password
+     */
+    private String userPasswordOn;
+
+    public String getUserPasswordOn()
+    {
+        return userPasswordOn;
+    }
+
+    @Mandatory(name = "user.password.auth.on",
+            description = "user.password.auth.on",
+            defaultValue = "",
+            required = false)
+    @Config("user.password.auth.on")
+    public KafkaConnectorConfig setUserPasswordOn(String userPasswordOn)
+    {
+        this.userPasswordOn = userPasswordOn;
+        return this;
+    }
+
+    public String getKrb5Conf()
+    {
+        return krb5Conf;
+    }
+
+    @Mandatory(name = "java.security.krb5.conf",
+            description = "java.security.krb5.conf",
+            defaultValue = "",
+            required = false)
+    @Config("java.security.krb5.conf")
+    public KafkaConnectorConfig setKrb5Conf(String krb5Conf)
+    {
+        this.krb5Conf = krb5Conf;
+        return this;
+    }
+
+    public String getLoginConfig()
+    {
+        return loginConfig;
+    }
+
+    @Mandatory(name = "sasl.jaas.config",
+            description = "sasl.jaas.config",
+            defaultValue = "",
+            required = false)
+    @Config("sasl.jaas.config")
+    public KafkaConnectorConfig setLoginConfig(String loginConfig)
+    {
+        this.loginConfig = loginConfig;
+        return this;
+    }
+
+    public String getGroupId()
+    {
+        return groupId;
+    }
+
+    @Mandatory(name = "group.id",
+            description = "group.id",
+            defaultValue = "test",
+            required = false)
+    @Config("group.id")
+    public KafkaConnectorConfig setGroupId(String groupId)
+    {
+        this.groupId = groupId;
+        return this;
+    }
+
+    public String getSecurityProtocol()
+    {
+        return securityProtocol;
+    }
+
+    @Mandatory(name = "security.protocol",
+            description = "security.protocol",
+            defaultValue = "SASL_PLAINTEXT",
+            required = false)
+    @Config("security.protocol")
+    public KafkaConnectorConfig setSecurityProtocol(String securityProtocol)
+    {
+        this.securityProtocol = securityProtocol;
+        return this;
+    }
+
+    public String getSaslMechanism()
+    {
+        return saslMechanism;
+    }
+
+    @Mandatory(name = "sasl.mechanism",
+            description = "sasl.mechanism",
+            defaultValue = "GSSAPI",
+            required = false)
+    @Config("sasl.mechanism")
+    public KafkaConnectorConfig setSaslMechanism(String saslMechanism)
+    {
+        this.saslMechanism = saslMechanism;
+        return this;
+    }
+
+    public String getSaslKerberosServiceName()
+    {
+        return saslKerberosServiceName;
+    }
+
+    @Mandatory(name = "sasl.kerberos.service.name",
+            description = "sasl.kerberos.service.name",
+            defaultValue = "kafka",
+            required = false)
+    @Config("sasl.kerberos.service.name")
+    public KafkaConnectorConfig setSaslKerberosServiceName(String saslKerberosServiceName)
+    {
+        this.saslKerberosServiceName = saslKerberosServiceName;
+        return this;
+    }
+
+    public String isKerberosOn()
+    {
+        return kerberosOn;
+    }
+
+    @Mandatory(name = "kerberos.on",
+            description = "whether to use kerberos",
+            defaultValue = "false",
+            required = false)
+    @Config("kerberos.on")
+    public KafkaConnectorConfig setKerberosOn(String kerberosOn)
+    {
+        this.kerberosOn = kerberosOn;
+        return this;
+    }
+
     @NotNull
     public File getTableDescriptionDir()
     {

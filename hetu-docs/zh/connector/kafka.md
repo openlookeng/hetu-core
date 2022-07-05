@@ -29,16 +29,23 @@ kafka.nodes=host1:port,host2:port
 
 配置属性包括：
 
-| 属性名称| 说明|
-|:----------|:----------|
-| `kafka.table-names`| 目录提供的所有表列表|
-| `kafka.default-schema`| 表的默认模式名|
-| `kafka.nodes`| Kafka集群节点列表|
-| `kafka.connect-timeout`| 连接Kafka集群超时|
-| `kafka.buffer-size`| Kafka读缓冲区大小|
-| `kafka.table-description-dir`| 包含主题描述文件的目录|
-| `kafka.hide-internal-columns`| 控制内部列是否是表模式的一部分|
-
+| 属性名称| 说明                                 |
+|:----------|:-----------------------------------|
+| `kafka.table-names`| 目录提供的所有表列表                         |
+| `kafka.default-schema`| 表的默认模式名                            |
+| `kafka.nodes`| Kafka集群节点列表                        |
+| `kafka.connect-timeout`| 连接Kafka集群超时                        |
+| `kafka.buffer-size`| Kafka读缓冲区大小                        |
+| `kafka.table-description-dir`| 包含主题描述文件的目录                        |
+| `kafka.hide-internal-columns`| 控制内部列是否是表模式的一部分                    |
+| `kerberos.on`| 是否开启Kerberos认证                     |
+| `user.password.auth.on`| 是否开启kafka用户密码认证                    |
+| `sasl.jaas.config`| 认证相关信息                             |
+| `java.security.krb5.conf`| krb5.conf文件路径                      |
+| `group.id`| kafka的groupID                      |
+| `security.protocol`| Kafka的安全认证协议                       |
+| `sasl.mechanism`| sasl机制                             |
+| `sasl.kerberos.service.name`| kafka服务运行时的kerberos principal name |
 ### `kafka.table-names`
 
 此目录提供的所有表的逗号分隔列表。表名可以是非限定的（简单名称），并将被放入默认模式（见下文）中，或者用模式名称（`<schema-name>.<table-name>`）限定。
@@ -86,6 +93,56 @@ openLooKeng必须仍然能够连接到群集的所有节点，即使这里只指
 除了在表描述文件中定义数据列外，连接器还为每个表维护许多附加列。如果这些列是隐藏的，它们仍然可以在查询中使用，但是不会显示在`DESCRIBE <table-name>`或`SELECT *`中。
 
 此属性是可选的；默认值为`true`。
+
+### `kerberos.on`
+
+是否开启kerberos认证，适用于开启了kerberos认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证，且该项与`user.password.auth.on`仅能选择一个，若两者均为true，则`user.password.auth.on`将覆盖`kerberos.on`且会异常。
+
+此属性是可选的；默认值为`false`。
+
+### `user.password.auth.on`
+
+是否开启用户密码认证，适用于开启了用户密码认证的集群，如果在运行presto-kafka中的测试包，请置为false，因为测试程序使用内嵌Kafka，不支持认证，且该项与`kerberos.on`仅能选择一个，若两者均为true，则`user.password.auth.on`将覆盖`kerberos.on`且会异常。
+若使用用户密码认证，需要在jvm配置中增加-Djava.ext.dirs=$JAVA_HOME/jre/lib/ext:/Users/mac/apps/lib，其中/Users/mac/apps/lib下需要放置kafka-client.jar，否则会报出 loginModule not found的相关异常
+此属性是可选的；默认值为`false`。
+
+### `sasl.jaas.config`
+
+Kafka的认证相关信息。
+对于kerberos认证，可能的值为：sasl.jaas.config= com.sun.security.auth.module.Krb5LoginModule required useKeyTab=true useTicketCache=true serviceName=kafka keyTab=\"/Users/mac/Desktop/user01.keytab\" principal=\"user01@EXAMPLE.COM\";
+对于用户密码认证，可能的值为：sasl.jaas.config= org.apache.kafka.common.security.plain.PlainLoginModule required username=\"producer\" password=\"producerpwd\";
+
+此属性是可选的；默认值为``。
+
+### `java.security.krb5.conf`
+
+存放krb5.conf文件的路径，要注意全局配置中也需要配置此选项，例如部署后在jvm.config中配置,而在开发中需要在启动PrestoServer时使用"-D"参数配置。
+
+此属性是可选的；默认值为``。
+
+### `group.id`
+
+kafka的groupId。
+
+此属性是可选的；默认值为``。
+
+### `security.protocol`
+
+Kafka的安全协议。
+
+此属性是可选的；默认值为`SASL_PLAINTEXT`。
+
+### `sasl.mechanism`
+
+sasl机制，被用于客户端连接安全的机制。
+
+此属性是可选的；默认值为`GSSAPI`。
+
+### `sasl.kerberos.service.name`
+
+kafka运行时的kerberos principal name。
+
+此属性是可选的；默认值为`kafka`。
 
 ## 内部列
 
