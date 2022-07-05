@@ -37,13 +37,14 @@ class EchartPart extends React.Component{
                 checkFive:true,
                 checkSix:true,
                 checkSeven:true,
-                heatMapChart: true,
-                cpuLoad: true,
-                heatMapMemoryChart: true
+                checkEight:true,
+                // heatMapChart: true,
+                cpuLoad: true
+                // heatMapMemoryChart: true
             },
             itemList: [
-                {key: "Cluster CPU Usage", value: "heatMapChart"},
-                {key: "Cluster Free Memory", value: "heatMapMemoryChart"},
+                // {key: "Cluster CPU Usage", value: "heatMapChart"},
+                // {key: "Cluster Free Memory", value: "heatMapMemoryChart"},
                 {key: "Avg Cluster CPU Usage", value: "cpuLoad"},
                 {key: "Used Query Memory", value: "checkOne"},
                 {key: "Running Queries", value: "checkTwo"},
@@ -51,11 +52,12 @@ class EchartPart extends React.Component{
                 {key: "Blocked Queries", value: "checkFour"},
                 {key: "Active Workers", value: "checkFive"},
                 {key: "Avg Running Tasks", value: "checkSix"},
-                {key: "Avg CPU cycles per worker", value: "checkSeven"}
-              ],
+                {key: "Avg CPU cycles per worker", value: "checkSeven"},
+                {key: "Input Total Bytes", value: "checkEight"}
+            ],
             selectedItemList: [
-                {key: "Cluster CPU Usage", value: "heatMapChart"},
-                {key: "Cluster Free Memory", value: "heatMapMemoryChart"},
+                // {key: "Cluster CPU Usage", value: "heatMapChart"},
+                // {key: "Cluster Free Memory", value: "heatMapMemoryChart"},
                 {key: "Avg Cluster CPU Usage", value: "cpuLoad"},
                 {key: "Used Query Memory", value: "checkOne"},
                 {key: "Running Queries", value: "checkTwo"},
@@ -63,14 +65,15 @@ class EchartPart extends React.Component{
                 {key: "Blocked Queries", value: "checkFour"},
                 {key: "Active Workers", value: "checkFive"},
                 {key: "Avg Running Tasks", value: "checkSix"},
-                {key: "Avg CPU cycles per worker", value: "checkSeven"}
-              ],
-            chartName:['Used Query Memory', 'Running Queries', 'Queued Queries', 'Blocked Queries', 'Active Workers', 'Avg Running Tasks', 'Avg CPU cycles per worker'],
+                {key: "Avg CPU cycles per worker", value: "checkSeven"},
+                {key: "total Input Bytes", value: "checkEight"}
+            ],
+            chartName:['Used Query Memory', 'Running Queries', 'Queued Queries', 'Blocked Queries', 'Active Workers', 'Avg Running Tasks', 'Avg CPU cycles per worker','total Input Bytes'],
             step:10,
             timer:null,
             chartCpu:[],
-            heatMapChart: [],
-            heatMapMemoryChart: [],
+            // heatMapChart: [],
+            // heatMapMemoryChart: [],
             chart1:[],
             chart2:[],
             chart3:[],
@@ -78,16 +81,17 @@ class EchartPart extends React.Component{
             chart5:[],
             chart6:[],
             chart7:[],
+            chart8:[],
             chartRef:null,
             lastRow:null,
             lastByte:null,
             lastWorker:null,
             memoryInit:false,
-            unitArr:['bytes','quantity','quantity','quantity','quantity','quantity','quantity'],
+            unitArr:['bytes','quantity','quantity','quantity','quantity','quantity','quantity','bytes'],
             lastRefresh: null
         };
         this.state.chartRef = Object.keys(this.state.checkStatus),
-        this._onChange=this._onChange.bind(this);
+            this._onChange=this._onChange.bind(this);
         this.changeList = this.changeList.bind(this);
         this.resize = this.resize.bind(this);
     }
@@ -151,74 +155,74 @@ class EchartPart extends React.Component{
     _onChange(data){
         if(data.requestNum%2===0){
             if(!this.state.memoryInit && data.memoryData){
-            //     let cpuChart=echarts.init(this.refs.cpuLoad);
-            //     let option=cpuChart.getOption();
-            //     let memoryInitData=[];
-            //     let cpuSeries={};
-            //     let index = 0;
-            //     Object.keys(data.memoryData).map(key=>{
-            //         let op = Object.assign({}, option.series[index]);
-            //         index++;
-            //         op.name = key.slice(0, key.indexOf(" "));
-            //         let currentCpuData = [...this.delete(this.state.chartCpu), [new Date().format('yyyy-MM-dd hh:mm:ss'), (data.memoryData[key].processCpuLoad * 100).toFixed(2)]];
-            //         op.data = this.state.step === 10 ? currentCpuData.slice(1200) : this.state.step === 20 ? currentCpuData.slice(600) : currentCpuData;
-            //         op.areaStyle = {
-            //         shadowBlur: 10,
-            //         opacity: 0.1
-            //     };
-            //     op.type = 'line';
-            //     op.showSymbol = false;
-            //     memoryInitData.push(op);
-            //     cpuSeries[key]= currentCpuData;
-            // })
-            // option.series=memoryInitData;
-            // option.yAxis = {max: 100, min: 0, type: "value"};
-            // cpuChart.setOption(option);
+                //     let cpuChart=echarts.init(this.refs.cpuLoad);
+                //     let option=cpuChart.getOption();
+                //     let memoryInitData=[];
+                //     let cpuSeries={};
+                //     let index = 0;
+                //     Object.keys(data.memoryData).map(key=>{
+                //         let op = Object.assign({}, option.series[index]);
+                //         index++;
+                //         op.name = key.slice(0, key.indexOf(" "));
+                //         let currentCpuData = [...this.delete(this.state.chartCpu), [new Date().format('yyyy-MM-dd hh:mm:ss'), (data.memoryData[key].processCpuLoad * 100).toFixed(2)]];
+                //         op.data = this.state.step === 10 ? currentCpuData.slice(1200) : this.state.step === 20 ? currentCpuData.slice(600) : currentCpuData;
+                //         op.areaStyle = {
+                //         shadowBlur: 10,
+                //         opacity: 0.1
+                //     };
+                //     op.type = 'line';
+                //     op.showSymbol = false;
+                //     memoryInitData.push(op);
+                //     cpuSeries[key]= currentCpuData;
+                // })
+                // option.series=memoryInitData;
+                // option.yAxis = {max: 100, min: 0, type: "value"};
+                // cpuChart.setOption(option);
 
-                let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
-                heatMapChart.setOption({
-                    animation: false,
-                    title: {
-                        text: 'Cluster CPU Usage',
-                        left: 'center',
-                        textStyle: {
-                            color: "#767676",
-                            fontSize: 16
-                        }
-                    },
-                    tooltip:{
-                        trigger:'item',
-                        formatter: function (params, t, cb) {
-                            return params.name + " : " + params.value+"%";
-                        }
-                    },
-                    series: [{
-                        type: 'treemap',
-                        data: this.state.heatMapChart
-                    }]
-                })
-                let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
-                heatMapMemoryChart.setOption({
-                    animation: false,
-                    title: {
-                        text: 'Cluster Free Memory ',
-                        left: 'center',
-                        textStyle: {
-                            color: "#767676",
-                            fontSize: 16
-                        }
-                    },
-                    tooltip:{
-                        trigger:'item',
-                        formatter: function (params, t, cb) {
-                            return params.name + " : " + formatDataSizeBytes(params.value);
-                        }
-                    },
-                    series: [{
-                        type: 'treemap',
-                        data: this.state.heatMapMemoryChart
-                    }]
-                })
+                // let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
+                // heatMapChart.setOption({
+                //     animation: false,
+                //     title: {
+                //         text: 'Cluster CPU Usage',
+                //         left: 'center',
+                //         textStyle: {
+                //             color: "#767676",
+                //             fontSize: 16
+                //         }
+                //     },
+                //     tooltip:{
+                //         trigger:'item',
+                //         formatter: function (params, t, cb) {
+                //             return params.name + " : " + params.value+"%";
+                //         }
+                //     },
+                //     series: [{
+                //         type: 'treemap',
+                //         data: this.state.heatMapChart
+                //     }]
+                // })
+                // let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
+                // heatMapMemoryChart.setOption({
+                //     animation: false,
+                //     title: {
+                //         text: 'Cluster Free Memory ',
+                //         left: 'center',
+                //         textStyle: {
+                //             color: "#767676",
+                //             fontSize: 16
+                //         }
+                //     },
+                //     tooltip:{
+                //         trigger:'item',
+                //         formatter: function (params, t, cb) {
+                //             return params.name + " : " + formatDataSizeBytes(params.value);
+                //         }
+                //     },
+                //     series: [{
+                //         type: 'treemap',
+                //         data: this.state.heatMapMemoryChart
+                //     }]
+                // })
 
                 this.setState({
                     memoryInit:true
@@ -259,100 +263,100 @@ class EchartPart extends React.Component{
             //     })
             // }
             //heatMap data
-            let heatMapData = this.state.heatMapChart;
-            Object.keys(data.memoryData).map(key => {
-                let id = data.memoryData[key].id;
-                let name = key;
-                let index = _.findIndex(heatMapData, {id: id});
-                let newDataPoint = Number((data.memoryData[key].systemCpuLoad * 100).toFixed(2));
-                if (index == -1) {
-                    let newData = {};
-                    newData.id = id;
-                    newData.name = name;
-                    newData.value = newDataPoint
-                    newData.dataset = [newDataPoint];
-                    newData.children = [];
-                    heatMapData.push(newData);
-                }
-                else {
-                    let entry = heatMapData[index];
-                    let dataset = entry.dataset;
-                    if (dataset.length >= 600) {
-                        dataset = dataset.splice(600 - 1, dataset.length - 600 - 1);
-                    }
-                    dataset = [...dataset, newDataPoint]
-                    entry.dataset = dataset;
-                    let sum = 0;
-                    for (let i = 0; i < dataset.length; i++) {
-                        sum += dataset[i];
-                    }
-                    entry.value = Number((sum / dataset.length).toFixed(2));
-                }
-            });
-
-            let heatMapDataSort = bubbleSort(heatMapData);
-            this.state.heatMapChart = heatMapDataSort.slice(0,10);
-            let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
-            let heatMapChartOption = heatMapChart.getOption();
-            heatMapChartOption.series = [{
-                type: "treemap",
-                data: heatMapDataSort.slice(0,10),
-                breadcrumb: {
-                    show: false
-                }
-            }];
-            heatMapChart.setOption(heatMapChartOption);
-
-            //heatMap memory data
-            let heatMapMemoryData = this.state.heatMapMemoryChart;
-            Object.keys(data.memoryData).map(key => {
-                let id = data.memoryData[key].id;
-                let name = key;
-                let index = _.findIndex(heatMapMemoryData, {id: id});
-                let newDataPoint = 0;
-                if (typeof (data.memoryData[key].pools.general) != "undefined"){
-                    newDataPoint += data.memoryData[key].pools.general.freeBytes;
-                    if (typeof (data.memoryData[key].pools.reserved) != "undefined"){
-                        newDataPoint += data.memoryData[key].pools.reserved.freeBytes;
-                    }
-                }
-                newDataPoint = Number(newDataPoint);
-                if (index == -1) {
-                    let newData = {};
-                    newData.id = id;
-                    newData.name = name;
-                    newData.value = newDataPoint
-                    newData.dataset = [newDataPoint];
-                    newData.children = [];
-                    heatMapMemoryData.push(newData);
-                }
-                else {
-                    let entry = heatMapMemoryData[index];
-                    let dataset = entry.dataset;
-                    if (dataset.length >= 600) {
-                        dataset = dataset.splice(600 - 1, dataset.length - 600 - 1);
-                    }
-                    dataset = [...dataset, newDataPoint]
-                    entry.dataset = dataset;
-                    let sum = 0;
-                    for (let i = 0; i < dataset.length; i++) {
-                        sum += dataset[i];
-                    }
-                    entry.value = Number((sum / dataset.length).toFixed(2));
-                }
-            });
-            let heatMapMemoryDataSort = bubbleSort(heatMapMemoryData);
-            this.state.heatMapMemoryChart = heatMapMemoryDataSort.slice(0,10);
-            let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
-            let heatMapMemoryChartOption = heatMapMemoryChart.getOption();
-            heatMapMemoryChartOption.series = [{
-                type: "treemap",
-                data: heatMapMemoryDataSort.slice(0,10),
-                breadcrumb: {
-                    show: false
-                },
-            }];
-            heatMapMemoryChart.setOption(heatMapMemoryChartOption);
+            // let heatMapData = this.state.heatMapChart;
+            // Object.keys(data.memoryData).map(key => {
+            //     let id = data.memoryData[key].id;
+            //     let name = key;
+            //     let index = _.findIndex(heatMapData, {id: id});
+            //     let newDataPoint = Number((data.memoryData[key].systemCpuLoad * 100).toFixed(2));
+            //     if (index == -1) {
+            //         let newData = {};
+            //         newData.id = id;
+            //         newData.name = name;
+            //         newData.value = newDataPoint
+            //         newData.dataset = [newDataPoint];
+            //         newData.children = [];
+            //         heatMapData.push(newData);
+            //     }
+            //     else {
+            //         let entry = heatMapData[index];
+            //         let dataset = entry.dataset;
+            //         if (dataset.length >= 600) {
+            //             dataset = dataset.splice(600 - 1, dataset.length - 600 - 1);
+            //         }
+            //         dataset = [...dataset, newDataPoint]
+            //         entry.dataset = dataset;
+            //         let sum = 0;
+            //         for (let i = 0; i < dataset.length; i++) {
+            //             sum += dataset[i];
+            //         }
+            //         entry.value = Number((sum / dataset.length).toFixed(2));
+            //     }
+            // });
+            //
+            // let heatMapDataSort = bubbleSort(heatMapData);
+            // this.state.heatMapChart = heatMapDataSort.slice(0,10);
+            // let heatMapChart = echarts.init(this.refs.heatMapChart, "royal");
+            // let heatMapChartOption = heatMapChart.getOption();
+            // heatMapChartOption.series = [{
+            //     type: "treemap",
+            //     data: heatMapDataSort.slice(0,10),
+            //     breadcrumb: {
+            //         show: false
+            //     }
+            // }];
+            // heatMapChart.setOption(heatMapChartOption);
+            //
+            // //heatMap memory data
+            // let heatMapMemoryData = this.state.heatMapMemoryChart;
+            // Object.keys(data.memoryData).map(key => {
+            //     let id = data.memoryData[key].id;
+            //     let name = key;
+            //     let index = _.findIndex(heatMapMemoryData, {id: id});
+            //     let newDataPoint = 0;
+            //     if (typeof (data.memoryData[key].pools.general) != "undefined"){
+            //         newDataPoint += data.memoryData[key].pools.general.freeBytes;
+            //         if (typeof (data.memoryData[key].pools.reserved) != "undefined"){
+            //             newDataPoint += data.memoryData[key].pools.reserved.freeBytes;
+            //         }
+            //     }
+            //     newDataPoint = Number(newDataPoint);
+            //     if (index == -1) {
+            //         let newData = {};
+            //         newData.id = id;
+            //         newData.name = name;
+            //         newData.value = newDataPoint
+            //         newData.dataset = [newDataPoint];
+            //         newData.children = [];
+            //         heatMapMemoryData.push(newData);
+            //     }
+            //     else {
+            //         let entry = heatMapMemoryData[index];
+            //         let dataset = entry.dataset;
+            //         if (dataset.length >= 600) {
+            //             dataset = dataset.splice(600 - 1, dataset.length - 600 - 1);
+            //         }
+            //         dataset = [...dataset, newDataPoint]
+            //         entry.dataset = dataset;
+            //         let sum = 0;
+            //         for (let i = 0; i < dataset.length; i++) {
+            //             sum += dataset[i];
+            //         }
+            //         entry.value = Number((sum / dataset.length).toFixed(2));
+            //     }
+            // });
+            // let heatMapMemoryDataSort = bubbleSort(heatMapMemoryData);
+            // this.state.heatMapMemoryChart = heatMapMemoryDataSort.slice(0,10);
+            // let heatMapMemoryChart = echarts.init(this.refs.heatMapMemoryChart, "royal");
+            // let heatMapMemoryChartOption = heatMapMemoryChart.getOption();
+            // heatMapMemoryChartOption.series = [{
+            //     type: "treemap",
+            //     data: heatMapMemoryDataSort.slice(0,10),
+            //     breadcrumb: {
+            //         show: false
+            //     },
+            // }];
+            // heatMapMemoryChart.setOption(heatMapMemoryChartOption);
 
             let now = Date.now();
             let secondsSinceLastRefresh = this.state.lastRefresh ? (now - this.state.lastRefresh) / 1000.0 : 1;
@@ -367,9 +371,11 @@ class EchartPart extends React.Component{
                 chart5:[...this.delete(this.state.chart5),[new Date().format('yyyy-MM-dd hh:mm:ss'),data.lineData.activeWorkers]],
                 chart6:[...this.delete(this.state.chart6),[new Date().format('yyyy-MM-dd hh:mm:ss'),data.lineData.runningDrivers]],
                 chart7:[...this.delete(this.state.chart7),[new Date().format('yyyy-MM-dd hh:mm:ss'),lastWorker]],
+                chart8:[...this.delete(this.state.chart8),[new Date().format('yyyy-MM-dd hh:mm:ss'),data.lineData.totalInputBytes
+                ]],
                 lastWorker:data.lineData.totalCpuTimeSecs,
-                heatMapChart: this.state.heatMapChart,
-                heatMapMemoryChart: this.state.heatMapMemoryChart,
+                // heatMapChart: this.state.heatMapChart,
+                // heatMapMemoryChart: this.state.heatMapMemoryChart,
                 lastRefresh: now
             });
             if (!this.refs.cpuLoad.className) {
@@ -428,6 +434,7 @@ class EchartPart extends React.Component{
             chart5:[...arr],
             chart6:[...arr],
             chart7:[...arr],
+            chart8:[...arr],
         });
         let  mychart1=echarts.init(this.refs.cpuLoad);
         mychart1.setOption({
@@ -483,13 +490,13 @@ class EchartPart extends React.Component{
                 mychart.setOption({
                     animation: false,
                     title:{
-                        text:this.state.chartName[i], 
-                        left:'center', 
+                        text:this.state.chartName[i],
+                        left:'center',
                         textStyle: {
                             color: "#767676",
                             fontSize: 16
-                            }
-                        },
+                        }
+                    },
                     tooltip:{
                         trigger:'axis'
                     },
@@ -569,45 +576,45 @@ class EchartPart extends React.Component{
         return(
             <div>
                 <div className="selectItemContainer">
-                <div className="selectChart multiSelect">
-                     <MultiSelect
+                    <div className="selectChart multiSelect">
+                        <MultiSelect
                             title={"Select Chart"}
                             itemList={this.state.itemList}
                             selectedItemList={this.state.selectedItemList}
                             changeList={this.changeList}
                             isObjectArray={true}
-                      />
-                </div>
-                <div className="select-part">
-                    <select onChange={this.selected.bind(this)} value={this.state.step}>
-                        <option value="10">Last 10 minutes</option>
-                        <option value="20">Last 20 minutes</option>
-                        <option value="30">Last 30 minutes</option>
-                    </select>
-                </div>
+                        />
+                    </div>
+                    <div className="select-part">
+                        <select onChange={this.selected.bind(this)} value={this.state.step}>
+                            <option value="10">Last 10 minutes</option>
+                            <option value="20">Last 20 minutes</option>
+                            <option value="30">Last 30 minutes</option>
+                        </select>
+                    </div>
                 </div>
                 <div className="overviewGraphContainerParent">
-                <div className="overviewGraphContainer">
-                    <div className={this.state.checkStatus["heatMapChart"] ? 'overviewChart' : 'display-none'}>
-                        <div ref="heatMapChart" style={style}/>
+                    <div className="overviewGraphContainer">
+                        {/*<div className={this.state.checkStatus["heatMapChart"] ? 'overviewChart' : 'display-none'}>*/}
+                        {/*    <div ref="heatMapChart" style={style}/>*/}
+                        {/*</div>*/}
+                        {/*<div className={this.state.checkStatus["heatMapMemoryChart"] ? 'overviewChart' : 'display-none'}>*/}
+                        {/*    <div ref="heatMapMemoryChart" style={style}/>*/}
+                        {/*</div>*/}
+                        <div className={this.state.checkStatus["cpuLoad"] ? 'overviewChart' : 'display-none'}>
+                            <div ref="cpuLoad" style={style}/>
+                        </div>
+                        {Object.keys(this.state.checkStatus).map((key, index) => {
+                            if (key == 'cpuLoad' ) {
+                                return null;
+                            }
+                            return (
+                                <div className={this.state.checkStatus[key] ? 'overviewChart' : 'display-none'} key={index}>
+                                    <div ref={key} style={style}/>
+                                </div>
+                            )
+                        })}
                     </div>
-                    <div className={this.state.checkStatus["heatMapMemoryChart"] ? 'overviewChart' : 'display-none'}>
-                        <div ref="heatMapMemoryChart" style={style}/>
-                    </div>
-                    <div className={this.state.checkStatus["cpuLoad"] ? 'overviewChart' : 'display-none'}>
-                        <div ref="cpuLoad" style={style}/>
-                    </div>
-                    {Object.keys(this.state.checkStatus).map((key, index) => {
-                        if (key == 'cpuLoad' || key == 'heatMapChart' || key == 'heatMapMemoryChart') {
-                            return null;
-                        }
-                        return (
-                            <div className={this.state.checkStatus[key] ? 'overviewChart' : 'display-none'} key={index}>
-                                <div ref={key} style={style}/>
-                            </div>
-                        )
-                    })}
-                </div>
                 </div>
             </div>
 
