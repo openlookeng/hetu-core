@@ -61,6 +61,7 @@ import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPC
 import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XPCDP_VALUE;
 import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP;
 import static io.prestosql.client.HttpSecurityHeadersConstants.HTTP_SECURITY_XXP_VALUE;
+import static io.prestosql.client.PrestoHeaders.PRESTO_BATCH_QUERY;
 import static java.lang.String.format;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.net.HttpURLConnection.HTTP_UNAVAILABLE;
@@ -97,10 +98,10 @@ class StatementClientV1
     private final String user;
     private final String clientCapabilities;
     private final boolean timeInMilliseconds;
-
+    private boolean isBatchQuery;
     private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
 
-    public StatementClientV1(OkHttpClient httpClient, ClientSession session, String query)
+    public StatementClientV1(OkHttpClient httpClient, ClientSession session, String query, boolean isBatchQuery)
     {
         requireNonNull(httpClient, "httpClient is null");
         requireNonNull(session, "session is null");
@@ -113,6 +114,7 @@ class StatementClientV1
         this.user = session.getUser();
         this.clientCapabilities = Joiner.on(",").join(ClientCapabilities.values());
         this.timeInMilliseconds = session.isTimeInMilliseconds();
+        this.isBatchQuery = isBatchQuery;
 
         Request request = buildQueryRequest(session, query);
 
@@ -232,6 +234,9 @@ class StatementClientV1
         }
         else {
             builder.addHeader(HTTP_SECURITY_XXP, HTTP_SECURITY_XXP_VALUE);
+        }
+        if (isBatchQuery) {
+            builder.addHeader(PRESTO_BATCH_QUERY, "1");
         }
 
         return builder.build();

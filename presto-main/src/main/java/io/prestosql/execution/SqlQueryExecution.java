@@ -164,6 +164,7 @@ public class SqlQueryExecution
     private final ExecutionPolicy executionPolicy;
     private final SplitSchedulerStats schedulerStats;
     private final Analysis analysis;
+    private final List<Analysis> analysisList;
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final DynamicFilterService dynamicFilterService;
@@ -176,6 +177,7 @@ public class SqlQueryExecution
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
+            List<PreparedQuery> preparedQueryList,
             QueryStateMachine stateMachine,
             String slug,
             Metadata metadata,
@@ -243,28 +245,64 @@ public class SqlQueryExecution
                 }
             });
 
-            // analyze query
-            requireNonNull(preparedQuery, "preparedQuery is null");
-            Analyzer analyzer = new Analyzer(
-                    stateMachine.getSession(),
-                    metadata,
-                    sqlParser,
-                    accessControl,
-                    Optional.of(queryExplainer),
-                    preparedQuery.getParameters(),
-                    warningCollector,
-                    heuristicIndexerManager,
-                    cubeManager);
-            this.analysis = analyzer.analyze(preparedQuery.getStatement());
+            if (preparedQueryList == null) {
+                // analyze query
+                requireNonNull(preparedQuery, "preparedQuery is null");
+                Analyzer analyzer = new Analyzer(
+                        stateMachine.getSession(),
+                        metadata,
+                        sqlParser,
+                        accessControl,
+                        Optional.of(queryExplainer),
+                        preparedQuery.getParameters(),
+                        warningCollector,
+                        heuristicIndexerManager,
+                        cubeManager);
+                this.analysis = analyzer.analyze(preparedQuery.getStatement());
+                this.analysisList = null;
 
-            stateMachine.setUpdateType(analysis.getUpdateType());
+                stateMachine.setUpdateType(analysis.getUpdateType());
+            }
+            else { // For batch query
+                this.analysisList = new ArrayList<>();
+                for (PreparedQuery curPreparedQuery : preparedQueryList) {
+                    requireNonNull(curPreparedQuery, "curPreparedQuery is null");
+                    Analyzer analyzer = new Analyzer(
+                            stateMachine.getSession(),
+                            metadata,
+                            sqlParser,
+                            accessControl,
+                            Optional.of(queryExplainer),
+                            curPreparedQuery.getParameters(),
+                            warningCollector,
+                            heuristicIndexerManager,
+                            cubeManager);
+                    Analysis curAnlaysis = analyzer.analyze(curPreparedQuery.getStatement());
+                    this.analysisList.add(curAnlaysis);
+                    stateMachine.addUpdateType(curAnlaysis.getUpdateType());
+                }
+                this.analysis = null;
+            }
 
             // when the query finishes cache the final query info, and clear the reference to the output stage
             AtomicReference<SqlQueryScheduler> localQueryScheduler = this.queryScheduler;
             stateMachine.addStateChangeListener(state -> {
-                //Set the AsyncRunning flag if query is capable of running async
-                if (analysis.isAsyncQuery() && state == QueryState.RUNNING) {
-                    stateMachine.setRunningAsync(true);
+                if (state == QueryState.RUNNING) {
+                    if (analysis != null) {
+                        if (analysis.isAsyncQuery()) {
+                            stateMachine.setRunningAsync(true);
+                        }
+                    }
+                    else { // For batch query
+                        boolean asyncQueries = false;
+                        for (Analysis curAnalysis : analysisList) {
+                            asyncQueries = curAnalysis.isAsyncQuery();
+                            if (!asyncQueries) {
+                                break;
+                            }
+                        }
+                        stateMachine.setRunningAsync(asyncQueries);
+                    }
                 }
 
                 if (!state.isDone()) {
@@ -648,9 +686,15 @@ public class SqlQueryExecution
         stateMachine.beginAnalysis();
         stateMachine.beginLogicalPlan();
 
+        Analysis curAnalysis = analysis;
+        //TODO temporary till bqo is up
+        if (analysisList != null && analysisList.get(0) != null) {
+            curAnalysis = analysisList.get(0);
+        }
+
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-        Plan plan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
+        Plan plan = createPlan(curAnalysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
         queryPlan.set(plan);
 
         // extract inputs
@@ -658,7 +702,7 @@ public class SqlQueryExecution
         stateMachine.setInputs(inputs);
 
         // extract output
-        stateMachine.setOutput(analysis.getTarget());
+        stateMachine.setOutput(curAnalysis.getTarget());
         stateMachine.endLogicalPlan();
 
         // fragment the plan
@@ -667,13 +711,13 @@ public class SqlQueryExecution
         // record analysis time
         stateMachine.endAnalysis();
 
-        boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
+        boolean explainAnalyze = curAnalysis.getStatement() instanceof Explain && ((Explain) curAnalysis.getStatement()).isAnalyze();
 
         if (SystemSessionProperties.isRecoveryEnabled(getSession())) {
             checkRecoverySupport(getSession());
         }
 
-        return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
+        return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(curAnalysis));
     }
 
     // This method was introduced separate logical planning from query analyzing stage
@@ -1160,6 +1204,7 @@ public class SqlQueryExecution
         @Override
         public QueryExecution createQueryExecution(
                 PreparedQuery preparedQuery,
+                List<PreparedQuery> preparedQueryList,
                 QueryStateMachine stateMachine,
                 String slug,
                 WarningCollector warningCollector)
@@ -1170,6 +1215,7 @@ public class SqlQueryExecution
 
             return new CachedSqlQueryExecution(
                     preparedQuery,
+                    preparedQueryList,
                     stateMachine,
                     slug,
                     metadata,

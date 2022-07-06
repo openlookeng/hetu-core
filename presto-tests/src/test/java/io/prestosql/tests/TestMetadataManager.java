@@ -119,7 +119,7 @@ public class TestMetadataManager
                 queryId,
                 "slug",
                 new TestingSessionContext(TEST_SESSION),
-                "SELECT * FROM lineitem")
+                "SELECT * FROM lineitem", false)
                 .get();
 
         // wait until query starts running

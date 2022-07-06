@@ -21,6 +21,11 @@ public final class StatementClientFactory
 
     public static StatementClient newStatementClient(OkHttpClient httpClient, ClientSession session, String query)
     {
-        return new StatementClientV1(httpClient, session, query);
+        return new StatementClientV1(httpClient, session, query, false);
+    }
+
+    public static StatementClient newStatementClient(OkHttpClient httpClient, ClientSession session, String query, boolean isBatchQuery)
+    {
+        return new StatementClientV1(httpClient, session, query, isBatchQuery);
     }
 }

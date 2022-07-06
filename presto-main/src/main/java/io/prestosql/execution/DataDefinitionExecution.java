@@ -306,6 +306,7 @@ public class DataDefinitionExecution<T extends Statement>
         @Override
         public DataDefinitionExecution<?> createQueryExecution(
                 PreparedQuery preparedQuery,
+                List<PreparedQuery> preparedQueryList,
                 QueryStateMachine stateMachine,
                 String slug,
                 WarningCollector warningCollector)

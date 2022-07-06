@@ -232,7 +232,7 @@ public class PagePublisherQueryRunner
 
     private void waitForDispatched(QueryId queryId, String slug, SessionContext sessionContext, String query)
     {
-        ListenableFuture<?> future = this.dispatchManager.createQuery(queryId, slug, sessionContext, query);
+        ListenableFuture<?> future = this.dispatchManager.createQuery(queryId, slug, sessionContext, query, false);
         try {
             future.get();
             this.dispatchManager.waitForDispatched(queryId).get();
