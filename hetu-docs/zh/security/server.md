@@ -141,7 +141,7 @@ Java资料中列出了[支持的加密套件](http://docs.oracle.com/javase/8/do
 
 ## 异常处理
 
-实现Kerberos身份验证具有挑战性的。您可以独立地验证openLooKeng之外的一些配置，以便在尝试解决问题时缩小您的关注范围。
+实现Kerberos身份验证具有挑战性。您可以独立地验证openLooKeng之外的一些配置，以便在尝试解决问题时缩小您的关注范围。
 
 ### Kerberos验证
 
