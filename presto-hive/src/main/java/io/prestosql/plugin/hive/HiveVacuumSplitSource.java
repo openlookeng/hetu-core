@@ -47,7 +47,7 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
  * to same worker and together, to start vacuum operation. So class wrapps all such splits together and scheduled as
  * single split.
  */
-class HiveVacuumSplitSource
+public class HiveVacuumSplitSource
         implements ConnectorSplitSource
 {
     private HiveSplitSource splitSource;
@@ -63,7 +63,7 @@ class HiveVacuumSplitSource
     private HdfsEnvironment hdfsEnvironment;
     private HdfsContext hdfsContext;
 
-    HiveVacuumSplitSource(HiveSplitSource splitSource, HiveVacuumTableHandle vacuumTableHandle, HdfsEnvironment hdfsEnvironment, HdfsContext hdfsContext, ConnectorSession session)
+    public HiveVacuumSplitSource(HiveSplitSource splitSource, HiveVacuumTableHandle vacuumTableHandle, HdfsEnvironment hdfsEnvironment, HdfsContext hdfsContext, ConnectorSession session)
     {
         this.splitSource = splitSource;
         this.vacuumTableHandle = vacuumTableHandle;

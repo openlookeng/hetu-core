@@ -157,6 +157,7 @@
         <module>hetu-greenplum</module>
         <module>hetu-clickhouse</module>
         <module>hetu-kylin</module>
+        <module>hetu-mpp</module>
     </modules>
 
     <dependencyManagement>
@@ -287,6 +288,12 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-hive-hadoop2</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-mpp</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -1730,6 +1737,7 @@
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2020.txt</item>
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2021.txt</item>
                             <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2022.txt</item>
+                            <item>${air.main.basedir}/src/main/resource/license/license-header-alternate-2022-1.txt</item>
                             <item>${air.main.basedir}/src/main/resource/license/license-header-third.txt</item>
                         </validHeaders>
                     </configuration>
