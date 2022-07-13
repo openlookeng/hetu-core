@@ -101,7 +101,7 @@ public class TestDynamicCatalogRunner
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("catalog.share.filesystem.profile", "local-config-default")
                 .put("catalog.dynamic-enabled", "true")
-                .put("catalog.config-dir", localPath)
+                .put("catalog.local.config-dir", localPath)
                 .put("catalog.share.config-dir", sharePath)
                 .put("catalog.valid-file-suffixes", "jks,keytab,conf,xml")
                 .put("security.share.filesystem.profile", "local-config-default")

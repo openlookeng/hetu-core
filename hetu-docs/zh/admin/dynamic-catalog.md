@@ -35,7 +35,7 @@
 * 最后，在`etc/node.properties`配置用户文件系统中的存储动态目录信息的路径，用于指定共享文件系统上与本地存放目录相关的配置文件的路径；同时因为需要从共享文件系统上的相同路径同步配置文件，所以所有协调节点和工作节点的共享文件系统上的路径必须一致，本地的存放路径不做要求。
 
   ```
-  catalog.config-dir=/opt/openlookeng/catalog
+  catalog.local.config-dir=/opt/openlookeng/catalog
   catalog.share.config-dir=/opt/openkeng/catalog/share
   ```
 
@@ -223,7 +223,7 @@ curl --location --request PUT 'http://your_coordinator_ip:8090/v1/catalog' \
 
 | 属性名称| 是否必选| 描述| 默认值|
 |----------|----------|----------|----------|
-| `catalog.config-dir`| 是| 本地磁盘存放配置文件的根目录。||
+| `catalog.local.config-dir`| 是| 本地磁盘存放配置文件的根目录。||
 | `catalog.share.config-dir`| 是 | 共享文件系统中存放配置文件的根目录。||
 | `catalog.share.filesystem.profile` | 否 | 共享文件系统的配置文件名。 |hdfs-config-default|
 

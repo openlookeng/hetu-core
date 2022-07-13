@@ -38,7 +38,7 @@ public class TestStaticCatalogStoreConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("catalog.config-dir", "/foo")
+                .put("catalog.local.config-dir", "/foo")
                 .put("catalog.disabled-catalogs", "abc,xyz")
                 .build();
 

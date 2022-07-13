@@ -49,6 +49,6 @@ openLooKeng 还提供了其他一些依赖项，包括 Slice 和 Jackson 注释�
 
 要在 openLooKeng 安装中添加自定义插件，请在 openLooKeng 插件目录中为该插件创建一个目录，并且在该目录中添加此插件的所有必需 JAR 文件。例如，对于名为 `my-functions` 的插件，您应在 openLooKeng 插件目录中创建 `my-functions` 目录，并在该目录中添加相关的 JAR 文件。
 
-默认情况下，插件目录是相对于 openLooKeng 安装目录的 `plugin` 目录，但可以使用配置变量 `catalog.config-dir` 来配置插件目录。为了使 openLooKeng 能够识别新插件，您必须重新启动 openLooKeng。
+默认情况下，插件目录是相对于 openLooKeng 安装目录的 `plugin` 目录，但可以使用配置变量 `catalog.local.config-dir` 来配置插件目录。为了使 openLooKeng 能够识别新插件，您必须重新启动 openLooKeng。
 
 必须在 openLooKeng 集群的所有节点（协调节点和工作节点）上安装插件。

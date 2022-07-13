@@ -32,7 +32,7 @@ Check the [filesystem doc](../develop/filesystem.md) for more information.
     ```
  * Finally, configure the paths of filesystems in `etc/node.properties`. Used to specify the path of the configuration file associated with the local storage directory on the shared file system, and because the configuration file needs to be synchronized from the same path on the shared file system, the shared file system path of all coordinator nodes and worker nodes must be consistent, local storage path isn't required.
     ```
-    catalog.config-dir=/opt/openlookeng/catalog
+    catalog.local.config-dir=/opt/openlookeng/catalog
     catalog.share.config-dir=/opt/openkeng/catalog/share
     ```
 
@@ -216,7 +216,7 @@ otherwise, the current workspace is the openlookeng server's directory.
 
 | Property Name              | Mandatory | Description                                                               | Default Value |
 |----------------------------|-----------|---------------------------------------------------------------------------|---------------|
-| `catalog.config-dir`       | YES       | Root directory for storing configuration files in local disk.             |               |
+| `catalog.local.config-dir`       | YES       | Root directory for storing configuration files in local disk.             |               |
 | `catalog.share.config-dir` | YES    | Root directory for storing configuration files in the shared file system. |               |
 | `catalog.share.filesystem.profile` | NO       | The profile name of the shared file system. | hdfs-config-default |
 

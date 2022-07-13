@@ -94,7 +94,7 @@
 
 5. After the dynamic directory is configured, the error message "*XXX* path must be at user workspace" is displayed when the openLooKeng is started.
    
-   > Check **catalog.config-dir** and **catalog.share.config-dir** in the **etc/node.properties** file, ensure that the two paths are in the allowlist: \["/tmp", "/opt/hetu", "/opt/openLooKeng", "/etc/hetu", "/etc/openLooKeng", *work directory*]. Note: Do not select the root directory. The path cannot contain **../**.
+   > Check **catalog.local.config-dir** and **catalog.share.config-dir** in the **etc/node.properties** file, ensure that the two paths are in the allowlist: \["/tmp", "/opt/hetu", "/opt/openLooKeng", "/etc/hetu", "/etc/openLooKeng", *work directory*]. Note: Do not select the root directory. The path cannot contain **../**.
    > 
    > If **node.data\_dir** is configured, the current work directory is the parent directory of **node.data\_dir**. Otherwise, the current work directory is the directory of the openLooKeng server.
 
