@@ -14,7 +14,7 @@
 | Compaction for ORC |支持hive ORC事务表的Compaction，通过增加每个读取器的数据获取来减少读取的文件数量，从而有助于提高查询性能，并提高并发度|
 | CarbonData Connector with IUD support |支持CarbonData表的插入、更新、删除操作|
 | Insert Overwrite |支持插入覆盖语法。这是裁剪和加载到现有表的简单方法|
-| ODBC connector| ODBC PowerBI、Tableau、永洪桌面等第三方BI工具连接河图的驱动和网关|
+| ODBC connector| ODBC PowerBI、Tableau、永洪桌面等第三方BI工具连接openLooKeng的驱动和网关|
 |Dynamic Hive UDF|将自定义的Hive UDF动态加载到openLooKeng |
 | HBase Connector| HBase连接器支持查询HBase数据源的数据|
 | Enhance Create table statement |允许在openLooKeng中执行CREATE TABLE AS命令时指定所管理的hive表的外部位置;允许在openLooKeng中创建Hive事务表|

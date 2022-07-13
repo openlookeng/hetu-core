@@ -7,7 +7,7 @@ This release is mainly for fixing version number issue and index-cli issues. Bes
 | Area                    | Feature                                                      | PR #s                                                        |
 | ----------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Index                | Merge the index-cli into hetu-cli, and introduce the basic access control to index command                                               | 283, 298                                                          |
-| Security | Handle CVEs | 289,287,295,288,285,292，297,249,302                                                           |
+| Security | Handle CVEs | 289,287,295,288,285,292,297,249,302                                                           |
 
 ## Obtaining the Document 
 

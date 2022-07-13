@@ -131,7 +131,7 @@ http-server.https.excluded-cipher=
 
 Java资料中列出了[支持的加密套件](http://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html#SupportedCipherSuites )。
 
-### access-controls.properties
+### access-control.properties
 
 `access-control.properties`文件必须至少包含`access-control.name`属性。  其他配置则因配置的实现而异。有关详细信息，请参阅系统访问控制。
 

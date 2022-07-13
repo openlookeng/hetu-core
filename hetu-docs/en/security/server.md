@@ -131,7 +131,7 @@ http-server.https.excluded-cipher=
 
 The Java documentation lists the [supported cipher suites](http://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html#SupportedCipherSuites).
 
-### access-controls.properties
+### access-control.properties
 
 At a minimum, an `access-control.properties` file must contain an `access-control.name` property. All other configuration is specific for the implementation being configured. See System Access Control for details.
 

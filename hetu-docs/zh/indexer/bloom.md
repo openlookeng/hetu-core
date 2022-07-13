@@ -86,9 +86,9 @@ select name from hive.hindex.users where id=123
 当OLK引擎需要读取数据时，它会计划Splits（分片）。
 每个分片负责读取一部分数据。
 例如，当读取具有ORC数据格式的Hive表时，
-每个分割将负责读取指定偏移量之间的ORC文件的一部分。
+每个Splits（分片）将负责读取指定偏移量之间的ORC文件的一部分。
 
-例如，`/hive/database.db/animals/000.orc`，从偏移量`0`开始，从偏移量`2000`开始。
+例如，`/hive/database.db/animals/000.orc`，起始偏移量0，结束偏移量2000。
 
 为简单起见，我们可以假定每个分片对应于一个Stripe。
 

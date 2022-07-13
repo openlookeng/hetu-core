@@ -28,7 +28,7 @@ public class ExampleFunctionsPlugin
 ``getFunctions()`` 方法包含我们将在本教程的下面部分实现的所有函数类。
 
 
-有关代码库的完整示例，请参见 ``presto-m`` 模块中的机器学习函数或 ``presto-teradata-functions`` 模块中与 Teradata 兼容的函数，这两个模块都位于在 openLooKeng 源代码的根目录中。
+有关代码库的完整示例，请参见 ``presto-ml`` 模块中的机器学习函数或 ``presto-teradata-functions`` 模块中与 Teradata 兼容的函数，这两个模块都位于在 openLooKeng 源代码的根目录中。
 
 
 
