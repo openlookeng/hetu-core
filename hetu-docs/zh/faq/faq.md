@@ -90,7 +90,7 @@
 
 5. 配置动态目录后，启动openLooKeng报错：XXX path must be at user workspace
 
-   > 检查etc/node.properties文件中的catalog.local.config-dir和catalog.share.config-dir，请确保这两个路径配置在白名单中：["/tmp”, “/opt/hetu”, “/opt/openLooKeng”, “/etc/hetu”, “/etc/openLooKeng”, 工作目录]。 
+   > 检查etc/node.properties文件中的catalog.config-dir和catalog.share.config-dir，请确保这两个路径配置在白名单中：["/tmp”, “/opt/hetu”, “/opt/openLooKeng”, “/etc/hetu”, “/etc/openLooKeng”, 工作目录]。 
    > 注意：避免选择根目录；路径不能包含../；
    >
    > 工作目录是指：如果配置了node.data_dir,那么当前工作目录为node.data_dir的父目录； 如果没有配置，那么当前工作目录为openLooKeng server的目录。
