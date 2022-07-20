@@ -209,12 +209,18 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/mariadb">
+        <artifact id="${project.groupId}:hetu-mariadb:zip:${project.version}">
+            <unpack/>
+        </artifact>
+    </artifactSet>
+
     <artifactSet to="plugin/hetu-function-namespace-managers">
         <artifact id="${project.groupId}:hetu-function-namespace-managers:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
-    
+
     <artifactSet to="plugin/tpch">
         <artifact id="${project.groupId}:presto-tpch:zip:${project.version}">
             <unpack />
