@@ -27,7 +27,7 @@ openLooKeng需要一个*数据*目录来存储日志等。我们建议在安装�
 node.environment=openlookeng
 node.launcher-log-file=/opt/openlookeng/hetu-server-1.1.0/log/launch.log
 node.server-log-file=/opt/openlookeng/hetu-server-1.1.0/log/server.log
-catalog.local.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
+catalog.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
 node.data-dir=/opt/openlookeng/hetu-server-1.1.0/data
 plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 ```
@@ -42,7 +42,7 @@ plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 
 - `node.server-log-file`: server.log文件。这是openLooKeng使用的主要日志文件。如果服务器在初始化期间失败，此日志通常会包含相关信息。此日志会自动轮转和压缩。
 
-- `catalog.local.config-dir`: 创建目录属性文件来注册目录。openLooKeng通过连接器访问数据，连接器挂载在目录中。
+- `catalog.config-dir`: 创建目录属性文件来注册目录。openLooKeng通过连接器访问数据，连接器挂载在目录中。
 
 - `plugin.dir`: plugin目录位置。
 

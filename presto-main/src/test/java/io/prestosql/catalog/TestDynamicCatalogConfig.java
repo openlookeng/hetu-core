@@ -47,7 +47,7 @@ public class TestDynamicCatalogConfig
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("catalog.dynamic-enabled", "true")
-                .put("catalog.local.config-dir", "/etc/catalog")
+                .put("catalog.config-dir", "/etc/catalog")
                 .put("catalog.share.config-dir", "hdfs://etc/catalog")
                 .put("catalog.scanner-interval", "5m")
                 .put("catalog.max-file-size", "5MB")

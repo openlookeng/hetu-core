@@ -49,6 +49,6 @@ For an example `pom.xml` file, see the example HTTP connector in the `presto-exa
 
 In order to add a custom plugin to a openLooKeng installation, create a directory for that plugin in the openLooKeng plugin directory and add all the necessary jars for the plugin to that directory. For example, for a plugin called `my-functions`, you would create a directory `my-functions` in the openLooKeng plugin directory and add the relevant jars to that directory.
 
-By default, the plugin directory is the `plugin` directory relative to the directory in which openLooKeng is installed, but it is configurable using the configuration variable `catalog.local.config-dir`. In order for openLooKeng to pick up the new plugin, you must restart openLooKeng.
+By default, the plugin directory is the `plugin` directory relative to the directory in which openLooKeng is installed, but it is configurable using the configuration variable `catalog.config-dir`. In order for openLooKeng to pick up the new plugin, you must restart openLooKeng.
 
 Plugins must be installed on all nodes in the openLooKeng cluster (coordinator and workers).

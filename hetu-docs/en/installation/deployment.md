@@ -26,7 +26,7 @@ The node properties file, `etc/node.properties`, contains configuration specific
 node.environment=openlookeng
 node.launcher-log-file=/opt/openlookeng/hetu-server-1.1.0/log/launch.log
 node.server-log-file=/opt/openlookeng/hetu-server-1.1.0/log/server.log
-catalog.local.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
+catalog.config-dir=/opt/openlookeng/hetu-server-1.1.0/etc/catalog
 node.data-dir=/opt/openlookeng/hetu-server-1.1.0/data
 plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 ```
@@ -41,7 +41,7 @@ The above properties are described below:
 
 - `node.server-log-file`: server.log. This is the main log file used by openLooKeng. It will typically contain the relevant information if the server fails during initialization. It is automatically rotated and compressed.
 
-- `catalog.local.config-dir`: openLooKeng accesses data via *connectors*, which are mounted in catalogs. Catalogs are registered by creating a catalog properties file in the `etc/catalog` directory.
+- `catalog.config-dir`: openLooKeng accesses data via *connectors*, which are mounted in catalogs. Catalogs are registered by creating a catalog properties file in the `etc/catalog` directory.
 
 - `plugin.dir`: The location  of the plugin directory.
 

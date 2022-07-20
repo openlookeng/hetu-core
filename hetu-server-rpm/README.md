@@ -42,5 +42,5 @@ We use the following directory structure to deploy various openLooKeng artifacts
 
 The node.properties file requires the following two additional properties since our directory structure is different from what standard openLooKeng expects.
 
-    catalog.local.config-dir=/etc/hetu/catalog
+    catalog.config-dir=/etc/hetu/catalog
     plugin.dir=/usr/lib/hetu/lib/plugin
