@@ -62,8 +62,7 @@ public class DynamicCatalogConfig
         return this.shareFileSystemProfile;
     }
 
-    @LegacyConfig("catalog.config-dir")
-    @Config("catalog.local.config-dir")
+    @Config("catalog.config-dir")
     @ConfigDescription("Root directory for storing configuration files in local disk.")
     public DynamicCatalogConfig setCatalogConfigurationDir(String dir)
     {
