@@ -91,7 +91,7 @@ Here is a reference `etc/hetu-metastore.properties`:
 As mentioned in the Hetu Metastore setup, the global cache must be enabled, this requires the Hetu Statestore
 to be configured. For more information about how to configure it, please check [Hetu Statestore](../admin/state-store.md).
 
-In `etc/config.propertes`:
+In `etc/config.properties`:
 
   ```properties
   hetu.embedded-state-store.enabled=true

@@ -89,7 +89,7 @@ Hetu Metastore 是一个共享元数据管理实用程序，多个 openLooKeng �
 如Hetu Metastore 设置中提到的，必须启用全局缓存，这需要配置Hetu Statestore。 
 更多配置方法请查看[Hetu Statestore](../admin/state-store.md).
 
-在`etc/config.propertes`中配置:
+在`etc/config.properties`中配置:
 
 ```properties
   hetu.embedded-state-store.enabled=true
