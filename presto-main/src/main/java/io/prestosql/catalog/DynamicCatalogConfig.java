@@ -17,7 +17,6 @@ package io.prestosql.catalog;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
-import io.airlift.configuration.LegacyConfig;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MaxDataSize;
@@ -62,8 +61,7 @@ public class DynamicCatalogConfig
         return this.shareFileSystemProfile;
     }
 
-    @LegacyConfig("catalog.config-dir")
-    @Config("catalog.local.config-dir")
+    @Config("catalog.config-dir")
     @ConfigDescription("Root directory for storing configuration files in local disk.")
     public DynamicCatalogConfig setCatalogConfigurationDir(String dir)
     {
