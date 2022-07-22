@@ -50,10 +50,6 @@ plugin.dir=/opt/openlookeng/hetu-server-1.1.0/plugin
 
 ### JVM配置
 
-JVM配置文件etc/jvm.config包含用于启动Java虚拟机的命令行选项列表。文件的格式是一个选项列表，每行一个选项。这些选项不由shell解释，因此包含空格或其他特殊字符的选项不应被引用。
-
-### JVM配置
-
 JVM配置文件`etc/jvm.config`包含用于启动Java虚拟机的命令行选项列表。文件的格式是一个选项列表，每行一个选项。这些选项不由shell解释，因此包含空格或其他特殊字符的选项不应被引用。
 
 以下为创建`etc/jvm.config`提供了一个良好的起点：
