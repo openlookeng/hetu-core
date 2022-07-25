@@ -115,6 +115,8 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryhistory.QueryHistoryModule;
+import io.prestosql.resourcemanager.ForResourceMonitor;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -192,6 +194,7 @@ import static io.prestosql.execution.SqlQueryExecution.SqlQueryExecutionFactory;
 import static io.prestosql.util.StatementUtils.getAllQueryTypes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
@@ -354,6 +357,10 @@ public class CoordinatorModule
                     config.setRequestTimeout(serverConfig.getHttpClientRequestTimeout());
                     config.setMaxConnectionsPerServer(250);
                 });
+
+        binder.bind(ExecutorService.class).annotatedWith(ForResourceMonitor.class)
+                .toInstance(newSingleThreadExecutor(threadsNamed("resource-monitor-%s")));
+        binder.bind(QueryResourceManagerService.class).in(Scopes.SINGLETON);
 
         binder.bind(ScheduledExecutorService.class).annotatedWith(ForScheduler.class)
                 .toInstance(newSingleThreadScheduledExecutor(threadsNamed("stage-scheduler")));
