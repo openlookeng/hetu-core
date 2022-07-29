@@ -13,7 +13,7 @@
  */
 package io.prestosql.plugin.hive;
 
-interface HiveSplitLoader
+public interface HiveSplitLoader
 {
     void start(HiveSplitSource splitSource);
 

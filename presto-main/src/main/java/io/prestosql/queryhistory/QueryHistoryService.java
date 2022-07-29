@@ -78,8 +78,8 @@ public class QueryHistoryService
             resource = queryInfo.getResourceGroupId().get().getLastSegment();
         }
         String query = queryInfo.getQuery();
-        String catalog = queryInfo.getSession().getCatalog().get();
-        String schemata = queryInfo.getSession().getSchema().get();
+        String catalog = queryInfo.getSession().getCatalog().orElse("");
+        String schemata = queryInfo.getSession().getSchema().orElse("");
         String state = queryInfo.getState().toString();
         String failed = "null";
         if (queryInfo.getErrorType() != null) {

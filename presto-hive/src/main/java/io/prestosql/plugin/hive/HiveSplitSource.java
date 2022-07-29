@@ -78,7 +78,7 @@ import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
-class HiveSplitSource
+public class HiveSplitSource
         implements ConnectorSplitSource
 {
     private static final Logger log = Logger.get(HiveSplitSource.class);
