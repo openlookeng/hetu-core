@@ -3,7 +3,7 @@ openLooKeng is a drop in engine which enables in-situ analytics on any data, any
 
 The goal of openLooKeng is to support data exploration, ad hoc queries, and batch processing with near real time latency ranging from 100+ms to minutes, without moving your data around. openLooKeng also supports hierarchical deployment enabling geographically remote openLooKeng clusters to participate in the same query. With its cross region query plan optimization capability, queries involving remote data can achieve close to "local" performance.
 
-## Application Scenarios
+## Application Scenarios:
 
 ### Cross-Source Heterogeneous Query Scenario
 Data management systems like RDBMS (such as MySQL and Oracle) and NoSQL (such as HBase, ES, and Kafka) are widely used in various application systems of customers. With the increase of data volume and better data management, customers gradually build data warehouses based on Hive or MPPDB. These data storage systems are often isolated from each other, resulting in independent data islands. Data analysts often suffer from the following problems:
