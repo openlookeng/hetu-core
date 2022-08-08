@@ -29,7 +29,7 @@ BTreeIndex用于调度时的分片(Split)过滤，被coordinator节点使用。
 列中的数据已被过滤，`phone`列的基数较高。
 
 在BTreeIndex和BloomIndex索引之间选择时，需要考虑：
-- BloomIndex只支持`=`，而BTreeIndex提供范围咨询
+- BloomIndex只支持`=`，而BTreeIndex提供范围查询
 - BloomIndex是不确定的，而BTreeIndex是确定的。因此BTreeIndex通常有更好的过滤性能
 - BTreeIndex比BloomIndex索引更大
 

@@ -17,7 +17,7 @@
 **注意：当前，启发式索引仅支持ORC存储格式的Hive数据源。**
 
 1. BloomIndex，MinMaxIndex和BtreeIndex可以在Coordinator上使用，以在调度期间过滤Splits
-2. 在读取ORC文件时，可以在worker上使用MinMaxIndex或者BloomIndex过滤stripe
+2. 在读取ORC文件时，可以在worker上使用MinMaxIndex或者BloomIndex过滤Stripes
 3. 在读取ORC文件时，可以在worker上使用BitmapIndex过滤数据行
 
 ### 1.查询过程中过滤预定分片
@@ -36,7 +36,7 @@
 
 *支持的索引：BloomIndex, MinMaxIndex*
 
-与分片过滤类似，当使用Hive Connector读取ORC文件时，Stripe可以被提前过滤来减少读取的数据量，从而提升查询性能。
+与分片过滤类似，当使用Hive Connector读取ORC文件时，Stripes可以被提前过滤来减少读取的数据量，从而提升查询性能。
 
 ### 3.读取ORC文件时筛选行
 
@@ -89,7 +89,7 @@ Hetu Metastore 是一个共享元数据管理实用程序，多个 openLooKeng �
 如Hetu Metastore 设置中提到的，必须启用全局缓存，这需要配置Hetu Statestore。 
 更多配置方法请查看[Hetu Statestore](../admin/state-store.md).
 
-在`etc/config.propertes`中配置:
+在`etc/config.properties`中配置:
 
 ```properties
   hetu.embedded-state-store.enabled=true

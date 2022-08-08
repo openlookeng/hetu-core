@@ -14,7 +14,7 @@
 | 分类          | 描述                                                         | Gitee问题                                                 |
 | ------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
 | Task Recovery | 启用快照时，执行带事务的CTAS语句时，SQL语句执行报错          | [I502KF](https://e.gitee.com/open_lookeng/issues/list?issue=I502KF) |
-|               | 启用快照并将exchange.is-timeout-failure-detection-enable关闭时，概率性出现错误 | [I4Y3TQ](https://e.gitee.com/open_lookeng/issues/list?issue=I4Y3TQ) |
+|               | 启用快照并将exchange.is-timeout-failure-detection-enabled关闭时，概率性出现错误 | [I4Y3TQ](https://e.gitee.com/open_lookeng/issues/list?issue=I4Y3TQ) |
 | Star Tree     | 在内存连接器中，启用star tree功能后，查询时偶尔出现数据不一致 | [I4QQUB](https://e.gitee.com/open_lookeng/issues/list?issue=I4QQUB) |
 |               | 当同时对10个不同的cube执行reload cube命令时，部分cube无法重新加载 | [I4VSVJ](https://e.gitee.com/open_lookeng/issues/list?issue=I4VSVJ) |
 
