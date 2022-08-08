@@ -33,6 +33,7 @@ import io.prestosql.protocol.ObjectMapperProvider;
 import io.prestosql.queryhistory.model.Info;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.server.BasicQueryStats;
+import io.prestosql.spi.metastore.HetuMetastore;
 import io.prestosql.spi.queryhistory.QueryHistoryEntity;
 import io.prestosql.spi.queryhistory.QueryHistoryResult;
 
@@ -50,6 +51,7 @@ public class QueryHistoryService
     private static final Logger log = Logger.get(QueryHistoryService.class);
     private final HetuMetaStoreManager hetuMetaStoreManager;
     private final QueryHistoryConfig queryHistoryConfig;
+    private HetuMetastore hetuMetastore;
 
     private static final DataSize ZERO_BYTES = new DataSize(0, DataSize.Unit.BYTE);
     private static final Duration ZERO_MILLIS = new Duration(0, TimeUnit.MILLISECONDS);
@@ -60,6 +62,15 @@ public class QueryHistoryService
     {
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "metaStoreManager is null");
         this.queryHistoryConfig = requireNonNull(queryHistoryConfig, "queryHistoryConfig is null");
+        this.hetuMetastore = validateMetaStore();
+    }
+
+    private HetuMetastore validateMetaStore()
+    {
+        if (hetuMetaStoreManager.getHetuMetastore() == null) {
+            return MockhetuMetaStore.getInstance();
+        }
+        return hetuMetaStoreManager.getHetuMetastore();
     }
 
     public void insert(QueryInfo queryInfo)
@@ -131,13 +142,13 @@ public class QueryHistoryService
                 .setPeakTotalMemoryReservation(peakTotalMemoryReservation)
                 .setCumulativeUserMemory(cumulativeUserMemory)
                 .build();
-        hetuMetaStoreManager.getHetuMetastore().insertQueryHistory(queryHistoryEntity, jsonString);
+        hetuMetastore.insertQueryHistory(queryHistoryEntity, jsonString);
         currentQueries.incrementAndGet();
     }
 
     public String getQueryDetail(String queryId)
     {
-        String res = hetuMetaStoreManager.getHetuMetastore().getQueryDetail(queryId);
+        String res = hetuMetastore.getQueryDetail(queryId);
         return res;
     }
 
@@ -204,8 +215,7 @@ public class QueryHistoryService
             failFilter.add(s.toUpperCase(Locale.ENGLISH));
         }
         failFilter.add("null");
-
-        QueryHistoryResult queryHistoryResult = hetuMetaStoreManager.getHetuMetastore().getQueryHistory(startNum, pageSize, user, startTime, endTime,
+        QueryHistoryResult queryHistoryResult = hetuMetastore.getQueryHistory(startNum, pageSize, user, startTime, endTime,
                 queryId, query, resource, source, stateFilter, failFilter, sort, sortOrder);
         return queryHistoryResult;
     }
@@ -215,10 +225,10 @@ public class QueryHistoryService
     public Long getCurrentQueries()
     {
         if (currentQueries.get() == 0) {
-            currentQueries.set(hetuMetaStoreManager.getHetuMetastore().getAllQueryHistoryNum());
+            currentQueries.set(hetuMetastore.getAllQueryHistoryNum());
         }
         if (currentQueries.get() > queryHistoryConfig.getMaxQueryHistoryCount()) {
-            hetuMetaStoreManager.getHetuMetastore().deleteQueryHistoryBatch();
+            hetuMetastore.deleteQueryHistoryBatch();
             currentQueries.set(0);
         }
         return currentQueries.get();
