@@ -144,7 +144,7 @@ UPDATE操作是DELETE和ADD操作的组合。首先管理员向协调节点发�
 
 其他协调节点和工作节点定期检查共享文件系统中的目录属性文件，并在本地文件系统上执行相应的更改。
 
-目录属性，包括 `connector-name`、`properties`等，支持修改。但是**目录名称**不能更改。
+支持修改`properties`目录属性，但是**目录名称**不能更改。不建议通过PUT请求直接修改`connector-name`，可以通过先DELETE后POST的方式进行修改。
 
 以Hive为例，通过curl可以用以下命令更新目录，以下更新了`hive.allow-drop-table`参数：
 

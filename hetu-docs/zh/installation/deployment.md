@@ -161,7 +161,14 @@ connector.name=jmx
 
 ## 运行openLooKeng
 
-安装目录中在`bin/launcher`中包含启动器脚本。openLooKeng可以通过运行如下命令以守护进程的方式启动：
+安装目录中在`bin/launcher`中包含启动器脚本。在运行前需进行一项准备工作：
+
+编辑安装目录下的`bin/launcher.py`文件，将其440行与441行处的`options.launcher_log_file`与`options.server_log_file`分别修改为`node_properties.get('node.launcher-log-file')`与`node_properties.get('node.server-log-file')`。此处修改后的代码应为：
+```
+o.launcher_log = realpath(node_properties.get('node.launcher-log-file' ) or pathjoin(o.data_dir, 'var/log/launcher.log'))
+o.server_log = realpath(node_properties.get('node.server-log-file' ) or pathjoin(o.data_dir, 'var/log/server.log'))
+```
+这使得集群启动时日志文件会优先保存在`etc/node.properties`配置的路径中。 openLooKeng可以通过运行如下命令以守护进程的方式启动：
 
 ``` shell
 bin/launcher start
