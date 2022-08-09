@@ -23,6 +23,7 @@ import io.prestosql.operator.TaskContext;
 import javax.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OutputBuffer
 {
@@ -100,6 +101,18 @@ public interface OutputBuffer
     void abort(OutputBufferId bufferId);
 
     /**
+     * Abort the buffer, discarding all pages, but blocking readers. Its is expected
+     * readers will be unblocked when the failed query is cleaned up.
+     */
+    void abort();
+
+    /**
+     *
+     * @return non-empty failure cause if the buffer is in state {@link BufferState#FAILED}
+     */
+    Optional<Throwable> getFailureCause();
+
+    /**
      * Get a future that will be completed when the buffer is not full.
      */
     ListenableFuture<?> isFull();
@@ -121,6 +134,11 @@ public interface OutputBuffer
      * page are ignored.
      */
     void setNoMorePages();
+
+    /**
+     * Get buffer state
+     */
+    BufferState getState();
 
     /**
      * Destroys the buffer, discarding all pages.
