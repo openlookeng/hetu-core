@@ -79,7 +79,7 @@ public class QueryHistoryService
             return;
         }
         String user = queryInfo.getSession().getUser();
-        String source = queryInfo.getSession().getSource().get();
+        String source = queryInfo.getSession().getSource().orElse(null);
         if (source == null) {
             return;
         }
