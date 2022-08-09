@@ -14,6 +14,7 @@
 package io.prestosql.spi.connector;
 
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.SplitWeight;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.List;
@@ -61,8 +62,18 @@ public interface ConnectorSplit
         return 1;
     }
 
+    default SplitWeight getSplitWeight()
+    {
+        return SplitWeight.standard();
+    }
+
     default List<ConnectorSplit> getUnwrappedSplits()
     {
         throw new NotImplementedException();
+    }
+
+    default long getRetainedSizeInBytes()
+    {
+        return 0;
     }
 }

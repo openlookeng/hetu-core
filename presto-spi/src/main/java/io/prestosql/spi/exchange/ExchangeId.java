@@ -11,33 +11,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.plan;
+package io.prestosql.spi.exchange;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
-import org.openjdk.jol.info.ClassLayout;
 
-import javax.annotation.concurrent.Immutable;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
+import static java.util.UUID.randomUUID;
 
-@Immutable
-public class PlanNodeId
+public class ExchangeId
 {
-    private static final int INSTANCE_SIZE = ClassLayout.parseClass(PlanNodeId.class).instanceSize();
+    private static final Pattern ID_PATTERN = Pattern.compile("[a-zA-Z\\d_-]+");
+
     private final String id;
 
     @JsonCreator
-    public PlanNodeId(String id)
+    public ExchangeId(String id)
     {
         requireNonNull(id, "id is null");
+        if (!ID_PATTERN.matcher(id).matches()) {
+            throw new IllegalArgumentException("Invalid exchange id: " + id);
+        }
         this.id = id;
     }
 
-    @Override
+    public static ExchangeId createRandomExchangeId()
+    {
+        return new ExchangeId(randomUUID().toString());
+    }
+
     @JsonValue
-    public String toString()
+    public String getId()
     {
         return id;
     }
@@ -51,25 +58,19 @@ public class PlanNodeId
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-
-        PlanNodeId that = (PlanNodeId) o;
-
-        if (!id.equals(that.id)) {
-            return false;
-        }
-
-        return true;
+        ExchangeId that = (ExchangeId) o;
+        return Objects.equals(id, that.id);
     }
 
     @Override
     public int hashCode()
     {
-        return id.hashCode();
+        return Objects.hash(id);
     }
 
-    public long getRetainedSizeInBytes()
+    @Override
+    public String toString()
     {
-        return INSTANCE_SIZE
-                + estimatedSizeOf(id);
+        return id;
     }
 }
