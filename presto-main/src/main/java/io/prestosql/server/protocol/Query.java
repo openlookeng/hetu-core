@@ -50,7 +50,6 @@ import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.PipelineStats;
-import io.prestosql.operator.TaskLocation;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.snapshot.RestoreResult;
 import io.prestosql.snapshot.SnapshotInfo;
@@ -469,6 +468,9 @@ public class Query
                 // client implementations do not properly handle empty list of data
                 data = Iterables.concat(pages.build());
             }
+            if (exchangeClient.isFinished()) {
+                exchangeClient.close();
+            }
         }
         catch (Throwable cause) {
             queryManager.failQuery(queryId, cause);
@@ -518,6 +520,8 @@ public class Query
         }
         else {
             nextToken = OptionalLong.empty();
+            // the client is not coming back, make sure the exchangeClient is closed
+            exchangeClient.close();
             queryManager.checkForQueryPruning(queryId, queryInfo);
         }
 
@@ -761,9 +765,7 @@ public class Query
             types = outputInfo.getColumnTypes();
         }
 
-        for (TaskLocation outputLocation : outputInfo.getBufferLocations()) {
-            exchangeClient.addLocation(outputLocation);
-        }
+        outputInfo.getBufferLocations().forEach(exchangeClient::addLocation);
         if (outputInfo.isNoMoreBufferLocations()) {
             exchangeClient.noMoreLocations();
         }

@@ -28,7 +28,7 @@ import java.net.URI;
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class RemoteSplit

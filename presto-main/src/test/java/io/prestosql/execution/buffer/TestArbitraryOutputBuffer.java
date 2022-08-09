@@ -16,10 +16,10 @@ package io.prestosql.execution.buffer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
-import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.TaskContext;
@@ -48,8 +48,6 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.execution.buffer.BufferResult.emptyResults;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.BufferTestUtils.MAX_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.NO_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.acknowledgeBufferResult;
@@ -79,6 +77,7 @@ import static org.testng.Assert.fail;
 
 public class TestArbitraryOutputBuffer
 {
+    private static final Logger LOG = Logger.get(TestArbitraryOutputBuffer.class);
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId FIRST = new OutputBufferId(0);
     private static final OutputBufferId SECOND = new OutputBufferId(1);
@@ -109,12 +108,14 @@ public class TestArbitraryOutputBuffer
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
         try {
             createArbitraryBuffer(createInitialEmptyOutputBuffers(ARBITRARY), new DataSize(0, BYTE));
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -476,6 +477,7 @@ public class TestArbitraryOutputBuffer
             fail("Expected IllegalStateException from addQueue after noMoreQueues has been called");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -520,6 +522,7 @@ public class TestArbitraryOutputBuffer
             fail("Expected IllegalStateException from addQueue after noMoreQueues has been called");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -1136,7 +1139,7 @@ public class TestArbitraryOutputBuffer
     private ArbitraryOutputBuffer createArbitraryBuffer(OutputBuffers buffers, DataSize dataSize)
     {
         ArbitraryOutputBuffer buffer = new ArbitraryOutputBuffer(
-                new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                 dataSize,
                 () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 stateNotificationExecutor);
@@ -1232,7 +1235,7 @@ public class TestArbitraryOutputBuffer
         switch (bufferType) {
             case ARBITRARY:
                 buffer = new ArbitraryOutputBuffer(
-                        new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                        new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                         sizeOfPages(5),
                         () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                         stateNotificationExecutor);
@@ -1240,7 +1243,7 @@ public class TestArbitraryOutputBuffer
                 break;
             case BROADCAST:
                 buffer = new BroadcastOutputBuffer(
-                        new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                        new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                         sizeOfPages(5),
                         () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                         stateNotificationExecutor);
@@ -1248,7 +1251,7 @@ public class TestArbitraryOutputBuffer
                 break;
             case PARTITIONED:
                 buffer = new PartitionedOutputBuffer(
-                        new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                        new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                         buffers,
                         sizeOfPages(5),
                         () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),

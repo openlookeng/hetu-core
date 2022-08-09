@@ -57,7 +57,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.hetu.core.plugin.exchange.filesystem.FileSystemExchangeManager.PATH_SEPARATOR;
 import static io.hetu.core.plugin.exchange.filesystem.FileSystemExchangeSink.COMMITTED_MARKER_FILE_NAME;
 import static io.hetu.core.plugin.exchange.filesystem.FileSystemExchangeSink.DATA_FILE_SUFFIX;
-import static io.hetu.core.plugin.exchange.filesystem.util.HetuAsyncSemaphore.processAll;
+import static io.hetu.core.plugin.exchange.filesystem.util.AsyncSemaphore.processAll;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;

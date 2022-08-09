@@ -89,6 +89,8 @@ public class TaskContext
     private final AtomicReference<DateTime> lastExecutionStartTime = new AtomicReference<>();
     private final AtomicReference<DateTime> executionEndTime = new AtomicReference<>();
 
+    private final AtomicLong currentPeakUserMemoryReservation = new AtomicLong(0);
+
     private final Set<Lifespan> completedDriverGroups = newConcurrentHashSet();
 
     private final List<PipelineContext> pipelineContexts = new CopyOnWriteArrayList<>();
@@ -521,6 +523,7 @@ public class TaskContext
         Duration fullGcTime = getFullGcTime();
 
         long userMemory = taskMemoryContext.getUserMemory();
+        currentPeakUserMemoryReservation.updateAndGet(oldValue -> max(oldValue, userMemory));
 
         synchronized (cumulativeMemoryLock) {
             double sinceLastPeriodMillis = (System.nanoTime() - lastTaskStatCallNanos) / 1_000_000.0;
@@ -559,6 +562,7 @@ public class TaskContext
                 succinctBytes(userMemory),
                 succinctBytes(taskMemoryContext.getRevocableMemory()),
                 succinctBytes(taskMemoryContext.getSystemMemory()),
+                succinctBytes(currentPeakUserMemoryReservation.get()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -627,5 +631,10 @@ public class TaskContext
     public QueryRecoveryManager getRecoveryManager()
     {
         return queryRecoveryManager;
+    }
+
+    public void sourceTaskFailed(TaskId taskId, Throwable failure)
+    {
+        taskStateMachine.sourceTaskFailed(taskId, failure);
     }
 }

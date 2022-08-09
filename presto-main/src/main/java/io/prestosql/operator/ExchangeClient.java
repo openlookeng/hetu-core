@@ -25,6 +25,8 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.execution.TaskFailureListener;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.HttpPageBufferClient.ClientCallback;
@@ -32,6 +34,7 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -127,6 +130,9 @@ public class ExchangeClient
 
     private final LocalMemoryContext systemMemoryContext;
     private final Executor pageBufferClientCallbackExecutor;
+    private final TaskFailureListener taskFailureListener;
+    private final RetryPolicy retryPolicy;
+    private final DirectExchangeBuffer buffer;
 
     // ExchangeClientStatus.mergeWith assumes all clients have the same bufferCapacity.
     // Please change that method accordingly when this assumption becomes not true.
@@ -138,7 +144,10 @@ public class ExchangeClient
                            ScheduledExecutorService scheduler,
                            LocalMemoryContext systemMemoryContext,
                            Executor pageBufferClientCallbackExecutor,
-                          FailureDetectorManager failureDetectorManager)
+                           FailureDetectorManager failureDetectorManager,
+                           TaskFailureListener taskFailureListener,
+                           RetryPolicy retryPolicy,
+                           DirectExchangeBuffer buffer)
     {
         this.bufferCapacity = bufferCapacity.toBytes();
         this.maxResponseSize = maxResponseSize;
@@ -150,6 +159,9 @@ public class ExchangeClient
         this.failureDetectorManager = failureDetectorManager;
         this.maxBufferRetainedSizeInBytes = Long.MIN_VALUE;
         this.pageBufferClientCallbackExecutor = requireNonNull(pageBufferClientCallbackExecutor, "pageBufferClientCallbackExecutor is null");
+        this.taskFailureListener = taskFailureListener;
+        this.retryPolicy = retryPolicy;
+        this.buffer = buffer;
     }
 
     Set<String> getAllClients()
@@ -180,12 +192,26 @@ public class ExchangeClient
             pageBufferClientStatusBuilder.add(client.getStatus());
         }
         List<PageBufferClientStatus> pageBufferClientStatus = pageBufferClientStatusBuilder.build();
-        synchronized (this) {
-            int bufferedPages = pageBuffer.size();
-            if (bufferedPages > 0 && pageBuffer.peekLast() == NO_MORE_PAGES) {
-                bufferedPages--;
+        if (buffer != null) {
+            synchronized (this) {
+                return new ExchangeClientStatus(
+                        buffer.getRetainedSizeInBytes(),
+                        buffer.getMaxRetainedSizeInBytes(),
+                        averageBytesPerRequest,
+                        successfulRequests,
+                        buffer.getBufferedPageCount(),
+                        noMoreLocations,
+                        pageBufferClientStatus);
             }
-            return new ExchangeClientStatus(bufferRetainedSizeInBytes, maxBufferRetainedSizeInBytes, averageBytesPerRequest, successfulRequests, bufferedPages, noMoreLocations, pageBufferClientStatus);
+        }
+        else {
+            synchronized (this) {
+                int bufferedPages = pageBuffer.size();
+                if (bufferedPages > 0 && pageBuffer.peekLast() == NO_MORE_PAGES) {
+                    bufferedPages--;
+                }
+                return new ExchangeClientStatus(bufferRetainedSizeInBytes, maxBufferRetainedSizeInBytes, averageBytesPerRequest, successfulRequests, bufferedPages, noMoreLocations, pageBufferClientStatus);
+            }
         }
     }
 
@@ -224,7 +250,7 @@ public class ExchangeClient
         scheduleRequestIfNecessary();
     }
 
-    public synchronized boolean addLocation(TaskLocation location)
+    public synchronized boolean addLocation(TaskId remoteTaskId, TaskLocation location)
     {
         requireNonNull(location, "TaskLocation is null");
         requireNonNull(location.getUri(), "location uri is null");
@@ -242,6 +268,9 @@ public class ExchangeClient
         }
 
         checkState(!noMoreLocations, "No more locations already set");
+        if (buffer != null) {
+            buffer.addTask(remoteTaskId);
+        }
 
         HttpPageBufferClient client = new HttpPageBufferClient(
                 httpClient,
@@ -253,7 +282,9 @@ public class ExchangeClient
                 pageBufferClientCallbackExecutor,
                 recoveryEnabled,
                 failureDetectorManager,
-                queryRecoveryManager);
+                queryRecoveryManager,
+                remoteTaskId,
+                retryPolicy);
         allClients.put(uri, client);
         queuedClients.add(client);
 
@@ -264,6 +295,9 @@ public class ExchangeClient
     public synchronized void noMoreLocations()
     {
         noMoreLocations = true;
+        if (buffer != null) {
+            buffer.noMoreTasks();
+        }
         scheduleRequestIfNecessary();
     }
 
@@ -344,7 +378,10 @@ public class ExchangeClient
             return Pair.of(null, null);
         }
 
-        if (!recoveryEnabled) {
+        if (buffer != null) {
+            return Pair.of(postProcessPage(buffer.pollPage()), null);
+        }
+        else if (!recoveryEnabled) {
             return Pair.of(postProcessPage(pageBuffer.poll()), null);
         }
         Pair<SerializedPage, String> ret = pollPageImpl(target);
@@ -402,22 +439,27 @@ public class ExchangeClient
             return null;
         }
 
-        if (page == NO_MORE_PAGES) {
-            // mark client closed; close() will add the end marker
-            close();
-
-            notifyBlockedCallers();
-
-            // don't return end of stream marker
-            return null;
+        if (buffer != null) {
+            systemMemoryContext.setBytes(buffer.getRetainedSizeInBytes());
         }
+        else {
+            if (page == NO_MORE_PAGES) {
+                // mark client closed; close() will add the end marker
+                close();
 
-        synchronized (this) {
-            if (!closed.get()) {
-                bufferRetainedSizeInBytes -= page.getRetainedSizeInBytes();
-                systemMemoryContext.setBytes(bufferRetainedSizeInBytes);
-                if (pageBuffer.peek() == NO_MORE_PAGES) {
-                    close();
+                notifyBlockedCallers();
+
+                // don't return end of stream marker
+                return null;
+            }
+
+            synchronized (this) {
+                if (!closed.get()) {
+                    bufferRetainedSizeInBytes -= page.getRetainedSizeInBytes();
+                    systemMemoryContext.setBytes(bufferRetainedSizeInBytes);
+                    if (pageBuffer.peek() == NO_MORE_PAGES) {
+                        close();
+                    }
                 }
             }
         }
@@ -428,8 +470,9 @@ public class ExchangeClient
     public boolean isFinished()
     {
         throwIfFailed();
+        boolean isFinished = (buffer != null) ? buffer.isFinished() : isClosed();
         // For this to works, locations must never be added after is closed is set
-        return isClosed() && completedClients.size() == allClients.size();
+        return isFinished && completedClients.size() == allClients.size();
     }
 
     public boolean isClosed()
@@ -455,10 +498,20 @@ public class ExchangeClient
         }
 
         cleanup();
-        if (pageBuffer.peekLast() != NO_MORE_PAGES) {
-            checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
+        if (buffer == null) {
+            if (pageBuffer.peekLast() != NO_MORE_PAGES) {
+                checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
+                notifyBlockedCallers();
+            }
         }
-        notifyBlockedCallers();
+        else {
+            try {
+                buffer.close();
+            }
+            catch (RuntimeException e) {
+                log.warn(e, "error in closing buffer");
+            }
+        }
     }
 
     private void cleanup()
@@ -478,28 +531,31 @@ public class ExchangeClient
     @VisibleForTesting
     synchronized void scheduleRequestIfNecessary()
     {
-        if (isFinished() || isFailed()) {
+        boolean isFinished = (buffer != null) ? buffer.isFinished() : (isFinished() || isFailed());
+        if (isFinished) {
             return;
         }
 
         // if finished, add the end marker
         if (noMoreLocations && completedClients.size() == allClients.size() && pendingMarkers.isEmpty()) {
-            if (pageBuffer.peekLast() != NO_MORE_PAGES) {
-                checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
+            if (buffer == null) {
+                if (pageBuffer.peekLast() != NO_MORE_PAGES) {
+                    checkState(pageBuffer.add(NO_MORE_PAGES), "Could not add no more pages marker");
+                }
+                if (pageBuffer.peek() == NO_MORE_PAGES) {
+                    close();
+                }
+                notifyBlockedCallers();
             }
-            if (pageBuffer.peek() == NO_MORE_PAGES) {
-                close();
-            }
-            notifyBlockedCallers();
             return;
         }
 
-        long neededBytes = bufferCapacity - bufferRetainedSizeInBytes;
+        long neededBytes = (buffer != null) ? buffer.getRemainingCapacityInBytes() : (bufferCapacity - bufferRetainedSizeInBytes);
         if (neededBytes <= 0) {
             return;
         }
 
-        int clientCount = (int) ((1.0 * neededBytes / averageBytesPerRequest) * concurrentRequestMultiplier);
+        long clientCount = (long) ((1.0 * neededBytes / averageBytesPerRequest) * concurrentRequestMultiplier);
         clientCount = Math.max(clientCount, 1);
 
         int pendingClients = allClients.size() - queuedClients.size() - completedClients.size();
@@ -517,82 +573,94 @@ public class ExchangeClient
 
     public synchronized ListenableFuture<?> isBlocked()
     {
-        if (isClosed() || isFailed() || pageBuffer.peek() != null) {
-            return Futures.immediateFuture(true);
+        ListenableFuture<?> resultFuture;
+        if (buffer != null) {
+            resultFuture = buffer.isBlocked();
         }
-        SettableFuture<?> future = SettableFuture.create();
-        blockedCallers.add(future);
-        return future;
+        else {
+            if (isClosed() || isFailed() || pageBuffer.peek() != null) {
+                return Futures.immediateFuture(true);
+            }
+            SettableFuture<?> future = SettableFuture.create();
+            blockedCallers.add(future);
+            resultFuture = future;
+        }
+        return resultFuture;
     }
 
     @VisibleForTesting
-    synchronized boolean addPages(List<SerializedPage> pages, String location)
+    boolean addPages(HttpPageBufferClient client, List<SerializedPage> pages, String location)
     {
-        if (isClosed() || isFailed()) {
-            return false;
+        checkState(!completedClients.contains(client), "client is already marked as completed");
+        // Compute stats before acquiring the lock
+        long responseSize = 0;
+        for (SerializedPage page : pages) {
+            responseSize += page.getSizeInBytes();
         }
 
-        long sizeAdjustment = 0;
-        if (!pages.isEmpty()) {
-            if (!recoveryEnabled) {
-                pageBuffer.addAll(pages);
+        synchronized (this) {
+            boolean isFinished = isClosed() || (buffer != null ? buffer.isFinished() : isFailed());
+            if (isFinished) {
+                return false;
             }
-            else {
-                for (SerializedPage page : pages) {
-                    if (snapshotState != null) {
-                        // Only for MergeOperator
-                        SerializedPage processedPage;
-                        synchronized (snapshotState) {
-                            // This may look suspicious, in that if there are "pending pages" in the snapshot state, then
-                            // a) those pages were associated with specific input channels (exchange source/sink) when the state
-                            // was captured, but now they would be returned to any channel asking for the next page, and
-                            // b) when the pending page is returned, the current page (in pageReference) is discarded and lost.
-                            // But the above never happens because "merge" operators are always preceded by OrderByOperators,
-                            // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
-                            // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
-                            processedPage = snapshotState.processSerializedPage(() -> Pair.of(page, location)).orElse(null);
+
+            long sizeAdjustment = 0;
+            if (!pages.isEmpty()) {
+                if (buffer != null) {
+                    buffer.addPages(client.getRemoteTaskId(), pages);
+                }
+                else {
+                    for (SerializedPage page : pages) {
+                        if (snapshotState != null) {
+                            // Only for MergeOperator
+                            SerializedPage processedPage;
+                            synchronized (snapshotState) {
+                                // This may look suspicious, in that if there are "pending pages" in the snapshot state, then
+                                // a) those pages were associated with specific input channels (exchange source/sink) when the state
+                                // was captured, but now they would be returned to any channel asking for the next page, and
+                                // b) when the pending page is returned, the current page (in pageReference) is discarded and lost.
+                                // But the above never happens because "merge" operators are always preceded by OrderByOperators,
+                                // which only send data pages at the end, *after* all markers. That means when snapshot is taken,
+                                // no data page has been received, so when the snapshot is restored, there won't be any pending pages.
+                                processedPage = snapshotState.processSerializedPage(() -> Pair.of(page, location)).orElse(null);
+                            }
+                            if (processedPage == null || processedPage.isMarkerPage()) {
+                                // Don't add markers to the buffer, otherwise it may affect the order in which these buffers are accessed.
+                                // Instead, markers are stored in and returned by the snapshot state.
+                                continue;
+                            }
                         }
-                        if (processedPage == null || processedPage.isMarkerPage()) {
-                            // Don't add markers to the buffer, otherwise it may affect the order in which these buffers are accessed.
-                            // Instead, markers are stored in and returned by the snapshot state.
-                            continue;
+                        pageBuffer.add(page);
+                        originBuffer.add(Optional.ofNullable(location));
+                        if (page.isMarkerPage()) {
+                            if (!noMoreTargets) {
+                                pendingMarkers.add(page);
+                                pendingOrigins.add(Optional.ofNullable(location));
+                            }
+                            targetBuffer.add(new HashSet<>(allTargets));
+                            // This page will be sent out multiple times. Adjust total size.
+                            sizeAdjustment += page.getRetainedSizeInBytes() * (allTargets.size() - 1);
+                        }
+                        else {
+                            targetBuffer.add(Collections.emptySet());
                         }
                     }
-                    pageBuffer.add(page);
-                    originBuffer.add(Optional.ofNullable(location));
-                    if (page.isMarkerPage()) {
-                        if (!noMoreTargets) {
-                            pendingMarkers.add(page);
-                            pendingOrigins.add(Optional.ofNullable(location));
-                        }
-                        targetBuffer.add(new HashSet<>(allTargets));
-                        // This page will be sent out multiple times. Adjust total size.
-                        sizeAdjustment += page.getRetainedSizeInBytes() * (allTargets.size() - 1);
-                    }
-                    else {
-                        targetBuffer.add(Collections.emptySet());
-                    }
+                    // notify all blocked callers
+                    notifyBlockedCallers();
                 }
             }
-            // notify all blocked callers
-            notifyBlockedCallers();
+
+            long pagesRetainedSizeInBytes = pages.stream()
+                    .mapToLong(SerializedPage::getRetainedSizeInBytes)
+                    .sum();
+            bufferRetainedSizeInBytes += pagesRetainedSizeInBytes + sizeAdjustment;
+            maxBufferRetainedSizeInBytes = Math.max(maxBufferRetainedSizeInBytes, bufferRetainedSizeInBytes);
+            systemMemoryContext.setBytes(bufferRetainedSizeInBytes);
+            successfulRequests++;
+
+            // AVG_n = AVG_(n-1) * (n-1)/n + VALUE_n / n
+            averageBytesPerRequest = (long) (1.0 * averageBytesPerRequest * (successfulRequests - 1) / successfulRequests + responseSize / successfulRequests);
         }
-
-        long pagesRetainedSizeInBytes = pages.stream()
-                .mapToLong(SerializedPage::getRetainedSizeInBytes)
-                .sum();
-
-        bufferRetainedSizeInBytes += pagesRetainedSizeInBytes + sizeAdjustment;
-        maxBufferRetainedSizeInBytes = Math.max(maxBufferRetainedSizeInBytes, bufferRetainedSizeInBytes);
-        systemMemoryContext.setBytes(bufferRetainedSizeInBytes);
-        successfulRequests++;
-
-        long responseSize = pages.stream()
-                .mapToLong(SerializedPage::getSizeInBytes)
-                .sum();
-        // AVG_n = AVG_(n-1) * (n-1)/n + VALUE_n / n
-        averageBytesPerRequest = (long) (1.0 * averageBytesPerRequest * (successfulRequests - 1) / successfulRequests + responseSize / successfulRequests);
-
         return true;
     }
 
@@ -624,18 +692,36 @@ public class ExchangeClient
         // Snapshot: Client may have been removed as a result of rescheduling, then don't add it.
         // Use object identity, instead of .equals, for comparison.
         if (!recoveryEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
-            completedClients.add(client);
+            if (completedClients.add(client)) {
+                if (buffer != null) {
+                    buffer.taskFinished(client.getRemoteTaskId());
+                }
+            }
         }
         scheduleRequestIfNecessary();
     }
 
-    private synchronized void clientFailed(Throwable cause)
+    private synchronized void clientFailed(HttpPageBufferClient client, Throwable cause)
     {
-        // TODO: properly handle the failed vs closed state
-        // it is important not to treat failures as a successful close
-        if (!isClosed()) {
-            failure.compareAndSet(null, cause);
-            notifyBlockedCallers();
+        log.error("clientFailed is called!, cause: " + cause + ", isClosed(): " + isClosed());
+        if (buffer != null) {
+            requireNonNull(client, "client is null");
+            if (completedClients.add(client)) {
+                buffer.taskFailed(client.getRemoteTaskId(), cause);
+                closeQuietly(client);
+            }
+            scheduleRequestIfNecessary();
+        }
+        else {
+            // TODO: properly handle the failed vs closed state
+            // it is important not to treat failures as a successful close
+            if (!isClosed()) {
+                failure.compareAndSet(null, cause);
+                if (taskFailureListener != null) {
+                    scheduler.execute(() -> taskFailureListener.onTaskFailed(client.getRemoteTaskId(), cause));
+                }
+                notifyBlockedCallers();
+            }
         }
     }
 
@@ -668,7 +754,7 @@ public class ExchangeClient
         {
             requireNonNull(client, "client is null");
             requireNonNull(pages, "pages is null");
-            return ExchangeClient.this.addPages(pages, location);
+            return ExchangeClient.this.addPages(client, pages, location);
         }
 
         @Override
@@ -689,7 +775,7 @@ public class ExchangeClient
         {
             requireNonNull(client, "client is null");
             requireNonNull(cause, "cause is null");
-            ExchangeClient.this.clientFailed(cause);
+            ExchangeClient.this.clientFailed(client, cause);
         }
     }
 

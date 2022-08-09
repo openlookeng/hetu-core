@@ -19,7 +19,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.concurrent.Immutable;
 
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
 
 @Immutable

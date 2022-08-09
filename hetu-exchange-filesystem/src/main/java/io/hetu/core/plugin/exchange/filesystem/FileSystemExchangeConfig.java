@@ -34,7 +34,7 @@ import static io.hetu.core.plugin.exchange.filesystem.FileSystemExchangeManager.
 public class FileSystemExchangeConfig
 {
     private List<URI> baseDirectories = ImmutableList.of();
-    private boolean exchangeEncryptionEnabled = true;
+    private boolean exchangeEncryptionEnabled;
 
     private DataSize maxPageStorageSize = new DataSize(16, MEGABYTE);
     private int exchangeSinkBufferPoolMinSize = 10;

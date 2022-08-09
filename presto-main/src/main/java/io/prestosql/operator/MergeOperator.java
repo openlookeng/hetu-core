@@ -18,12 +18,14 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.Split;
 import io.prestosql.snapshot.MultiInputRestorable;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.exchange.ExchangeId;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
@@ -46,6 +48,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.util.MergeSortedPages.mergeSortedPages;
 import static io.prestosql.util.MoreLists.mappedCopy;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @RestorableConfig(uncapturedFields = {"sourceId", "exchangeClientSupplier", "comparator", "outputChannels", "outputTypes", "blockedOnSplits", "pageProducers", "closer", "closed",
@@ -167,9 +170,15 @@ public class MergeOperator
         checkArgument(split.getConnectorSplit() instanceof RemoteSplit, "split is not a remote split");
         checkState(!blockedOnSplits.isDone(), "noMoreSplits has been called already");
 
+        TaskContext taskContext = operatorContext.getDriverContext().getPipelineContext().getTaskContext();
         URI location = ((RemoteSplit) split.getConnectorSplit()).getLocation();
         String instanceId = ((RemoteSplit) split.getConnectorSplit()).getInstanceId();
-        ExchangeClient exchangeClient = closer.register(exchangeClientSupplier.get(operatorContext.localSystemMemoryContext()));
+        TaskId remoteTaskId = ((RemoteSplit) split.getConnectorSplit()).getExchangeInput().getTaskId();
+        ExchangeClient exchangeClient = closer.register(exchangeClientSupplier.get(operatorContext.localSystemMemoryContext(),
+                taskContext::sourceTaskFailed,
+                operatorContext.getRetryPolicy(),
+                new ExchangeId(format("direct-exchange-merge-%s-%s", remoteTaskId.getStageId().getId(), sourceId)),
+                remoteTaskId.getQueryId()));
         if (operatorContext.isRecoveryEnabled()) {
             exchangeClient.setRecoveryEnabled(operatorContext.getDriverContext().getPipelineContext().getTaskContext().getRecoveryManager());
         }
@@ -178,7 +187,7 @@ public class MergeOperator
         }
         exchangeClient.addTarget(id);
         exchangeClient.noMoreTargets();
-        exchangeClient.addLocation(new TaskLocation(location, instanceId));
+        exchangeClient.addLocation(remoteTaskId, new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         clients.add(exchangeClient);
         pageProducers.add(exchangeClient.pages(id)

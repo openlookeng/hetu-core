@@ -24,8 +24,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
-import static io.prestosql.spi.EstimateSizeUtil.sizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class NodeRequirements

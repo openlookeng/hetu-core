@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.lang.Integer.parseInt;
 
 public class TaskId

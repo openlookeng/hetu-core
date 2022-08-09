@@ -89,7 +89,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("saveandload");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 2);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 2, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
 
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
@@ -105,7 +105,7 @@ public class TestTaskSnapshotManager
 
         // Test task state
         MockState taskState = new MockState("task-state");
-        TaskId taskId2 = new TaskId(queryId.getId(), 3, 4);
+        TaskId taskId2 = new TaskId(queryId.getId(), 3, 4, 0);
         SnapshotStateId taskStateId = SnapshotStateId.forOperator(3L, taskId2, 5, 6, 7);
         snapshotManager.storeState(taskStateId, taskState, 0);
         snapshotManager.succeededToCapture(taskStateId);
@@ -119,7 +119,7 @@ public class TestTaskSnapshotManager
     {
         queryId = new QueryId("loadbacktrack");
         StageId stageId = new StageId(queryId, 0);
-        TaskId taskId = new TaskId(stageId, 0);
+        TaskId taskId = new TaskId(stageId, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, 0, recoveryUtils);
 
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
@@ -150,7 +150,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("file");
-        TaskId taskId = new TaskId(queryId.getId(), 1, 5);
+        TaskId taskId = new TaskId(queryId.getId(), 1, 5, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -189,7 +189,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("filebacktrack");
-        TaskId taskId = new TaskId(queryId.getId(), 2, 3);
+        TaskId taskId = new TaskId(queryId.getId(), 2, 3, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -239,8 +239,8 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("query");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 1);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 2);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 1, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 2, 0);
         TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, 0, recoveryUtils);
         snapshotManager1.setTotalComponents(2);
@@ -265,8 +265,8 @@ public class TestTaskSnapshotManager
     public void testRestore()
             throws Exception
     {
-        TaskId taskId1 = new TaskId("query", 1, 1);
-        TaskId taskId2 = new TaskId("query", 1, 2);
+        TaskId taskId1 = new TaskId("query", 1, 1, 0);
+        TaskId taskId2 = new TaskId("query", 1, 2, 0);
         TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, 0, recoveryUtils);
         snapshotManager1.setTotalComponents(2);
@@ -303,7 +303,7 @@ public class TestTaskSnapshotManager
     public void testUpdateFinishedQueryComponents()
     {
         queryId = new QueryId("query");
-        TaskId taskId = new TaskId(queryId.getId(), 1, 1);
+        TaskId taskId = new TaskId(queryId.getId(), 1, 1, 0);
         TaskSnapshotManager sm = new TaskSnapshotManager(taskId, 0, recoveryUtils);
         sm.setTotalComponents(2);
 
@@ -319,7 +319,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("consolidatesimplequery");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -338,7 +338,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("consolidatebacktrackquery");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -372,8 +372,8 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("consolidateoverlapquery");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 1);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 1, 0);
         TaskSnapshotManager snapshotManager1 = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         TaskSnapshotManager snapshotManager2 = new TaskSnapshotManager(taskId2, 0, recoveryUtils);
         snapshotManager1.setTotalComponents(1);
@@ -420,7 +420,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("deletedfileloadquery");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -466,7 +466,7 @@ public class TestTaskSnapshotManager
         RecoveryUtils faultyRecoveryUtils = mock(RecoveryUtils.class);
         doThrow(new NullPointerException()).when(faultyRecoveryUtils).storeState(any(), any(), any());
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, faultyRecoveryUtils);
         snapshotManager.setTotalComponents(1);
 
@@ -485,7 +485,7 @@ public class TestTaskSnapshotManager
             throws Exception
     {
         queryId = new QueryId("spilleddeletedquery");
-        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 1, 0, 0);
         TaskSnapshotManager snapshotManager = new TaskSnapshotManager(taskId1, 0, recoveryUtils);
         snapshotManager.setTotalComponents(1);
 

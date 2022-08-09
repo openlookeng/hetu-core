@@ -32,8 +32,10 @@ import io.airlift.jmx.testing.TestingJmxModule;
 import io.airlift.json.JsonModule;
 import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.QueryManagerConfig;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.FailureDetectorModule;
 import io.prestosql.failuredetector.HeartbeatFailureDetector;
@@ -43,6 +45,7 @@ import io.prestosql.metadata.Split;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.RemoteSplit;
@@ -77,6 +80,8 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -141,7 +146,7 @@ public class TestMergeOperator
 
         taskBuffers = CacheBuilder.newBuilder().build(CacheLoader.from(TestingTaskBuffer::new));
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), executor);
-        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor, new FailureDetectorManager(detector, "60s"));
+        exchangeClientFactory = new ExchangeClientFactory(new ExchangeClientConfig(), httpClient, executor, new FailureDetectorManager(detector, "60s"), new ExchangeManagerRegistry(new ExchangeHandleResolver()));
         FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
         orderingCompiler = new OrderingCompiler();
     }
@@ -408,7 +413,9 @@ public class TestMergeOperator
 
     private static Split createRemoteSplit(String taskId)
     {
-        return new Split(ExchangeOperator.REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId), "new split test instance id"), Lifespan.taskWide());
+        RemoteSplit.DirectExchangeInput exchangeInput = (RemoteSplit.DirectExchangeInput) mock(RemoteSplit.DirectExchangeInput.class);
+        when(exchangeInput.getTaskId()).thenReturn(new TaskId("query.1.1.0"));
+        return new Split(ExchangeOperator.REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId), "new split test instance id", exchangeInput), Lifespan.taskWide());
     }
 
     private static List<Page> pullAvailablePages(Operator operator)

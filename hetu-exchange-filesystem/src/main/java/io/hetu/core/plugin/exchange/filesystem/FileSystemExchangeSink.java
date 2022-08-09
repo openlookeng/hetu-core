@@ -21,9 +21,9 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
-import io.hetu.core.plugin.exchange.filesystem.util.HetuSizeOf;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.exchange.ExchangeSink;
+import io.prestosql.spi.util.SizeOf;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.openjdk.jol.info.ClassLayout;
 
@@ -53,8 +53,8 @@ import static io.airlift.concurrent.MoreFutures.addExceptionCallback;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.concurrent.MoreFutures.toCompletableFuture;
 import static io.airlift.units.DataSize.succinctBytes;
-import static io.hetu.core.plugin.exchange.filesystem.util.HetuSizeOf.estimatedSizeOf;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
@@ -164,7 +164,7 @@ public class FileSystemExchangeSink
     {
         return INSTANCE_SIZE
                 + bufferPool.bufferRetainedSize
-                + estimatedSizeOf(writerMap, HetuSizeOf::sizeOf, BufferedStorageWriter::getRetainedSize);
+                + estimatedSizeOf(writerMap, SizeOf::sizeOf, BufferedStorageWriter::getRetainedSize);
     }
 
     @Override

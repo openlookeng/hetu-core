@@ -24,7 +24,7 @@ import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.collect.Multimaps.asMap;
-import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class TaskDescriptor

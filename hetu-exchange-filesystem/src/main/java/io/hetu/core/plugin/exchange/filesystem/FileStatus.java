@@ -22,7 +22,7 @@ import javax.annotation.concurrent.Immutable;
 import java.util.Objects;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static io.hetu.core.plugin.exchange.filesystem.util.HetuSizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 
 @Immutable
 public class FileStatus

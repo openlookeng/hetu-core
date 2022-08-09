@@ -13,9 +13,10 @@
  */
 package io.hetu.core.plugin.exchange.filesystem.util;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+
+import javax.annotation.concurrent.ThreadSafe;
 
 import java.util.List;
 import java.util.Queue;
@@ -27,14 +28,20 @@ import java.util.function.Function;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.immediateCancelledFuture;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static io.airlift.concurrent.MoreFutures.addExceptionCallback;
+import static io.hetu.core.plugin.exchange.filesystem.util.MoreFutures.allAsListWithCancellationOnFailure;
 import static java.util.Objects.requireNonNull;
 
-public class HetuAsyncSemaphore<T, R>
+/**
+ * Guarantees that no more than maxPermits of tasks will be run concurrently.
+ * The class will rely on the ListenableFuture returned by the submitter function to determine
+ * when a task has been completed. The submitter function NEEDS to be thread-safe and is recommended
+ * to do the bulk of its work asynchronously.
+ */
+@ThreadSafe
+public class AsyncSemaphore<T, R>
 {
     private final Queue<QueuedTask<T, R>> queuedTasks = new ConcurrentLinkedQueue<>();
     private final AtomicInteger counter = new AtomicInteger();
@@ -43,11 +50,38 @@ public class HetuAsyncSemaphore<T, R>
     private final Executor submitExecutor;
     private final Function<T, ListenableFuture<R>> submitter;
 
+    /**
+     * Process a list of tasks as a single unit
+     * (similar to {@link com.google.common.util.concurrent.Futures#allAsList(ListenableFuture[])})
+     * with limiting the number of tasks running in parallel.
+     * <p>
+     * This method may be useful for limiting the number of concurrent requests sent to a remote server when
+     * trying to load multiple related entities concurrently:
+     * <p>
+     * For example:
+     * <pre>{@code
+     * List<Integer> userIds = Lists.of(1, 2, 3);
+     * ListenableFuture<List<UserInfo>> future = processAll(ids, client::getUserInfoById, 2, executor);
+     * List<UserInfo> userInfos = future.get(...);
+     * }</pre>
+     *
+     * @param tasks          tasks to process
+     * @param submitter      task submitter
+     * @param maxConcurrency maximum number of tasks allowed to run in parallel
+     * @param submitExecutor task submission executor
+     * @return {@link ListenableFuture} containing a list of values returned by the {@code tasks}.
+     * The order of elements in the list matches the order of {@code tasks}.
+     * If the result future is cancelled all the remaining tasks are cancelled (submitted tasks will be cancelled, pending tasks will not be submitted).
+     * If any of the submitted tasks fails or are cancelled, the result future is too.
+     * If any of the submitted tasks fails or are cancelled, the remaining tasks are cancelled.
+     */
     public static <T, R> ListenableFuture<List<R>> processAll(List<T> tasks, Function<T, ListenableFuture<R>> submitter, int maxConcurrency, Executor submitExecutor)
     {
         SettableFuture<List<R>> resultFuture = SettableFuture.create();
-        HetuAsyncSemaphore<T, R> semaphore = new HetuAsyncSemaphore<>(maxConcurrency, submitExecutor, task -> {
+        AsyncSemaphore<T, R> semaphore = new AsyncSemaphore<>(maxConcurrency, submitExecutor, task -> {
             if (resultFuture.isCancelled()) {
+                // Task cancellation tends to happen in task submission order, which can race with subsequent task submissions after previous cancellations.
+                // This eager check prevents this race from occurring, and can reduce the number of unnecessary submissions.
                 return immediateCancelledFuture();
             }
             return submitter.apply(task);
@@ -56,6 +90,14 @@ public class HetuAsyncSemaphore<T, R>
                 .map(semaphore::submit)
                 .collect(toImmutableList())));
         return resultFuture;
+    }
+
+    public AsyncSemaphore(int maxPermits, Executor submitExecutor, Function<T, ListenableFuture<R>> submitter)
+    {
+        checkArgument(maxPermits > 0, "must have at least one permit");
+        this.maxPermits = maxPermits;
+        this.submitExecutor = requireNonNull(submitExecutor, "submitExecutor is null");
+        this.submitter = requireNonNull(submitter, "submitter is null");
     }
 
     public ListenableFuture<R> submit(T task)
@@ -69,6 +111,7 @@ public class HetuAsyncSemaphore<T, R>
     private void acquirePermit()
     {
         if (counter.incrementAndGet() <= maxPermits) {
+            // Kick off a task if not all permits have been handed out
             submitExecutor.execute(runNextTask);
         }
     }
@@ -76,24 +119,9 @@ public class HetuAsyncSemaphore<T, R>
     private void releasePermit()
     {
         if (counter.getAndDecrement() > maxPermits) {
+            // Now that a task has finished, we can kick off another task if there are more tasks than permits
             submitExecutor.execute(runNextTask);
         }
-    }
-
-    private static <V> ListenableFuture<List<V>> allAsListWithCancellationOnFailure(Iterable<? extends ListenableFuture<? extends V>> futures)
-    {
-        List<ListenableFuture<? extends V>> futuresSnapshot = ImmutableList.copyOf(futures);
-        ListenableFuture<List<V>> listFuture = allAsList(futuresSnapshot);
-        addExceptionCallback(listFuture, () -> futuresSnapshot.forEach(future -> future.cancel(true)));
-        return listFuture;
-    }
-
-    public HetuAsyncSemaphore(int maxPermits, Executor submitExecutor, Function<T, ListenableFuture<R>> submitter)
-    {
-        checkArgument(maxPermits > 0, "must have at least one permit");
-        this.maxPermits = maxPermits;
-        this.submitExecutor = requireNonNull(submitExecutor, "submitExecutor is null");
-        this.submitter = requireNonNull(submitter, "submitter is null");
     }
 
     private void runNext()
@@ -111,7 +139,7 @@ public class HetuAsyncSemaphore<T, R>
         try {
             ListenableFuture<R> future = submitter.apply(task);
             if (future == null) {
-                return immediateFailedFuture(new NullPointerException("Submitter returned a null future for task " + task));
+                return immediateFailedFuture(new NullPointerException("Submitter returned a null future for task: " + task));
             }
             return future;
         }

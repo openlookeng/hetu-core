@@ -20,9 +20,9 @@ import org.testng.annotations.Test;
 
 public class TestSnapshotComponentCounter
 {
-    private static final SnapshotStateId component1 = new SnapshotStateId(1, new TaskId("query1", 1, 1));
-    private static final SnapshotStateId component2 = new SnapshotStateId(1, new TaskId("query1", 1, 2));
-    private static final SnapshotStateId component3 = new SnapshotStateId(1, new TaskId("query1", 1, 3));
+    private static final SnapshotStateId component1 = new SnapshotStateId(1, new TaskId("query1", 1, 1, 0));
+    private static final SnapshotStateId component2 = new SnapshotStateId(1, new TaskId("query1", 1, 2, 0));
+    private static final SnapshotStateId component3 = new SnapshotStateId(1, new TaskId("query1", 1, 3, 0));
 
     @Test
     public void testCaptureStateValidChange()

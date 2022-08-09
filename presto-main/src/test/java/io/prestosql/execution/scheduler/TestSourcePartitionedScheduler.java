@@ -48,6 +48,10 @@ import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.FixedSplitSource;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.exchange.Exchange;
+import io.prestosql.spi.exchange.ExchangeManager;
+import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.spi.exchange.TestExchangeManager;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -422,6 +426,19 @@ public class TestSourcePartitionedScheduler
         secondStage.abort();
     }
 
+    @Test
+    public void testCreateExchange()
+    {
+        ExchangeManager exchangeManager = TestExchangeManager.createExchangeManager();
+        StageId rootStageId = new StageId(new QueryId("query"), 0);
+        Optional<Exchange> exchange = SqlQueryScheduler.createSqlStageExchange(exchangeManager, rootStageId);
+        assertFalse(exchange.isPresent());
+
+        StageId exchangeStageId = new StageId(new QueryId("query"), 1);
+        exchange = SqlQueryScheduler.createSqlStageExchange(exchangeManager, exchangeStageId);
+        assertTrue(exchange.isPresent());
+    }
+
     private static void assertPartitionedSplitCount(SqlStageExecution stage, int expectedPartitionedSplitCount)
     {
         assertEquals(stage.getAllTasks().stream().mapToInt(RemoteTask::getPartitionedSplitCount).sum(), expectedPartitionedSplitCount);
@@ -474,7 +491,7 @@ public class TestSourcePartitionedScheduler
                 ImmutableList.of(symbol),
                 ImmutableMap.of(symbol, new TestingColumnHandle("column")), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0), 0, false);
 
-        RemoteSourceNode remote = new RemoteSourceNode(new PlanNodeId("remote_id"), new PlanFragmentId("plan_fragment_id"), ImmutableList.of(), Optional.empty(), GATHER);
+        RemoteSourceNode remote = new RemoteSourceNode(new PlanNodeId("remote_id"), new PlanFragmentId("plan_fragment_id"), ImmutableList.of(), Optional.empty(), GATHER, RetryPolicy.NONE);
         PlanFragment testFragment = new PlanFragment(
                 new PlanFragmentId("plan_id"),
                 new JoinNode(new PlanNodeId("join_id"),
@@ -535,7 +552,8 @@ public class TestSourcePartitionedScheduler
                 new SplitSchedulerStats(),
                 new DynamicFilterService(new LocalStateStoreProvider(seedStoreManager)),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(TestingRecoveryUtils.NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(TestingRecoveryUtils.NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(PARTITIONED)
                 .withBuffer(OUT, 0)

@@ -15,9 +15,9 @@ package io.prestosql.execution.buffer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
-import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.PageAssertions;
@@ -26,6 +26,7 @@ import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.snapshot.SnapshotStateId;
 import io.prestosql.snapshot.TaskSnapshotManager;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.type.BigintType;
@@ -47,8 +48,6 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.execution.buffer.BufferResult.emptyResults;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.BufferTestUtils.MAX_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.NO_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.PAGES_SERDE;
@@ -83,6 +82,7 @@ import static org.testng.Assert.fail;
 
 public class TestPartitionedOutputBuffer
 {
+    private static final Logger LOG = Logger.get(TestPartitionedOutputBuffer.class);
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
     private static final OutputBufferId FIRST = new OutputBufferId(0);
     private static final OutputBufferId SECOND = new OutputBufferId(1);
@@ -113,12 +113,14 @@ public class TestPartitionedOutputBuffer
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
         try {
             createPartitionedBuffer(createInitialEmptyOutputBuffers(PARTITIONED), new DataSize(0, BYTE));
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -561,6 +563,7 @@ public class TestPartitionedOutputBuffer
             fail("Expected IllegalStateException from addQueue after noMoreQueues has been called");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -1062,7 +1065,7 @@ public class TestPartitionedOutputBuffer
     private PartitionedOutputBuffer createPartitionedBuffer(OutputBuffers buffers, DataSize dataSize)
     {
         return new PartitionedOutputBuffer(
-                new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                 buffers,
                 dataSize,
                 () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
@@ -1073,5 +1076,15 @@ public class TestPartitionedOutputBuffer
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
         return createBufferResult(token, pages);
+    }
+
+    @Test
+    public void testBuffersWithExchangeSink()
+    {
+        OutputBuffers buffers = createInitialEmptyOutputBuffers(PARTITIONED);
+        assertFalse(buffers.getExchangeSinkInstanceHandle().isPresent());
+
+        buffers.setExchangeSinkInstanceHandle(new ExchangeSinkInstanceHandle() {});
+        assertTrue(buffers.getExchangeSinkInstanceHandle().isPresent());
     }
 }
