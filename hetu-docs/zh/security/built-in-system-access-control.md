@@ -66,7 +66,7 @@ security.refresh-period=1s
 *默认情况下，所有用户都可以访问`system`目录。您可以通过添加规则来改变此行为。*
 
 
-例如，如果希望仅允许`admin`用户访问`mysql`和`system`目录，允许所有用户访问`hive`目录，拒绝其他用户访问，则可以定义以下规则：
+例如，如果希望仅允许`admin`用户访问`mysql`和`system`目录，允许所有用户访问`hive`目录，允许`alice`用户只读地访问`postgresql`，拒绝其他用户访问，则可以定义以下规则：
 
 ``` json
 {
