@@ -16,15 +16,19 @@ package io.prestosql.execution;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.prestosql.spi.QueryId;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.EstimateSizeUtil.estimatedSizeOf;
 import static java.lang.Integer.parseInt;
 
 public class TaskId
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(TaskId.class).instanceSize();
+
     @JsonCreator
     public static TaskId valueOf(String taskId)
     {
@@ -33,16 +37,18 @@ public class TaskId
 
     private final String fullId;
 
-    public TaskId(String queryId, int stageId, int id)
+    public TaskId(String queryId, int stageId, int id, int attemptId)
     {
         checkArgument(id >= 0, "id is negative");
-        this.fullId = queryId + "." + stageId + "." + id;
+        checkArgument(attemptId >= 0, "attemptId is negative");
+        this.fullId = queryId + "." + stageId + "." + id + "." + attemptId;
     }
 
-    public TaskId(StageId stageId, int id)
+    public TaskId(StageId stageId, int id, int attemptId)
     {
         checkArgument(id >= 0, "id is negative");
-        this.fullId = stageId.getQueryId().getId() + "." + stageId.getId() + "." + id;
+        checkArgument(attemptId >= 0, "attemptId is negative");
+        this.fullId = stageId.getQueryId().getId() + "." + stageId.getId() + "." + id + "." + attemptId;
     }
 
     public TaskId(String fullId)
@@ -52,18 +58,23 @@ public class TaskId
 
     public QueryId getQueryId()
     {
-        return new QueryId(QueryId.parseDottedId(fullId, 3, "taskId").get(0));
+        return new QueryId(QueryId.parseDottedId(fullId, 4, "taskId").get(0));
     }
 
     public StageId getStageId()
     {
-        List<String> ids = QueryId.parseDottedId(fullId, 3, "taskId");
+        List<String> ids = QueryId.parseDottedId(fullId, 4, "taskId");
         return StageId.valueOf(ids.subList(0, 2));
     }
 
     public int getId()
     {
-        return parseInt(QueryId.parseDottedId(fullId, 3, "taskId").get(2));
+        return parseInt(QueryId.parseDottedId(fullId, 4, "taskId").get(2));
+    }
+
+    public int getAttemptId()
+    {
+        return parseInt(QueryId.parseDottedId(fullId, 4, "taskId").get(3));
     }
 
     @Override
@@ -90,5 +101,10 @@ public class TaskId
         }
         TaskId other = (TaskId) obj;
         return Objects.equals(this.fullId, other.fullId);
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE + estimatedSizeOf(fullId);
     }
 }

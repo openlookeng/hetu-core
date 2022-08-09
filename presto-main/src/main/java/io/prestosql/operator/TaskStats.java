@@ -55,6 +55,7 @@ public class TaskStats
     private final DataSize userMemoryReservation;
     private final DataSize revocableMemoryReservation;
     private final DataSize systemMemoryReservation;
+    private final DataSize peakUserMemoryReservation;
 
     private final Duration totalScheduledTime;
     private final Duration totalCpuTime;
@@ -104,6 +105,7 @@ public class TaskStats
                 new DataSize(0, BYTE),
                 new DataSize(0, BYTE),
                 new DataSize(0, BYTE),
+                new DataSize(0, BYTE),
                 new Duration(0, MILLISECONDS),
                 new Duration(0, MILLISECONDS),
                 new Duration(0, MILLISECONDS),
@@ -147,6 +149,7 @@ public class TaskStats
             @JsonProperty("userMemoryReservation") DataSize userMemoryReservation,
             @JsonProperty("revocableMemoryReservation") DataSize revocableMemoryReservation,
             @JsonProperty("systemMemoryReservation") DataSize systemMemoryReservation,
+            @JsonProperty("peakUserMemoryReservation") DataSize peakUserMemoryReservation,
 
             @JsonProperty("totalScheduledTime") Duration totalScheduledTime,
             @JsonProperty("totalCpuTime") Duration totalCpuTime,
@@ -206,6 +209,7 @@ public class TaskStats
         this.userMemoryReservation = requireNonNull(userMemoryReservation, "userMemoryReservation is null");
         this.revocableMemoryReservation = requireNonNull(revocableMemoryReservation, "revocableMemoryReservation is null");
         this.systemMemoryReservation = requireNonNull(systemMemoryReservation, "systemMemoryReservation is null");
+        this.peakUserMemoryReservation = requireNonNull(peakUserMemoryReservation, "peakUserMemoryReservation is null");
 
         this.totalScheduledTime = requireNonNull(totalScheduledTime, "totalScheduledTime is null");
         this.totalCpuTime = requireNonNull(totalCpuTime, "totalCpuTime is null");
@@ -334,6 +338,12 @@ public class TaskStats
     public DataSize getRevocableMemoryReservation()
     {
         return revocableMemoryReservation;
+    }
+
+    @JsonProperty
+    public DataSize getPeakUserMemoryReservation()
+    {
+        return peakUserMemoryReservation;
     }
 
     @JsonProperty
@@ -489,6 +499,7 @@ public class TaskStats
                 userMemoryReservation,
                 revocableMemoryReservation,
                 systemMemoryReservation,
+                peakUserMemoryReservation,
                 totalScheduledTime,
                 totalCpuTime,
                 totalBlockedTime,
@@ -531,6 +542,7 @@ public class TaskStats
                 userMemoryReservation,
                 revocableMemoryReservation,
                 systemMemoryReservation,
+                peakUserMemoryReservation,
                 totalScheduledTime,
                 totalCpuTime,
                 totalBlockedTime,

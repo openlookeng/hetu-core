@@ -32,7 +32,8 @@ import static java.util.Objects.requireNonNull;
 public class PartitionedOutputBufferManager
         implements OutputBufferManager
 {
-    private final Map<OutputBufferId, Integer> outputBuffers;
+    private final Map<OutputBufferId, Integer> outputBuffersMap;
+    private final OutputBuffers outputBuffers;
 
     public PartitionedOutputBufferManager(PartitioningHandle partitioningHandle, int partitionCount, Consumer<OutputBuffers> outputBufferTarget)
     {
@@ -43,12 +44,28 @@ public class PartitionedOutputBufferManager
             partitions.put(new OutputBufferId(partition), partition);
         }
 
-        OutputBuffers buffers = createInitialEmptyOutputBuffers(requireNonNull(partitioningHandle, "partitioningHandle is null"))
+        outputBuffers = createInitialEmptyOutputBuffers(requireNonNull(partitioningHandle, "partitioningHandle is null"))
                 .withBuffers(partitions.build())
                 .withNoMoreBufferIds();
-        outputBufferTarget.accept(buffers);
+        outputBufferTarget.accept(outputBuffers);
 
-        this.outputBuffers = buffers.getBuffers();
+        this.outputBuffersMap = outputBuffers.getBuffers();
+    }
+
+    public PartitionedOutputBufferManager(PartitioningHandle partitioningHandle, int partitionCount)
+    {
+        checkArgument(partitionCount >= 1, "partitionCount must be at least 1");
+
+        ImmutableMap.Builder<OutputBufferId, Integer> partitions = ImmutableMap.builder();
+        for (int partition = 0; partition < partitionCount; partition++) {
+            partitions.put(new OutputBufferId(partition), partition);
+        }
+
+        outputBuffers = createInitialEmptyOutputBuffers(requireNonNull(partitioningHandle, "partitioningHandle is null"))
+                .withBuffers(partitions.build())
+                .withNoMoreBufferIds();
+
+        this.outputBuffersMap = ImmutableMap.of();
     }
 
     @Override
@@ -57,7 +74,7 @@ public class PartitionedOutputBufferManager
         // All buffers are created in the constructor, so just validate that this isn't
         // a request to add a new buffer
         for (OutputBufferId newBuffer : newBuffers) {
-            Integer existingBufferId = outputBuffers.get(newBuffer);
+            Integer existingBufferId = outputBuffersMap.get(newBuffer);
             if (existingBufferId == null) {
                 throw new IllegalStateException("Unexpected new output buffer " + newBuffer);
             }
@@ -65,5 +82,28 @@ public class PartitionedOutputBufferManager
                 throw new IllegalStateException("newOutputBuffers has changed the assignment for task " + newBuffer);
             }
         }
+    }
+
+    @Override
+    public void addOutputBuffer(OutputBufferId newBuffer)
+    {
+        // All buffers are created in the constructor, so just validate that this isn't
+        // a request to add a new buffer
+        Integer existingBufferId = outputBuffers.getBuffers().get(newBuffer);
+        if (existingBufferId == null) {
+            throw new IllegalStateException("Unexpected new output buffer " + newBuffer);
+        }
+        if (newBuffer.getId() != existingBufferId) {
+            throw new IllegalStateException("newOutputBuffers has changed the assignment for task " + newBuffer);
+        }
+    }
+
+    @Override
+    public void noMoreBuffers() {}
+
+    @Override
+    public OutputBuffers getOutputBuffers()
+    {
+        return outputBuffers;
     }
 }

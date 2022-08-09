@@ -58,6 +58,7 @@ import static io.prestosql.execution.StageState.ABORTED;
 import static io.prestosql.execution.StageState.CANCELED;
 import static io.prestosql.execution.StageState.FAILED;
 import static io.prestosql.execution.StageState.FINISHED;
+import static io.prestosql.execution.StageState.PENDING;
 import static io.prestosql.execution.StageState.PLANNED;
 import static io.prestosql.execution.StageState.RECOVERING;
 import static io.prestosql.execution.StageState.RUNNING;
@@ -203,6 +204,11 @@ public class StageStateMachine
         return stageState.setIf(RUNNING, currentState -> currentState != RUNNING && !currentState.isDone());
     }
 
+    public boolean transitionToPending()
+    {
+        return stageState.setIf(PENDING, currentState -> currentState != PENDING && !currentState.isDone());
+    }
+
     public boolean transitionToFinished()
     {
         SqlStageExecution.setReuseTableScanMappingIdStatus(this);
@@ -309,7 +315,7 @@ public class StageStateMachine
         // never be visible.
         StageState state = stageState.get();
         // Snapshot: RESCHEDULING, although a done state for stage, should not be deemed as "scheduled".
-        boolean isScheduled = (state == RUNNING) || state.isDone() && state != RECOVERING;
+        boolean isScheduled = (state == RUNNING) || (state == PENDING) || state.isDone() && state != RECOVERING;
 
         List<TaskInfo> taskInfos = ImmutableList.copyOf(taskInfosSupplier.get());
 

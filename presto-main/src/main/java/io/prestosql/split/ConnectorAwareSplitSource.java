@@ -26,6 +26,7 @@ import io.prestosql.spi.connector.ConnectorSplitSource.ConnectorSplitBatch;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
@@ -72,6 +73,12 @@ public class ConnectorAwareSplitSource
     public boolean isFinished()
     {
         return source.isFinished();
+    }
+
+    @Override
+    public Optional<List<Object>> getTableExecuteSplitsInfo()
+    {
+        return source.getTableExecuteSplitsInfo();
     }
 
     @Override

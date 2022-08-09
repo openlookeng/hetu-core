@@ -83,6 +83,8 @@ public class TaskStatus
     private final Map<Long, SnapshotInfo> snapshotCaptureResult;
     private final Optional<RestoreResult> snapshotRestoreResult;
 
+    private final DataSize peakMemoryReservation;
+
     @JsonCreator
     public TaskStatus(
             @JsonProperty("taskId") TaskId taskId,
@@ -103,7 +105,8 @@ public class TaskStatus
             @JsonProperty("fullGcCount") long fullGcCount,
             @JsonProperty("fullGcTime") Duration fullGcTime,
             @JsonProperty("snapshotCaptureResult") Map<Long, SnapshotInfo> snapshotCaptureResult,
-            @JsonProperty("snapshotRestoreResult") Optional<RestoreResult> snapshotRestoreResult)
+            @JsonProperty("snapshotRestoreResult") Optional<RestoreResult> snapshotRestoreResult,
+            @JsonProperty("peakMemoryReservation") DataSize peakMemoryReservation)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
         this.confirmationInstanceId = requireNonNull(confirmationInstanceId, "confirmationInstanceId is null");
@@ -136,6 +139,8 @@ public class TaskStatus
 
         this.snapshotCaptureResult = snapshotCaptureResult;
         this.snapshotRestoreResult = snapshotRestoreResult;
+
+        this.peakMemoryReservation = requireNonNull(peakMemoryReservation, "peakMemoryReservation is null");
     }
 
     @JsonProperty
@@ -252,6 +257,12 @@ public class TaskStatus
         return snapshotRestoreResult;
     }
 
+    @JsonProperty
+    public DataSize getPeakMemoryReservation()
+    {
+        return peakMemoryReservation;
+    }
+
     @Override
     public String toString()
     {
@@ -287,7 +298,8 @@ public class TaskStatus
                 0,
                 new Duration(0, MILLISECONDS),
                 ImmutableMap.of(),
-                Optional.empty());
+                Optional.empty(),
+                new DataSize(0, BYTE));
     }
 
     public static TaskStatus failWith(TaskStatus taskStatus, TaskState state, List<ExecutionFailureInfo> exceptions)
@@ -311,6 +323,7 @@ public class TaskStatus
                 taskStatus.getFullGcCount(),
                 taskStatus.getFullGcTime(),
                 taskStatus.snapshotCaptureResult,
-                taskStatus.snapshotRestoreResult);
+                taskStatus.snapshotRestoreResult,
+                taskStatus.getPeakMemoryReservation());
     }
 }

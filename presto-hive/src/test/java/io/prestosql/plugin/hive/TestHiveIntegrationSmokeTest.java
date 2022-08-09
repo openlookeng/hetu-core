@@ -5568,7 +5568,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         Set<Split> splits = createAndGetSplits(10);
         Multimap<InternalNode, Split> producerAssignment = nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments();
@@ -5594,7 +5595,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
         Multimap<InternalNode, Split> consumerAssignment = nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(stage)).getAssignments();
 
         assertEquals(consumerAssignment.size(), consumerAssignment.size());
@@ -5650,7 +5652,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         Set<Split> producerSplits = createAndGetSplits(10);
         Multimap<InternalNode, Split> producerAssignment = nodeSelector.computeAssignments(producerSplits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments();
@@ -5676,7 +5679,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
         Set<Split> consumerSplits = createAndGetSplits(50);
 
         try {

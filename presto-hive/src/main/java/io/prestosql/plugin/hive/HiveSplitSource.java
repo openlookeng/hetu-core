@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -766,6 +767,12 @@ public class HiveSplitSource
         List<ConnectorSplit> resultConnectorSplits = connectorSplitList.build();
         log.debug("info resultBuilder size %d", resultConnectorSplits.size());
         return resultConnectorSplits;
+    }
+
+    @Override
+    public Optional<List<Object>> getTableExecuteSplitsInfo()
+    {
+        return Optional.empty();
     }
 
     private boolean getSmallerSplits(List<HiveSplitWrapper> hiveSplitWrappers, Multimap<Integer, HiveSplit> bucketNumberHiveSplits,

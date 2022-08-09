@@ -35,6 +35,12 @@ public enum TaskState
      */
     SUSPENDED(false),
     /**
+     * Task has finished executing and output is left to be consumed.
+     * In this state, there will be no new drivers, the existing drivers have finished
+     * and the output buffer of the task is at-least in a 'no-more-pages' state.
+     */
+    FLUSHING(false),
+    /**
      * Task has finished executing and all output has been consumed.
      */
     FINISHED(true),

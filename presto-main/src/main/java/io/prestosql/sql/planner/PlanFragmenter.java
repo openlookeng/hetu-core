@@ -28,6 +28,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.connector.ConnectorPartitioningHandle;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
@@ -74,6 +75,7 @@ import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.SystemSessionProperties.getQueryMaxStageCount;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.SystemSessionProperties.isDynamicSchduleForGroupedExecution;
 import static io.prestosql.SystemSessionProperties.isForceSingleNodeOutput;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
@@ -378,9 +380,11 @@ public class PlanFragmenter
                 context.get().setDistribution(partitioningScheme.getPartitioning().getHandle(), metadata, session);
             }
 
+            ImmutableList.Builder<FragmentProperties> childrenProperties = ImmutableList.builder();
             ImmutableList.Builder<SubPlan> builder = ImmutableList.builder();
             for (int sourceIndex = 0; sourceIndex < exchange.getSources().size(); sourceIndex++) {
                 FragmentProperties childProperties = new FragmentProperties(partitioningScheme.translateOutputLayout(exchange.getInputs().get(sourceIndex)));
+                childrenProperties.add(childProperties);
                 // check if it has CTE.
                 Integer planNodeId = checkForCTENode(exchange.getSources().get(sourceIndex), exchange.getId());
                 if (planNodeId == null) {
@@ -424,7 +428,7 @@ public class PlanFragmenter
                     .map(PlanFragment::getId)
                     .collect(toImmutableList());
 
-            return new RemoteSourceNode(exchange.getId(), childrenIds, exchange.getOutputSymbols(), exchange.getOrderingScheme(), exchange.getType());
+            return new RemoteSourceNode(exchange.getId(), childrenIds, exchange.getOutputSymbols(), exchange.getOrderingScheme(), exchange.getType(), isWorkerCoordinatorBoundary(context.get(), childrenProperties.build()) ? getRetryPolicy(session) : RetryPolicy.NONE);
         }
 
         private Integer checkForCTENode(PlanNode node, PlanNodeId nodeId)
@@ -470,6 +474,22 @@ public class PlanFragmenter
             PlanFragmentId planFragmentId = nextFragmentId();
             PlanNode child = context.rewrite(node, properties);
             return buildFragment(child, properties, planFragmentId, isfeederCTE, feederCTEParentId);
+        }
+
+        private static boolean isWorkerCoordinatorBoundary(FragmentProperties fragmentProperties, List<FragmentProperties> childFragmentsProperties)
+        {
+            if (!fragmentProperties.getPartitioningHandle().isCoordinatorOnly()) {
+                // receiver stage is not a coordinator stage
+                return false;
+            }
+            if (childFragmentsProperties.stream().allMatch(properties -> properties.getPartitioningHandle().isCoordinatorOnly())) {
+                // coordinator to coordinator exchange
+                return false;
+            }
+            checkArgument(
+                    childFragmentsProperties.stream().noneMatch(properties -> properties.getPartitioningHandle().isCoordinatorOnly()),
+                    "Plans are not expected to have a mix of coordinator only fragments and distributed fragments as siblings");
+            return true;
         }
     }
 

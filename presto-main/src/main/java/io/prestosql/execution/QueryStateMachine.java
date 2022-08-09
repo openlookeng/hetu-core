@@ -58,8 +58,9 @@ import javax.annotation.concurrent.ThreadSafe;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -645,12 +646,17 @@ public class QueryStateMachine
         outputManager.addOutputInfoListener(listener);
     }
 
+    public void addOutputTaskFailureListener(TaskFailureListener listener)
+    {
+        outputManager.addOutputTaskFailureListener(listener);
+    }
+
     public void setColumns(List<String> columnNames, List<Type> columnTypes)
     {
         outputManager.setColumns(columnNames, columnTypes);
     }
 
-    public void updateOutputLocations(Set<TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
+    public void updateOutputLocations(Map<TaskId, TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
     {
         outputManager.updateOutputLocations(newExchangeLocations, noMoreExchangeLocations);
     }
@@ -1239,9 +1245,14 @@ public class QueryStateMachine
         @GuardedBy("this")
         private List<Type> columnTypes;
         @GuardedBy("this")
-        private final Set<TaskLocation> exchangeLocations = new LinkedHashSet<>();
+        private final Map<TaskId, TaskLocation> exchangeLocations = new LinkedHashMap<>();
         @GuardedBy("this")
         private boolean noMoreExchangeLocations;
+
+        @GuardedBy("this")
+        private final Map<TaskId, Throwable> outputTaskFailures = new HashMap<>();
+        @GuardedBy("this")
+        private final List<TaskFailureListener> outputTaskFailureListeners = new ArrayList<>();
 
         public QueryOutputManager(Executor executor)
         {
@@ -1258,6 +1269,18 @@ public class QueryStateMachine
                 queryOutputInfo = getQueryOutputInfo();
             }
             queryOutputInfo.ifPresent(info -> executor.execute(() -> listener.accept(info)));
+        }
+
+        public void addOutputTaskFailureListener(TaskFailureListener listener)
+        {
+            Map<TaskId, Throwable> failures;
+            synchronized (this) {
+                outputTaskFailureListeners.add(listener);
+                failures = ImmutableMap.copyOf(outputTaskFailures);
+            }
+            executor.execute(() -> {
+                failures.forEach(listener::onTaskFailed);
+            });
         }
 
         public void setColumns(List<String> columnNames, List<Type> columnTypes)
@@ -1286,7 +1309,7 @@ public class QueryStateMachine
             this.exchangeLocations.clear();
         }
 
-        public void updateOutputLocations(Set<TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
+        public void updateOutputLocations(Map<TaskId, TaskLocation> newExchangeLocations, boolean noMoreExchangeLocations)
         {
             requireNonNull(newExchangeLocations, "newExchangeLocations is null");
 
@@ -1294,11 +1317,11 @@ public class QueryStateMachine
             List<Consumer<QueryOutputInfo>> localOutputInfoListeners;
             synchronized (this) {
                 if (this.noMoreExchangeLocations) {
-                    checkArgument(this.exchangeLocations.containsAll(newExchangeLocations), "New locations added after no more locations set");
+                    checkArgument(this.exchangeLocations.values().containsAll(newExchangeLocations.values()), "New locations added after no more locations set");
                     return;
                 }
 
-                this.exchangeLocations.addAll(newExchangeLocations);
+                this.exchangeLocations.putAll(newExchangeLocations);
                 this.noMoreExchangeLocations = noMoreExchangeLocations;
                 queryOutputInfo = getQueryOutputInfo();
                 localOutputInfoListeners = ImmutableList.copyOf(this.outputInfoListeners);
