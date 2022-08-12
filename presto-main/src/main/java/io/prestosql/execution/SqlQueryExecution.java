@@ -24,6 +24,7 @@ import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.cost.CostCalculator;
+import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
@@ -43,6 +44,8 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
+import io.prestosql.resourcemanager.QueryResourceManager;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.snapshot.MarkerAnnouncer;
@@ -57,6 +60,7 @@ import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.StandardWarningCode;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
@@ -111,6 +115,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -173,6 +178,7 @@ public class SqlQueryExecution
     private final QueryRecoveryManager queryRecoveryManager;
     private final WarningCollector warningCollector;
     private final AtomicBoolean suspendedWithRecoveryManager = new AtomicBoolean();
+    private final QueryResourceManager queryResourceManager;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -203,7 +209,8 @@ public class SqlQueryExecution
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             StateStoreProvider stateStoreProvider,
-            RecoveryUtils recoveryUtils)
+            RecoveryUtils recoveryUtils,
+            QueryResourceManagerService queryResourceManager)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -235,6 +242,7 @@ public class SqlQueryExecution
 
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
+            this.queryResourceManager = requireNonNull(queryResourceManager, "queryResourceManager is null").createQueryResourceManager(stateMachine.getQueryId(), stateMachine.getSession());
 
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
@@ -473,6 +481,37 @@ public class SqlQueryExecution
         log.debug("queryId=%s, add columnToSymbolMapping into hazelcast success.", queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
     }
 
+    private void setResourceLimitsFromEstimates(PlanNodeId rootId)
+    {
+        PlanCostEstimate estimate = queryPlan.get().getStatsAndCosts().getCosts().get(rootId);
+        if (estimate != null && estimate != PlanCostEstimate.zero() && estimate != PlanCostEstimate.unknown()) {
+            double cpuCost = estimate.getCpuCost();
+            cpuCost = Double.isInfinite(cpuCost) || Double.isNaN(cpuCost) ? 0.0 : cpuCost;
+
+            double memCost = estimate.getMaxMemory();
+            memCost = Double.isInfinite(memCost) || Double.isNaN(memCost) ? 0.0 : memCost;
+
+            double ioCost = estimate.getNetworkCost();
+            ioCost = Double.isInfinite(ioCost) || Double.isNaN(ioCost) ? 0.0 : ioCost;
+
+            queryResourceManager.setResourceLimit(new DataSize(memCost, BYTE),
+                    new Duration(cpuCost, TimeUnit.MILLISECONDS),
+                    new DataSize(ioCost, BYTE));
+        }
+    }
+
+    private void updateQueryResourceStats()
+    {
+        SqlQueryScheduler scheduler = queryScheduler.get();
+        if (scheduler != null) {
+            Duration totalCpu = scheduler.getTotalCpuTime();
+            DataSize totalMem = DataSize.succinctBytes(scheduler.getTotalMemoryReservation());
+            DataSize totalIo = scheduler.getBasicStageStats().getInternalNetworkInputDataSize();
+
+            queryResourceManager.updateStats(totalCpu, totalMem, totalIo);
+        }
+    }
+
     @Override
     public void start()
     {
@@ -486,6 +525,7 @@ public class SqlQueryExecution
 
                 // analyze query
                 PlanRoot plan = analyzeQuery();
+                setResourceLimitsFromEstimates(plan.getRoot().getFragment().getRoot().getId());
 
                 try {
                     handleCrossRegionDynamicFilter(plan);
@@ -583,7 +623,7 @@ public class SqlQueryExecution
                 queryRecoveryManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
                 snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
-                true);
+                true, queryResourceManager);
         if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
             // Restore going to happen first, mark the restore state for all stages
             scheduler.setResuming(snapshotId.getAsLong());
@@ -850,7 +890,8 @@ public class SqlQueryExecution
                 snapshotManager,
                 queryRecoveryManager,
                 null,
-                false);
+                false,
+                queryResourceManager);
 
         queryScheduler.set(scheduler);
 
@@ -1085,6 +1126,8 @@ public class SqlQueryExecution
         private final StateStoreProvider stateStoreProvider;
         private final RecoveryUtils recoveryUtils;
 
+        private final QueryResourceManagerService queryResourceManagerService;
+
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
                 HetuConfig hetuConfig,
@@ -1111,7 +1154,8 @@ public class SqlQueryExecution
                 DynamicFilterService dynamicFilterService,
                 HeuristicIndexerManager heuristicIndexerManager,
                 StateStoreProvider stateStoreProvider,
-                RecoveryUtils recoveryUtils)
+                RecoveryUtils recoveryUtils,
+                QueryResourceManagerService queryResourceManagerService)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1139,6 +1183,7 @@ public class SqlQueryExecution
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.recoveryUtils = requireNonNull(recoveryUtils, "recoveryUtils is null");
+            this.queryResourceManagerService = requireNonNull(queryResourceManagerService, "queryResourceManagerService is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -1199,7 +1244,8 @@ public class SqlQueryExecution
                     this.cache,
                     heuristicIndexerManager,
                     stateStoreProvider,
-                    recoveryUtils);
+                    recoveryUtils,
+                    queryResourceManagerService);
         }
     }
 }
