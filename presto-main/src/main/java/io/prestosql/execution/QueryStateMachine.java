@@ -105,7 +105,9 @@ public class QueryStateMachine
 
     private final QueryId queryId;
     private final String query;
+    private final List<String> queryList;
     private final Optional<String> preparedQuery;
+    private final List<Optional<String>> preparedQueryList;
     private final Session session;
     private final URI self;
     private final ResourceGroupId resourceGroup;
@@ -153,6 +155,8 @@ public class QueryStateMachine
 
     private final AtomicReference<String> updateType = new AtomicReference<>();
 
+    private final List<String> updateTypeList = new ArrayList<>();
+
     private final AtomicReference<ExecutionFailureInfo> failureCause = new AtomicReference<>();
 
     private final AtomicReference<Set<Input>> inputs = new AtomicReference<>(ImmutableSet.of());
@@ -178,7 +182,9 @@ public class QueryStateMachine
             WarningCollector warningCollector)
     {
         this.query = requireNonNull(query, "query is null");
+        this.queryList = null;
         this.preparedQuery = requireNonNull(preparedQuery, "preparedQuery is null");
+        this.preparedQueryList = null;
         this.session = requireNonNull(session, "session is null");
         this.queryId = session.getQueryId();
         this.self = requireNonNull(self, "self is null");
@@ -195,6 +201,40 @@ public class QueryStateMachine
         this.outputManager = new QueryOutputManager(executor);
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
         this.recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(getSession());
+    }
+
+    private QueryStateMachine(
+            List<String> queryList,
+            List<Optional<String>> preparedQueryList,
+            Session session,
+            URI self,
+            ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
+            TransactionManager transactionManager,
+            Executor executor,
+            Ticker ticker,
+            Metadata metadata,
+            WarningCollector warningCollector)
+    {
+        this.query = null;
+        this.queryList = requireNonNull(queryList, "queryList is null");
+        this.preparedQuery = null;
+        this.preparedQueryList = requireNonNull(preparedQueryList, "preparedQuery is null");
+        this.session = requireNonNull(session, "session is null");
+        this.queryId = session.getQueryId();
+        this.self = requireNonNull(self, "self is null");
+        this.resourceGroup = requireNonNull(resourceGroup, "resourceGroup is null");
+        this.resourceGroupManager = resourceGroupManager;
+        this.throttlingEnabled = resourceGroupManager.isGroupRegistered(resourceGroup)
+                && resourceGroupManager.getSoftReservedMemory(resourceGroup) != Long.MAX_VALUE;
+        this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
+        this.queryStateTimer = new QueryStateTimer(ticker);
+        this.metadata = requireNonNull(metadata, "metadata is null");
+
+        this.queryState = new StateMachine<>("query " + queryId, executor, QUEUED, TERMINAL_QUERY_STATES);
+        this.finalQueryInfo = new StateMachine<>("finalQueryInfo-" + queryId, executor, Optional.empty());
+        this.outputManager = new QueryOutputManager(executor);
+        this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
     }
 
     /**
@@ -217,6 +257,39 @@ public class QueryStateMachine
         return beginWithTicker(
                 query,
                 preparedQuery,
+                session,
+                self,
+                resourceGroup,
+                resourceGroupManager,
+                transactionControl,
+                transactionManager,
+                accessControl,
+                executor,
+                Ticker.systemTicker(),
+                metadata,
+                warningCollector);
+    }
+
+    /**
+     * Created QueryStateMachines must be transitioned to terminal states to clean up resources.
+     */
+    public static QueryStateMachine begin(
+            List<String> queryList,
+            List<Optional<String>> preparedQueryList,
+            Session session,
+            URI self,
+            ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
+            boolean transactionControl,
+            TransactionManager transactionManager,
+            AccessControl accessControl,
+            Executor executor,
+            Metadata metadata,
+            WarningCollector warningCollector)
+    {
+        return beginWithTicker(
+                queryList,
+                preparedQueryList,
                 session,
                 self,
                 resourceGroup,
@@ -256,6 +329,46 @@ public class QueryStateMachine
         QueryStateMachine queryStateMachine = new QueryStateMachine(
                 query,
                 preparedQuery,
+                localSession,
+                self,
+                resourceGroup,
+                resourceGroupManager,
+                transactionManager,
+                executor,
+                ticker,
+                metadata,
+                warningCollector);
+        queryStateMachine.addStateChangeListener(newState -> QUERY_STATE_LOG.debug("Query %s is %s", queryStateMachine.getQueryId(), newState));
+
+        return queryStateMachine;
+    }
+
+    static QueryStateMachine beginWithTicker(
+            List<String> queryList,
+            List<Optional<String>> preparedQueryList,
+            Session inputSession,
+            URI self,
+            ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
+            boolean transactionControl,
+            TransactionManager transactionManager,
+            AccessControl accessControl,
+            Executor executor,
+            Ticker ticker,
+            Metadata metadata,
+            WarningCollector warningCollector)
+    {
+        Session localSession = inputSession;
+        // If there is not an existing transaction, begin an auto commit transaction
+        if (!localSession.getTransactionId().isPresent() && !transactionControl) {
+            // TODO: make autocommit isolation level a session parameter
+            TransactionId transactionId = transactionManager.beginTransaction(true);
+            localSession = localSession.beginTransactionId(transactionId, transactionManager, accessControl);
+        }
+
+        QueryStateMachine queryStateMachine = new QueryStateMachine(
+                queryList,
+                preparedQueryList,
                 localSession,
                 self,
                 resourceGroup,
@@ -402,8 +515,8 @@ public class QueryStateMachine
                 memoryPool.get().getId(),
                 stageStats.isScheduled(),
                 self,
-                query,
-                preparedQuery,
+                query != null ? query : queryList.get(0),
+                preparedQuery != null ? preparedQuery : preparedQueryList.get(0),
                 queryStats,
                 errorCode == null ? null : errorCode.getType(),
                 errorCode,
@@ -439,8 +552,8 @@ public class QueryStateMachine
                 isScheduled,
                 self,
                 outputManager.getQueryOutputInfo().map(QueryOutputInfo::getColumnNames).orElse(ImmutableList.of()),
-                query,
-                preparedQuery,
+                query != null ? query : queryList.get(0),
+                preparedQuery != null ? preparedQuery : preparedQueryList.get(0),
                 getQueryStats(rootStage),
                 Optional.ofNullable(setCatalog.get()),
                 Optional.ofNullable(setSchema.get()),
@@ -452,7 +565,7 @@ public class QueryStateMachine
                 deallocatedPreparedStatements,
                 Optional.ofNullable(startedTransactionId.get()),
                 clearTransactionId.get(),
-                updateType.get(),
+                updateType.get() != null ? updateType.get() : updateTypeList.get(0),
                 rootStage,
                 localFailureCause,
                 errorCode,
@@ -756,6 +869,11 @@ public class QueryStateMachine
     public void setUpdateType(String updateType)
     {
         this.updateType.set(updateType);
+    }
+
+    public void addUpdateType(String updateType)
+    {
+        this.updateTypeList.add(updateType);
     }
 
     public QueryState getQueryState()

@@ -31,11 +31,14 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
+import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.transaction.TransactionManager;
 
 import javax.inject.Inject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -119,7 +122,58 @@ public class LocalDispatchQueryFactory
                 throw new PrestoException(NOT_SUPPORTED, "Unsupported statement type: " + preparedQuery.getStatement().getClass().getSimpleName());
             }
 
-            QueryExecution queryExecution = queryExecutionFactory.createQueryExecution(preparedQuery, stateMachine, slug, warningCollector);
+            QueryExecution queryExecution = queryExecutionFactory.createQueryExecution(preparedQuery, null, stateMachine, slug, warningCollector);
+            stateMachine.endSyntaxAnalysis();
+            return queryExecution;
+        });
+
+        return new LocalDispatchQuery(
+                stateMachine,
+                queryExecutionFuture,
+                clusterSizeMonitor,
+                executor,
+                queryManager::createQuery);
+    }
+
+    @Override
+    public DispatchQuery createDispatchQuery(
+            Session session,
+            List<String> queryList,
+            List<PreparedQuery> preparedQueryList,
+            String slug, ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
+            boolean isTransactionControlStatement)
+    {
+        WarningCollector warningCollector = warningCollectorFactory.create();
+        List<Optional<String>> prepareSqlList = new ArrayList<>();
+        for (PreparedQuery preparedQuery : preparedQueryList) {
+            prepareSqlList.add(preparedQuery.getPrepareSql());
+        }
+        QueryStateMachine stateMachine = QueryStateMachine.begin(
+                queryList,
+                prepareSqlList,
+                session,
+                locationFactory.createQueryLocation(session.getQueryId()),
+                resourceGroup,
+                resourceGroupManager,
+                isTransactionControlStatement,
+                transactionManager,
+                accessControl,
+                executor,
+                metadata,
+                warningCollector);
+
+        queryMonitor.queryCreatedEvent(stateMachine.getBasicQueryInfo(Optional.empty()));
+
+        ListenableFuture<QueryExecution> queryExecutionFuture = executor.submit(() -> {
+            stateMachine.beginSyntaxAnalysis();
+            // Temporarily to get SqlQueryExecutionFactory
+            QueryExecutionFactory<?> queryExecutionFactory = executionFactories.get(Query.class);
+            if (queryExecutionFactory == null) {
+                throw new PrestoException(NOT_SUPPORTED, "Unsupported statement type: " + Query.class.getSimpleName());
+            }
+
+            QueryExecution queryExecution = queryExecutionFactory.createQueryExecution(null, preparedQueryList, stateMachine, slug, warningCollector);
             stateMachine.endSyntaxAnalysis();
             return queryExecution;
         });

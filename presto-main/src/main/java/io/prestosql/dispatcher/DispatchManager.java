@@ -41,6 +41,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.resourcegroups.SelectionContext;
 import io.prestosql.spi.resourcegroups.SelectionCriteria;
 import io.prestosql.spi.service.PropertyService;
+import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.SharedQueryState;
 import io.prestosql.statestore.StateCacheStore;
 import io.prestosql.statestore.StateFetcher;
@@ -57,10 +58,12 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.StringTokenizer;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -170,7 +173,7 @@ public class DispatchManager
         return queryIdGenerator.createNextQueryId();
     }
 
-    public ListenableFuture<?> createQuery(QueryId queryId, String slug, SessionContext sessionContext, String query)
+    public ListenableFuture<?> createQuery(QueryId queryId, String slug, SessionContext sessionContext, String query, boolean isBatchQuery)
     {
         requireNonNull(queryId, "queryId is null");
         requireNonNull(sessionContext, "sessionFactory is null");
@@ -181,7 +184,12 @@ public class DispatchManager
         DispatchQueryCreationFuture queryCreationFuture = new DispatchQueryCreationFuture();
         queryExecutor.execute(() -> {
             try {
-                createQueryInternal(queryId, slug, sessionContext, query, resourceGroupManager);
+                if (!isBatchQuery) {
+                    createQueryInternal(queryId, slug, sessionContext, query, resourceGroupManager);
+                }
+                else {
+                    createBatchQueryInternal(queryId, slug, sessionContext, query, resourceGroupManager);
+                }
             }
             finally {
                 queryCreationFuture.set(null);
@@ -235,6 +243,107 @@ public class DispatchManager
                     slug,
                     selectionContext.getResourceGroupId(),
                     resourceGroupManager);
+
+            boolean queryAdded = queryCreated(dispatchQuery);
+            if (queryAdded && !dispatchQuery.isDone()) {
+                try {
+                    resourceGroupManager.submit(dispatchQuery, selectionContext, queryExecutor);
+
+                    if (PropertyService.getBooleanProperty(HetuConstant.MULTI_COORDINATOR_ENABLED) && stateUpdater != null) {
+                        stateUpdater.registerQuery(StateStoreConstants.QUERY_STATE_COLLECTION_NAME, dispatchQuery);
+                    }
+
+                    if (LOG.isDebugEnabled()) {
+                        long now = System.currentTimeMillis();
+                        LOG.debug("query:%s submission started at %s, ended at %s, total time use: %sms",
+                                dispatchQuery.getQueryId(),
+                                new SimpleDateFormat("HH:mm:ss:SSS").format(dispatchQuery.getCreateTime().toDate()),
+                                new SimpleDateFormat("HH:mm:ss:SSS").format(new Date(now)),
+                                now - dispatchQuery.getCreateTime().getMillis());
+                    }
+                }
+                catch (Throwable e) {
+                    // dispatch query has already been registered, so just fail it directly
+                    dispatchQuery.fail(e);
+                }
+            }
+        }
+        catch (Throwable throwable) {
+            // creation must never fail, so register a failed query in this case
+            if (dispatchQuery == null) {
+                if (session == null) {
+                    session = Session.builder(new SessionPropertyManager())
+                            .setQueryId(queryId)
+                            .setIdentity(sessionContext.getIdentity())
+                            .setSource(sessionContext.getSource())
+                            .build();
+                }
+                DispatchQuery failedDispatchQuery = failedDispatchQueryFactory.createFailedDispatchQuery(session, query, Optional.empty(), throwable);
+                queryCreated(failedDispatchQuery);
+            }
+            else {
+                dispatchQuery.fail(throwable);
+            }
+        }
+    }
+
+    private <C> void createBatchQueryInternal(QueryId queryId, String slug, SessionContext sessionContext, String inputQuery, ResourceGroupManager<C> resourceGroupManager)
+    {
+        String query = inputQuery;
+        Session session = null;
+        DispatchQuery dispatchQuery = null;
+        List<String> queryList = new ArrayList<>();
+        List<PreparedQuery> preparedQueryList = new ArrayList<>();
+        boolean isTransactionControlStatement = false;
+
+        try {
+            if (query.length() > maxQueryLength) {
+                int queryLength = query.length();
+                query = query.substring(0, maxQueryLength);
+                throw new PrestoException(QUERY_TEXT_TOO_LARGE, format("Query text length (%s) exceeds the maximum length (%s)", queryLength, maxQueryLength));
+            }
+
+            // decode session
+            session = sessionSupplier.createSession(queryId, sessionContext);
+            StringTokenizer tokenizer = new StringTokenizer(query, ";");
+            while (tokenizer.hasMoreTokens()) {
+                String curQuery = tokenizer.nextToken();
+                queryList.add(curQuery);
+                // prepare query
+                preparedQueryList.add(queryPreparer.prepareQuery(session, curQuery));
+            }
+
+            // select resource group
+            SelectionContext<C> selectionContext = resourceGroupManager.selectGroup(new SelectionCriteria(
+                    sessionContext.getIdentity().getPrincipal().isPresent(),
+                    sessionContext.getIdentity().getUser(),
+                    Optional.ofNullable(sessionContext.getSource()),
+                    sessionContext.getClientTags(),
+                    sessionContext.getResourceEstimates(),
+                    Optional.empty()));
+
+            // apply system default session properties (does not override user set properties)
+            session = sessionPropertyDefaults.newSessionWithDefaultProperties(session, Optional.empty(), selectionContext.getResourceGroupId());
+
+            // Check if any query is transaction control statement
+            for (PreparedQuery preparedQuery : preparedQueryList) {
+                Statement statement = preparedQuery.getStatement();
+                isTransactionControlStatement = isTransactionControlStatement(statement);
+                if (isTransactionControlStatement) {
+                    break;
+                }
+            }
+            // mark existing transaction as active
+            transactionManager.activateTransaction(session, isTransactionControlStatement, accessControl);
+
+            dispatchQuery = dispatchQueryFactory.createDispatchQuery(
+                    session,
+                    queryList,
+                    preparedQueryList,
+                    slug,
+                    selectionContext.getResourceGroupId(),
+                    resourceGroupManager,
+                    isTransactionControlStatement);
 
             boolean queryAdded = queryCreated(dispatchQuery);
             if (queryAdded && !dispatchQuery.isDone()) {

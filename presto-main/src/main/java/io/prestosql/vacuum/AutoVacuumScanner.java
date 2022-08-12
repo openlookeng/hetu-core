@@ -229,7 +229,7 @@ public class AutoVacuumScanner
         ListenableFuture<?> querySubmissionFuture;
         // if query query submission has not finished, wait for it to finish
         synchronized (this) {
-            querySubmissionFuture = dispatchManager.createQuery(queryId, slug, sessionContext, vacuumQuery);
+            querySubmissionFuture = dispatchManager.createQuery(queryId, slug, sessionContext, vacuumQuery, false);
         }
 
         if (!querySubmissionFuture.isDone()) {

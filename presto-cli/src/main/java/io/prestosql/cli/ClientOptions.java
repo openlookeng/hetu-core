@@ -155,6 +155,9 @@ public class ClientOptions
     @Option(name = "--max-batch-process-size", title = "Maximum Batch Process Size (Rows)", description = "Maximum Batch Process Size as the number of Rows which can be processed")
     public String maxBatchProcessSize = "50000000";
 
+    @Option(name = {"-b", "--batch"}, title = "batch query", description = "Execute batch query")
+    public String batchQuery;
+
     public enum OutputFormat
     {
         ALIGNED,

@@ -18,6 +18,8 @@ import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.spi.resourcegroups.ResourceGroupId;
 
+import java.util.List;
+
 public interface DispatchQueryFactory
 {
     DispatchQuery createDispatchQuery(
@@ -27,4 +29,13 @@ public interface DispatchQueryFactory
             String slug,
             ResourceGroupId resourceGroup,
             ResourceGroupManager resourceGroupManager);
+
+    DispatchQuery createDispatchQuery(
+            Session session,
+            List<String> queryList,
+            List<PreparedQuery> preparedQueryList,
+            String slug,
+            ResourceGroupId resourceGroup,
+            ResourceGroupManager resourceGroupManager,
+            boolean isTransactionControlStatement);
 }

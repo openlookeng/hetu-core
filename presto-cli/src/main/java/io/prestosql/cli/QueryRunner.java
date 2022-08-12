@@ -44,6 +44,7 @@ public class QueryRunner
 {
     private final AtomicReference<ClientSession> session;
     private final boolean debug;
+    private final boolean isBatchQuery;
     private final OkHttpClient httpClient;
     private final Consumer<OkHttpClient.Builder> sslSetup;
     private CubeConsole cubeConsole;
@@ -67,10 +68,12 @@ public class QueryRunner
             Optional<String> kerberosConfigPath,
             Optional<String> kerberosKeytabPath,
             Optional<String> kerberosCredentialCachePath,
-            boolean kerberosUseCanonicalHostname)
+            boolean kerberosUseCanonicalHostname,
+            boolean isBatchQuery)
     {
         this.session = new AtomicReference<>(requireNonNull(session, "session is null"));
         this.debug = debug;
+        this.isBatchQuery = isBatchQuery;
 
         this.sslSetup = builder -> setupSsl(builder, keystorePath, keystorePassword, truststorePath, truststorePassword);
 
@@ -153,7 +156,7 @@ public class QueryRunner
         sslSetup.accept(builder);
         OkHttpClient client = builder.build();
 
-        return newStatementClient(client, session, query);
+        return newStatementClient(client, session, query, isBatchQuery);
     }
 
     @Override

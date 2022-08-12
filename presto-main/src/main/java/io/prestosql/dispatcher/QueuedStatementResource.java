@@ -71,6 +71,7 @@ import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.jaxrs.AsyncResponseHandler.bindAsyncResponse;
+import static io.prestosql.client.PrestoHeaders.PRESTO_BATCH_QUERY;
 import static io.prestosql.execution.QueryState.FAILED;
 import static io.prestosql.execution.QueryState.QUEUED;
 import static io.prestosql.metadata.NodeState.ACTIVE;
@@ -169,7 +170,7 @@ public class QueuedStatementResource
         }
 
         SessionContext sessionContext = new HttpRequestSessionContext(servletRequest, groupProvider);
-        Query query = new Query(statement, sessionContext, dispatchManager);
+        Query query = new Query(statement, sessionContext, dispatchManager, "1".equals(servletRequest.getHeader(PRESTO_BATCH_QUERY)));
         queries.put(query.getQueryId(), query);
 
         return Response.ok(query.getQueryResults(query.getLastToken(), uriInfo, xForwardedProto)).build();
@@ -304,16 +305,18 @@ public class QueuedStatementResource
         private final QueryId queryId;
         private final String slug = "x" + randomUUID().toString().toLowerCase(ENGLISH).replace("-", "");
         private final AtomicLong lastToken = new AtomicLong();
+        private final boolean isBatchQuery;
 
         @GuardedBy("this")
         private ListenableFuture<?> querySubmissionFuture;
 
-        public Query(String query, SessionContext sessionContext, DispatchManager dispatchManager)
+        public Query(String query, SessionContext sessionContext, DispatchManager dispatchManager, boolean isBatchQuery)
         {
             this.query = requireNonNull(query, "query is null");
             this.sessionContext = requireNonNull(sessionContext, "sessionContext is null");
             this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");
             this.queryId = dispatchManager.createQueryId();
+            this.isBatchQuery = isBatchQuery;
         }
 
         public QueryId getQueryId()
@@ -341,7 +344,7 @@ public class QueuedStatementResource
             // if query query submission has not finished, wait for it to finish
             synchronized (this) {
                 if (querySubmissionFuture == null) {
-                    querySubmissionFuture = dispatchManager.createQuery(queryId, slug, sessionContext, query);
+                    querySubmissionFuture = dispatchManager.createQuery(queryId, slug, sessionContext, query, isBatchQuery);
                 }
                 if (!querySubmissionFuture.isDone()) {
                     return querySubmissionFuture;

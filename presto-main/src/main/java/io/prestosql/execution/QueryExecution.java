@@ -96,7 +96,7 @@ public interface QueryExecution
 
     interface QueryExecutionFactory<T extends QueryExecution>
     {
-        T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);
+        T createQueryExecution(PreparedQuery preparedQuery, List<PreparedQuery> preparedQueryList, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);
     }
 
     /**

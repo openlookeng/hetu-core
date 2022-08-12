@@ -93,6 +93,7 @@ public class Console
         boolean hasQuery = !isNullOrEmpty(clientOptions.execute);
         boolean isFromFile = !isNullOrEmpty(clientOptions.file);
         initializeLogging(clientOptions.logLevelsFile);
+        boolean hasBatchQuery = !isNullOrEmpty(clientOptions.batchQuery);
 
         String query = clientOptions.execute;
         if (hasQuery) {
@@ -103,6 +104,9 @@ public class Console
             if (hasQuery) {
                 throw new RuntimeException("both --execute and --file specified");
             }
+            if (hasBatchQuery) {
+                throw new RuntimeException("both --batch and --file specified");
+            }
             try {
                 query = asCharSource(new File(clientOptions.file), UTF_8).read();
                 hasQuery = true;
@@ -110,6 +114,14 @@ public class Console
             catch (IOException e) {
                 throw new RuntimeException(format("Error reading from file %s: %s", clientOptions.file, e.getMessage()));
             }
+        }
+
+        if (hasBatchQuery) {
+            if (hasQuery) {
+                throw new RuntimeException("both --execute and --batch specified");
+            }
+            query = clientOptions.batchQuery;
+            hasQuery = true;
         }
 
         // abort any running query if the CLI is terminated
@@ -140,7 +152,8 @@ public class Console
                 Optional.ofNullable(clientOptions.krb5ConfigPath),
                 Optional.ofNullable(clientOptions.krb5KeytabPath),
                 Optional.ofNullable(clientOptions.krb5CredentialCachePath),
-                !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization)) {
+                !clientOptions.krb5DisableRemoteServiceHostnameCanonicalization,
+                hasBatchQuery)) {
             if (hasQuery) {
                 return executeCommand(
                         queryRunner,

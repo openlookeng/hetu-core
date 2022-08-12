@@ -87,6 +87,7 @@ public class Console
         boolean isFromFile = !isNullOrEmpty(cliOptions.sqlFile);
 
         String query = cliOptions.execute;
+
         if (hasQuery) {
             query += ";";
         }
