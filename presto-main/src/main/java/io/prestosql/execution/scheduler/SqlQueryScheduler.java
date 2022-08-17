@@ -46,6 +46,8 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.operator.TaskLocation;
+import io.prestosql.resourcemanager.QueryExecutionModifier;
+import io.prestosql.resourcemanager.QueryResourceManager;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
@@ -162,6 +164,8 @@ public class SqlQueryScheduler
     private final QueryRecoveryManager queryRecoveryManager;
     private final Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes = new ConcurrentHashMap<>();
 
+    private final QueryResourceManager queryResourceManager;
+
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
             LocationFactory locationFactory,
@@ -184,7 +188,8 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager,
             Map<StageId, Integer> stageTaskCounts,
-            boolean isResume)
+            boolean isResume,
+            QueryResourceManager queryResourceManager)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -208,7 +213,8 @@ public class SqlQueryScheduler
                 snapshotManager,
                 queryRecoveryManager,
                 stageTaskCounts,
-                isResume);
+                isResume,
+                queryResourceManager);
         sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
@@ -235,7 +241,8 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager,
             Map<StageId, Integer> stageTaskCounts,
-            boolean isResumeScheduler)
+            boolean isResumeScheduler,
+            QueryResourceManager queryResourceManager)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -246,6 +253,7 @@ public class SqlQueryScheduler
 
         this.snapshotManager = snapshotManager;
         this.queryRecoveryManager = queryRecoveryManager;
+        this.queryResourceManager = queryResourceManager;
         if (SystemSessionProperties.isRecoveryEnabled(session)) {
             queryRecoveryManager.setCancelToResumeCb(this::cancelToResume);
         }
@@ -666,6 +674,11 @@ public class SqlQueryScheduler
         return aggregateBasicStageStats(stageStats);
     }
 
+    private ImmutableList<StageInfo> getStagesInfo()
+    {
+        return stages.values().stream().map(SqlStageExecution::getStageInfo).collect(toImmutableList());
+    }
+
     public StageInfo getStageInfo()
     {
         Map<StageId, StageInfo> stageInfos = stages.values().stream()
@@ -733,6 +746,8 @@ public class SqlQueryScheduler
     {
         long cachedMemoryUsage = queryStateMachine.getResourceGroupManager().getCachedMemoryUsage(queryStateMachine.getResourceGroup());
         long softReservedMemory = queryStateMachine.getResourceGroupManager().getSoftReservedMemory(queryStateMachine.getResourceGroup());
+
+        /* Todo(Nitin K) replace with smart scheduler and pull the resource limit from QueryResourceManager/Service */
         if (cachedMemoryUsage < softReservedMemory) {
             return true;
         }
@@ -752,6 +767,33 @@ public class SqlQueryScheduler
             }
         }
         return SPLIT_GROUP_GRADATION[result];
+    }
+
+    private void updateQueryResourceStats()
+    {
+        QueryExecutionModifier modifier = queryResourceManager.updateStats(getStagesInfo());
+
+        switch (modifier) {
+            case SPILL_REVOCABLE:
+                spillRevocableMem();
+                break;
+
+            case SUSPEND_QUERY:
+                suspend();
+                break;
+
+            case RESUME_QUERY:
+                resume();
+                break;
+
+            case NO_OP:
+            case THROTTLE_SPLITS: /* Todo(nitin): if throttle suggested, don't suggest again and give little time for throttling to take effect */
+                break;
+
+            case KILL_QUERY:
+                abort();
+                break;
+        }
     }
 
     private void schedule()
@@ -786,6 +828,8 @@ public class SqlQueryScheduler
                         stage.setThrottledSchedule(false);
                         currentTimerLevel = 0;
                     }
+
+                    updateQueryResourceStats();
 
                     // perform some scheduling work
                     /* Get groupSize specification from the ResourceGroupManager */
@@ -831,6 +875,8 @@ public class SqlQueryScheduler
                         completedStages.add(stage.getStageId());
                     }
                 }
+
+                updateQueryResourceStats();
 
                 // wait for a state change and then schedule again
                 if (!blockedStages.isEmpty()) {
@@ -914,6 +960,14 @@ public class SqlQueryScheduler
         log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
             stages.values().forEach(SqlStageExecution::resume);
+        }
+    }
+
+    public synchronized void spillRevocableMem()
+    {
+        log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::spillRevocableMem);
         }
     }
 

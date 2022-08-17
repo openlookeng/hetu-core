@@ -123,4 +123,6 @@ public interface QueryManager
     void suspendQuery(QueryId queryId);
 
     void resumeQuery(QueryId queryId);
+
+    void spillQueryRevocableMemory(QueryId queryId);
 }

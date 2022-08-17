@@ -67,6 +67,8 @@ public interface RemoteTask
 
     void resume();
 
+    void spillRevocableMemory();
+
     void abort();
 
     int getPartitionedSplitCount();

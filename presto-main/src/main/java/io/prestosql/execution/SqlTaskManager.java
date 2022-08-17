@@ -533,6 +533,24 @@ public class SqlTaskManager
     }
 
     @Override
+    public TaskInfo spillTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId)
+    {
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(targetState, "targetState is null");
+
+        SqlTask sqlTask = getTaskOrCreate(expectedTaskInstanceId, taskId);
+        if (sqlTask == null) {
+            return null;
+        }
+
+        TaskState oldState = sqlTask.getTaskStatus().getState();
+        TaskInfo result = sqlTask.spill(targetState);
+
+        log.debug("Resuming task %s (instanceId %s). Old state: %s; new state: %s", taskId, expectedTaskInstanceId, oldState, targetState);
+        return result;
+    }
+
+    @Override
     public TaskInfo cancelTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId)
     {
         requireNonNull(taskId, "taskId is null");
