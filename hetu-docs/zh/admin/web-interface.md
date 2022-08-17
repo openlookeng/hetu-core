@@ -62,15 +62,15 @@ openLooKeng提供了一个用于监视和管理查询的Web界面。Web界面可
 
 ### `hetu.queryhistory.max-count`
 
-> -   **Type:** `int`
-> -   **Default value:** `1000`
+> -   **类型:** `int`
+> -   **默认值:** `1000`
 >
 > openLooKeng储存的历史查询记录最大数量。可以通过配置`etc/config.properties`文件的`hetu.queryhistory.max-count`属性修改。
 
 ### `hetu.collectionsql.max-count`
 
-> -   **Type:** `int`
-> -   **Default value:** `100`
+> -   **类型:** `int`
+> -   **默认值:** `100`
 >
 > 每位用户收藏sql语句条数上限.可以通过配置`etc/config.properties`文件的`hetu.collectionsql.max-count`属性修改。
 
