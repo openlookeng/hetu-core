@@ -483,6 +483,7 @@ public class SqlQueryExecution
 
     private void setResourceLimitsFromEstimates(PlanNodeId rootId)
     {
+        /* Todo(Nitin): Re-divide the available resources amongst queries again when new query comes in.. */
         PlanCostEstimate estimate = queryPlan.get().getStatsAndCosts().getCosts().get(rootId);
         if (estimate != null && estimate != PlanCostEstimate.zero() && estimate != PlanCostEstimate.unknown()) {
             double cpuCost = estimate.getCpuCost();
@@ -959,6 +960,17 @@ public class SqlQueryExecution
                     scheduler.resume();
                 }
                 stateMachine.transitionToResumeRunning();
+            }
+        }
+    }
+
+    @Override
+    public void spillQueryRevocableMemory()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            if (scheduler != null) {
+                scheduler.spillRevocableMem();
             }
         }
     }

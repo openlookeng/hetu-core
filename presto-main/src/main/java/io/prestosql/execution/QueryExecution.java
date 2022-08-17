@@ -94,6 +94,11 @@ public interface QueryExecution
         // no-op
     }
 
+    default void spillQueryRevocableMemory()
+    {
+        // no-op
+    }
+
     interface QueryExecutionFactory<T extends QueryExecution>
     {
         T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);

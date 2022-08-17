@@ -307,6 +307,30 @@ public class TaskResource
     }
 
     @DELETE
+    @Path("{taskId}/spill")
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    public TaskInfo spillTask(
+            @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
+            @QueryParam("targetState") String targetStateStr,
+            @Context UriInfo uriInfo)
+    {
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+
+        TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
+        TaskInfo taskInfo = taskManager.spillTask(taskId, targetState, taskInstanceId);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+        }
+
+        if (shouldSummarize(uriInfo)) {
+            taskInfo = taskInfo.summarize();
+        }
+        return taskInfo;
+    }
+
+    @DELETE
     @Path("{taskId}")
     @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
     public TaskInfo deleteTask(

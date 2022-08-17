@@ -346,6 +346,16 @@ public class SqlQueryManager
     }
 
     @Override
+    public void spillQueryRevocableMemory(QueryId queryId)
+    {
+        requireNonNull(queryId, "queryId is null");
+        log.debug("Spill any revocable memory in query %s", queryId);
+
+        queryTracker.tryGetQuery(queryId)
+                .ifPresent(QueryExecution::spillQueryRevocableMemory);
+    }
+
+    @Override
     @Managed
     @Flatten
     public QueryManagerStats getStats()

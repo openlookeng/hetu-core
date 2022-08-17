@@ -14,13 +14,17 @@
  */
 package io.prestosql.resourcemanager;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.AtomicDouble;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.execution.StageId;
+import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StageStats;
-import io.prestosql.metadata.InternalNode;
+import io.prestosql.execution.TaskId;
+import io.prestosql.execution.TaskInfo;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.resourcegroups.KillPolicy;
 import io.prestosql.spi.resourcegroups.ResourceGroup;
@@ -30,8 +34,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.KILL_QUERY;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.NO_OP;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.RESUME_QUERY;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.SPILL_REVOCABLE;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.SUSPEND_QUERY;
+import static io.prestosql.resourcemanager.QueryExecutionModifier.THROTTLE_SPLITS;
+import static java.util.function.Function.identity;
 
 public class QueryResourceManager
         implements ResourceManager
@@ -58,10 +72,15 @@ public class QueryResourceManager
 
     private final QueryResourceManagerService.ResourceUpdateListener resourceUpdateListener;
     private final BasicResourceStats queryResources = new BasicResourceStats();
-    private Map<InternalNode, BasicResourceStats> nodeWiseQueryStats = new HashMap<>();
+    private final Map<String, BasicResourceStats> nodeResourceStats = new ConcurrentHashMap<>(); // Todo(NitinK): check if concHash really needed here!
+    private Map<StageId, StageInfo> lastStagesInfo = new HashMap<>();
+
+    private boolean isSuspendSuggested;
 
     public QueryResourceManager(QueryId queryId, Session session, QueryResourceManagerService.ResourceUpdateListener resourceUpdateListener)
     {
+        /* Todo(NitinK): get configs for resource limit from resource group! */
+
         this.queryId = queryId;
         this.softMemoryLimit = Optional.empty();
         this.softMemoryLimitFraction = Optional.empty();
@@ -142,6 +161,82 @@ public class QueryResourceManager
     }
 
     @Override
+    public QueryExecutionModifier updateStats(ImmutableList<StageInfo> stats)
+    {
+        double cpuTime = 0.0;
+        long userMem = 0;
+        long revocableMem = 0;
+        long io = 0;
+
+        StageInfo lastStage = null;
+        for (StageInfo stageInfo : stats) {
+            lastStage = lastStagesInfo.getOrDefault(stageInfo.getStageId(), null);
+
+            Map<TaskId, TaskInfo> lastTasks = (lastStage == null) ? new HashMap<>() : lastStage.getTasks().stream().collect(toImmutableMap(k -> k.getTaskStatus().getTaskId(), identity()));
+
+            for (TaskInfo taskInfo : stageInfo.getTasks()) {
+                /* Consider finished stages also for cumulative result */
+                cpuTime += taskInfo.getStats().getTotalCpuTime().getValue(TimeUnit.MICROSECONDS);
+                userMem += taskInfo.getStats().getUserMemoryReservation().toBytes();
+                revocableMem += taskInfo.getStats().getRevocableMemoryReservation().toBytes();
+                io += taskInfo.getStats().getInternalNetworkInputDataSize().toBytes();
+
+                /* If already finished then can ignore the stats for given stage */
+                if (lastStage == null || !lastStage.getState().isDone()) {
+                    TaskInfo lastTask = lastTasks.getOrDefault(taskInfo.getTaskStatus().getTaskId(), null);
+                    double cpuTimeDiff = (lastTask == null) ? taskInfo.getStats().getTotalCpuTime().getValue(TimeUnit.MICROSECONDS) :
+                            ((diffDuration(taskInfo.getStats().getTotalCpuTime(), lastTask.getStats().getTotalCpuTime()) > 0) ?
+                                diffDuration(taskInfo.getStats().getTotalCpuTime(), lastTask.getStats().getTotalCpuTime()) : 0.0);
+                    long userMemDiff = (lastTask == null) ? taskInfo.getStats().getUserMemoryReservation().toBytes() :
+                            ((diffDataSize(taskInfo.getStats().getUserMemoryReservation(), lastTask.getStats().getUserMemoryReservation()) > 0) ?
+                                diffDataSize(taskInfo.getStats().getUserMemoryReservation(), lastTask.getStats().getUserMemoryReservation()) : 0);
+                    long revocableMemDiff = (lastTask == null) ? taskInfo.getStats().getRevocableMemoryReservation().toBytes() :
+                            ((diffDataSize(taskInfo.getStats().getRevocableMemoryReservation(), lastTask.getStats().getRevocableMemoryReservation()) > 0) ?
+                                diffDataSize(taskInfo.getStats().getRevocableMemoryReservation(), lastTask.getStats().getRevocableMemoryReservation()) : 0);
+                    long ioDiff = (lastTask == null) ? taskInfo.getStats().getInternalNetworkInputDataSize().toBytes() :
+                            ((diffDataSize(taskInfo.getStats().getInternalNetworkInputDataSize(), lastTask.getStats().getInternalNetworkInputDataSize()) > 0) ?
+                                diffDataSize(taskInfo.getStats().getInternalNetworkInputDataSize(), lastTask.getStats().getInternalNetworkInputDataSize()) : 0);
+
+                    BasicResourceStats stat = nodeResourceStats.computeIfAbsent(taskInfo.getTaskStatus().getNodeId(), v -> new BasicResourceStats());
+                    stat.memCurrent = addDataSize(stat.memCurrent, userMemDiff);
+                    stat.revocableMem = addDataSize(stat.revocableMem, revocableMemDiff);
+                    stat.cpuTime = addDuration(stat.cpuTime, cpuTimeDiff);
+                    stat.ioCurrent = addDataSize(stat.ioCurrent, ioDiff);
+                }
+            }
+        }
+
+        queryResources.cpuTime = Duration.succinctDuration(cpuTime, TimeUnit.MICROSECONDS);
+        queryResources.memCurrent = DataSize.succinctBytes(userMem);
+        queryResources.revocableMem = DataSize.succinctBytes(revocableMem);
+        queryResources.ioCurrent = DataSize.succinctBytes(io);
+
+        lastStagesInfo = stats.stream().collect(toImmutableMap(StageInfo::getStageId, identity()));
+
+        return checkResourceLimits();
+    }
+
+    private static Duration addDuration(Duration a, double b)
+    {
+        return Duration.succinctDuration(a.getValue(TimeUnit.MICROSECONDS) + b, TimeUnit.MICROSECONDS);
+    }
+
+    private static DataSize addDataSize(DataSize a, long b)
+    {
+        return DataSize.succinctBytes(a.toBytes() + b);
+    }
+
+    private static double diffDuration(Duration a, Duration b)
+    {
+        return (a.getValue(TimeUnit.MICROSECONDS) - b.getValue(TimeUnit.MICROSECONDS));
+    }
+
+    private static long diffDataSize(DataSize a, DataSize b)
+    {
+        return (a.toBytes() - b.toBytes());
+    }
+
+    @Override
     public void updateStats(Duration totalCpu, DataSize totalMem, DataSize totalIo)
     {
         queryResources.cpuTime = totalCpu;
@@ -151,30 +246,46 @@ public class QueryResourceManager
         checkResourceLimits();
     }
 
-    private void checkResourceLimits()
+    private QueryExecutionModifier checkResourceLimits()
     {
+        QueryExecutionModifier modifier = NO_OP;
         /* Inform the resource usage update to the ResourceManagerService
         * for broader resource planning. */
-        resourceUpdateListener.resourceUpdate(queryId, queryResources);
+        resourceUpdateListener.resourceUpdate(queryId, queryResources, nodeResourceStats);
 
         if (hardCpuLimit.isPresent() && queryResources.cpuTime.compareTo(hardCpuLimit.get()) > 0) {
             logger.warn("Query [%s] exceeds assigned Hard CPU-Time of %s, current Cpu: %s",
                     queryId.toString(), hardCpuLimit.get().toString(), queryResources.cpuTime.toString());
+            return KILL_QUERY;
         }
 
         if (softCpuLimit.isPresent() && queryResources.cpuTime.compareTo(softCpuLimit.get()) > 0) {
             logger.warn("Query [%s] exceeds assigned CPU-Time of %s, current Cpu: %s",
                     queryId.toString(), softCpuLimit.get().toString(), queryResources.cpuTime.toString());
+            isSuspendSuggested = true;
+            return SUSPEND_QUERY;
+        }
+        else if (isSuspendSuggested) {
+            return RESUME_QUERY;
+        }
+
+        if (softMemoryLimit.isPresent() && queryResources.revocableMem.compareTo(softMemoryLimit.get()) > 0) {
+            logger.warn("Query [%s] exceeds assigned Memory limit of %s, current revocable memory used: %s",
+                    queryId.toString(), softMemoryLimit.get().toString(), queryResources.revocableMem.toString());
+            return SPILL_REVOCABLE;
         }
 
         if (softMemoryLimit.isPresent() && queryResources.memCurrent.compareTo(softMemoryLimit.get()) > 0) {
             logger.warn("Query [%s] exceeds assigned Memory limit of %s, current memory used: %s",
                     queryId.toString(), softMemoryLimit.get().toString(), queryResources.memCurrent.toString());
+            return THROTTLE_SPLITS;
         }
 
         if (diskUseLimit.isPresent() && queryResources.ioCurrent.compareTo(diskUseLimit.get()) > 0) {
             logger.warn("Query [%s] exceeds assigned disk use limit of %s, current disk used: %s",
                     queryId.toString(), diskUseLimit.get().toString(), queryResources.ioCurrent.toString());
         }
+
+        return modifier;
     }
 }

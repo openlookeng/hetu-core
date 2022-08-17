@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
 import static java.util.Objects.requireNonNull;
@@ -26,7 +27,7 @@ import static java.util.Objects.requireNonNull;
 public class QueryResourceManagerService
 {
     private final ResourceUpdateListener resourceUpdateListener = new ResourceUpdateListener() {
-        public void resourceUpdate(QueryId queryId, BasicResourceStats stats)
+        public void resourceUpdate(QueryId queryId, BasicResourceStats stats, Map<String, BasicResourceStats> nodeResourceMap)
         {
             /* Todo(Nitin K) Implement resource estimation & reservation for future
              *   also, decision for given query level resource change */
@@ -78,6 +79,6 @@ public class QueryResourceManagerService
 
     public interface ResourceUpdateListener
     {
-        void resourceUpdate(QueryId queryId, BasicResourceStats stats);
+        void resourceUpdate(QueryId queryId, BasicResourceStats stats, Map<String, BasicResourceStats> nodeResourceMap);
     }
 }

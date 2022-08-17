@@ -350,6 +350,11 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::resume);
     }
 
+    public synchronized void spillRevocableMem()
+    {
+        getAllTasks().forEach(RemoteTask::spillRevocableMemory);
+    }
+
     public void OnSnapshotXCompleted(boolean capture, long snapshotId)
     {
         log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);

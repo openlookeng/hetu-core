@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.concurrent.SetThreadName;
 import io.airlift.log.Logger;
 import io.airlift.stats.TimeStat;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
@@ -47,6 +46,7 @@ import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.operator.TaskLocation;
+import io.prestosql.resourcemanager.QueryExecutionModifier;
 import io.prestosql.resourcemanager.QueryResourceManager;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.snapshot.QueryRecoveryManager;
@@ -674,6 +674,11 @@ public class SqlQueryScheduler
         return aggregateBasicStageStats(stageStats);
     }
 
+    private ImmutableList<StageInfo> getStagesInfo()
+    {
+        return stages.values().stream().map(SqlStageExecution::getStageInfo).collect(toImmutableList());
+    }
+
     public StageInfo getStageInfo()
     {
         Map<StageId, StageInfo> stageInfos = stages.values().stream()
@@ -766,11 +771,29 @@ public class SqlQueryScheduler
 
     private void updateQueryResourceStats()
     {
-        Duration totalCpu = getTotalCpuTime();
-        DataSize totalMem = DataSize.succinctBytes(getTotalMemoryReservation());
-        DataSize totalIo = getBasicStageStats().getInternalNetworkInputDataSize();
+        QueryExecutionModifier modifier = queryResourceManager.updateStats(getStagesInfo());
 
-        queryResourceManager.updateStats(totalCpu, totalMem, totalIo);
+        switch (modifier) {
+            case SPILL_REVOCABLE:
+                spillRevocableMem();
+                break;
+
+            case SUSPEND_QUERY:
+                suspend();
+                break;
+
+            case RESUME_QUERY:
+                resume();
+                break;
+
+            case NO_OP:
+            case THROTTLE_SPLITS: /* Todo(nitin): if throttle suggested, don't suggest again and give little time for throttling to take effect */
+                break;
+
+            case KILL_QUERY:
+                abort();
+                break;
+        }
     }
 
     private void schedule()
@@ -937,6 +960,14 @@ public class SqlQueryScheduler
         log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
             stages.values().forEach(SqlStageExecution::resume);
+        }
+    }
+
+    public synchronized void spillRevocableMem()
+    {
+        log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::spillRevocableMem);
         }
     }
 

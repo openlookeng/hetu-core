@@ -24,20 +24,22 @@ public class BasicResourceStats
 {
     public Duration cpuTime;
     public DataSize memCurrent;
+    public DataSize revocableMem;
     public DataSize ioCurrent;
 
     public BasicResourceStats()
     {
         this(DataSize.succinctBytes(0),
                 Duration.succinctDuration(0, TimeUnit.NANOSECONDS),
-                DataSize.succinctBytes(0));
+                DataSize.succinctBytes(0), DataSize.succinctBytes(0));
     }
 
-    public BasicResourceStats(DataSize memCurrent, Duration cpuTime, DataSize ioCurrent)
+    public BasicResourceStats(DataSize memCurrent, Duration cpuTime, DataSize ioCurrent, DataSize revocableMem)
     {
         this.memCurrent = memCurrent;
         this.cpuTime = cpuTime;
         this.ioCurrent = ioCurrent;
+        this.revocableMem = revocableMem;
     }
 
     @Override
@@ -54,13 +56,14 @@ public class BasicResourceStats
 
         return this.cpuTime.equals(stats.cpuTime)
                 && this.ioCurrent.equals(stats.ioCurrent)
-                && this.memCurrent.equals(stats.memCurrent);
+                && this.memCurrent.equals(stats.memCurrent)
+                && this.revocableMem.equals(stats.revocableMem);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(cpuTime, ioCurrent, memCurrent);
+        return Objects.hash(cpuTime, ioCurrent, memCurrent, revocableMem);
     }
 
     @Override
@@ -70,6 +73,7 @@ public class BasicResourceStats
         builder.append("{")
                 .append("CpuTime: ").append(this.cpuTime).append(", ")
                 .append("Memory: ").append(this.memCurrent).append(", ")
+                .append("RevokabkeMemory: ").append(this.revocableMem).append(", ")
                 .append("Network: ").append(this.ioCurrent).append("}");
         return builder.toString();
     }

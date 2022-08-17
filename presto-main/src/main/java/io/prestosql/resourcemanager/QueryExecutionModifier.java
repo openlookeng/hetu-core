@@ -14,23 +14,16 @@
  */
 package io.prestosql.resourcemanager;
 
-import com.google.common.collect.ImmutableList;
-import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
-import io.prestosql.execution.StageInfo;
-import io.prestosql.execution.StageStats;
-
-import java.util.List;
-
-public interface ResourceManager
+public enum QueryExecutionModifier
 {
-    void setResourceLimit(DataSize memoryLimit, Duration cpuLimit, DataSize ioLimit);
+    NO_OP,
 
-    DataSize getMemoryLimit();
+    // Mem
+    SPILL_REVOCABLE,
+    THROTTLE_SPLITS, // IO + Mem
 
-    void updateStats(List<StageStats> stats);
-
-    QueryExecutionModifier updateStats(ImmutableList<StageInfo> stats);
-
-    void updateStats(Duration totalCpu, DataSize totalMem, DataSize totalIo);
+    // CPU
+    SUSPEND_QUERY,
+    RESUME_QUERY,
+    KILL_QUERY
 }

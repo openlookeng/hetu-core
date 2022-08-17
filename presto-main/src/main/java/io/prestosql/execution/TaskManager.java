@@ -90,6 +90,8 @@ public interface TaskManager
 
     TaskInfo resumeTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
 
+    TaskInfo spillTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
+
     /**
      * Cancels a task.  If the task does not already exist, is is created and then
      * canceled. Snapshot: If a worker dies and then brought back, we don't want
