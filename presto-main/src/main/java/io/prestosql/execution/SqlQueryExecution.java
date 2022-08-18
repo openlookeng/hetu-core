@@ -27,14 +27,20 @@ import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
+import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeScheduler;
+import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.execution.scheduler.SqlQueryScheduler;
+import io.prestosql.execution.scheduler.TaskDescriptorStorage;
+import io.prestosql.execution.scheduler.TaskExecutionStats;
+import io.prestosql.execution.scheduler.TaskSourceFactory;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -55,6 +61,7 @@ import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.StandardWarningCode;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
@@ -93,6 +100,7 @@ import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.InsertCube;
+import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
@@ -119,6 +127,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
@@ -173,6 +183,13 @@ public class SqlQueryExecution
     private final QueryRecoveryManager queryRecoveryManager;
     private final WarningCollector warningCollector;
     private final AtomicBoolean suspendedWithRecoveryManager = new AtomicBoolean();
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+    private final SqlTaskManager coordinatorTaskManager;
+    private final TaskSourceFactory taskSourceFactory;
+    private final TaskDescriptorStorage taskDescriptorStorage;
+    private final NodeAllocatorService nodeAllocatorService;
+    private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
+    private final TaskExecutionStats taskExecutionStats;
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -203,7 +220,14 @@ public class SqlQueryExecution
             DynamicFilterService dynamicFilterService,
             HeuristicIndexerManager heuristicIndexerManager,
             StateStoreProvider stateStoreProvider,
-            RecoveryUtils recoveryUtils)
+            RecoveryUtils recoveryUtils,
+            ExchangeManagerRegistry exchangeManagerRegistry,
+            SqlTaskManager coordinatorTaskManager,
+            TaskSourceFactory taskSourceFactory,
+            TaskDescriptorStorage taskDescriptorStorage,
+            NodeAllocatorService nodeAllocatorService,
+            PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
+            TaskExecutionStats taskExecutionStats)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -235,6 +259,7 @@ public class SqlQueryExecution
 
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
+            this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
 
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
@@ -282,6 +307,12 @@ public class SqlQueryExecution
             });
 
             this.remoteTaskFactory = new MemoryTrackingRemoteTaskFactory(requireNonNull(remoteTaskFactory, "remoteTaskFactory is null"), stateMachine);
+            this.coordinatorTaskManager = requireNonNull(coordinatorTaskManager, "coordinatorTaskManager is null");
+            this.taskSourceFactory = requireNonNull(taskSourceFactory, "taskSourceFactory is null");
+            this.taskDescriptorStorage = requireNonNull(taskDescriptorStorage, "taskDescriptorStorage is null");
+            this.nodeAllocatorService = requireNonNull(nodeAllocatorService, "nodeAllocatorService is null");
+            this.partitionMemoryEstimatorFactory = requireNonNull(partitionMemoryEstimatorFactory, "partitionMemoryEstimatorFactory is null");
+            this.taskExecutionStats = requireNonNull(taskExecutionStats, "taskExecutionStats is null");
         }
     }
 
@@ -583,7 +614,15 @@ public class SqlQueryExecution
                 queryRecoveryManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
                 snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
-                true);
+                true,
+                exchangeManagerRegistry,
+                metadata,
+                coordinatorTaskManager,
+                taskSourceFactory,
+                taskDescriptorStorage,
+                nodeAllocatorService,
+                partitionMemoryEstimatorFactory,
+                taskExecutionStats);
         if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
             // Restore going to happen first, mark the restore state for all stages
             scheduler.setResuming(snapshotId.getAsLong());
@@ -672,6 +711,9 @@ public class SqlQueryExecution
         if (SystemSessionProperties.isRecoveryEnabled(getSession())) {
             checkRecoverySupport(getSession());
         }
+        if (SystemSessionProperties.getRetryPolicy(getSession()) == RetryPolicy.TASK) {
+            checkTaskRetrySupport(getSession());
+        }
 
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
@@ -690,6 +732,27 @@ public class SqlQueryExecution
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
         return logicalPlanner.plan(analysis, true);
+    }
+
+    private void checkTaskRetrySupport(Session session)
+    {
+        List<String> reasons = new ArrayList<>();
+
+        Statement statement = analysis.getStatement();
+        // Task retry is supported only for Select statements currently
+        if (!(statement instanceof Query)) {
+            reasons.add("Only support select statements currently");
+        }
+
+        if (isCTEReuseEnabled(session)) {
+            reasons.add("Disable Task Retry If CTEReuse is enabled");
+        }
+
+        if (!reasons.isEmpty()) {
+            session.disableTaskRetry();
+            String reasonsMessage = "Task retry feature is disabled: \n" + String.join(". \n", reasons);
+            warningCollector.add(new PrestoWarning(StandardWarningCode.TASK_RETRY_NOT_SUPPORTED, reasonsMessage));
+        }
     }
 
     // Check if snapshot feature conflict with other aspects of the query.
@@ -754,6 +817,10 @@ public class SqlQueryExecution
             else {
                 reasons.add("Specified value '" + snapshotProfile + "' for property hetu.experimental.snapshot.profile is not valid");
             }
+        }
+
+        if (getRetryPolicy(session) == RetryPolicy.TASK) {
+            reasons.add("Only support when retry policy is none");
         }
 
         if (!reasons.isEmpty()) {
@@ -850,7 +917,15 @@ public class SqlQueryExecution
                 snapshotManager,
                 queryRecoveryManager,
                 null,
-                false);
+                false,
+                exchangeManagerRegistry,
+                metadata,
+                coordinatorTaskManager,
+                taskSourceFactory,
+                taskDescriptorStorage,
+                nodeAllocatorService,
+                partitionMemoryEstimatorFactory,
+                taskExecutionStats);
 
         queryScheduler.set(scheduler);
 
@@ -1084,6 +1159,13 @@ public class SqlQueryExecution
         private final HeuristicIndexerManager heuristicIndexerManager;
         private final StateStoreProvider stateStoreProvider;
         private final RecoveryUtils recoveryUtils;
+        private final ExchangeManagerRegistry exchangeManagerRegistry;
+        private final SqlTaskManager coordinatorTaskManager;
+        private final TaskSourceFactory taskSourceFactory;
+        private final TaskDescriptorStorage taskDescriptorStorage;
+        private final NodeAllocatorService nodeAllocatorService;
+        private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
+        private final TaskExecutionStats taskExecutionStats;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1111,7 +1193,14 @@ public class SqlQueryExecution
                 DynamicFilterService dynamicFilterService,
                 HeuristicIndexerManager heuristicIndexerManager,
                 StateStoreProvider stateStoreProvider,
-                RecoveryUtils recoveryUtils)
+                RecoveryUtils recoveryUtils,
+                ExchangeManagerRegistry exchangeManagerRegistry,
+                SqlTaskManager coordinatorTaskManager,
+                TaskSourceFactory taskSourceFactory,
+                TaskDescriptorStorage taskDescriptorStorage,
+                NodeAllocatorService nodeAllocatorService,
+                PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
+                TaskExecutionStats taskExecutionStats)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1149,6 +1238,13 @@ public class SqlQueryExecution
             else {
                 this.cache = Optional.empty();
             }
+            this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
+            this.coordinatorTaskManager = requireNonNull(coordinatorTaskManager, "coordinatorTaskManager is null");
+            this.taskSourceFactory = requireNonNull(taskSourceFactory, "taskSourceFactory is null");
+            this.taskDescriptorStorage = requireNonNull(taskDescriptorStorage, "taskDescriptorStorage is null");
+            this.nodeAllocatorService = requireNonNull(nodeAllocatorService, "nodeAllocatorService is null");
+            this.partitionMemoryEstimatorFactory = requireNonNull(partitionMemoryEstimatorFactory, "partitionMemoryEstimatorFactory is null");
+            this.taskExecutionStats = requireNonNull(taskExecutionStats, "taskExecutionStats is null");
         }
 
         // Loading properties into PropertyService for later reference
@@ -1199,7 +1295,14 @@ public class SqlQueryExecution
                     this.cache,
                     heuristicIndexerManager,
                     stateStoreProvider,
-                    recoveryUtils);
+                    recoveryUtils,
+                    exchangeManagerRegistry,
+                    coordinatorTaskManager,
+                    taskSourceFactory,
+                    taskDescriptorStorage,
+                    nodeAllocatorService,
+                    partitionMemoryEstimatorFactory,
+                    taskExecutionStats);
         }
     }
 }

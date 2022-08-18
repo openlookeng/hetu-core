@@ -49,7 +49,7 @@ public class SnapshotStateId
     {
         String[] components = str.split(SLASH);
         // the 4 first components are queryId, snapshotId, stageId, and taskId, according to generateHierarchy
-        TaskId taskIdGen = new TaskId(components[0], Integer.parseInt(components[2]), Integer.parseInt(components[3]));
+        TaskId taskIdGen = new TaskId(components[0], Integer.parseInt(components[2]), Integer.parseInt(components[3]), 0);
         long snapshotIdGen = Long.parseLong(components[1]);
         List<String> parts = Arrays.asList(components);
         return new SnapshotStateId(snapshotIdGen, taskIdGen, parts);

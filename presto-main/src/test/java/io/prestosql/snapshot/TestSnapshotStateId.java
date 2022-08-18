@@ -34,7 +34,7 @@ public class TestSnapshotStateId
         int pipelineId = 300;
         int driverId = 400;
         int operatorId = 3000;
-        TaskId taskId1 = new TaskId(queryId, stageId, taskId);
+        TaskId taskId1 = new TaskId(queryId, stageId, taskId, 0);
         SnapshotStateId stateId = SnapshotStateId.forOperator(snapshotId, taskId1, pipelineId, driverId, operatorId);
 
         Assert.assertEquals(stateId.getId(), "query1/1/100/200/300/400/3000");
@@ -50,7 +50,7 @@ public class TestSnapshotStateId
         int pipelineId = 300;
         int driverId = 400;
         int operatorId = 3000;
-        TaskId taskId1 = new TaskId(queryId, stageId, taskId);
+        TaskId taskId1 = new TaskId(queryId, stageId, taskId, 0);
         SnapshotStateId stateId = SnapshotStateId.forOperator(snapshotId, taskId1, pipelineId, driverId, operatorId);
 
         Assert.assertEquals(stateId.getHierarchy(), new ArrayList<String>()
@@ -72,7 +72,7 @@ public class TestSnapshotStateId
         long snapshotId = 1L;
         int stageId = 100;
         int taskId = 200;
-        TaskId taskId1 = new TaskId(queryId, stageId, taskId);
+        TaskId taskId1 = new TaskId(queryId, stageId, taskId, 0);
         SnapshotStateId stateId = new SnapshotStateId(snapshotId, taskId1, "component");
         stateId = stateId.withSnapshotId(2);
         Assert.assertEquals(stateId.getId(), "query1/2/100/200/component");
@@ -86,9 +86,9 @@ public class TestSnapshotStateId
         int stageId = 100;
         int taskId = 200;
         int taskId2 = 300;
-        SnapshotStateId stateId1 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId));
-        SnapshotStateId stateId2 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId));
-        SnapshotStateId stateId3 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId2));
+        SnapshotStateId stateId1 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId, 0));
+        SnapshotStateId stateId2 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId, 0));
+        SnapshotStateId stateId3 = new SnapshotStateId(snapshotId, new TaskId(queryId, stageId, taskId2, 0));
         Set<SnapshotStateId> set = new HashSet<>();
         set.add(stateId1);
         Assert.assertTrue(set.contains(stateId2));
@@ -104,7 +104,7 @@ public class TestSnapshotStateId
         int stageId = 500;
         int taskInt = 600;
 
-        TaskId taskId = new TaskId(testQueryId, stageId, taskInt);
+        TaskId taskId = new TaskId(testQueryId, stageId, taskInt, 0);
         SnapshotStateId notString = new SnapshotStateId(snapshotId, taskId);
         String str = notString.toString();
         SnapshotStateId withString = SnapshotStateId.fromString(str);

@@ -107,7 +107,8 @@ public class TestUtil
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), TestingRecoveryUtils.NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(TestingRecoveryUtils.NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(TestingRecoveryUtils.NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
         return stage;

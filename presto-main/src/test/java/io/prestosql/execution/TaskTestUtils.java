@@ -22,6 +22,7 @@ import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.scheduler.LegacyNetworkTopology;
@@ -39,6 +40,7 @@ import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
@@ -179,7 +181,8 @@ public final class TaskTestUtils
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
-                cubeManager);
+                cubeManager,
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)

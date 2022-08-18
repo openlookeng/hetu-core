@@ -412,6 +412,12 @@ public final class DiscoveryNodeManager
     }
 
     @Override
+    public NodesSnapshot getActiveNodesSnapshot()
+    {
+        return new NodesSnapshot(allNodes.getActiveNodes(), activeNodesByCatalogName);
+    }
+
+    @Override
     public InternalNode getCurrentNode()
     {
         return currentNode;

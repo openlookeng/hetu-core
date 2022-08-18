@@ -35,6 +35,8 @@ import java.util.Properties;
 import java.util.function.Predicate;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
+import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.hetu.core.transport.block.BlockSerdeUtil.readBlock;
 import static io.hetu.core.transport.block.BlockSerdeUtil.writeBlock;
 import static java.lang.Math.toIntExact;
@@ -119,6 +121,38 @@ public class PagesSerdeUtil
         else {
             output.writeInt(0);
         }
+    }
+
+    public static SerializedPage readSerializedPage(Slice slice)
+    {
+        int offset = 0;
+        int positionCount = slice.getInt(offset);
+        offset += SIZE_OF_INT;
+        PageCodecMarker.MarkerSet markers = PageCodecMarker.MarkerSet.fromByteValue(slice.getByte(offset));
+        offset += SIZE_OF_BYTE;
+        int uncompressedSizeInBytes = slice.getInt(offset);
+        offset += SIZE_OF_INT;
+        int sizeInBytes = slice.getInt(offset);
+        offset += SIZE_OF_INT;
+        Slice sliceData = slice.slice(offset, toIntExact(sizeInBytes));
+        offset += toIntExact(sizeInBytes);
+
+        int propertiesLength = slice.getInt(offset);
+        if (propertiesLength != 0) {
+            offset += SIZE_OF_INT;
+            byte[] pageMetadataBytes = new byte[propertiesLength];
+            slice.getBytes(offset, propertiesLength);
+            Properties pros = new Properties();
+            try {
+                pros.load(new ByteArrayInputStream(pageMetadataBytes));
+                return new SerializedPage(sliceData, markers, positionCount, uncompressedSizeInBytes, pros);
+            }
+            catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        return new SerializedPage(sliceData, markers, positionCount, uncompressedSizeInBytes);
     }
 
     private static SerializedPage readSerializedPage(SliceInput sliceInput)

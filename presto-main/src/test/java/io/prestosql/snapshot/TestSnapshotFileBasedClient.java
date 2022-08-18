@@ -64,7 +64,7 @@ public class TestSnapshotFileBasedClient
     {
         SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), new FileSystemClientManager(), null, false, true);
         String queryId = "query1";
-        TaskId taskId = new TaskId(queryId, 1, 1);
+        TaskId taskId = new TaskId(queryId, 1, 1, 0);
         SnapshotStateId snapshotStateId = new SnapshotStateId(2, taskId, 10);
         LinkedHashMap<Long, SnapshotResult> map = new LinkedHashMap<>();
         map.put(3L, SnapshotResult.SUCCESSFUL);
@@ -88,7 +88,7 @@ public class TestSnapshotFileBasedClient
     {
         SnapshotFileBasedClient client = new SnapshotFileBasedClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get(ROOT_PATH_STR)), Paths.get(ROOT_PATH_STR), new FileSystemClientManager(), null, false, false);
         String queryId = "query1";
-        TaskId taskId = new TaskId(queryId, 1, 1);
+        TaskId taskId = new TaskId(queryId, 1, 1, 0);
         SnapshotStateId snapshotStateId = new SnapshotStateId(2, taskId, 10);
         LinkedHashMap<Long, SnapshotResult> map = new LinkedHashMap<>();
         map.put(3L, SnapshotResult.SUCCESSFUL);

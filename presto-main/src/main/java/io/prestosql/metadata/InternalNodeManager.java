@@ -13,10 +13,15 @@
  */
 package io.prestosql.metadata;
 
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.SetMultimap;
 import io.prestosql.spi.connector.CatalogName;
 
 import java.util.Set;
 import java.util.function.Consumer;
+
+import static java.util.Objects.requireNonNull;
 
 public interface InternalNodeManager
 {
@@ -25,6 +30,8 @@ public interface InternalNodeManager
     Set<InternalNode> getActiveConnectorNodes(CatalogName catalogName);
 
     Set<InternalNode> getAllConnectorNodes(CatalogName catalogName);
+
+    NodesSnapshot getActiveNodesSnapshot();
 
     InternalNode getCurrentNode();
 
@@ -39,4 +46,28 @@ public interface InternalNodeManager
     void removeNodeChangeListener(Consumer<AllNodes> listener);
 
     void refreshWorkerStates();
+
+    class NodesSnapshot
+    {
+        private final Set<InternalNode> allNodes;
+        private final SetMultimap<CatalogName, InternalNode> connectorNodes;
+
+        public NodesSnapshot(Set<InternalNode> allActiveNodes, SetMultimap<CatalogName, InternalNode> activeNodesByCatalogName)
+        {
+            requireNonNull(allActiveNodes, "allActiveNodes is null");
+            requireNonNull(activeNodesByCatalogName, "activeNodesByCatalogName is null");
+            this.allNodes = ImmutableSet.copyOf(allActiveNodes);
+            this.connectorNodes = ImmutableSetMultimap.copyOf(activeNodesByCatalogName);
+        }
+
+        public Set<InternalNode> getAllNodes()
+        {
+            return allNodes;
+        }
+
+        public Set<InternalNode> getConnectorNodes(CatalogName catalogName)
+        {
+            return connectorNodes.get(catalogName);
+        }
+    }
 }

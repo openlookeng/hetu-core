@@ -40,7 +40,11 @@ public class TestMemoryManagerConfig
                 .setMaxQueryMemory(new DataSize(20, GIGABYTE))
                 .setSuspendQueryEnabled(false)
                 .setMaxSuspendedQueries(10)
-                .setMaxQueryTotalMemory(new DataSize(40, GIGABYTE)));
+                .setMaxQueryTotalMemory(new DataSize(40, GIGABYTE))
+                .setFaultTolerantExecutionTaskMemory(new DataSize(5, GIGABYTE))
+                .setFaultTolerantExecutionTaskMemoryGrowthFactor(3.0)
+                .setFaultTolerantExecutionTaskMemoryEstimationQuantile(0.9)
+                .setFaultTolerantExecutionTaskRuntimeMemoryEstimationOverhead(new DataSize(1, GIGABYTE)));
     }
 
     @Test
@@ -53,6 +57,10 @@ public class TestMemoryManagerConfig
                 .put("query.max-total-memory", "3GB")
                 .put("query.suspend-query-enabled", "true")
                 .put("query.max-suspended-queries", "20")
+                .put("fault-tolerant-execution-task-memory", "6GB")
+                .put("fault-tolerant-execution-task-memory-growth-factor", "2.0")
+                .put("fault-tolerant-execution-task-memory-estimation-quantile", "0.8")
+                .put("fault-tolerant-execution-task-runtime-memory-estimation-overhead", "2GB")
                 .build();
 
         MemoryManagerConfig expected = new MemoryManagerConfig()
@@ -61,7 +69,11 @@ public class TestMemoryManagerConfig
                 .setMaxQueryMemory(new DataSize(2, GIGABYTE))
                 .setSuspendQueryEnabled(true)
                 .setMaxSuspendedQueries(20)
-                .setMaxQueryTotalMemory(new DataSize(3, GIGABYTE));
+                .setMaxQueryTotalMemory(new DataSize(3, GIGABYTE))
+                .setFaultTolerantExecutionTaskMemory(new DataSize(6, GIGABYTE))
+                .setFaultTolerantExecutionTaskMemoryGrowthFactor(2.0)
+                .setFaultTolerantExecutionTaskMemoryEstimationQuantile(0.8)
+                .setFaultTolerantExecutionTaskRuntimeMemoryEstimationOverhead(new DataSize(2, GIGABYTE));
 
         assertFullMapping(properties, expected);
     }

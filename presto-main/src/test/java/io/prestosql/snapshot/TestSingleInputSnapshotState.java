@@ -63,7 +63,7 @@ public class TestSingleInputSnapshotState
 
     private static SnapshotStateId createSnapshotStateId(long snapshotId)
     {
-        return new SnapshotStateId(snapshotId, new TaskId("query", 1, 1));
+        return new SnapshotStateId(snapshotId, new TaskId("query", 1, 1, 0));
     }
 
     private TaskSnapshotManager snapshotManager;

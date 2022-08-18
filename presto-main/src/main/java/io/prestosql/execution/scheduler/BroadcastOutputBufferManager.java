@@ -72,4 +72,36 @@ class BroadcastOutputBufferManager
         }
         outputBufferTarget.accept(newOutputBuffers);
     }
+
+    @Override
+    public void addOutputBuffer(OutputBufferId newBuffer)
+    {
+        if (outputBuffers.isNoMoreBufferIds()) {
+            // a stage can move to a final state (e.g., failed) while scheduling, so ignore
+            // the new buffers
+            return;
+        }
+
+        // Note: it does not matter which partition id the task is using, in broadcast all tasks read from the same partition
+        OutputBuffers newOutputBuffers = outputBuffers.withBuffer(newBuffer, BROADCAST_PARTITION_ID);
+
+        // don't update if nothing changed
+        if (newOutputBuffers != outputBuffers) {
+            this.outputBuffers = newOutputBuffers;
+        }
+    }
+
+    @Override
+    public void noMoreBuffers()
+    {
+        if (!outputBuffers.isNoMoreBufferIds()) {
+            outputBuffers = outputBuffers.withNoMoreBufferIds();
+        }
+    }
+
+    @Override
+    public OutputBuffers getOutputBuffers()
+    {
+        return outputBuffers;
+    }
 }

@@ -175,7 +175,7 @@ public class TestPartitionedOutputOperator
                 .setMemoryPoolSize(MAX_MEMORY)
                 .build();
         // So that
-        return TestingTaskContext.createTaskContext(taskContext.getQueryContext(), EXECUTOR, TEST_SNAPSHOT_SESSION, new TaskId("query.1.1"));
+        return TestingTaskContext.createTaskContext(taskContext.getQueryContext(), EXECUTOR, TEST_SNAPSHOT_SESSION, new TaskId("query.1.1.0"));
     }
 
     private DriverContext createDriverContext(TaskContext taskContext)

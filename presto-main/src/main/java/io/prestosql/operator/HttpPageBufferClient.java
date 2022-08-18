@@ -32,9 +32,11 @@ import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.slice.SliceInput;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.failuredetector.FailureRetryPolicy;
 import io.prestosql.spi.failuredetector.IBackoff;
 import org.joda.time.DateTime;
@@ -117,6 +119,8 @@ public final class HttpPageBufferClient
     private final ClientCallback clientCallback;
     private final ScheduledExecutorService scheduler;
     private final IBackoff backoff;
+    private final TaskId remoteTaskId;
+    private final RetryPolicy retryPolicy;
 
     @GuardedBy("this")
     private boolean closed;
@@ -159,7 +163,9 @@ public final class HttpPageBufferClient
             Executor pageBufferClientCallbackExecutor,
             boolean isRecoveryEnabled,
             FailureDetectorManager failureDetectorManager,
-            QueryRecoveryManager queryRecoveryManager)
+            QueryRecoveryManager queryRecoveryManager,
+            TaskId remoteTaskId,
+            RetryPolicy retryPolicy)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.maxResponseSize = requireNonNull(maxResponseSize, "maxResponseSize is null");
@@ -175,6 +181,8 @@ public final class HttpPageBufferClient
         this.backoff = this.failureRetryPolicy.getBackoff();
         this.isRecoveryEnabled = isRecoveryEnabled;
         this.queryRecoveryManager = queryRecoveryManager;
+        this.remoteTaskId = requireNonNull(remoteTaskId, "remoteTaskId is null");
+        this.retryPolicy = retryPolicy;
     }
 
     @VisibleForTesting
@@ -189,7 +197,8 @@ public final class HttpPageBufferClient
             boolean isRecoveryEnabled,
             Ticker ticker,
             FailureDetectorManager failureDetectorManager,
-            QueryRecoveryManager queryRecoveryManager)
+            QueryRecoveryManager queryRecoveryManager,
+            TaskId remoteTaskId)
     {
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.maxResponseSize = requireNonNull(maxResponseSize, "maxResponseSize is null");
@@ -205,6 +214,8 @@ public final class HttpPageBufferClient
         this.backoff = this.failureRetryPolicy.getBackoff();
         this.isRecoveryEnabled = isRecoveryEnabled;
         this.queryRecoveryManager = queryRecoveryManager;
+        this.remoteTaskId = requireNonNull(remoteTaskId, "remoteTaskId is null");
+        this.retryPolicy = RetryPolicy.NONE;
     }
 
     public synchronized PageBufferClientStatus getStatus()
@@ -245,6 +256,11 @@ public final class HttpPageBufferClient
                 requestsCompleted.get(),
                 requestsFailed.get(),
                 httpRequestState);
+    }
+
+    public TaskId getRemoteTaskId()
+    {
+        return remoteTaskId;
     }
 
     public synchronized boolean isRunning()
@@ -442,6 +458,10 @@ public final class HttpPageBufferClient
                         log.debug(throwable, "Recovery: Failure detected in HttpPageBufferClient");
                         queryRecoveryManager.startRecovery();
                         handleFailure(throwable, resultFuture);
+                        return;
+                    }
+                    else if (retryPolicy == RetryPolicy.TASK) {
+                        handleFailure(throwable, resultFuture, fail);
                         return;
                     }
                     throwable = new PageTransportTimeoutException(fromUri(uri), message, throwable);

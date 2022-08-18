@@ -15,10 +15,12 @@ package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
+import io.airlift.units.Duration;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import org.testng.annotations.Test;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.LEGACY;
 
@@ -33,7 +35,9 @@ public class TestNodeSchedulerConfig
                 .setMaxSplitsPerNode(100)
                 .setMaxPendingSplitsPerTask(10)
                 .setIncludeCoordinator(true)
-                .setOptimizedLocalScheduling(true));
+                .setOptimizedLocalScheduling(true)
+                .setAllowedNoMatchingNodePeriod(new Duration(2, TimeUnit.MINUTES))
+                .setNodeAllocatorType("bin_packing"));
     }
 
     @Test
@@ -46,6 +50,8 @@ public class TestNodeSchedulerConfig
                 .put("node-scheduler.max-pending-splits-per-task", "11")
                 .put("node-scheduler.max-splits-per-node", "101")
                 .put("node-scheduler.optimized-local-scheduling", "false")
+                .put("node-scheduler.allowed-no-matching-node-period", "3m")
+                .put("node-scheduler.allocator-type", "fixed_count")
                 .build();
 
         NodeSchedulerConfig expected = new NodeSchedulerConfig()
@@ -54,7 +60,9 @@ public class TestNodeSchedulerConfig
                 .setMaxSplitsPerNode(101)
                 .setMaxPendingSplitsPerTask(11)
                 .setMinCandidates(11)
-                .setOptimizedLocalScheduling(false);
+                .setOptimizedLocalScheduling(false)
+                .setAllowedNoMatchingNodePeriod(new Duration(3, TimeUnit.MINUTES))
+                .setNodeAllocatorType("fixed_count");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

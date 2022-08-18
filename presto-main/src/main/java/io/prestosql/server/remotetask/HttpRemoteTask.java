@@ -13,6 +13,7 @@
  */
 package io.prestosql.server.remotetask;
 
+import com.google.common.base.Supplier;
 import com.google.common.base.Ticker;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -20,6 +21,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
+import com.google.common.net.HttpHeaders;
+import com.google.common.net.MediaType;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -29,6 +32,7 @@ import io.airlift.http.client.HttpUriBuilder;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.ResponseHandler;
 import io.airlift.http.client.StaticBodyGenerator;
+import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
@@ -53,11 +57,14 @@ import io.prestosql.operator.TaskStats;
 import io.prestosql.protocol.BaseResponse;
 import io.prestosql.protocol.Codec;
 import io.prestosql.protocol.SmileCodec;
+import io.prestosql.server.FailTaskRequest;
 import io.prestosql.server.TaskUpdateRequest;
 import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.spi.PrestoTransportException;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.util.Failures;
 import org.joda.time.DateTime;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -90,6 +97,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareDelete;
 import static io.airlift.http.client.Request.Builder.preparePost;
+import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
 import static io.prestosql.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
 import static io.prestosql.execution.TaskInfo.createInitialTask;
 import static io.prestosql.execution.TaskState.ABORTED;
@@ -180,6 +188,8 @@ public final class HttpRemoteTask
     private final AtomicBoolean suspending = new AtomicBoolean(false);
     private final boolean isBinaryEncoding;
     private Optional<PlanNodeId> parent;
+    private final Duration maxErrorDuration;
+    private final JsonCodec<FailTaskRequest> failTaskRequestCodec;
 
     public HttpRemoteTask(Session session,
             TaskId taskId,
@@ -205,7 +215,8 @@ public final class HttpRemoteTask
             RemoteTaskStats stats,
             boolean isBinaryEncoding,
             Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager,
+            JsonCodec<FailTaskRequest> failTaskRequestCodec)
     {
         requireNonNull(session, "session is null");
         requireNonNull(taskId, "taskId is null");
@@ -242,6 +253,8 @@ public final class HttpRemoteTask
             this.stats = stats;
             this.isBinaryEncoding = isBinaryEncoding;
             this.parent = parent;
+            this.maxErrorDuration = maxErrorDuration;
+            this.failTaskRequestCodec = failTaskRequestCodec;
 
             for (Entry<PlanNodeId, Split> entry : requireNonNull(initialSplits, "initialSplits is null").entries()) {
                 ScheduledSplit scheduledSplit = new ScheduledSplit(nextSplitId.getAndIncrement(), entry.getKey(), entry.getValue());
@@ -275,6 +288,7 @@ public final class HttpRemoteTask
 
             this.taskInfoFetcher = new TaskInfoFetcher(
                     this::failTask,
+                    taskStatusFetcher,
                     initialTask,
                     instanceId,
                     httpClient,
@@ -747,6 +761,45 @@ public final class HttpRemoteTask
         abort(failWith(getTaskStatus(), ABORTED, ImmutableList.of()));
     }
 
+    @Override
+    public void fail(Throwable cause)
+    {
+        TaskStatus taskStatus = getTaskStatus();
+        if (!taskStatus.getState().isDone()) {
+            log.debug(cause, "Remote task %s failed with %s", taskStatus.getSelf(), cause);
+        }
+
+        TaskStatus status = failWith(getTaskStatus(), FAILED, ImmutableList.of(toFailure(cause)));
+        taskStatusFetcher.updateTaskStatus(status);
+
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            if (cause instanceof PrestoTransportException) {
+                // task in unreachable
+                // cleaning Up Locally
+                updateTaskInfo(getTaskInfo().withTaskStatus(getTaskStatus()));
+            }
+            else {
+                // send abort to task
+                sendCancelRequest(status, status.getState(), "abort");
+            }
+        }
+    }
+
+    /**
+     * Trigger remote task failure. Task status will be updated only when request sent to remote node returns.
+     */
+    @Override
+    public synchronized void failRemotely(Throwable cause)
+    {
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            TaskStatus taskStatus = getTaskStatus();
+            if (taskStatus.getState().isDone()) {
+                return;
+            }
+            scheduleAsyncCleanupRequest(new Backoff(maxErrorDuration), new FailTaskRequest(Failures.toFailure(cause)), "fail");
+        }
+    }
+
     private synchronized void abort(TaskStatus status)
     {
         checkState(status.getState().isDone(), "cannot abort task with an incomplete status");
@@ -757,6 +810,34 @@ public final class HttpRemoteTask
             // send abort to task
             sendCancelRequest(getTaskStatus(), ABORTED, "abort");
         }
+    }
+
+    private void scheduleAsyncCleanupRequest(Backoff cleanupBackoff, FailTaskRequest failTaskRequest, String action)
+    {
+        scheduleAsyncCleanupRequest(cleanupBackoff, () -> buildFailTaskRequest(failTaskRequest), action);
+    }
+
+    private void scheduleAsyncCleanupRequest(Backoff cleanupBackoff, Supplier<Request> remoteRequestSupplier, String action)
+    {
+        if (!aborting.compareAndSet(false, true)) {
+            // Do not initiate another round of cleanup requests if one had been initiated.
+            // Otherwise, we can get into an asynchronous recursion here. For example, when aborting a task after REMOTE_TASK_MISMATCH.
+            return;
+        }
+
+        Request request = remoteRequestSupplier.get();
+        doScheduleAsyncCleanupRequest(cleanupBackoff, request, action);
+    }
+
+    private Request buildFailTaskRequest(FailTaskRequest failTaskRequest)
+    {
+        HttpUriBuilder uriBuilder = getHttpUriBuilder(getTaskStatus());
+        uriBuilder = uriBuilder.appendPath("fail");
+        return preparePost()
+                .setUri(uriBuilder.build())
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString())
+                .setBodyGenerator(createStaticBodyGenerator(failTaskRequestCodec.toJsonBytes(failTaskRequest)))
+                .build();
     }
 
     private void scheduleAsyncCleanupRequest(Backoff cleanupBackoff, Request request, String action)
@@ -889,7 +970,14 @@ public final class HttpRemoteTask
             log.debug(cause, "Recovery: remote task %s failed with unresumable error %s", taskStatus.getSelf(), cause);
         }
 
-        abort(failWith(taskStatus, FAILED, ImmutableList.of(failureInfo)));
+        taskStatus = failWith(taskStatus, FAILED, ImmutableList.of(failureInfo));
+        if (cause instanceof PrestoTransportException) {
+            // task is unreachable
+            updateTaskInfo(getTaskInfo().withTaskStatus(taskStatus));
+        }
+        else {
+            abort(taskStatus);
+        }
     }
 
     private static boolean isResumableFailure(ExecutionFailureInfo failureInfo)

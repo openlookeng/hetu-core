@@ -86,7 +86,7 @@ public class TestQuerySnapshotManager
     {
         queryId = new QueryId("resumeid");
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
-        TaskId taskId = new TaskId(queryId.getId(), 2, 3);
+        TaskId taskId = new TaskId(queryId.getId(), 2, 3, 0);
         SnapshotInfo info = SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL);
 
         // Try1: no id is available yet
@@ -123,7 +123,7 @@ public class TestQuerySnapshotManager
     {
         queryId = new QueryId("resumefailure");
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
-        TaskId taskId = new TaskId(queryId.getId(), 2, 3);
+        TaskId taskId = new TaskId(queryId.getId(), 2, 3, 0);
         Consumer recoveryComplete = mock(Consumer.class);
         snapshotManager.setRecoveryCallbacks(recoveryComplete, this::isRecoveryInProgress);
 
@@ -141,7 +141,7 @@ public class TestQuerySnapshotManager
     {
         queryId = new QueryId("updaterestore");
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
-        TaskId taskId = new TaskId(queryId.getId(), 2, 3);
+        TaskId taskId = new TaskId(queryId.getId(), 2, 3, 0);
         snapshotManager.addNewTask(taskId);
         snapshotManager.snapshotInitiated(1L);
         snapshotManager.setRecoveryCallbacks(this::onRecoveryComplete, this::isRecoveryInProgress);
@@ -164,8 +164,8 @@ public class TestQuerySnapshotManager
         queryId = new QueryId("updatefinished");
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3);
-        TaskId taskId2 = new TaskId(queryId.getId(), 3, 4);
+        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 3, 4, 0);
         snapshotManager.addNewTask(taskId1);
         snapshotManager.addNewTask(taskId2);
         snapshotManager.snapshotInitiated(1L);
@@ -181,7 +181,7 @@ public class TestQuerySnapshotManager
         queryId = new QueryId("updatefinished");
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3);
+        TaskId taskId1 = new TaskId(queryId.getId(), 2, 3, 0);
         snapshotManager.addNewTask(taskId1);
         snapshotManager.snapshotInitiated(1L);
         snapshotManager.updateQueryCapture(taskId1, Collections.singletonMap(1L, SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL)));
@@ -206,14 +206,14 @@ public class TestQuerySnapshotManager
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
         for (int i = 0; i < stageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j));
+                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j, 0));
             }
         }
         snapshotManager.snapshotInitiated(1L);
         List<TaskId> finishedList = Collections.synchronizedList(new ArrayList<>());
         for (int i = 0; i < finishedStageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                finishedList.add(new TaskId(queryId.getId(), i, j));
+                finishedList.add(new TaskId(queryId.getId(), i, j, 0));
             }
         }
         snapshotManager.updateFinishedQueryComponents(finishedList);
@@ -221,8 +221,8 @@ public class TestQuerySnapshotManager
         captureInfo.updateCpuTime(10);
         captureInfo.updateSizeBytes(1000);
         // Finish snapshot 1 capture
-        snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), 2, 0), Collections.singletonMap(1L, captureInfo));
-        snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), 2, 1), Collections.singletonMap(1L, captureInfo));
+        snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), 2, 0, 0), Collections.singletonMap(1L, captureInfo));
+        snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), 2, 1, 0), Collections.singletonMap(1L, captureInfo));
 
         List<Long> capturedSnapshots = new ArrayList<Long>();
         List<Long> capturingSnapshots = new ArrayList<Long>();
@@ -288,7 +288,7 @@ public class TestQuerySnapshotManager
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
         for (int i = 0; i < stageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j));
+                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j, 0));
             }
         }
 
@@ -300,7 +300,7 @@ public class TestQuerySnapshotManager
         // Finish snapshot 1 capture
         for (int i = 0; i < stageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), i, j), Collections.singletonMap(1L, captureInfo));
+                snapshotManager.updateQueryCapture(new TaskId(queryId.getId(), i, j, 0), Collections.singletonMap(1L, captureInfo));
             }
         }
 
@@ -343,7 +343,7 @@ public class TestQuerySnapshotManager
 
         for (int i = 0; i < stageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j));
+                snapshotManager.addNewTask(new TaskId(queryId.getId(), i, j, 0));
             }
         }
         // Initiate restore
@@ -352,7 +352,7 @@ public class TestQuerySnapshotManager
         restoreInfo.updateSizeBytes(1000);
         for (int i = 0; i < stageCount; i++) {
             for (int j = 0; j < taskCountPerStage; j++) {
-                snapshotManager.updateQueryRestore(new TaskId(queryId.getId(), i, j), Optional.of(new RestoreResult(1, restoreInfo)));
+                snapshotManager.updateQueryRestore(new TaskId(queryId.getId(), i, j, 0), Optional.of(new RestoreResult(1, restoreInfo)));
             }
         }
 
@@ -386,12 +386,12 @@ public class TestQuerySnapshotManager
         StageId stageId2 = new StageId(queryId, 2);
 
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
-        TaskId taskId00 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId01 = new TaskId(queryId.getId(), 0, 1);
-        TaskId taskId10 = new TaskId(queryId.getId(), 1, 0);
-        TaskId taskId11 = new TaskId(queryId.getId(), 1, 1);
-        TaskId taskId20 = new TaskId(queryId.getId(), 2, 0);
-        TaskId taskId21 = new TaskId(queryId.getId(), 2, 1);
+        TaskId taskId00 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId01 = new TaskId(queryId.getId(), 0, 1, 0);
+        TaskId taskId10 = new TaskId(queryId.getId(), 1, 0, 0);
+        TaskId taskId11 = new TaskId(queryId.getId(), 1, 1, 0);
+        TaskId taskId20 = new TaskId(queryId.getId(), 2, 0, 0);
+        TaskId taskId21 = new TaskId(queryId.getId(), 2, 1, 0);
         snapshotManager.addNewTask(taskId00);
         snapshotManager.addNewTask(taskId01);
         snapshotManager.addNewTask(taskId10);
@@ -473,12 +473,12 @@ public class TestQuerySnapshotManager
         StageId stageId2 = new StageId(queryId, 2);
 
         QuerySnapshotManager snapshotManager = new QuerySnapshotManager(queryId, recoveryUtils, TEST_SNAPSHOT_SESSION);
-        TaskId taskId00 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId01 = new TaskId(queryId.getId(), 0, 1);
-        TaskId taskId10 = new TaskId(queryId.getId(), 1, 0);
-        TaskId taskId11 = new TaskId(queryId.getId(), 1, 1);
-        TaskId taskId20 = new TaskId(queryId.getId(), 2, 0);
-        TaskId taskId21 = new TaskId(queryId.getId(), 2, 1);
+        TaskId taskId00 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId01 = new TaskId(queryId.getId(), 0, 1, 0);
+        TaskId taskId10 = new TaskId(queryId.getId(), 1, 0, 0);
+        TaskId taskId11 = new TaskId(queryId.getId(), 1, 1, 0);
+        TaskId taskId20 = new TaskId(queryId.getId(), 2, 0, 0);
+        TaskId taskId21 = new TaskId(queryId.getId(), 2, 1, 0);
         snapshotManager.addNewTask(taskId00);
         snapshotManager.addNewTask(taskId01);
         snapshotManager.addNewTask(taskId10);

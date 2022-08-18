@@ -657,6 +657,15 @@ public class ClusterMemoryManager
         return memoryInfo;
     }
 
+    public synchronized Map<String, Optional<MemoryInfo>> getWorkerMemoryInfoWithoutRole()
+    {
+        Map<String, Optional<MemoryInfo>> memoryInfo = new HashMap<>();
+        for (Entry<String, RemoteNodeMemory> entry : nodes.entrySet()) {
+            memoryInfo.put(entry.getKey(), entry.getValue().getInfo());
+        }
+        return memoryInfo;
+    }
+
     public synchronized Long getUsedMemory()
     {
         Long usedMemory = 0L;

@@ -26,6 +26,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.NodeTaskMap.PartitionedSplitCountTracker;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
 import io.prestosql.execution.buffer.OutputBuffer;
@@ -38,6 +39,7 @@ import io.prestosql.metadata.Split;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
 import io.prestosql.snapshot.QuerySnapshotManager;
+import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
@@ -225,7 +227,8 @@ public class MockRemoteTaskFactory
                     taskId,
                     executor,
                     new DataSize(1, BYTE),
-                    () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"));
+                    () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
+                    new ExchangeManagerRegistry(new ExchangeHandleResolver()));
 
             this.fragment = requireNonNull(fragment, "fragment is null");
             this.nodeId = requireNonNull(nodeId, "nodeId is null");
@@ -282,7 +285,7 @@ public class MockRemoteTaskFactory
                             0,
                             new Duration(0, MILLISECONDS),
                             ImmutableMap.of(),
-                            Optional.empty()),
+                            Optional.empty(), new DataSize(0, BYTE)),
                     DateTime.now(),
                     outputBuffer.getInfo(),
                     ImmutableSet.of(),
@@ -312,7 +315,7 @@ public class MockRemoteTaskFactory
                     0,
                     new Duration(0, MILLISECONDS),
                     ImmutableMap.of(),
-                    Optional.empty());
+                    Optional.empty(), new DataSize(0, BYTE));
         }
 
         private synchronized void updateSplitQueueSpace()
@@ -458,6 +461,18 @@ public class MockRemoteTaskFactory
         {
             taskStateMachine.cancel(TaskState.ABORTED);
             clearSplits();
+        }
+
+        @Override
+        public void fail(Throwable cause)
+        {
+            // do nothing
+        }
+
+        @Override
+        public void failRemotely(Throwable cause)
+        {
+            //do nothing
         }
 
         @Override

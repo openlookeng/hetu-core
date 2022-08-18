@@ -31,6 +31,7 @@ public class ExchangeClientConfig
     private int clientThreads = 25;
     private int pageBufferClientMaxCallbackThreads = 25;
     private boolean acknowledgePages = true;
+    private DataSize deduplicationBufferSize = new DataSize(32, Unit.MEGABYTE);
 
     @NotNull
     public DataSize getMaxBufferSize()
@@ -107,6 +108,19 @@ public class ExchangeClientConfig
     public ExchangeClientConfig setAcknowledgePages(boolean acknowledgePages)
     {
         this.acknowledgePages = acknowledgePages;
+        return this;
+    }
+
+    @NotNull
+    public DataSize getDeduplicationBufferSize()
+    {
+        return deduplicationBufferSize;
+    }
+
+    @Config("exchange.deduplication-buffer-size")
+    public ExchangeClientConfig setDeduplicationBufferSize(DataSize deduplicationBufferSize)
+    {
+        this.deduplicationBufferSize = deduplicationBufferSize;
         return this;
     }
 }

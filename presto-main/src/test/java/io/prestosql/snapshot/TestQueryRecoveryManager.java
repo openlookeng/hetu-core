@@ -127,8 +127,8 @@ public class TestQueryRecoveryManager
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
         QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(queryId);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0, 0);
         querySnapshotManager.addNewTask(taskId1);
         querySnapshotManager.addNewTask(taskId2);
 
@@ -156,8 +156,8 @@ public class TestQueryRecoveryManager
             assertEquals(queryRecoveryManager.getState(), RecoveryState.STOPPING_FOR_RESCHEDULE);
         }
 
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0));
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0, 0));
         // Initiate reschedule after stopping current execution
         try {
             if (useSuspendResume) {
@@ -179,8 +179,8 @@ public class TestQueryRecoveryManager
         // Finish recovery
         assertTrue(queryRecoveryManager.hasPendingRecovery());
         SnapshotInfo restoreInfo = SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL);
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0), Optional.of(new RestoreResult(1, restoreInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
 
         //check final state
         assertFalse(queryRecoveryManager.hasPendingRecovery());
@@ -196,8 +196,8 @@ public class TestQueryRecoveryManager
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
         QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(queryId);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0, 0);
         querySnapshotManager.addNewTask(taskId1);
         querySnapshotManager.addNewTask(taskId2);
 
@@ -236,12 +236,12 @@ public class TestQueryRecoveryManager
         // Finish recovery
         assertTrue(queryRecoveryManager.hasPendingRecovery());
 
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0));
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0, 0));
         SnapshotInfo restoreInfo = SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL);
         SnapshotInfo restoreFailedInfo = SnapshotInfo.withStatus(SnapshotResult.FAILED);
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0), Optional.of(new RestoreResult(1, restoreFailedInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0, 0), Optional.of(new RestoreResult(1, restoreFailedInfo)));
 
         //check if retry is triggered
         assertEquals(queryRecoveryManager.getState(), RecoveryState.STOPPING_FOR_RESCHEDULE);
@@ -273,8 +273,8 @@ public class TestQueryRecoveryManager
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
         QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(queryId);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0, 0);
         querySnapshotManager.addNewTask(taskId1);
         querySnapshotManager.addNewTask(taskId2);
 
@@ -313,12 +313,12 @@ public class TestQueryRecoveryManager
         // Finish recovery
         assertTrue(queryRecoveryManager.hasPendingRecovery());
 
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0));
-        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 0, 0, 0));
+        querySnapshotManager.addNewTask(new TaskId(queryId.getId(), 1, 0, 0));
         SnapshotInfo restoreInfo = SnapshotInfo.withStatus(SnapshotResult.SUCCESSFUL);
         SnapshotInfo restoreFailedInfo = SnapshotInfo.withStatus(SnapshotResult.FAILED);
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
-        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0), Optional.of(new RestoreResult(1, restoreFailedInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 0, 0, 0), Optional.of(new RestoreResult(1, restoreInfo)));
+        querySnapshotManager.updateQueryRestore(new TaskId(queryId.getId(), 1, 0, 0), Optional.of(new RestoreResult(1, restoreFailedInfo)));
 
         //check if retry is triggered
         assertEquals(queryRecoveryManager.getState(), RecoveryState.STOPPING_FOR_RESCHEDULE);
@@ -348,8 +348,8 @@ public class TestQueryRecoveryManager
         recoveryUtils.getOrCreateQuerySnapshotManager(queryId, TEST_SNAPSHOT_SESSION);
         QuerySnapshotManager querySnapshotManager = recoveryUtils.getQuerySnapshotManager(queryId);
 
-        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0);
-        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0);
+        TaskId taskId1 = new TaskId(queryId.getId(), 0, 0, 0);
+        TaskId taskId2 = new TaskId(queryId.getId(), 1, 0, 0);
         querySnapshotManager.addNewTask(taskId1);
         querySnapshotManager.addNewTask(taskId2);
 

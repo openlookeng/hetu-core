@@ -27,6 +27,7 @@ import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
@@ -972,7 +973,7 @@ public class PlanBuilder
 
     public RemoteSourceNode remoteSourceNode(List<PlanFragmentId> fragmentIds, List<Symbol> symbols, ExchangeNode.Type exchangeType)
     {
-        return new RemoteSourceNode(idAllocator.getNextId(), fragmentIds, symbols, Optional.empty(), exchangeType);
+        return new RemoteSourceNode(idAllocator.getNextId(), fragmentIds, symbols, Optional.empty(), exchangeType, RetryPolicy.NONE);
     }
 
     public RowExpression rowExpression(String sql)

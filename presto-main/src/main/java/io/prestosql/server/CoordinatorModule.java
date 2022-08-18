@@ -98,9 +98,17 @@ import io.prestosql.execution.resourcegroups.InternalResourceGroupManager;
 import io.prestosql.execution.resourcegroups.LegacyResourceGroupConfigurationManager;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.scheduler.AllAtOnceExecutionPolicy;
+import io.prestosql.execution.scheduler.BinPackingNodeAllocatorService;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
+import io.prestosql.execution.scheduler.NodeAllocatorService;
+import io.prestosql.execution.scheduler.NodeSchedulerConfig;
+import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
 import io.prestosql.execution.scheduler.PhasedExecutionPolicy;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
+import io.prestosql.execution.scheduler.StageTaskSourceFactory;
+import io.prestosql.execution.scheduler.TaskDescriptorStorage;
+import io.prestosql.execution.scheduler.TaskExecutionStats;
+import io.prestosql.execution.scheduler.TaskSourceFactory;
 import io.prestosql.failuredetector.CoordinatorGossipFailureDetectorModule;
 import io.prestosql.failuredetector.FailureDetectorModule;
 import io.prestosql.memory.ClusterMemoryManager;
@@ -122,6 +130,7 @@ import io.prestosql.spi.security.SelectedRole;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.planner.PlanFragmenter;
 import io.prestosql.sql.planner.PlanOptimizers;
+import io.prestosql.sql.planner.SplitSourceFactory;
 import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.Comment;
@@ -189,6 +198,7 @@ import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static io.prestosql.execution.DataDefinitionExecution.DataDefinitionExecutionFactory;
 import static io.prestosql.execution.QueryExecution.QueryExecutionFactory;
 import static io.prestosql.execution.SqlQueryExecution.SqlQueryExecutionFactory;
+import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NodeAllocatorType.BIN_PACKING;
 import static io.prestosql.util.StatementUtils.getAllQueryTypes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -230,6 +240,7 @@ public class CoordinatorModule
         jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(QueryResults.class);
         jsonCodecBinder(binder).bindJsonCodec(SelectedRole.class);
+        jsonCodecBinder(binder).bindJsonCodec(FailTaskRequest.class);
         jaxrsBinder(binder).bind(io.prestosql.dispatcher.QueuedStatementResource.class);
         jaxrsBinder(binder).bind(io.prestosql.datacenter.DataCenterStatementResource.class);
         jaxrsBinder(binder).bind(io.prestosql.server.protocol.ExecutingStatementResource.class);
@@ -308,6 +319,14 @@ public class CoordinatorModule
         bindLowMemoryKiller(LowMemoryKillerPolicy.TOTAL_RESERVATION, TotalReservationLowMemoryKiller.class);
         bindLowMemoryKiller(LowMemoryKillerPolicy.TOTAL_RESERVATION_ON_BLOCKED_NODES, TotalReservationOnBlockedNodesLowMemoryKiller.class);
         newExporter(binder).export(ClusterMemoryManager.class).withGeneratedName();
+
+        // node allocator
+        NodeSchedulerConfig nodeSchedulerConfig = buildConfigObject(NodeSchedulerConfig.class);
+        if (nodeSchedulerConfig.getNodeAllocatorType() == BIN_PACKING) {
+            binder.bind(BinPackingNodeAllocatorService.class).in(Scopes.SINGLETON);
+            binder.bind(NodeAllocatorService.class).to(BinPackingNodeAllocatorService.class);
+            binder.bind(PartitionMemoryEstimatorFactory.class).to(BinPackingNodeAllocatorService.class);
+        }
 
         // node monitor
         binder.bind(ClusterSizeMonitor.class).in(Scopes.SINGLETON);
@@ -419,6 +438,14 @@ public class CoordinatorModule
         MapBinder<String, ExecutionPolicy> executionPolicyBinder = newMapBinder(binder, String.class, ExecutionPolicy.class);
         executionPolicyBinder.addBinding("all-at-once").to(AllAtOnceExecutionPolicy.class);
         executionPolicyBinder.addBinding("phased").to(PhasedExecutionPolicy.class);
+
+        binder.bind(TaskSourceFactory.class).to(StageTaskSourceFactory.class).in(Scopes.SINGLETON);
+        binder.bind(TaskDescriptorStorage.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(TaskDescriptorStorage.class).withGeneratedName();
+
+        binder.bind(TaskExecutionStats.class).in(Scopes.SINGLETON);
+        newExporter(binder).export(TaskExecutionStats.class).withGeneratedName();
+        binder.bind(SplitSourceFactory.class).in(Scopes.SINGLETON);
 
         // cleanup
         binder.bind(ExecutorCleanup.class).in(Scopes.SINGLETON);

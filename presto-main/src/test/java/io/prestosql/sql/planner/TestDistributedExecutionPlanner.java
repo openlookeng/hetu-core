@@ -33,6 +33,7 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorTableProperties;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -520,6 +521,7 @@ public class TestDistributedExecutionPlanner
                 Arrays.stream(fragmentId).mapToObj(String::valueOf).map(PlanFragmentId::new).collect(Collectors.toList()),
                 ImmutableList.of(symbol),
                 Optional.empty(),
-                GATHER);
+                GATHER,
+                RetryPolicy.NONE);
     }
 }

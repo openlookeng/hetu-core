@@ -57,6 +57,7 @@ public class TaskInfoFetcher
     private final TaskId taskId;
     private final String instanceId;
     private final Consumer<Throwable> onFail;
+    private final ContinuousTaskStatusFetcher taskStatusFetcher;
     private final StateMachine<TaskInfo> taskInfo;
     private final StateMachine<Optional<TaskInfo>> finalTaskInfo;
     private final Codec<TaskInfo> taskInfoCodec;
@@ -88,6 +89,7 @@ public class TaskInfoFetcher
 
     public TaskInfoFetcher(
             Consumer<Throwable> onFail,
+            ContinuousTaskStatusFetcher taskStatusFetcher,
             TaskInfo initialTask,
             String instanceId,
             HttpClient httpClient,
@@ -107,6 +109,7 @@ public class TaskInfoFetcher
         this.taskId = initialTask.getTaskStatus().getTaskId();
         this.instanceId = requireNonNull(instanceId, "instanceId is null");
         this.onFail = requireNonNull(onFail, "onFail is null");
+        this.taskStatusFetcher = requireNonNull(taskStatusFetcher, "taskStatusFetcher is null");
         this.taskInfo = new StateMachine<>("task " + taskId, executor, initialTask);
         this.finalTaskInfo = new StateMachine<>("task-" + taskId, executor, Optional.empty());
         this.taskInfoCodec = requireNonNull(taskInfoCodec, "taskInfoCodec is null");
@@ -238,9 +241,19 @@ public class TaskInfoFetcher
 
     synchronized void updateTaskInfo(TaskInfo newValue)
     {
-        boolean updated = taskInfo.setIf(newValue, oldValue -> {
+        TaskStatus localTaskStatus = taskStatusFetcher.getTaskStatus();
+        TaskStatus newRemoteTaskStatus = newValue.getTaskStatus();
+
+        TaskInfo updateValue = newValue;
+        if (localTaskStatus.getState().isDone() && newRemoteTaskStatus.getState().isDone() && localTaskStatus.getState() != newRemoteTaskStatus.getState()) {
+            // prefer local
+            updateValue = newValue.withTaskStatus(localTaskStatus);
+        }
+
+        TaskInfo finalNewValue = updateValue;
+        boolean updated = taskInfo.setIf(updateValue, oldValue -> {
             TaskStatus oldTaskStatus = oldValue.getTaskStatus();
-            TaskStatus newTaskStatus = newValue.getTaskStatus();
+            TaskStatus newTaskStatus = finalNewValue.getTaskStatus();
             if (oldTaskStatus.getState().isDone()) {
                 // never update if the task has reached a terminal state
                 return false;
@@ -249,8 +262,8 @@ public class TaskInfoFetcher
             return newTaskStatus.getVersion() >= oldTaskStatus.getVersion();
         });
 
-        if (updated && newValue.getTaskStatus().getState().isDone()) {
-            finalTaskInfo.compareAndSet(Optional.empty(), Optional.of(newValue));
+        if (updated && updateValue.getTaskStatus().getState().isDone()) {
+            finalTaskInfo.compareAndSet(Optional.empty(), Optional.of(updateValue));
             stop();
         }
     }

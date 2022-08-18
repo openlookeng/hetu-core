@@ -15,11 +15,18 @@ package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.spi.exchange.RetryPolicy;
 import org.testng.annotations.Test;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
+import static io.prestosql.execution.QueryManagerConfig.AVAILABLE_HEAP_MEMORY;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class TestQueryManagerConfig
 {
@@ -47,7 +54,22 @@ public class TestQueryManagerConfig
                 .setQueryMaxExecutionTime(new Duration(100, TimeUnit.DAYS))
                 .setQueryMaxCpuTime(new Duration(1_000_000_000, TimeUnit.DAYS))
                 .setRequiredWorkers(1)
-                .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES)));
+                .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES))
+                .setRetryPolicy(RetryPolicy.NONE)
+                .setQueryRetryAttempts(4)
+                .setTaskRetryAttemptsPerTask(4)
+                .setTaskRetryAttemptsOverall(Integer.MAX_VALUE)
+                .setRetryInitialDelay(new Duration(10, SECONDS))
+                .setRetryMaxDelay(new Duration(1, MINUTES))
+                .setRetryDelayScaleFactor(2.0)
+                .setMaxTasksWaitingForNodePerStage(5)
+                .setFaultTolerantExecutionTargetTaskInputSize(new DataSize(4, GIGABYTE))
+                .setFaultTolerantExecutionTargetTaskSplitCount(64)
+                .setFaultTolerantPreserveInputPartitionsInWriteStage(true)
+                .setFaultTolerantExecutionMinTaskSplitCount(16)
+                .setFaultTolerantExecutionMaxTaskSplitCount(256)
+                .setFaultTolerantExecutionPartitionCount(50)
+                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE)));
     }
 
     @Test
@@ -75,6 +97,21 @@ public class TestQueryManagerConfig
                 .put("query.max-cpu-time", "2d")
                 .put("query-manager.required-workers", "333")
                 .put("query-manager.required-workers-max-wait", "33m")
+                .put("retry-policy", "TASK")
+                .put("query-retry-attempts", "5")
+                .put("task-retry-attempts-overall", "20")
+                .put("task-retry-attempts-per-task", "5")
+                .put("retry-initial-delay", "11s")
+                .put("retry-max-delay", "2m")
+                .put("retry-delay-scale-factor", "3.0")
+                .put("max-tasks-waiting-for-node-per-stage", "6")
+                .put("fault-tolerant-execution-target-task-input-size", "5GB")
+                .put("fault-tolerant-execution-target-task-split-count", "65")
+                .put("fault-tolerant-execution-preserve-input-partitions-in-write-stage", "false")
+                .put("fault-tolerant-execution-min-task-split-count", "17")
+                .put("fault-tolerant-execution-max-task-split-count", "257")
+                .put("fault-tolerant-execution-partition-count", "51")
+                .put("fault-tolerant-execution-task-descriptor-storage-max-memory", "1GB")
                 .build();
 
         QueryManagerConfig expected = new QueryManagerConfig()
@@ -98,7 +135,22 @@ public class TestQueryManagerConfig
                 .setQueryMaxExecutionTime(new Duration(3, TimeUnit.HOURS))
                 .setQueryMaxCpuTime(new Duration(2, TimeUnit.DAYS))
                 .setRequiredWorkers(333)
-                .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES));
+                .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES))
+                .setRetryPolicy(RetryPolicy.TASK)
+                .setQueryRetryAttempts(5)
+                .setTaskRetryAttemptsPerTask(5)
+                .setTaskRetryAttemptsOverall(20)
+                .setRetryInitialDelay(new Duration(11, SECONDS))
+                .setRetryMaxDelay(new Duration(2, MINUTES))
+                .setRetryDelayScaleFactor(3.0)
+                .setMaxTasksWaitingForNodePerStage(6)
+                .setFaultTolerantExecutionTargetTaskInputSize(new DataSize(5, GIGABYTE))
+                .setFaultTolerantExecutionTargetTaskSplitCount(65)
+                .setFaultTolerantPreserveInputPartitionsInWriteStage(false)
+                .setFaultTolerantExecutionMinTaskSplitCount(17)
+                .setFaultTolerantExecutionMaxTaskSplitCount(257)
+                .setFaultTolerantExecutionPartitionCount(51)
+                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(1, DataSize.Unit.GIGABYTE));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

@@ -58,6 +58,7 @@ import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.SqlTaskManager;
 import io.prestosql.execution.StageInfo;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskManagementExecutor;
 import io.prestosql.execution.TaskManager;
@@ -344,6 +345,7 @@ public class ServerMainModule
         binder.bind(TaskManagementExecutor.class).in(Scopes.SINGLETON);
         binder.bind(SqlTaskManager.class).in(Scopes.SINGLETON);
         binder.bind(TaskManager.class).to(Key.get(SqlTaskManager.class));
+        binder.bind(TableExecuteContextManager.class).in(Scopes.SINGLETON);
 
         // memory revoking scheduler
         binder.bind(MemoryRevokingScheduler.class).in(Scopes.SINGLETON);
