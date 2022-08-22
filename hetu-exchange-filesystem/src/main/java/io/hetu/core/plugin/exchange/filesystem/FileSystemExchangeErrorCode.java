@@ -23,11 +23,12 @@ public enum FileSystemExchangeErrorCode
         implements ErrorCodeSupplier
 {
     MAX_OUTPUT_PARTITION_COUNT_EXCEEDED(0, USER_ERROR),;
+    private static final int BASE_CODE = 0x0510_0000;
     private final ErrorCode errorCode;
 
     FileSystemExchangeErrorCode(int code, ErrorType type)
     {
-        errorCode = new ErrorCode(code + 0x0510_0000, name(), type);
+        errorCode = new ErrorCode(code + BASE_CODE, name(), type);
     }
 
     @Override

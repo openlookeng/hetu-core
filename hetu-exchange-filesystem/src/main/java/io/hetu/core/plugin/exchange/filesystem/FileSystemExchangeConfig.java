@@ -43,6 +43,7 @@ public class FileSystemExchangeConfig
     private int exchangeSourceConcurrentReaders = 4;
     private int maxOutputPartitionCount = 50;
     private int exchangeFileListingParallelism = 50;
+    private String exchangeFilesystemType = "local";
 
     @NotNull
     @NotEmpty(message = "At least one base directory needs to be configured")
@@ -168,6 +169,20 @@ public class FileSystemExchangeConfig
     public FileSystemExchangeConfig setExchangeFileListingParallelism(int exchangeFileListingParallelism)
     {
         this.exchangeFileListingParallelism = exchangeFileListingParallelism;
+        return this;
+    }
+
+    @NotNull
+    public String getExchangeFilesystemType()
+    {
+        return exchangeFilesystemType;
+    }
+
+    @Config("exchange-filesystem-type")
+    @ConfigDescription("Possible values: [local, hdfs]")
+    public FileSystemExchangeConfig setExchangeFilesystemType(String exchangeFilesystemType)
+    {
+        this.exchangeFilesystemType = exchangeFilesystemType;
         return this;
     }
 }

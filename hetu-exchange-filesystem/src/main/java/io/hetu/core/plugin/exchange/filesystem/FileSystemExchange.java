@@ -20,6 +20,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.exchange.Exchange;
 import io.prestosql.spi.exchange.ExchangeContext;
 import io.prestosql.spi.exchange.ExchangeSinkHandle;
@@ -133,7 +134,7 @@ public class FileSystemExchange
     {
         FileSystemExchangeSinkHandle fileSystemExchangeSinkHandle = (FileSystemExchangeSinkHandle) sinkHandle;
         int taskPartitionId = fileSystemExchangeSinkHandle.getPartitionId();
-        URI outputDirectory = getTaskOutputDirectory(taskPartitionId);
+        URI outputDirectory = getTaskOutputDirectory(taskPartitionId).resolve(taskAttemptId + PATH_SEPARATOR);
         try {
             exchangeStorage.createDirectories(outputDirectory);
         }

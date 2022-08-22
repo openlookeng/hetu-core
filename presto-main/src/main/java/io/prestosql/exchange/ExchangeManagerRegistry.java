@@ -1,4 +1,4 @@
-/*
+ /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,16 +14,19 @@
 package io.prestosql.exchange;
 
 import io.airlift.log.Logger;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.exchange.ExchangeManager;
 import io.prestosql.spi.exchange.ExchangeManagerFactory;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import javax.inject.Inject;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,7 +65,7 @@ public class ExchangeManagerRegistry
         }
     }
 
-    public void loadExchangeManager()
+    public void loadExchangeManager(FileSystemClientManager fileSystemClientManager)
     {
         if (!CONFIG_FILE.exists()) {
             return;
@@ -72,10 +75,19 @@ public class ExchangeManagerRegistry
         String name = properties.remove(EXCHANGE_MANAGER_NAME_PROPERTY);
         checkArgument(!isNullOrEmpty(name), "Exchange manager configuration %s does not contain %s property", CONFIG_FILE, EXCHANGE_MANAGER_NAME_PROPERTY);
 
-        loadExchangeManager(name, properties);
+        String filesystemType = properties.get("exchange-filesystem-type");
+        String filesystemBaseDirectory = properties.get("exchange.base-directories");
+        HetuFileSystemClient fileSystemClient;
+        try {
+            fileSystemClient = fileSystemClientManager.getFileSystemClient(filesystemType, Paths.get(filesystemBaseDirectory));
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        loadExchangeManager(name, properties, fileSystemClient);
     }
 
-    public synchronized void loadExchangeManager(String name, Map<String, String> properties)
+    public synchronized void loadExchangeManager(String name, Map<String, String> properties, HetuFileSystemClient fileSystemClient)
     {
         log.info("-- Loading exchange manager %s --", name);
 
@@ -86,7 +98,7 @@ public class ExchangeManagerRegistry
 
         ExchangeManager exchangeManagerInstance;
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {
-            exchangeManagerInstance = factory.create(properties);
+            exchangeManagerInstance = factory.create(properties, fileSystemClient);
         }
         handleResolver.setExchangeManagerHandleResolver(factory.getHandleResolver());
 

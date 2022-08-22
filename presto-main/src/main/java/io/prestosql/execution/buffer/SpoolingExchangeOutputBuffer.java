@@ -13,14 +13,14 @@
  */
 package io.prestosql.execution.buffer;
 
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
-import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
-import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.hetu.core.transport.execution.buffer.SerializedPageSerde;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -221,9 +221,9 @@ public class SpoolingExchangeOutputBuffer
         checkState(sink != null, "exchangeSink is null");
         for (SerializedPage page : pages) {
             int sizeRequired = calculateSerializedPageSizeInBytes(page);
-            SliceOutput sliceOutput = Slices.allocate(sizeRequired).getOutput();
-            PagesSerdeUtil.writeSerializedPage(sliceOutput, page);
-            sink.add(partition, sliceOutput.slice());
+            Output output = new Output(sizeRequired);
+            SerializedPageSerde.serialize(output, page);
+            sink.add(partition, Slices.wrappedBuffer(output.getBuffer()));
             totalRowsAdded.addAndGet(getSerializedPagePositionCount(page.getSlice()));
         }
         updateMemoryUsage(sink.getMemoryUsage());

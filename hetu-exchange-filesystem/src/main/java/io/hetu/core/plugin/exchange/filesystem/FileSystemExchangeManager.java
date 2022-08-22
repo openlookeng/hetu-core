@@ -14,6 +14,7 @@
 package io.hetu.core.plugin.exchange.filesystem;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.exchange.Exchange;
 import io.prestosql.spi.exchange.ExchangeContext;
@@ -64,6 +65,8 @@ public class FileSystemExchangeManager
     private final int exchangeFileListingParallelism;
     private final ExecutorService executor;
 
+    FileSystemExchangeConfig exchangeConfig;
+
     @Inject
     public FileSystemExchangeManager(
             FileSystemExchangeStorage exchangeStorage,
@@ -83,6 +86,7 @@ public class FileSystemExchangeManager
         this.maxOutputPartitionCount = config.getMaxOutputPartitionCount();
         this.exchangeFileListingParallelism = config.getExchangeFileListingParallelism();
         this.executor = newCachedThreadPool(daemonThreadsNamed("exchange-source-handles-creation-%s"));
+        this.exchangeConfig = config;
     }
 
     @Override
@@ -90,7 +94,7 @@ public class FileSystemExchangeManager
     {
         if (outputPartitionCount > maxOutputPartitionCount) {
             throw new PrestoException(MAX_OUTPUT_PARTITION_COUNT_EXCEEDED,
-                    format("Max output partition count exceeded for exchange %s. Allowed %s. Found: %s.", context.getExchangeId(), maxOutputPartitionCount, outputPartitionCount));
+                    format("Max number of output partitions exceeded for exchange %s. Allowed %s. Found: %s.", context.getExchangeId(), maxOutputPartitionCount, outputPartitionCount));
         }
         Optional<SecretKey> secretKey = Optional.empty();
         if (exchangeEncryptionEnabled) {
