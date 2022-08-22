@@ -162,9 +162,7 @@ public class HetuLocalFileSystemClient
             throws IOException
     {
         // Need inline check to pass security check
-        if (!path.toAbsolutePath().startsWith(root)) {
-            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
-        }
+        validate(path);
         return Files.newInputStream(path);
     }
 
@@ -173,9 +171,7 @@ public class HetuLocalFileSystemClient
             throws IOException
     {
         // Need inline check to pass security check
-        if (!path.toAbsolutePath().startsWith(root)) {
-            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
-        }
+        validate(path);
         return Files.newOutputStream(path, options);
     }
 
