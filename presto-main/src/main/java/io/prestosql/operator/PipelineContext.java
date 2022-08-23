@@ -103,6 +103,9 @@ public class PipelineContext
 
     private final MemoryTrackingContext pipelineMemoryContext;
 
+    private final AtomicLong inputBlockedTime = new AtomicLong();
+    private final AtomicLong outputBlockedTime = new AtomicLong();
+
     public PipelineContext(int pipelineId, TaskContext taskContext, Executor notificationExecutor, ScheduledExecutorService yieldExecutor, MemoryTrackingContext pipelineMemoryContext, boolean inputPipeline, boolean outputPipeline, boolean partitioned)
     {
         this.pipelineId = pipelineId;
@@ -228,6 +231,8 @@ public class PipelineContext
         outputPositions.update(driverStats.getOutputPositions());
 
         physicalWrittenDataSize.getAndAdd(driverStats.getPhysicalWrittenDataSize().toBytes());
+        inputBlockedTime.getAndAdd(driverStats.getInputBlockedTime().roundTo(NANOSECONDS));
+        outputBlockedTime.getAndAdd(driverStats.getOutputBlockedTime().roundTo(NANOSECONDS));
     }
 
     public void start()
@@ -374,6 +379,9 @@ public class PipelineContext
 
         long physicalWrittenSize = this.physicalWrittenDataSize.get();
 
+        long totalInputBlockedTime = this.inputBlockedTime.get();
+        long totalOutputBlockedTime = this.outputBlockedTime.get();
+
         List<DriverStats> driverStatsList = new ArrayList<>();
 
         TreeMap<Integer, OperatorStats> operatorStatsMap = new TreeMap<>(this.operatorSummaries);
@@ -410,6 +418,9 @@ public class PipelineContext
             outputPositionsTotalCount += driverStats.getOutputPositions();
 
             physicalWrittenSize += driverStats.getPhysicalWrittenDataSize().toBytes();
+
+            totalInputBlockedTime += driverStats.getInputBlockedTime().roundTo(NANOSECONDS);
+            totalOutputBlockedTime += driverStats.getOutputBlockedTime().roundTo(NANOSECONDS);
         }
 
         // merge the running operator stats into the operator summary
@@ -482,7 +493,9 @@ public class PipelineContext
                 succinctBytes(physicalWrittenSize),
 
                 ImmutableList.copyOf(operatorStatsMap.values()),
-                driverStatsList);
+                driverStatsList,
+                new Duration(totalInputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(totalOutputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit());
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)

@@ -81,7 +81,9 @@ public class TestPipelineStats
             new DataSize(20, BYTE),
 
             ImmutableList.of(TestOperatorStats.EXPECTED),
-            ImmutableList.of(TestDriverStats.EXPECTED));
+            ImmutableList.of(TestDriverStats.EXPECTED),
+            new Duration(10, NANOSECONDS),
+            new Duration(11, NANOSECONDS));
 
     @Test
     public void testJson()

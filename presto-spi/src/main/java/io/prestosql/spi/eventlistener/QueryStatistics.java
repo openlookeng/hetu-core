@@ -13,6 +13,8 @@
  */
 package io.prestosql.spi.eventlistener;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +47,7 @@ public class QueryStatistics
     private final long writtenRows;
 
     private final double cumulativeMemory;
+    private final double failedCumulativeMemory;
 
     private final List<StageGcStatistics> stageGcStatistics;
 
@@ -63,6 +66,11 @@ public class QueryStatistics
      * can change without preserving backward compatibility.
      */
     private final Optional<String> planNodeStatsAndCosts;
+
+    private final Optional<Duration> inputBlockedTime;
+    private final Optional<Duration> failedInputBlockedTime;
+    private final Optional<Duration> outputBlockedTime;
+    private final Optional<Duration> failedOutputBlockedTime;
 
     public QueryStatistics(
             Duration cpuTime,
@@ -86,12 +94,17 @@ public class QueryStatistics
             long writtenBytes,
             long writtenRows,
             double cumulativeMemory,
+            double failedCumulativeMemory,
             List<StageGcStatistics> stageGcStatistics,
             int completedSplits,
             boolean complete,
             List<StageCpuDistribution> cpuTimeDistribution,
             List<String> operatorSummaries,
-            Optional<String> planNodeStatsAndCosts)
+            Optional<String> planNodeStatsAndCosts,
+            Optional<Duration> inputBlockedTime,
+            Optional<Duration> failedInputBlockedTime,
+            Optional<Duration> outputBlockedTime,
+            Optional<Duration> failedOutputBlockedTime)
     {
         this.cpuTime = requireNonNull(cpuTime, "cpuTime is null");
         this.wallTime = requireNonNull(wallTime, "wallTime is null");
@@ -114,12 +127,17 @@ public class QueryStatistics
         this.writtenBytes = writtenBytes;
         this.writtenRows = writtenRows;
         this.cumulativeMemory = cumulativeMemory;
+        this.failedCumulativeMemory = failedCumulativeMemory;
         this.stageGcStatistics = requireNonNull(stageGcStatistics, "stageGcStatistics is null");
         this.completedSplits = completedSplits;
         this.complete = complete;
         this.cpuTimeDistribution = requireNonNull(cpuTimeDistribution, "cpuTimeDistribution is null");
         this.operatorSummaries = requireNonNull(operatorSummaries, "operatorSummaries is null");
         this.planNodeStatsAndCosts = requireNonNull(planNodeStatsAndCosts, "planNodeStatsAndCosts is null");
+        this.inputBlockedTime = requireNonNull(inputBlockedTime, "inputBlockedTime is null");
+        this.failedInputBlockedTime = requireNonNull(failedInputBlockedTime, "failedInputBlockedTime is null");
+        this.outputBlockedTime = requireNonNull(outputBlockedTime, "outputBlockedTime is null");
+        this.failedOutputBlockedTime = requireNonNull(failedOutputBlockedTime, "failedOutputBlockedTime is null");
     }
 
     public Duration getCpuTime()
@@ -227,6 +245,12 @@ public class QueryStatistics
         return cumulativeMemory;
     }
 
+    @JsonProperty
+    public double getFailedCumulativeMemory()
+    {
+        return failedCumulativeMemory;
+    }
+
     public List<StageGcStatistics> getStageGcStatistics()
     {
         return stageGcStatistics;
@@ -255,5 +279,25 @@ public class QueryStatistics
     public Optional<String> getPlanNodeStatsAndCosts()
     {
         return planNodeStatsAndCosts;
+    }
+
+    public Optional<Duration> getInputBlockedTime()
+    {
+        return inputBlockedTime;
+    }
+
+    public Optional<Duration> getFailedInputBlockedTime()
+    {
+        return failedInputBlockedTime;
+    }
+
+    public Optional<Duration> getOutputBlockedTime()
+    {
+        return outputBlockedTime;
+    }
+
+    public Optional<Duration> getFailedOutputBlockedTime()
+    {
+        return failedOutputBlockedTime;
     }
 }

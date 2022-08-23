@@ -75,7 +75,6 @@ public class QueryManagerConfig
 
     private RetryPolicy retryPolicy = RetryPolicy.NONE;
 
-    private int queryRetryAttempts = 4;
     private int taskRetryAttemptsPerTask = 4;
     private int taskRetryAttemptsOverall = Integer.MAX_VALUE;
     private Duration retryInitialDelay = new Duration(10, SECONDS);
@@ -387,20 +386,6 @@ public class QueryManagerConfig
     public QueryManagerConfig setRetryPolicy(RetryPolicy retryPolicy)
     {
         this.retryPolicy = retryPolicy;
-        return this;
-    }
-
-    @Min(0)
-    public int getQueryRetryAttempts()
-    {
-        return queryRetryAttempts;
-    }
-
-    @Config("query-retry-attempts")
-    @LegacyConfig("retry-attempts")
-    public QueryManagerConfig setQueryRetryAttempts(int queryRetryAttempts)
-    {
-        this.queryRetryAttempts = queryRetryAttempts;
         return this;
     }
 

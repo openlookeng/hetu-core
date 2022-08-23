@@ -84,6 +84,8 @@ public class PipelineStats
 
     private final List<OperatorStats> operatorSummaries;
     private final List<DriverStats> drivers;
+    private final Duration inputBlockedTime;
+    private final Duration outputBlockedTime;
 
     @JsonCreator
     public PipelineStats(
@@ -135,7 +137,9 @@ public class PipelineStats
             @JsonProperty("physicalWrittenDataSize") DataSize physicalWrittenDataSize,
 
             @JsonProperty("operatorSummaries") List<OperatorStats> operatorSummaries,
-            @JsonProperty("drivers") List<DriverStats> drivers)
+            @JsonProperty("drivers") List<DriverStats> drivers,
+            @JsonProperty("inputBlockedTime") Duration inputBlockedTime,
+            @JsonProperty("outputBlockedTime") Duration outputBlockedTime)
     {
         this.pipelineId = pipelineId;
 
@@ -198,6 +202,9 @@ public class PipelineStats
 
         this.operatorSummaries = ImmutableList.copyOf(requireNonNull(operatorSummaries, "operatorSummaries is null"));
         this.drivers = ImmutableList.copyOf(requireNonNull(drivers, "drivers is null"));
+
+        this.inputBlockedTime = requireNonNull(inputBlockedTime, "inputBlockedTime is null");
+        this.outputBlockedTime = requireNonNull(outputBlockedTime, "outputBlockedTime is null");
     }
 
     @JsonProperty
@@ -419,6 +426,18 @@ public class PipelineStats
         return drivers;
     }
 
+    @JsonProperty
+    public Duration getInputBlockedTime()
+    {
+        return inputBlockedTime;
+    }
+
+    @JsonProperty
+    public Duration getOutputBlockedTime()
+    {
+        return outputBlockedTime;
+    }
+
     public PipelineStats summarize()
     {
         return new PipelineStats(
@@ -459,6 +478,8 @@ public class PipelineStats
                 operatorSummaries.stream()
                         .map(OperatorStats::summarize)
                         .collect(Collectors.toList()),
-                ImmutableList.of());
+                ImmutableList.of(),
+                inputBlockedTime,
+                outputBlockedTime);
     }
 }

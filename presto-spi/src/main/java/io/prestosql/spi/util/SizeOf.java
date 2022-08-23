@@ -58,8 +58,8 @@ public final class SizeOf
     private static final int BYTE_INSTANCE_SIZE = ClassLayout.parseClass(Byte.class).instanceSize();
     private static final int SHORT_INSTANCE_SIZE = ClassLayout.parseClass(Short.class).instanceSize();
     private static final int CHARACTER_INSTANCE_SIZE = ClassLayout.parseClass(Character.class).instanceSize();
-    private static final int INTEGER_INSTANCE_SIZE = ClassLayout.parseClass(Integer.class).instanceSize();
-    private static final int LONG_INSTANCE_SIZE = ClassLayout.parseClass(Long.class).instanceSize();
+    public static final int INTEGER_INSTANCE_SIZE = ClassLayout.parseClass(Integer.class).instanceSize();
+    public static final int LONG_INSTANCE_SIZE = ClassLayout.parseClass(Long.class).instanceSize();
     private static final int FLOAT_INSTANCE_SIZE = ClassLayout.parseClass(Float.class).instanceSize();
     private static final int DOUBLE_INSTANCE_SIZE = ClassLayout.parseClass(Double.class).instanceSize();
 

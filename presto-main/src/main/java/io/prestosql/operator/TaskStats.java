@@ -84,6 +84,8 @@ public class TaskStats
     private final Duration fullGcTime;
 
     private final List<PipelineStats> pipelines;
+    private final Duration inputBlockedTime;
+    private final Duration outputBlockedTime;
 
     public TaskStats(DateTime createTime, DateTime endTime)
     {
@@ -124,7 +126,9 @@ public class TaskStats
                 new DataSize(0, BYTE),
                 0,
                 new Duration(0, MILLISECONDS),
-                ImmutableList.of());
+                ImmutableList.of(),
+                new Duration(0, MILLISECONDS),
+                new Duration(0, MILLISECONDS));
     }
 
     @JsonCreator
@@ -177,7 +181,9 @@ public class TaskStats
             @JsonProperty("fullGcCount") int fullGcCount,
             @JsonProperty("fullGcTime") Duration fullGcTime,
 
-            @JsonProperty("pipelines") List<PipelineStats> pipelines)
+            @JsonProperty("pipelines") List<PipelineStats> pipelines,
+            @JsonProperty("inputBlockedTime") Duration inputBlockedTime,
+            @JsonProperty("outputBlockedTime") Duration outputBlockedTime)
     {
         this.createTime = requireNonNull(createTime, "createTime is null");
         this.firstStartTime = firstStartTime;
@@ -232,6 +238,9 @@ public class TaskStats
         this.processedInputDataSize = requireNonNull(processedInputDataSize, "processedInputDataSize is null");
         checkArgument(processedInputPositions >= 0, "processedInputPositions is negative");
         this.processedInputPositions = processedInputPositions;
+
+        this.inputBlockedTime = requireNonNull(inputBlockedTime, "inputBlockedTime is null");
+        this.outputBlockedTime = requireNonNull(outputBlockedTime, "outputBlockedTime is null");
 
         this.outputDataSize = requireNonNull(outputDataSize, "outputDataSize is null");
         checkArgument(outputPositions >= 0, "outputPositions is negative");
@@ -362,6 +371,18 @@ public class TaskStats
     public Duration getTotalCpuTime()
     {
         return totalCpuTime;
+    }
+
+    @JsonProperty
+    public Duration getInputBlockedTime()
+    {
+        return inputBlockedTime;
+    }
+
+    @JsonProperty
+    public Duration getOutputBlockedTime()
+    {
+        return outputBlockedTime;
     }
 
     @JsonProperty
@@ -518,7 +539,9 @@ public class TaskStats
                 physicalWrittenDataSize,
                 fullGcCount,
                 fullGcTime,
-                ImmutableList.of());
+                ImmutableList.of(),
+                inputBlockedTime,
+                outputBlockedTime);
     }
 
     public TaskStats summarizeFinal()
@@ -563,6 +586,8 @@ public class TaskStats
                 fullGcTime,
                 pipelines.stream()
                         .map(PipelineStats::summarize)
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()),
+                inputBlockedTime,
+                outputBlockedTime);
     }
 }

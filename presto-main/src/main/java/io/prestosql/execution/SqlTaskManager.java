@@ -188,7 +188,6 @@ public class SqlTaskManager
         this.metadata = metadata;
         // currentTaskInstanceIds and seenInstanceIds are already initialized
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
-        //TODO(SURYA) check this instanceId , for now passing random UUID
         this.tasks = CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(
                 taskId -> createSqlTask(taskId, UUID.randomUUID().toString(),
                         locationFactory.createLocalTaskLocation(taskId),
@@ -674,7 +673,6 @@ public class SqlTaskManager
     /**
      * Add a listener that notifies about failures of any source tasks for a given task
      */
-    //TODO(SURYA): check this implementation.
     public void addSourceTaskFailureListener(TaskId taskId, TaskFailureListener listener)
     {
         tasks.getUnchecked(taskId).addSourceTaskFailureListener(listener);

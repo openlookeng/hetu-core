@@ -34,7 +34,6 @@ import static java.util.Objects.requireNonNull;
 public class RemoteSplit
         implements ConnectorSplit
 {
-    //TODO(SURYA): replace old constructor with new one and check how to get estimatedSizeOf information.
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RemoteSplit.class).instanceSize();
 
     private final URI location;

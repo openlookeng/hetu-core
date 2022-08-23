@@ -128,7 +128,6 @@ public class FaultTolerantStageScheduler
 
     private final DelayedFutureCompletor futureCompletor;
 
-    //TODO(SURYA) immediateVoidFuture() is replced here with immediateFuture(null).
     @GuardedBy("this")
     private ListenableFuture<Void> blocked = immediateFuture(null);
 
@@ -414,8 +413,7 @@ public class FaultTolerantStageScheduler
                 taskSplits,
                 allSourcePlanNodeIds.stream()
                         .collect(toImmutableListMultimap(Function.identity(), planNodeId -> Lifespan.taskWide())),
-                allSourcePlanNodeIds,
-                Optional.of(memoryRequirements.getRequiredMemory())).orElseThrow(() -> new VerifyException("stage execution is expected to be active"));
+                allSourcePlanNodeIds).orElseThrow(() -> new VerifyException("stage execution is expected to be active"));
 
         nodeLease.attachTaskId(task.getTaskId());
         partitionToRemoteTaskMap.put(partition, task);

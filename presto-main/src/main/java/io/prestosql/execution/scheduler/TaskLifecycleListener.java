@@ -16,7 +16,6 @@ package io.prestosql.execution.scheduler;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
 
-//TODO(SURYA): implement current interface for UT class: TestingTaskLifecycleListener
 public interface TaskLifecycleListener
 {
     void taskCreated(PlanFragmentId fragmentId, RemoteTask task);

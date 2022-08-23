@@ -464,6 +464,8 @@ public class TaskContext
         long outputPositions = 0;
 
         long physicalWrittenDataSize = 0;
+        long inputBlockedTime = 0;
+        long outputBlockedTime = 0;
 
         for (PipelineStats pipeline : pipelineStats) {
             if (pipeline.getLastEndTime() != null) {
@@ -494,11 +496,14 @@ public class TaskContext
 
                 processedInputDataSize += pipeline.getProcessedInputDataSize().toBytes();
                 processedInputPositions += pipeline.getProcessedInputPositions();
+                inputBlockedTime += pipeline.getInputBlockedTime().roundTo(NANOSECONDS);
             }
 
             if (pipeline.isOutputPipeline()) {
                 outputDataSize += pipeline.getOutputDataSize().toBytes();
                 outputPositions += pipeline.getOutputPositions();
+
+                outputBlockedTime += pipeline.getOutputBlockedTime().roundTo(NANOSECONDS);
             }
 
             physicalWrittenDataSize += pipeline.getPhysicalWrittenDataSize().toBytes();
@@ -581,7 +586,9 @@ public class TaskContext
                 succinctBytes(physicalWrittenDataSize),
                 fullGcCount,
                 fullGcTime,
-                pipelineStats);
+                pipelineStats,
+                new Duration(inputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(outputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit());
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)

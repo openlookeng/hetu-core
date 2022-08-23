@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.Path;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.Objects;
@@ -24,6 +25,7 @@ import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -31,6 +33,8 @@ import static java.util.Objects.requireNonNull;
  */
 public class DeleteDeltaLocations
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(DeleteDeltaLocations.class).instanceSize();
+
     private final String partitionLocation;
     private final List<WriteIdInfo> deleteDeltas;
 
@@ -85,6 +89,12 @@ public class DeleteDeltaLocations
                 .add("partitionLocation", partitionLocation)
                 .add("deleteDeltas", deleteDeltas)
                 .toString();
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + estimatedSizeOf(partitionLocation);
     }
 
     public static Builder builder(Path partitionPath)

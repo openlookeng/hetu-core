@@ -180,6 +180,7 @@ public class TestQueryStats
             9,
             10,
             11,
+            11,
 
             12,
             13,
@@ -188,6 +189,7 @@ public class TestQueryStats
             16,
 
             17.0,
+            18.0,
             new DataSize(18, BYTE),
             new DataSize(19, BYTE),
             new DataSize(20, BYTE),
@@ -200,26 +202,39 @@ public class TestQueryStats
 
             true,
             new Duration(20, NANOSECONDS),
+            new Duration(20, NANOSECONDS),
+            new Duration(21, NANOSECONDS),
             new Duration(21, NANOSECONDS),
             new Duration(23, NANOSECONDS),
             false,
             ImmutableSet.of(),
 
             new DataSize(241, BYTE),
+            new DataSize(241, BYTE),
+            251,
             251,
 
             new DataSize(242, BYTE),
+            new DataSize(242, BYTE),
+            252,
             252,
 
             new DataSize(24, BYTE),
+            new DataSize(24, BYTE),
+            25,
             25,
 
             new DataSize(26, BYTE),
+            new DataSize(26, BYTE),
+            27,
             27,
 
             new DataSize(28, BYTE),
+            new DataSize(28, BYTE),
+            29,
             29,
 
+            new DataSize(30, BYTE),
             new DataSize(30, BYTE),
 
             ImmutableList.of(new StageGcStatistics(
@@ -231,7 +246,11 @@ public class TestQueryStats
                     106,
                     107)),
 
-            operatorSummaries);
+            operatorSummaries,
+            new Duration(20, NANOSECONDS),
+            new Duration(20, NANOSECONDS),
+            new Duration(21, NANOSECONDS),
+            new Duration(21, NANOSECONDS));
 
     @Test
     public void testJson()

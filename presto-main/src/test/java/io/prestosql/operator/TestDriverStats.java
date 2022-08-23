@@ -70,7 +70,10 @@ public class TestDriverStats
 
             new DataSize(20, BYTE),
 
-            ImmutableList.of(TestOperatorStats.EXPECTED));
+            ImmutableList.of(TestOperatorStats.EXPECTED),
+
+            new Duration(155, NANOSECONDS),
+            new Duration(155, NANOSECONDS));
 
     @Test
     public void testJson()
