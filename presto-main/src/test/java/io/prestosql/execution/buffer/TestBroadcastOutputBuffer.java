@@ -16,9 +16,9 @@ package io.prestosql.execution.buffer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.MemoryReservationHandler;
@@ -43,8 +43,6 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.prestosql.SessionTestUtils.TEST_SNAPSHOT_SESSION;
 import static io.prestosql.execution.buffer.BufferResult.emptyResults;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.BufferTestUtils.MAX_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.NO_WAIT;
 import static io.prestosql.execution.buffer.BufferTestUtils.acknowledgeBufferResult;
@@ -77,6 +75,7 @@ import static org.testng.Assert.fail;
 
 public class TestBroadcastOutputBuffer
 {
+    private static final Logger LOG = Logger.get(TestBroadcastOutputBuffer.class);
     private static final PagesSerde PAGES_SERDE = testingPagesSerde();
 
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
@@ -109,12 +108,14 @@ public class TestBroadcastOutputBuffer
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
         try {
             createBroadcastBuffer(createInitialEmptyOutputBuffers(BROADCAST), new DataSize(0, BYTE));
             fail("Expected IllegalStateException");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -427,6 +428,7 @@ public class TestBroadcastOutputBuffer
             fail("Expected IllegalStateException from addQueue after noMoreQueues has been called");
         }
         catch (IllegalArgumentException ignored) {
+            LOG.info(ignored.getMessage());
         }
     }
 
@@ -1136,7 +1138,7 @@ public class TestBroadcastOutputBuffer
     private BroadcastOutputBuffer createBroadcastBuffer(OutputBuffers outputBuffers, DataSize dataSize, AggregatedMemoryContext memoryContext, Executor notificationExecutor)
     {
         BroadcastOutputBuffer buffer = new BroadcastOutputBuffer(
-                new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                 dataSize,
                 () -> memoryContext.newLocalMemoryContext("test"),
                 notificationExecutor);
@@ -1196,7 +1198,7 @@ public class TestBroadcastOutputBuffer
     private BroadcastOutputBuffer createBroadcastBuffer(OutputBuffers outputBuffers, DataSize dataSize)
     {
         BroadcastOutputBuffer buffer = new BroadcastOutputBuffer(
-                new StateMachine<>("bufferState", stateNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", stateNotificationExecutor),
                 dataSize,
                 () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
                 stateNotificationExecutor);

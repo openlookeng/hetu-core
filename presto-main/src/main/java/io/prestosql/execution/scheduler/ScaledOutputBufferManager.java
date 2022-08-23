@@ -69,4 +69,36 @@ public class ScaledOutputBufferManager
         }
         outputBufferTarget.accept(newOutputBuffers);
     }
+
+    @SuppressWarnings("ObjectEquality")
+    @Override
+    public synchronized void addOutputBuffer(OutputBufferId newBuffer)
+    {
+        if (outputBuffers.isNoMoreBufferIds()) {
+            // a stage can move to a final state (e.g., failed) while scheduling, so ignore
+            // the new buffers
+            return;
+        }
+
+        OutputBuffers newOutputBuffers = outputBuffers.withBuffer(newBuffer, newBuffer.getId());
+
+        // don't update if nothing changed
+        if (newOutputBuffers != outputBuffers) {
+            this.outputBuffers = newOutputBuffers;
+        }
+    }
+
+    @Override
+    public synchronized void noMoreBuffers()
+    {
+        if (!outputBuffers.isNoMoreBufferIds()) {
+            outputBuffers = outputBuffers.withNoMoreBufferIds();
+        }
+    }
+
+    @Override
+    public synchronized OutputBuffers getOutputBuffers()
+    {
+        return outputBuffers;
+    }
 }

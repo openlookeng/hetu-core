@@ -15,7 +15,7 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
-import io.prestosql.execution.StateMachine;
+import io.prestosql.execution.buffer.OutputBufferStateMachine;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
@@ -58,8 +58,6 @@ import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
@@ -205,7 +203,7 @@ public class BenchmarkPartitionedOutputOperator
         private PartitionedOutputBuffer createPartitionedBuffer(OutputBuffers buffers, DataSize dataSize)
         {
             return new PartitionedOutputBuffer(
-                    new StateMachine<>("bufferState", SCHEDULER, OPEN, TERMINAL_BUFFER_STATES),
+                    new OutputBufferStateMachine("bufferState", SCHEDULER),
                     buffers,
                     dataSize,
                     () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),

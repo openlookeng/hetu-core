@@ -166,4 +166,9 @@ public class PagesSerde
     {
         return blockEncodingSerde;
     }
+
+    public static int getSerializedPagePositionCount(Slice serializedPage)
+    {
+        return serializedPage.getInt(0);
+    }
 }

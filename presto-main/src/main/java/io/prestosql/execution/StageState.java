@@ -48,6 +48,10 @@ public enum StageState
      */
     RUNNING(false, false),
     /**
+     * Stage has finished executing existing tasks but more tasks could be scheduled in the future.
+     */
+    PENDING(false, false),
+    /**
      * Stage has finished executing and all output has been consumed.
      */
     FINISHED(true, false),

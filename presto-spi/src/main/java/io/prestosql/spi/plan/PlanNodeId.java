@@ -15,14 +15,17 @@ package io.prestosql.spi.plan;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.concurrent.Immutable;
 
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class PlanNodeId
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(PlanNodeId.class).instanceSize();
     private final String id;
 
     @JsonCreator
@@ -62,5 +65,11 @@ public class PlanNodeId
     public int hashCode()
     {
         return id.hashCode();
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + estimatedSizeOf(id);
     }
 }

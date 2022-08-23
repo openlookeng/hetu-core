@@ -22,6 +22,7 @@ import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -42,6 +43,7 @@ import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_CLASS_PA
 import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_ENABLED;
 import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_JAR_PATH;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.dataSizeProperty;
 import static io.prestosql.spi.session.PropertyMetadata.doubleProperty;
@@ -52,6 +54,7 @@ import static io.prestosql.spi.session.PropertyMetadata.longProperty;
 import static io.prestosql.spi.session.PropertyMetadata.stringProperty;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NONE;
@@ -181,6 +184,25 @@ public final class SystemSessionProperties
     public static final String SKIP_ATTACHING_STATS_WITH_PLAN = "skip_attaching_stats_with_plan";
     public static final String SKIP_NON_APPLICABLE_RULES_ENABLED = "skip_non_applicable_rules_enabled";
     public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "eliminate_duplicate_spill_files";
+    // Task Level Retry
+    public static final String QUERY_RETRY_ATTEMPTS = "query_retry_attempts";
+    public static final String TASK_RETRY_ATTEMPTS_OVERALL = "task_retry_attempts_overall";
+    public static final String TASK_RETRY_ATTEMPTS_PER_TASK = "task_retry_attempts_per_task";
+    public static final String MAX_TASKS_WAITING_FOR_NODE_PER_STAGE = "max_tasks_waiting_for_node_per_stage";
+    public static final String RETRY_INITIAL_DELAY = "retry_initial_delay";
+    public static final String RETRY_MAX_DELAY = "retry_max_delay";
+    public static final String RETRY_DELAY_SCALE_FACTOR = "retry_delay_scale_factor";
+    public static final String FAULT_TOLERANT_EXECUTION_TARGET_TASK_INPUT_SIZE = "fault_tolerant_execution_target_task_input_size";
+    public static final String FAULT_TOLERANT_EXECUTION_TARGET_TASK_SPLIT_COUNT = "fault_tolerant_execution_target_task_split_count";
+    public static final String FAULT_TOLERANT_EXECUTION_PRESERVE_INPUT_PARTITIONS_IN_WRITE_STAGE = "fault_tolerant_execution_preserve_input_partitions_in_write_stage";
+    public static final String FAULT_TOLERANT_EXECUTION_MIN_TASK_SPLIT_COUNT = "fault_tolerant_execution_min_task_split_count";
+    public static final String FAULT_TOLERANT_EXECUTION_MAX_TASK_SPLIT_COUNT = "fault_tolerant_execution_max_task_split_count";
+    public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY = "fault_tolerant_execution_task_memory";
+    public static final String FAULT_TOLERANT_EXECUTION_PARTITION_COUNT = "fault_tolerant_execution_partition_count";
+    public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY_GROWTH_FACTOR = "fault_tolerant_execution_task_memory_growth_factor";
+    public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE = "fault_tolerant_execution_task_memory_estimation_quantile";
+
+    public static final String RETRY_POLICY = "retry_policy";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -866,7 +888,120 @@ public final class SystemSessionProperties
                         ELIMINATE_DUPLICATE_SPILL_FILES,
                         "Eliminates back up of spill files",
                         recoveryConfig.isEliminateDuplicateSpillFilesEnabled(),
-                        false));
+                        false),
+                enumProperty(
+                        RETRY_POLICY,
+                        "Retry policy",
+                        RetryPolicy.class,
+                        queryManagerConfig.getRetryPolicy(),
+                        true),
+                integerProperty(
+                        QUERY_RETRY_ATTEMPTS,
+                        "Maximum number of query retry attempts",
+                        queryManagerConfig.getQueryRetryAttempts(),
+                        false),
+                integerProperty(
+                        TASK_RETRY_ATTEMPTS_OVERALL,
+                        "Maximum number of task retry attempts overall",
+                        queryManagerConfig.getTaskRetryAttemptsOverall(),
+                        false),
+                integerProperty(
+                        TASK_RETRY_ATTEMPTS_PER_TASK,
+                        "Maximum number of task retry attempts per single task",
+                        queryManagerConfig.getTaskRetryAttemptsPerTask(),
+                        false),
+                integerProperty(
+                        MAX_TASKS_WAITING_FOR_NODE_PER_STAGE,
+                        "Maximum possible number of tasks waiting for node allocation per stage before scheduling of new tasks for stage is paused",
+                        queryManagerConfig.getMaxTasksWaitingForNodePerStage(),
+                        false),
+                durationProperty(
+                        RETRY_INITIAL_DELAY,
+                        "Initial delay before initiating a retry attempt. Delay increases exponentially for each subsequent attempt up to 'retry_max_delay'",
+                        queryManagerConfig.getRetryInitialDelay(),
+                        false),
+                durationProperty(
+                        RETRY_MAX_DELAY,
+                        "Maximum delay before initiating a retry attempt. Delay increases exponentially for each subsequent attempt starting from 'retry_initial_delay'",
+                        queryManagerConfig.getRetryMaxDelay(),
+                        false),
+                new PropertyMetadata<>(
+                        RETRY_DELAY_SCALE_FACTOR,
+                        "Maximum delay before initiating a retry attempt. Delay increases exponentially for each subsequent attempt starting from 'retry_initial_delay'",
+                        DOUBLE,
+                        Double.class,
+                        queryManagerConfig.getRetryDelayScaleFactor(),
+                        false,
+                        value -> {
+                            double scaleFactor = (Double) value;
+                            if (scaleFactor < 1.0) {
+                                throw new PrestoException(
+                                        INVALID_SESSION_PROPERTY,
+                                        format("%s must be greater or equal to 1.0", RETRY_MAX_DELAY));
+                            }
+                            return scaleFactor;
+                        },
+                        value -> value),
+                dataSizeProperty(
+                        FAULT_TOLERANT_EXECUTION_TARGET_TASK_INPUT_SIZE,
+                        "Target size in bytes of all task inputs for a single fault tolerant task",
+                        queryManagerConfig.getFaultTolerantExecutionTargetTaskInputSize(),
+                        false),
+                integerProperty(
+                        FAULT_TOLERANT_EXECUTION_TARGET_TASK_SPLIT_COUNT,
+                        "Target number of splits for a single fault tolerant task (split weight aware)",
+                        queryManagerConfig.getFaultTolerantExecutionTargetTaskSplitCount(),
+                        false),
+                booleanProperty(
+                        FAULT_TOLERANT_EXECUTION_PRESERVE_INPUT_PARTITIONS_IN_WRITE_STAGE,
+                        "Ensure single task reads single hash partitioned input partition for stages which write table data",
+                        queryManagerConfig.getFaultTolerantPreserveInputPartitionsInWriteStage(),
+                        false),
+                integerProperty(
+                        FAULT_TOLERANT_EXECUTION_MIN_TASK_SPLIT_COUNT,
+                        "Minimal number of splits for a single fault tolerant task (count based)",
+                        queryManagerConfig.getFaultTolerantExecutionMinTaskSplitCount(),
+                        false),
+                integerProperty(
+                        FAULT_TOLERANT_EXECUTION_MAX_TASK_SPLIT_COUNT,
+                        "Maximal number of splits for a single fault tolerant task (count based)",
+                        queryManagerConfig.getFaultTolerantExecutionMaxTaskSplitCount(),
+                        false),
+                dataSizeProperty(
+                        FAULT_TOLERANT_EXECUTION_TASK_MEMORY,
+                        "Estimated amount of memory a single task will use when task level retries are used; value is used allocating nodes for tasks execution",
+                        memoryManagerConfig.getFaultTolerantExecutionTaskMemory(),
+                        false),
+                integerProperty(
+                        FAULT_TOLERANT_EXECUTION_PARTITION_COUNT,
+                        "Number of partitions for distributed joins and aggregations executed with fault tolerant execution enabled",
+                        queryManagerConfig.getFaultTolerantExecutionPartitionCount(),
+                        false),
+                doubleProperty(
+                        FAULT_TOLERANT_EXECUTION_TASK_MEMORY_GROWTH_FACTOR,
+                        "Factor by which estimated task memory is increased if task execution runs out of memory; value is used allocating nodes for tasks execution",
+                        memoryManagerConfig.getFaultTolerantExecutionTaskMemoryGrowthFactor(),
+                        false),
+                new PropertyMetadata<>(
+                        FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE,
+                        "What quantile of memory usage of completed tasks to look at when estimating memory usage for upcoming tasks",
+                        DOUBLE,
+                        Double.class,
+                        memoryManagerConfig.getFaultTolerantExecutionTaskMemoryEstimationQuantile(),
+                        false,
+                        value -> validateDoubleRange(value, FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, 0.0, 1.0),
+                        value -> value));
+    }
+
+    private static double validateDoubleRange(Object value, String property, double lowerBoundIncluded, double upperBoundIncluded)
+    {
+        double doubleValue = (double) value;
+        if (doubleValue < lowerBoundIncluded || doubleValue > upperBoundIncluded) {
+            throw new PrestoException(
+                    INVALID_SESSION_PROPERTY,
+                    format("%s must be in the range [%.2f, %.2f]: %.2f", property, lowerBoundIncluded, upperBoundIncluded, doubleValue));
+        }
+        return doubleValue;
     }
 
     public List<PropertyMetadata<?>> getSessionProperties()
@@ -1240,6 +1375,9 @@ public final class SystemSessionProperties
 
     public static boolean isDistributedSortEnabled(Session session)
     {
+        if (getRetryPolicy(session) != RetryPolicy.NONE) {
+            return false;
+        }
         return session.getSystemProperty(DISTRIBUTED_SORT, Boolean.class);
     }
 
@@ -1332,6 +1470,10 @@ public final class SystemSessionProperties
 
     public static boolean isEnableDynamicFiltering(Session session)
     {
+        if (getRetryPolicy(session) == RetryPolicy.TASK) {
+            // dynamic filtering is not supported with task level failure recovery enabled
+            return false;
+        }
         return session.getSystemProperty(ENABLE_DYNAMIC_FILTERING, Boolean.class);
     }
 
@@ -1504,5 +1646,96 @@ public final class SystemSessionProperties
     public static boolean isEliminateDuplicateSpillFilesEnabled(Session session)
     {
         return session.getSystemProperty(ELIMINATE_DUPLICATE_SPILL_FILES, Boolean.class);
+    }
+
+    public static RetryPolicy getRetryPolicy(Session session)
+    {
+        RetryPolicy retryPolicy = session.getSystemProperty(RETRY_POLICY, RetryPolicy.class);
+        if (retryPolicy == RetryPolicy.TASK) {
+            if (isGroupedExecutionEnabled(session) || isDynamicSchduleForGroupedExecution(session)) {
+                throw new PrestoException(NOT_SUPPORTED, "Grouped execution is not supported with task level retries enabled");
+            }
+        }
+        return retryPolicy;
+    }
+
+    public static int getQueryRetryAttempts(Session session)
+    {
+        return session.getSystemProperty(QUERY_RETRY_ATTEMPTS, Integer.class);
+    }
+
+    public static int getTaskRetryAttemptsOverall(Session session)
+    {
+        return session.getSystemProperty(TASK_RETRY_ATTEMPTS_OVERALL, Integer.class);
+    }
+
+    public static int getTaskRetryAttemptsPerTask(Session session)
+    {
+        return session.getSystemProperty(TASK_RETRY_ATTEMPTS_PER_TASK, Integer.class);
+    }
+
+    public static int getMaxTasksWaitingForNodePerStage(Session session)
+    {
+        return session.getSystemProperty(MAX_TASKS_WAITING_FOR_NODE_PER_STAGE, Integer.class);
+    }
+
+    public static Duration getRetryInitialDelay(Session session)
+    {
+        return session.getSystemProperty(RETRY_INITIAL_DELAY, Duration.class);
+    }
+
+    public static Duration getRetryMaxDelay(Session session)
+    {
+        return session.getSystemProperty(RETRY_MAX_DELAY, Duration.class);
+    }
+
+    public static double getRetryDelayScaleFactor(Session session)
+    {
+        return session.getSystemProperty(RETRY_DELAY_SCALE_FACTOR, Double.class);
+    }
+
+    public static DataSize getFaultTolerantExecutionTargetTaskInputSize(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TARGET_TASK_INPUT_SIZE, DataSize.class);
+    }
+
+    public static int getFaultTolerantExecutionTargetTaskSplitCount(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TARGET_TASK_SPLIT_COUNT, Integer.class);
+    }
+
+    public static boolean getFaultTolerantPreserveInputPartitionsInWriteStage(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_PRESERVE_INPUT_PARTITIONS_IN_WRITE_STAGE, Boolean.class);
+    }
+
+    public static int getFaultTolerantExecutionMinTaskSplitCount(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_MIN_TASK_SPLIT_COUNT, Integer.class);
+    }
+
+    public static int getFaultTolerantExecutionMaxTaskSplitCount(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_MAX_TASK_SPLIT_COUNT, Integer.class);
+    }
+
+    public static DataSize getFaultTolerantExecutionDefaultTaskMemory(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TASK_MEMORY, DataSize.class);
+    }
+
+    public static int getFaultTolerantExecutionPartitionCount(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_PARTITION_COUNT, Integer.class);
+    }
+
+    public static double getFaultTolerantExecutionTaskMemoryGrowthFactor(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TASK_MEMORY_GROWTH_FACTOR, Double.class);
+    }
+
+    public static double getFaultTolerantExecutionTaskMemoryEstimationQuantile(Session session)
+    {
+        return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, Double.class);
     }
 }

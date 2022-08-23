@@ -36,7 +36,8 @@ public class TestExchangeClientConfig
                 .setMaxResponseSize(new HttpClientConfig().getMaxContentLength())
                 .setPageBufferClientMaxCallbackThreads(25)
                 .setClientThreads(25)
-                .setAcknowledgePages(true));
+                .setAcknowledgePages(true)
+                .setDeduplicationBufferSize(new DataSize(32, Unit.MEGABYTE)));
     }
 
     @Test
@@ -49,6 +50,7 @@ public class TestExchangeClientConfig
                 .put("exchange.client-threads", "2")
                 .put("exchange.page-buffer-client.max-callback-threads", "16")
                 .put("exchange.acknowledge-pages", "false")
+                .put("exchange.deduplication-buffer-size", "64MB")
                 .build();
 
         ExchangeClientConfig expected = new ExchangeClientConfig()
@@ -57,7 +59,8 @@ public class TestExchangeClientConfig
                 .setMaxResponseSize(new DataSize(1, Unit.MEGABYTE))
                 .setClientThreads(2)
                 .setPageBufferClientMaxCallbackThreads(16)
-                .setAcknowledgePages(false);
+                .setAcknowledgePages(false)
+                .setDeduplicationBufferSize(new DataSize(64, Unit.MEGABYTE));
 
         assertFullMapping(properties, expected);
     }

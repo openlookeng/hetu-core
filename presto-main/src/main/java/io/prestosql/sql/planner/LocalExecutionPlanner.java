@@ -33,6 +33,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -375,6 +376,7 @@ public class LocalExecutionPlanner
     protected final FunctionResolution functionResolution;
     protected final LogicalRowExpressions logicalRowExpressions;
     protected final TaskManagerConfig taskManagerConfig;
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
 
     public Metadata getMetadata()
     {
@@ -553,7 +555,8 @@ public class LocalExecutionPlanner
             StateStoreListenerManager stateStoreListenerManager,
             DynamicFilterCacheManager dynamicFilterCacheManager,
             HeuristicIndexerManager heuristicIndexerManager,
-            CubeManager cubeManager)
+            CubeManager cubeManager,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -587,6 +590,7 @@ public class LocalExecutionPlanner
         this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
         this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
+        this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
     }
 
     public LocalExecutionPlan plan(
@@ -1142,7 +1146,9 @@ public class LocalExecutionPlanner
             OperatorFactory operatorFactory = new ExchangeOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
-                    exchangeClientSupplier);
+                    exchangeClientSupplier,
+                    node.getRetryPolicy(),
+                    exchangeManagerRegistry);
 
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, UNGROUPED_EXECUTION);
         }

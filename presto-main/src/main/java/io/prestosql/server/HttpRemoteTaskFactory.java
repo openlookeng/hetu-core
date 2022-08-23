@@ -67,6 +67,7 @@ public class HttpRemoteTaskFactory
     private final Codec<TaskStatus> taskStatusCodec;
     private final Codec<TaskInfo> taskInfoCodec;
     private final Codec<TaskUpdateRequest> taskUpdateRequestCodec;
+    private final JsonCodec<FailTaskRequest> failTaskRequestCodec;
     private final Duration maxErrorDuration;
     private final Duration taskStatusRefreshMaxWait;
     private final Duration taskInfoUpdateInterval;
@@ -89,6 +90,7 @@ public class HttpRemoteTaskFactory
             SmileCodec<TaskInfo> taskInfoSmileCodec,
             JsonCodec<TaskUpdateRequest> taskUpdateRequestJsonCodec,
             SmileCodec<TaskUpdateRequest> taskUpdateRequestSmileCodec,
+            JsonCodec<FailTaskRequest> failTaskRequestCodec,
             RemoteTaskStats stats, InternalCommunicationConfig internalCommunicationConfig)
     {
         this.httpClient = httpClient;
@@ -114,6 +116,8 @@ public class HttpRemoteTaskFactory
             this.taskInfoCodec = wrapJsonCodec(taskInfoJsonCodec);
             this.taskUpdateRequestCodec = wrapJsonCodec(taskUpdateRequestJsonCodec);
         }
+
+        this.failTaskRequestCodec = failTaskRequestCodec;
 
         this.updateScheduledExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("task-info-update-scheduler-%s"));
         this.errorScheduledExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("remote-task-error-delay-%s"));
@@ -172,6 +176,7 @@ public class HttpRemoteTaskFactory
                 stats,
                 isBinaryEncoding,
                 parent,
-                snapshotManager);
+                snapshotManager,
+                failTaskRequestCodec);
     }
 }

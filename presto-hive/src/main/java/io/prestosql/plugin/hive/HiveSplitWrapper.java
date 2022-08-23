@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.OptionalInt;
@@ -31,6 +32,7 @@ import static java.util.Objects.requireNonNull;
 public class HiveSplitWrapper
         implements ConnectorSplit
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveSplitWrapper.class).instanceSize();
     private final List<HiveSplit> splits;
     private final OptionalInt bucketNumber;
 
@@ -146,5 +148,12 @@ public class HiveSplitWrapper
     public int getSplitCount()
     {
         return splits.size();
+    }
+
+    //TODO(SURYA): need to check if any others need to be added.
+    @Override
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE;
     }
 }

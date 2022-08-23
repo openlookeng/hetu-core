@@ -91,7 +91,7 @@ public class MemoryLocalQueryRunner
                 NOOP_RECOVERY_UTILS);
 
         TaskContext taskContext = queryContext
-                .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), localQueryRunner.getExecutor()),
+                .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0, 0), localQueryRunner.getExecutor()),
                         localQueryRunner.getDefaultSession(),
                         false,
                         false,

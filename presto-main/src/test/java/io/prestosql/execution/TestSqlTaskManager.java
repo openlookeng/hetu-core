@@ -21,6 +21,7 @@ import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.BufferState;
 import io.prestosql.execution.buffer.OutputBuffers;
@@ -33,6 +34,9 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.ExchangeClientSupplier;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.exchange.ExchangeHandleResolver;
+import io.prestosql.spi.exchange.ExchangeId;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spiller.LocalSpillManager;
 import io.prestosql.spiller.NodeSpillConfig;
 import org.testng.annotations.AfterClass;
@@ -64,7 +68,7 @@ import static org.testng.Assert.assertNull;
 @Test
 public class TestSqlTaskManager
 {
-    private static final TaskId TASK_ID = new TaskId("query", 0, 1);
+    private static final TaskId TASK_ID = new TaskId("query", 0, 1, 0);
     public static final OutputBufferId OUT = new OutputBufferId(0);
 
     private final TaskExecutor taskExecutor;
@@ -98,7 +102,7 @@ public class TestSqlTaskManager
             assertEquals(sqlTaskManager.getTaskStatus(taskId, instanceId).getState(), TaskState.RUNNING);
 
             // external call to non-existent is null
-            assertNull(sqlTaskManager.getTaskStatus(new TaskId("query", 3, 3), null));
+            assertNull(sqlTaskManager.getTaskStatus(new TaskId("query", 3, 3, 0), null));
 
             // external call to existent works
             assertEquals(sqlTaskManager.getTaskStatus(taskId, null).getState(), TaskState.RUNNING);
@@ -284,7 +288,8 @@ public class TestSqlTaskManager
                 new NodeSpillConfig(),
                 new TestingGcMonitor(),
                 createTestMetadataManager(),
-                NOOP_RECOVERY_UTILS);
+                NOOP_RECOVERY_UTILS,
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, ImmutableSet<ScheduledSplit> splits, OutputBuffers outputBuffers)
@@ -323,7 +328,7 @@ public class TestSqlTaskManager
             implements ExchangeClientSupplier
     {
         @Override
-        public ExchangeClient get(LocalMemoryContext systemMemoryContext)
+        public ExchangeClient get(LocalMemoryContext systemMemoryContext, TaskFailureListener taskFailureListener, RetryPolicy retryPolicy, ExchangeId exchangeId, QueryId queryId)
         {
             throw new UnsupportedOperationException();
         }

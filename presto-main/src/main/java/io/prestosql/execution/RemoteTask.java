@@ -69,6 +69,13 @@ public interface RemoteTask
 
     void abort();
 
+    void fail(Throwable cause);
+
+    /**
+     * Fails task remotely; only transitions to failed state when we recevie confirmation that remote operation is completed
+     */
+    void failRemotely(Throwable cause);
+
     int getPartitionedSplitCount();
 
     int getQueuedPartitionedSplitCount();

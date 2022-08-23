@@ -45,6 +45,8 @@ import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.dynamicfilter.DynamicFilterListener;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeManagerModule;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.SqlQueryManager;
@@ -164,6 +166,8 @@ public class TestingPrestoServer
     private final boolean coordinator;
     private StateStoreProvider stateStoreProvider;
 
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+
     public static class TestShutdownAction
             implements ShutdownAction
     {
@@ -257,6 +261,7 @@ public class TestingPrestoServer
                 .add(new PasswordSecurityModule())
                 .add(new ServerMainModule(parserOptions))
                 .add(new TestingWarningCollectorModule())
+                .add(new ExchangeManagerModule())
                 .add(binder -> {
                     binder.bind(TestingAccessControlManager.class).in(Scopes.SINGLETON);
                     binder.bind(TestingEventListenerManager.class).in(Scopes.SINGLETON);
@@ -268,6 +273,7 @@ public class TestingPrestoServer
                     binder.bind(ShutdownAction.class).to(TestShutdownAction.class).in(Scopes.SINGLETON);
                     binder.bind(NodeStateChangeHandler.class).in(Scopes.SINGLETON);
                     binder.bind(ProcedureTester.class).in(Scopes.SINGLETON);
+                    binder.bind(ExchangeManagerRegistry.class).in(Scopes.SINGLETON);
                 });
 
         if (discoveryUri != null) {
@@ -343,7 +349,10 @@ public class TestingPrestoServer
         announcer = injector.getInstance(Announcer.class);
 
         injector.getInstance(ServerInfoResource.class).startupComplete();
+        injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager();
         announcer.forceAnnounce();
+
+        exchangeManagerRegistry = injector.getInstance(ExchangeManagerRegistry.class);
 
         refreshNodes();
     }

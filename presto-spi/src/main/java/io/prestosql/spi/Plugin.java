@@ -17,6 +17,7 @@ import io.prestosql.spi.block.BlockEncoding;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
+import io.prestosql.spi.exchange.ExchangeManagerFactory;
 import io.prestosql.spi.failuredetector.FailureRetryFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.function.FunctionNamespaceManagerFactory;
@@ -149,18 +150,27 @@ public interface Plugin
     }
 
     default void setExternalFunctionsDir(File externalFuncsDir)
-    {}
+    {
+    }
 
     default void setMaxFunctionRunningTimeEnable(boolean enable)
-    {}
+    {
+    }
 
     default void setMaxFunctionRunningTimeInSec(long time)
-    {}
+    {
+    }
 
     default void setFunctionRunningThreadPoolSize(int size)
-    {}
+    {
+    }
 
     default Iterable<FunctionNamespaceManagerFactory> getFunctionNamespaceManagerFactories()
+    {
+        return emptyList();
+    }
+
+    default Iterable<ExchangeManagerFactory> getExchangeManagerFactories()
     {
         return emptyList();
     }

@@ -28,7 +28,7 @@ access-control.name=read-only
 基于文件的系统访问控制
 --------------------------------
 
-此插件允许您在文件中设置访问控制规则。要使用该插件，需要添加一个`etc/access-control.properties`文件，其中必需包含两个属性：`Access-control.name`属性，必须等于`file`；`security.config-file`属性，必须等于配置文件所在的位置。例如，配置文件`rules.json`位于`etc`目录，则添加`etc/access-control.properties`文件，内容如下：
+此插件允许您在文件中设置访问控制规则。要使用该插件，需要添加一个`etc/access-control.properties`文件，其中必需包含两个属性：`access-control.name`属性，必须等于`file`；`security.config-file`属性，必须等于配置文件所在的位置。例如，配置文件`rules.json`位于`etc`目录，则添加`etc/access-control.properties`文件，内容如下：
 
 ``` properties
 access-control.name=file
@@ -66,7 +66,7 @@ security.refresh-period=1s
 *默认情况下，所有用户都可以访问`system`目录。您可以通过添加规则来改变此行为。*
 
 
-例如，如果希望仅允许`admin`用户访问`mysql`和`system`目录，允许所有用户访问`hive`目录，拒绝其他用户访问，则可以定义以下规则：
+例如，如果希望仅允许`admin`用户访问`mysql`和`system`目录，允许所有用户访问`hive`目录，允许`alice`用户只读地访问`postgresql`，拒绝其他用户访问，则可以定义以下规则：
 
 ``` json
 {

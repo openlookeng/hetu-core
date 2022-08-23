@@ -28,6 +28,7 @@ import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
@@ -123,7 +124,8 @@ public class TestSqlStageExecution
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
@@ -177,7 +179,8 @@ public class TestSqlStageExecution
                 ImmutableList.of(new PlanFragmentId("source")),
                 ImmutableList.of(new Symbol("column")),
                 Optional.empty(),
-                REPARTITION);
+                REPARTITION,
+                RetryPolicy.NONE);
 
         ImmutableMap.Builder<Symbol, Type> types = ImmutableMap.builder();
         for (Symbol symbol : planNode.getOutputSymbols()) {

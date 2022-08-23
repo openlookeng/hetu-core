@@ -26,6 +26,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
@@ -114,9 +115,10 @@ public class SqlTask
             Function<SqlTask, ?> onDone,
             DataSize maxBufferSize,
             CounterStat failedTasks,
-            Metadata metadata)
+            Metadata metadata,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
-        SqlTask sqlTask = new SqlTask(taskId, instanceId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata);
+        SqlTask sqlTask = new SqlTask(taskId, instanceId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata, exchangeManagerRegistry);
         sqlTask.initialize(onDone, failedTasks);
         return sqlTask;
     }
@@ -130,7 +132,8 @@ public class SqlTask
             SqlTaskExecutionFactory sqlTaskExecutionFactory,
             ExecutorService taskNotificationExecutor,
             DataSize maxBufferSize,
-            Metadata metadata)
+            Metadata metadata,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
         this.taskInstanceId = requireNonNull(instanceId, "instanceId is null");
@@ -149,7 +152,8 @@ public class SqlTask
                 maxBufferSize,
                 // Pass a memory context supplier instead of a memory context to the output buffer,
                 // because we haven't created the task context that holds the the memory context yet.
-                () -> queryContext.getTaskContext(taskInstanceId).localSystemMemoryContext());
+                () -> queryContext.getTaskContext(taskInstanceId).localSystemMemoryContext(),
+                exchangeManagerRegistry);
         taskStateMachine = new TaskStateMachine(taskId, taskNotificationExecutor);
 
         log.debug("Created new SqlTask object for task %s, with instanceId %s", taskId, taskInstanceId);
@@ -270,6 +274,7 @@ public class SqlTask
         Duration fullGcTime = new Duration(0, MILLISECONDS);
         Map<Long, SnapshotInfo> snapshotCaptureResult = ImmutableMap.of();
         Optional<RestoreResult> snapshotRestoreResult = Optional.empty();
+        DataSize peakUserMemoryReservation = new DataSize(0, BYTE);
         TaskInfo finalTaskInfo = taskHolder.getFinalTaskInfo();
         if (finalTaskInfo != null) {
             TaskStats taskStats = finalTaskInfo.getStats();
@@ -279,6 +284,7 @@ public class SqlTask
             userMemoryReservation = taskStats.getUserMemoryReservation();
             systemMemoryReservation = taskStats.getSystemMemoryReservation();
             revocableMemoryReservation = taskStats.getRevocableMemoryReservation();
+            peakUserMemoryReservation = taskStats.getPeakUserMemoryReservation();
             fullGcCount = taskStats.getFullGcCount();
             fullGcTime = taskStats.getFullGcTime();
 
@@ -331,7 +337,8 @@ public class SqlTask
                 fullGcCount,
                 fullGcTime,
                 snapshotCaptureResult,
-                snapshotRestoreResult);
+                snapshotRestoreResult,
+                peakUserMemoryReservation);
     }
 
     private TaskStats getTaskStats(TaskHolder taskHolder)
@@ -656,5 +663,10 @@ public class SqlTask
     public boolean isRecoveryEnabled()
     {
         return isRecoveryEnabled;
+    }
+
+    public void addSourceTaskFailureListener(TaskFailureListener listener)
+    {
+        taskStateMachine.addSourceTaskFailureListener(listener);
     }
 }

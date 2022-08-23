@@ -48,6 +48,7 @@ import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskOutputOperator;
 import io.prestosql.operator.exchange.LocalExchangeSinkOperator;
 import io.prestosql.snapshot.MarkerSplit;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
@@ -88,6 +89,7 @@ import static io.prestosql.execution.SqlTaskExecution.SplitsState.ADDING_SPLITS;
 import static io.prestosql.execution.SqlTaskExecution.SplitsState.FINISHED;
 import static io.prestosql.execution.SqlTaskExecution.SplitsState.NO_MORE_SPLITS;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
@@ -793,13 +795,29 @@ public class SqlTaskExecution
         // no more output will be created
         outputBuffer.setNoMorePages();
 
+        BufferState bufferState = outputBuffer.getState();
         // are there still pages in the output buffer
-        if (!outputBuffer.isFinished()) {
+        if (!bufferState.isTerminal()) {
+            taskStateMachine.transitionToFlushing();
             return;
         }
 
-        // Cool! All done!
-        taskStateMachine.finished();
+        if (bufferState == BufferState.FINISHED) {
+            // Cool! All done!
+            taskStateMachine.finished();
+            return;
+        }
+
+        if (bufferState == BufferState.FAILED) {
+            Throwable failureCause = outputBuffer.getFailureCause()
+                    .orElseGet(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Output buffer is failed but the failure cause is missing"));
+            taskStateMachine.failed(failureCause);
+            return;
+        }
+
+        // The only terminal state that remains is ABORTED.
+        // Buffer is expected to be aborted only if the task itself is aborted. In this scenario the following statement is expected to be noop.
+        taskStateMachine.failed(new PrestoException(GENERIC_INTERNAL_ERROR, "Unexpected buffer state: " + bufferState));
     }
 
     @Override

@@ -25,7 +25,8 @@ public enum StandardWarningCode
     CUBE_NOT_FOUND(0x0000_0004),
     PARSER_WARNING(0x0000_0005),
     SNAPSHOT_NOT_SUPPORTED(0x0000_0006),
-    SNAPSHOT_RECOVERY(0X000_007)
+    SNAPSHOT_RECOVERY(0X000_007),
+    TASK_RETRY_NOT_SUPPORTED(0x0000_0008)
     /**/;
     private final WarningCode warningCode;
 

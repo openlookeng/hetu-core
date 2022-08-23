@@ -157,7 +157,9 @@
         <module>hetu-greenplum</module>
         <module>hetu-clickhouse</module>
         <module>hetu-kylin</module>
-        <module>hetu-mpp</module>
+	<module>hetu-mpp</module>
+	<module>hetu-mariadb</module>
+        <module>hetu-exchange-filesystem</module>
     </modules>
 
     <dependencyManagement>
@@ -319,6 +321,12 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>hetu-filesystem-client</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-exchange-filesystem</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

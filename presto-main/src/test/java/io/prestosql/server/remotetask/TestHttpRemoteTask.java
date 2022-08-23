@@ -26,6 +26,7 @@ import io.airlift.jaxrs.JsonMapper;
 import io.airlift.jaxrs.testing.JaxrsTestingHttpProcessor;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonModule;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.execution.Lifespan;
@@ -48,6 +49,7 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.Split;
 import io.prestosql.protocol.SmileCodec;
 import io.prestosql.protocol.SmileModule;
+import io.prestosql.server.FailTaskRequest;
 import io.prestosql.server.HttpRemoteTaskFactory;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.TaskUpdateRequest;
@@ -216,7 +218,7 @@ public class TestHttpRemoteTask
     {
         return httpRemoteTaskFactory.createRemoteTask(
                 TEST_SESSION,
-                new TaskId("test", 1, 2),
+                new TaskId("test", 1, 2, 0),
                 "Testing instance id",
                 new InternalNode("node-id", URI.create("http://fake.invalid/"), new NodeVersion("version"), false),
                 TaskTestUtils.PLAN_FRAGMENT,
@@ -250,6 +252,7 @@ public class TestHttpRemoteTask
                         smileCodecBinder(binder).bindSmileCodec(TaskStatus.class);
                         smileCodecBinder(binder).bindSmileCodec(TaskInfo.class);
                         smileCodecBinder(binder).bindSmileCodec(TaskUpdateRequest.class);
+                        jsonCodecBinder(binder).bindJsonCodec(FailTaskRequest.class);
                     }
 
                     @Provides
@@ -260,7 +263,8 @@ public class TestHttpRemoteTask
                             JsonCodec<TaskInfo> taskInfoJsonCodec,
                             SmileCodec<TaskInfo> taskInfoSmileCodec,
                             JsonCodec<TaskUpdateRequest> taskUpdateRequestJsonCodec,
-                            SmileCodec<TaskUpdateRequest> taskUpdateRequestSmileCodec)
+                            SmileCodec<TaskUpdateRequest> taskUpdateRequestSmileCodec,
+                            JsonCodec<FailTaskRequest> failTaskRequestCodec)
                     {
                         JaxrsTestingHttpProcessor jaxrsTestingHttpProcessor = new JaxrsTestingHttpProcessor(URI.create("http://fake.invalid/"), testingTaskResource, jsonMapper);
                         TestingHttpClient testingHttpClient = new TestingHttpClient(jaxrsTestingHttpProcessor.setTrace(TRACE_HTTP));
@@ -276,6 +280,7 @@ public class TestHttpRemoteTask
                                 taskInfoSmileCodec,
                                 taskUpdateRequestJsonCodec,
                                 taskUpdateRequestSmileCodec,
+                                failTaskRequestCodec,
                                 new RemoteTaskStats(),
                                 new InternalCommunicationConfig());
                     }
@@ -503,7 +508,7 @@ public class TestHttpRemoteTask
                     initialTaskStatus.getFullGcCount(),
                     initialTaskStatus.getFullGcTime(),
                     ImmutableMap.of(),
-                    Optional.empty());
+                    Optional.empty(), new DataSize(0, DataSize.Unit.BYTE));
         }
     }
 }

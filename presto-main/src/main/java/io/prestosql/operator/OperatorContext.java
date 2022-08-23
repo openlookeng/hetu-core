@@ -29,6 +29,7 @@ import io.prestosql.memory.context.MemoryTrackingContext;
 import io.prestosql.operator.OperationTimer.OperationTiming;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.Restorable;
@@ -123,6 +124,7 @@ public class OperatorContext
     private final MemoryTrackingContext operatorMemoryContext;
     private final boolean snapshotEnabled;
     private final boolean recoveryEnabled;
+    private final RetryPolicy retryPolicy;
 
     public OperatorContext(
             int operatorId,
@@ -148,6 +150,7 @@ public class OperatorContext
 
         this.snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(driverContext.getSession());
         this.recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(driverContext.getSession());
+        this.retryPolicy = SystemSessionProperties.getRetryPolicy(driverContext.getSession());
     }
 
     public int getOperatorId()
@@ -821,6 +824,11 @@ public class OperatorContext
     public boolean isRecoveryEnabled()
     {
         return recoveryEnabled;
+    }
+
+    public RetryPolicy getRetryPolicy()
+    {
+        return retryPolicy;
     }
 
     public String getUniqueId()

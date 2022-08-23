@@ -299,7 +299,7 @@ public abstract class AbstractOperatorBenchmark
                 new DataSize(256, MEGABYTE),
                 spillSpaceTracker,
                 NOOP_RECOVERY_UTILS)
-                .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), localQueryRunner.getExecutor()),
+                .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0, 0), localQueryRunner.getExecutor()),
                         setSession,
                         false,
                         false,

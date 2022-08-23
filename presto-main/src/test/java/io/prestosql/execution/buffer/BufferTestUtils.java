@@ -293,7 +293,7 @@ public final class BufferTestUtils
                 new DataSize(1, MEGABYTE),
                 new SpillSpaceTracker(new DataSize(1, GIGABYTE)),
                 NOOP_RECOVERY_UTILS);
-        TaskId taskId = TaskId.valueOf("query_id.1.2");
+        TaskId taskId = TaskId.valueOf("query_id.1.2.0");
         TaskContext taskContext = queryContext.addTaskContext(
                 new TaskStateMachine(taskId, executor),
                 TEST_SNAPSHOT_SESSION,
