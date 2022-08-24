@@ -16,7 +16,6 @@ package io.prestosql.operator.aggregation;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.bytecode.DynamicClassLoader;
-import io.airlift.slice.Slice;
 import io.prestosql.metadata.BoundVariables;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.SqlAggregationFunction;
@@ -31,7 +30,6 @@ import io.prestosql.spi.function.AccumulatorStateSerializer;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.UnscaledDecimal128Arithmetic;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
@@ -39,6 +37,7 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.metadata.SignatureBinder.applyBoundVariables;
 import static io.prestosql.operator.aggregation.AggregationMetadata.ParameterMetadata;
 import static io.prestosql.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.BLOCK_INDEX;
@@ -46,9 +45,10 @@ import static io.prestosql.operator.aggregation.AggregationMetadata.ParameterMet
 import static io.prestosql.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
 import static io.prestosql.operator.aggregation.AggregationUtils.generateAggregationName;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.SIGN_LONG_MASK;
+import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.addWithOverflow;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.throwIfOverflows;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.throwOverflowException;
-import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimal;
 import static io.prestosql.spi.util.Reflection.methodHandle;
 
 public class DecimalSumAggregation
@@ -56,10 +56,10 @@ public class DecimalSumAggregation
 {
     public static final DecimalSumAggregation DECIMAL_SUM_AGGREGATION = new DecimalSumAggregation();
     private static final String NAME = "sum";
-    private static final MethodHandle SHORT_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputShortDecimal", Type.class, LongDecimalWithOverflowState.class, Block.class, int.class);
-    private static final MethodHandle LONG_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputLongDecimal", Type.class, LongDecimalWithOverflowState.class, Block.class, int.class);
+    private static final MethodHandle SHORT_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputShortDecimal", LongDecimalWithOverflowState.class, Block.class, int.class);
+    private static final MethodHandle LONG_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputLongDecimal", LongDecimalWithOverflowState.class, Block.class, int.class);
 
-    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "outputLongDecimal", DecimalType.class, LongDecimalWithOverflowState.class, BlockBuilder.class);
+    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "outputLongDecimal", LongDecimalWithOverflowState.class, BlockBuilder.class);
 
     private static final MethodHandle COMBINE_FUNCTION = methodHandle(DecimalSumAggregation.class, "combine", LongDecimalWithOverflowState.class, LongDecimalWithOverflowState.class);
 
@@ -106,9 +106,9 @@ public class DecimalSumAggregation
         AggregationMetadata metadata = new AggregationMetadata(
                 generateAggregationName(NAME, outputType.getTypeSignature(), inputTypes.stream().map(Type::getTypeSignature).collect(toImmutableList())),
                 createInputParameterMetadata(inputType),
-                inputFunction.bindTo(inputType),
+                inputFunction,
                 COMBINE_FUNCTION,
-                LONG_DECIMAL_OUTPUT_FUNCTION.bindTo(outputType),
+                LONG_DECIMAL_OUTPUT_FUNCTION,
                 ImmutableList.of(new AccumulatorStateDescriptor(
                         stateInterface,
                         stateSerializer,
@@ -125,54 +125,92 @@ public class DecimalSumAggregation
         return ImmutableList.of(new ParameterMetadata(STATE), new ParameterMetadata(BLOCK_INPUT_CHANNEL, type), new ParameterMetadata(BLOCK_INDEX));
     }
 
-    public static void inputShortDecimal(Type type, LongDecimalWithOverflowState state, Block block, int position)
+    public static void inputShortDecimal(LongDecimalWithOverflowState state, Block block, int position)
     {
-        accumulateValueInState(unscaledDecimal(type.getLong(block, position)), state);
-    }
+        state.setNotNull();
 
-    public static void inputLongDecimal(Type type, LongDecimalWithOverflowState state, Block block, int position)
-    {
-        accumulateValueInState(type.getSlice(block, position), state);
-    }
+        long[] decimal = state.getDecimalArray();
+        int offset = state.getDecimalArrayOffset();
 
-    private static void accumulateValueInState(Slice unscaledDecimal, LongDecimalWithOverflowState state)
-    {
-        initializeIfNeeded(state);
-        Slice sum = state.getLongDecimal();
-        long overflow = UnscaledDecimal128Arithmetic.addWithOverflow(sum, unscaledDecimal, sum);
-        state.setOverflow(state.getOverflow() + overflow);
-    }
-
-    private static void initializeIfNeeded(LongDecimalWithOverflowState state)
-    {
-        if (state.getLongDecimal() == null) {
-            state.setLongDecimal(UnscaledDecimal128Arithmetic.unscaledDecimal());
+        long rightLow = block.getLong(position, 0);
+        long rightHigh = 0;
+        if (rightLow < 0) {
+            rightLow = -rightLow;
+            rightHigh = SIGN_LONG_MASK;
         }
+        long overflow = addWithOverflow(
+                decimal[offset],
+                decimal[offset + 1],
+                rightLow,
+                rightHigh,
+                decimal,
+                offset);
+        state.addOverflow(overflow);
+    }
+
+    public static void inputLongDecimal(LongDecimalWithOverflowState state, Block block, int position)
+    {
+        state.setNotNull();
+
+        long[] decimal = state.getDecimalArray();
+        int offset = state.getDecimalArrayOffset();
+
+        long overflow = addWithOverflow(
+                decimal[offset],
+                decimal[offset + 1],
+                block.getLong(position, 0),
+                block.getLong(position, SIZE_OF_LONG),
+                decimal,
+                offset);
+        state.addOverflow(overflow);
     }
 
     public static void combine(LongDecimalWithOverflowState state, LongDecimalWithOverflowState otherState)
     {
-        state.setOverflow(state.getOverflow() + otherState.getOverflow());
+        long overflow = otherState.getOverflow();
+        long[] decimal = state.getDecimalArray();
+        int offset = state.getDecimalArrayOffset();
 
-        if (state.getLongDecimal() == null) {
-            state.setLongDecimal(otherState.getLongDecimal());
+        long[] otherDecimal = otherState.getDecimalArray();
+        int otherOffset = otherState.getDecimalArrayOffset();
+
+        if (state.isNotNull()) {
+            overflow += addWithOverflow(
+                    decimal[offset],
+                    decimal[offset + 1],
+                    otherDecimal[otherOffset],
+                    otherDecimal[otherOffset + 1],
+                    decimal,
+                    offset);
         }
         else {
-            accumulateValueInState(otherState.getLongDecimal(), state);
+            state.setNotNull();
+            decimal[offset] = otherDecimal[otherOffset];
+            decimal[offset + 1] = otherDecimal[otherOffset + 1];
         }
+        state.addOverflow(overflow);
     }
 
-    public static void outputLongDecimal(DecimalType type, LongDecimalWithOverflowState state, BlockBuilder out)
+    public static void outputLongDecimal(LongDecimalWithOverflowState state, BlockBuilder out)
     {
-        if (state.getLongDecimal() == null) {
-            out.appendNull();
-        }
-        else {
+        if (state.isNotNull()) {
             if (state.getOverflow() != 0) {
                 throwOverflowException();
             }
-            throwIfOverflows(state.getLongDecimal());
-            type.writeSlice(out, state.getLongDecimal());
+
+            long[] decimal = state.getDecimalArray();
+            int offset = state.getDecimalArrayOffset();
+
+            long rawLow = decimal[offset];
+            long rawHigh = decimal[offset + 1];
+
+            throwIfOverflows(rawLow, rawHigh);
+            out.writeLong(rawLow);
+            out.writeLong(rawHigh);
+            out.closeEntry();
+        }
+        else {
+            out.appendNull();
         }
     }
 }

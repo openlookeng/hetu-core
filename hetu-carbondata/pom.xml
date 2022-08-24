@@ -226,6 +226,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.jboss</groupId>
+      <artifactId>jdk-misc</artifactId>
+      <version>3.Final</version>
+    </dependency>
+    <dependency>
         <groupId>io.hetu.core</groupId>
         <artifactId>presto-tests</artifactId>
         <scope>test</scope>

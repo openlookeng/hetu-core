@@ -22,6 +22,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 
 import static io.airlift.slice.SizeOf.sizeOfLongArray;
+import static io.prestosql.array.BigArrays.offset;
+import static io.prestosql.array.BigArrays.segment;
 
 // Note: this code was forked from fastutil (http://fastutil.di.unimi.it/)
 // Copyright (C) 2010-2013 Sebastiano Vigna
@@ -71,7 +73,17 @@ public final class LongBigArray
      */
     public long get(long index)
     {
-        return array[BigArrays.segment(index)][BigArrays.offset(index)];
+        return array[segment(index)][offset(index)];
+    }
+
+    public long[] getSegment(long index)
+    {
+        return array[segment(index)];
+    }
+
+    public int getOffset(long index)
+    {
+        return offset(index);
     }
 
     /**
@@ -81,7 +93,7 @@ public final class LongBigArray
      */
     public void set(long index, long value)
     {
-        array[BigArrays.segment(index)][BigArrays.offset(index)] = value;
+        array[segment(index)][offset(index)] = value;
     }
 
     /**
@@ -91,7 +103,7 @@ public final class LongBigArray
      */
     public void increment(long index)
     {
-        array[BigArrays.segment(index)][BigArrays.offset(index)]++;
+        array[segment(index)][offset(index)]++;
     }
 
     /**
@@ -102,7 +114,7 @@ public final class LongBigArray
      */
     public void add(long index, long value)
     {
-        array[BigArrays.segment(index)][BigArrays.offset(index)] += value;
+        array[segment(index)][offset(index)] += value;
     }
 
     /**
@@ -121,7 +133,7 @@ public final class LongBigArray
     private void grow(long length)
     {
         // how many segments are required to get to the length?
-        int requiredSegments = BigArrays.segment(length) + 1;
+        int requiredSegments = segment(length) + 1;
 
         // grow base array if necessary
         if (array.length < requiredSegments) {

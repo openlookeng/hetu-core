@@ -16,13 +16,18 @@ package io.prestosql.spi.predicate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.airlift.json.ObjectMapperProvider;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slices;
 import io.prestosql.spi.type.TestingTypeDeserializer;
 import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.Test;
 
+import java.util.Collections;
+import java.util.Optional;
+
 import static io.prestosql.spi.type.HyperLogLogType.HYPER_LOG_LOG;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -30,6 +35,8 @@ import static org.testng.Assert.fail;
 
 public class TestAllOrNoneValueSet
 {
+    private static final Logger LOGGER = Logger.get(TestAllOrNoneValueSet.class);
+
     @Test
     public void testAll()
     {
@@ -45,6 +52,7 @@ public class TestAllOrNoneValueSet
             fail();
         }
         catch (Exception ignored) {
+            LOGGER.error("TestAllOrNoneValueSet#testAll error : %s", ignored.getMessage());
         }
     }
 
@@ -63,6 +71,7 @@ public class TestAllOrNoneValueSet
             fail();
         }
         catch (Exception ignored) {
+            LOGGER.error("TestAllOrNoneValueSet#testNone error : %s", ignored.getMessage());
         }
     }
 
@@ -150,5 +159,15 @@ public class TestAllOrNoneValueSet
 
         AllOrNoneValueSet none = AllOrNoneValueSet.none(HYPER_LOG_LOG);
         assertEquals(none, mapper.readValue(mapper.writeValueAsString(none), AllOrNoneValueSet.class));
+    }
+
+    @Test
+    public void testExpandRanges()
+    {
+        // HyperLogLogType is non-comparable and non-orderable
+        assertThat(ValueSet.all(HYPER_LOG_LOG).tryExpandRanges(10)).isEqualTo(Optional.empty());
+        assertThat(ValueSet.none(HYPER_LOG_LOG).tryExpandRanges(10)).isEqualTo(Optional.of(Collections.emptyList()));
+        assertThat(ValueSet.none(HYPER_LOG_LOG).tryExpandRanges(1)).isEqualTo(Optional.of(Collections.emptyList()));
+        assertThat(ValueSet.none(HYPER_LOG_LOG).tryExpandRanges(0)).isEqualTo(Optional.of(Collections.emptyList()));
     }
 }
