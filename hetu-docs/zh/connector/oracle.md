@@ -178,7 +178,7 @@ openLooKeng支持选择以下Oracle数据库类型。下表显示了Oracle数据
 
 > | Oracle数据库类型 | openLooKeng类型| 说明|
 > |:----------|:----------|:----------|
-> | DECIMAL(p, s)| DECIMAL(p, s)| |
+> | NUMBER(p, s)| DECIMAL(p, s)| |
 > | NUMBER(p)                   | DECIMAL(p, 0)            |  |
 > | FLOAT(p)                    | DOUBLE                   |      |
 > | BINARY_FLOAT                | REAL                     |      |
