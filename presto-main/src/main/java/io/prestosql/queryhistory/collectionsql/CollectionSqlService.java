@@ -16,10 +16,12 @@ package io.prestosql.queryhistory.collectionsql;
 
 import com.google.inject.Inject;
 import io.prestosql.metastore.HetuMetaStoreManager;
+import io.prestosql.queryhistory.MockhetuMetaStore;
 import io.prestosql.queryhistory.QueryHistoryConfig;
 import io.prestosql.queryhistory.model.FavoriteInfo;
 import io.prestosql.spi.favorite.FavoriteEntity;
 import io.prestosql.spi.favorite.FavoriteResult;
+import io.prestosql.spi.metastore.HetuMetastore;
 
 import static java.util.Objects.requireNonNull;
 
@@ -27,12 +29,22 @@ public class CollectionSqlService
 {
     private final HetuMetaStoreManager hetuMetaStoreManager;
     private final QueryHistoryConfig queryHistoryConfig;
+    private HetuMetastore hetuMetastore;
 
     @Inject
     public CollectionSqlService(HetuMetaStoreManager hetuMetaStoreManager, QueryHistoryConfig queryHistoryConfig)
     {
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "MetaStoreManager is null");
         this.queryHistoryConfig = requireNonNull(queryHistoryConfig, "queryHistoryConfig is null");
+        this.hetuMetastore = validateMetaStore();
+    }
+
+    private HetuMetastore validateMetaStore()
+    {
+        if (hetuMetaStoreManager.getHetuMetastore() == null) {
+            return MockhetuMetaStore.getInstance();
+        }
+        return hetuMetaStoreManager.getHetuMetastore();
     }
 
     public Boolean insert(FavoriteInfo favoriteInfo)
@@ -41,10 +53,10 @@ public class CollectionSqlService
         String query = favoriteInfo.getQuery();
         String catalog = favoriteInfo.getCatalog();
         String schema = favoriteInfo.getSchemata();
-        if (hetuMetaStoreManager.getHetuMetastore().getFavorite(1, 1, user).getTotal() >= queryHistoryConfig.getMaxCollectionSqlCount()) {
+        if (hetuMetastore.getFavorite(1, 1, user).getTotal() >= queryHistoryConfig.getMaxCollectionSqlCount()) {
             return false;
         }
-        hetuMetaStoreManager.getHetuMetastore().insertFavorite(new FavoriteEntity(user, query, catalog, schema));
+        hetuMetastore.insertFavorite(new FavoriteEntity(user, query, catalog, schema));
         return true;
     }
 
@@ -54,14 +66,14 @@ public class CollectionSqlService
         String query = favoriteInfo.getQuery();
         String catalog = favoriteInfo.getCatalog();
         String schemata = favoriteInfo.getSchemata();
-        hetuMetaStoreManager.getHetuMetastore().deleteFavorite(new FavoriteEntity(user, query, catalog, schemata));
+        hetuMetastore.deleteFavorite(new FavoriteEntity(user, query, catalog, schemata));
         return true;
     }
 
     public FavoriteResult query(int pageNum, int pageSize, String user)
     {
         int startNum = (pageNum - 1) * pageSize;
-        FavoriteResult favoriteResult = hetuMetaStoreManager.getHetuMetastore().getFavorite(startNum, pageSize, user);
+        FavoriteResult favoriteResult = hetuMetastore.getFavorite(startNum, pageSize, user);
         return favoriteResult;
     }
 }
