@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.QueryTracker.TrackedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -104,9 +105,29 @@ public interface QueryExecution
         // no-op
     }
 
+    default void spillQueryRevocableMemory()
+    {
+        // no-op
+    }
+
     interface QueryExecutionFactory<T extends QueryExecution>
     {
         T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);
+    }
+
+    default PlanCostEstimate getEstimates()
+    {
+        return PlanCostEstimate.unknown();
+    }
+
+    default int getTryCount()
+    {
+        return 0;
+    }
+
+    default void setTryCount(int tryCount)
+    {
+        // NO_OP
     }
 
     /**

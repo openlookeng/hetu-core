@@ -69,6 +69,8 @@ public interface RemoteTask
 
     void setPriority(int priority);
 
+    void spillRevocableMemory();
+
     void abort();
 
     void fail(Throwable cause);

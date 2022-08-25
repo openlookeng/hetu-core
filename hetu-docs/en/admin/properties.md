@@ -387,6 +387,13 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Output buffer size for task data that is waiting to be pulled by upstream tasks. If the task output is hash partitioned, then the buffer will be shared across all of the partitioned consumers. Increasing this value may improve network throughput for data transferred between stages if the network has high latency or if there are many nodes in the cluster.
 
+### `query-resource-tracking`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Disable query level resource tracking and mitigation actions.
+
 ## Failure Recovery handling Properties
 
 ### Failure Retry Policies

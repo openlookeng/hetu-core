@@ -57,7 +57,8 @@ public class TestHetuConfig
                 .setIndexToPreload("")
                 .setExtensionExecutionPlannerEnabled(false)
                 .setExtensionExecutionPlannerJarPath(null)
-                .setExtensionExecutionPlannerClassPath(null));
+                .setExtensionExecutionPlannerClassPath(null)
+                .setNoResourceRetryCount(5));
     }
 
     @Test
@@ -91,6 +92,7 @@ public class TestHetuConfig
                 .put("extension_execution_planner_enabled", "true")
                 .put("extension_execution_planner_jar_path", "")
                 .put("extension_execution_planner_class_path", "")
+                .put("query-no-resource-retry-count", "15")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -120,7 +122,8 @@ public class TestHetuConfig
                 .setIndexToPreload("idx1,idx2")
                 .setExtensionExecutionPlannerEnabled(true)
                 .setExtensionExecutionPlannerJarPath("")
-                .setExtensionExecutionPlannerClassPath("");
+                .setExtensionExecutionPlannerClassPath("")
+                .setNoResourceRetryCount(15);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

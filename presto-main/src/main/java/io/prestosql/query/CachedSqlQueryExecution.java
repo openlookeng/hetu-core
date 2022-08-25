@@ -44,6 +44,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.security.AccessControl;
 import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PrestoException;
@@ -129,14 +130,16 @@ public class CachedSqlQueryExecution
                                    HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, RecoveryUtils recoveryUtils,
                                    ExchangeManagerRegistry exchangeManagerRegistry, SqlTaskManager coordinatorTaskManager, TaskSourceFactory taskSourceFactory,
                                    TaskDescriptorStorage taskDescriptorStorage, NodeAllocatorService nodeAllocatorService,
-                                   PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats)
+                                   PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats,
+                                   QueryResourceManagerService queryResourceManager)
     {
         super(preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService,
                 heuristicIndexerManager, stateStoreProvider, recoveryUtils, exchangeManagerRegistry, coordinatorTaskManager,
-                taskSourceFactory, taskDescriptorStorage, nodeAllocatorService, partitionMemoryEstimatorFactory, taskExecutionStats);
+                taskSourceFactory, taskDescriptorStorage, nodeAllocatorService, partitionMemoryEstimatorFactory, taskExecutionStats,
+                queryResourceManager);
         this.cache = cache;
         this.beginTableWrite = new BeginTableWrite(metadata);
     }

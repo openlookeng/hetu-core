@@ -65,6 +65,7 @@ public class HetuConfig
     private String extensionExecutionPlannerJarPath;
     private String extensionExecutionPlannerClassPath;
     private boolean extensionExecutionPlannerEnabled;
+    private int noResourceRetryCount = 5;
 
     public HetuConfig()
     {
@@ -445,6 +446,19 @@ public class HetuConfig
     {
         this.isTraceStackVisible = isTraceStackVisible;
         System.setProperty("stack-trace-visible", String.valueOf(isTraceStackVisible));
+        return this;
+    }
+
+    public int getNoResourceRetryCount()
+    {
+        return noResourceRetryCount;
+    }
+
+    @Config("query-no-resource-retry-count")
+    @ConfigDescription("Number of retries for the query till the resources are available")
+    public HetuConfig setNoResourceRetryCount(int retryCount)
+    {
+        this.noResourceRetryCount = retryCount;
         return this;
     }
 }

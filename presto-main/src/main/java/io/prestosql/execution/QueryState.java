@@ -24,6 +24,10 @@ public enum QueryState
      * Query has been accepted and is awaiting execution.
      */
     QUEUED(false),
+    /*
+    * Query is evaluated for estimates and resource
+    */
+    ESTIMATING(false),
     /**
      * Query is waiting for the required resources (beta).
      */

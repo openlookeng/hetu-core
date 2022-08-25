@@ -187,6 +187,8 @@ public class MockRemoteTaskFactory
 
         private final PartitionedSplitCountTracker partitionedSplitCountTracker;
 
+        private final AtomicBoolean taskSpillCalled = new AtomicBoolean();
+
         public MockRemoteTask(TaskId taskId,
                 String instanceId,
                 PlanFragment fragment,
@@ -479,6 +481,11 @@ public class MockRemoteTaskFactory
         public void failRemotely(Throwable cause)
         {
             //do nothing
+        }
+
+        public void spillRevocableMemory()
+        {
+            taskSpillCalled.set(true);
         }
 
         @Override

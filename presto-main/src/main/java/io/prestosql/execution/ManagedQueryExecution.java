@@ -63,4 +63,9 @@ public interface ManagedQueryExecution
     {
         return getBasicQueryInfo().getQueryStats().getProgressPercentage();
     }
+
+    default int getRetryCount()
+    {
+        return 0;
+    }
 }

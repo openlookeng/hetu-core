@@ -24,6 +24,7 @@ import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.cost.CostCalculator;
+import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
@@ -50,6 +51,8 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
+import io.prestosql.resourcemanager.QueryResourceManager;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.security.AccessControl;
 import io.prestosql.server.BasicQueryInfo;
 import io.prestosql.snapshot.MarkerAnnouncer;
@@ -64,6 +67,7 @@ import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.StandardWarningCode;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
@@ -118,6 +122,7 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -131,6 +136,7 @@ import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
+import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
@@ -191,6 +197,10 @@ public class SqlQueryExecution
     private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
     private final TaskExecutionStats taskExecutionStats;
     private AtomicInteger queryPriority = new AtomicInteger(1);
+    private final QueryResourceManager queryResourceManager;
+    private PlanRoot plan;
+
+    private AtomicInteger tryCount = new AtomicInteger(0);
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -228,7 +238,8 @@ public class SqlQueryExecution
             TaskDescriptorStorage taskDescriptorStorage,
             NodeAllocatorService nodeAllocatorService,
             PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
-            TaskExecutionStats taskExecutionStats)
+            TaskExecutionStats taskExecutionStats,
+            QueryResourceManagerService queryResourceManager)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -261,6 +272,7 @@ public class SqlQueryExecution
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
+            this.queryResourceManager = requireNonNull(queryResourceManager, "queryResourceManager is null").createQueryResourceManager(stateMachine.getQueryId(), stateMachine.getSession(), stateMachine.getResourceGroup(), stateMachine.getResourceGroupManager());
 
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
@@ -505,6 +517,69 @@ public class SqlQueryExecution
         log.debug("queryId=%s, add columnToSymbolMapping into hazelcast success.", queryId + QUERY_COLUMN_NAME_TO_SYMBOL_MAPPING);
     }
 
+    private void getCostEstimateByStageLevel(SubPlan current, Map<Integer, PlanCostEstimate> accumulator, int level)
+    {
+        for (SubPlan child : current.getChildren()) {
+            getCostEstimateByStageLevel(child, accumulator, level + 1);
+        }
+
+        PlanCostEstimate cost = accumulator.computeIfAbsent(level, v -> PlanCostEstimate.zero());
+        cost = current.getFragment().getStatsAndCosts().getCosts().values().stream()
+                .reduce(cost, (a, b) -> PlanCostEstimate.add(a, b));
+
+        accumulator.put(level, cost);
+    }
+
+    private Map<Integer, PlanCostEstimate> getResourceLimitFromPlan()
+    {
+        Map<Integer, PlanCostEstimate> planDepthWiseCost = new HashMap<>();
+
+        getCostEstimateByStageLevel(plan.getRoot(), planDepthWiseCost, 0);
+
+        PlanCostEstimate maxLimit = planDepthWiseCost.values().stream()
+                .reduce(PlanCostEstimate.zero(), (a, b) -> PlanCostEstimate.max(a, b));
+
+        planDepthWiseCost.put(-1, maxLimit);
+        return planDepthWiseCost;
+    }
+
+    private boolean setResourceLimitsFromEstimates(PlanNodeId rootId)
+    {
+        /* Get Stage level plan and which plan to get the resource availability decision */
+        Map<Integer, PlanCostEstimate> stageLevelCosts = getResourceLimitFromPlan();
+        PlanCostEstimate estimate = stageLevelCosts.getOrDefault(-1, null);
+
+        if (estimate != null && estimate != PlanCostEstimate.zero() && estimate != PlanCostEstimate.unknown()) {
+            double cpuCost = estimate.getCpuCost();
+            cpuCost = Double.isInfinite(cpuCost) || Double.isNaN(cpuCost) ? 0.0 : cpuCost;
+
+            double memCost = estimate.getMaxMemory();
+            memCost = Double.isInfinite(memCost) || Double.isNaN(memCost) ? 0.0 : memCost;
+
+            double ioCost = estimate.getNetworkCost();
+            ioCost = Double.isInfinite(ioCost) || Double.isNaN(ioCost) ? 0.0 : ioCost;
+
+            /* Todo(Future Feature): Re-divide the available resources amongst queries again when new query comes in.. */
+            return queryResourceManager.setResourceLimit(new DataSize(memCost, BYTE),
+                    new Duration(cpuCost, TimeUnit.MILLISECONDS),
+                    new DataSize(ioCost, BYTE));
+        }
+
+        return true;
+    }
+
+    private void updateQueryResourceStats()
+    {
+        SqlQueryScheduler scheduler = queryScheduler.get();
+        if (scheduler != null) {
+            Duration totalCpu = scheduler.getTotalCpuTime();
+            DataSize totalMem = DataSize.succinctBytes(scheduler.getTotalMemoryReservation());
+            DataSize totalIo = scheduler.getBasicStageStats().getInternalNetworkInputDataSize();
+
+            queryResourceManager.updateStats(totalCpu, totalMem, totalIo);
+        }
+    }
+
     @Override
     public void start()
     {
@@ -517,7 +592,7 @@ public class SqlQueryExecution
                 }
 
                 // analyze query
-                PlanRoot plan = analyzeQuery();
+                plan = analyzeQuery();
 
                 try {
                     handleCrossRegionDynamicFilter(plan);
@@ -525,6 +600,13 @@ public class SqlQueryExecution
                 catch (Throwable e) {
                     // ignore any exception
                     log.warn("something unexpected happened.. cause: %s", e.getMessage());
+                }
+
+                /* check session config for enabling resource monitoring feature */
+                if (isQueryResourceTrackingEnabled(stateMachine.getSession())
+                        && !setResourceLimitsFromEstimates(plan.getRoot().getFragment().getRoot().getId())) {
+                    stateMachine.transitionToRequeue();
+                    return;
                 }
 
                 // plan distribution of query
@@ -623,7 +705,8 @@ public class SqlQueryExecution
                 taskDescriptorStorage,
                 nodeAllocatorService,
                 partitionMemoryEstimatorFactory,
-                taskExecutionStats);
+                taskExecutionStats,
+                queryResourceManager);
         if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
             // Restore going to happen first, mark the restore state for all stages
             scheduler.setResuming(snapshotId.getAsLong());
@@ -690,11 +773,11 @@ public class SqlQueryExecution
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-        Plan plan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
-        queryPlan.set(plan);
+        Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
+        queryPlan.set(localPlan);
 
         // extract inputs
-        List<Input> inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(plan.getRoot());
+        List<Input> inputs = new InputExtractor(metadata, stateMachine.getSession()).extractInputs(localPlan.getRoot());
         stateMachine.setInputs(inputs);
 
         // extract output
@@ -702,7 +785,7 @@ public class SqlQueryExecution
         stateMachine.endLogicalPlan();
 
         // fragment the plan
-        SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), plan, false, stateMachine.getWarningCollector());
+        SubPlan fragmentedPlan = planFragmenter.createSubPlans(stateMachine.getSession(), localPlan, false, stateMachine.getWarningCollector());
 
         // record analysis time
         stateMachine.endAnalysis();
@@ -920,7 +1003,8 @@ public class SqlQueryExecution
                 taskDescriptorStorage,
                 nodeAllocatorService,
                 partitionMemoryEstimatorFactory,
-                taskExecutionStats);
+                taskExecutionStats,
+                queryResourceManager);
 
         queryScheduler.set(scheduler);
 
@@ -1001,11 +1085,24 @@ public class SqlQueryExecution
     @Override
     public void setPriority(int priority)
     {
-        queryPriority.set(priority);
-        stateMachine.setPriority(priority);
-        SqlQueryScheduler scheduler = queryScheduler.get();
-        if (scheduler != null) {
-            scheduler.setStagePriority();
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            queryPriority.set(priority);
+            stateMachine.setPriority(priority);
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            if (scheduler != null) {
+                scheduler.setStagePriority();
+            }
+        }
+    }
+
+    @Override
+    public void spillQueryRevocableMemory()
+    {
+        try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
+            SqlQueryScheduler scheduler = queryScheduler.get();
+            if (scheduler != null) {
+                scheduler.spillRevocableMem();
+            }
         }
     }
 
@@ -1077,6 +1174,18 @@ public class SqlQueryExecution
 
             return stateMachine.getFinalQueryInfo().orElseGet(() -> buildQueryInfo(scheduler));
         }
+    }
+
+    @Override
+    public void setTryCount(int tryCount)
+    {
+        this.tryCount.set(tryCount);
+    }
+
+    @Override
+    public int getTryCount()
+    {
+        return this.tryCount.get();
     }
 
     @Override
@@ -1179,6 +1288,8 @@ public class SqlQueryExecution
         private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
         private final TaskExecutionStats taskExecutionStats;
 
+        private final QueryResourceManagerService queryResourceManagerService;
+
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
                 HetuConfig hetuConfig,
@@ -1212,7 +1323,8 @@ public class SqlQueryExecution
                 TaskDescriptorStorage taskDescriptorStorage,
                 NodeAllocatorService nodeAllocatorService,
                 PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
-                TaskExecutionStats taskExecutionStats)
+                TaskExecutionStats taskExecutionStats,
+                QueryResourceManagerService queryResourceManagerService)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1240,6 +1352,7 @@ public class SqlQueryExecution
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.recoveryUtils = requireNonNull(recoveryUtils, "recoveryUtils is null");
+            this.queryResourceManagerService = requireNonNull(queryResourceManagerService, "queryResourceManagerService is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -1314,7 +1427,8 @@ public class SqlQueryExecution
                     taskDescriptorStorage,
                     nodeAllocatorService,
                     partitionMemoryEstimatorFactory,
-                    taskExecutionStats);
+                    taskExecutionStats,
+                    queryResourceManagerService);
         }
     }
 }

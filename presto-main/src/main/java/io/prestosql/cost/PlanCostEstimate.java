@@ -178,4 +178,20 @@ public final class PlanCostEstimate
     {
         return Objects.hash(cpuCost, maxMemory, maxMemoryWhenOutputting, networkCost, rootNodeLocalCostEstimate);
     }
+
+    public static PlanCostEstimate add(PlanCostEstimate a, PlanCostEstimate b)
+    {
+        return new PlanCostEstimate(a.getCpuCost() + b.getCpuCost(),
+                a.getMaxMemory() + b.getMaxMemory(),
+                a.getMaxMemoryWhenOutputting() + b.getMaxMemoryWhenOutputting(),
+                a.getNetworkCost() + b.getNetworkCost());
+    }
+
+    public static PlanCostEstimate max(PlanCostEstimate a, PlanCostEstimate b)
+    {
+        return new PlanCostEstimate(Math.max(a.getCpuCost(), b.getCpuCost()),
+                Math.max(a.getMaxMemory(), b.getMaxMemory()),
+                Math.max(a.getMaxMemoryWhenOutputting(), b.getMaxMemoryWhenOutputting()),
+                Math.max(a.getNetworkCost(), b.getNetworkCost()));
+    }
 }
