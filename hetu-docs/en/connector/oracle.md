@@ -177,7 +177,7 @@ Data type mapping
 
 > | Oracle Database Type| openLooKeng Type| Description|
 > |:----------|:----------|:----------|
-> | DECIMAL(p, s)| DECIMAL(p, s)|
+> | NUMBER(p, s)| DECIMAL(p, s)|
 > | NUMBER(p)| DECIMAL(p, 0)|
 > | FLOAT(p)| DOUBLE|
 > | BINARY\_FLOAT| REAL|
