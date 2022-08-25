@@ -22,7 +22,7 @@ import java.util.function.Supplier;
 
 import static io.prestosql.operator.HashCollisionsInfo.createHashCollisionsInfo;
 
-@RestorableConfig(uncapturedFields = {"operatorContext"})
+@RestorableConfig(uncapturedFields = "operatorContext")
 public class HashCollisionsCounter
         implements Supplier<OperatorInfo>, Restorable
 {

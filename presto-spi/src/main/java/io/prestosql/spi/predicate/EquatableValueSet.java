@@ -172,7 +172,18 @@ public class EquatableValueSet
             {
                 return EquatableValueSet.this.getValues();
             }
+
+            @Override
+            public int getValuesCount()
+            {
+                return EquatableValueSet.this.getValuesCount();
+            }
         };
+    }
+
+    public int getValuesCount()
+    {
+        return entries.size();
     }
 
     @Override

@@ -37,4 +37,9 @@ public interface UpdatablePageSource
     CompletableFuture<Collection<Slice>> finish();
 
     default void abort() {}
+
+    default void updateRows(Page page, List<Integer> columnValueAndRowIdChannels)
+    {
+        throw new UnsupportedOperationException("This connector does not support row update");
+    }
 }

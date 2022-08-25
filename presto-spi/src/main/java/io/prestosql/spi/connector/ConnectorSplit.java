@@ -14,12 +14,18 @@
 package io.prestosql.spi.connector;
 
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.SplitWeight;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.List;
 
 public interface ConnectorSplit
 {
+    default SplitWeight getSplitWeight()
+    {
+        return SplitWeight.standard();
+    }
+
     default boolean isSplitEmpty()
     {
         return false;
@@ -64,5 +70,10 @@ public interface ConnectorSplit
     default List<ConnectorSplit> getUnwrappedSplits()
     {
         throw new NotImplementedException();
+    }
+
+    default long getRetainedSizeInBytes()
+    {
+        throw new UnsupportedOperationException("This connector does not provide memory accounting capabilities for ConnectorSplit");
     }
 }

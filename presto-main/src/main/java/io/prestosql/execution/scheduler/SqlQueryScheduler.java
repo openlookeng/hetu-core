@@ -45,6 +45,7 @@ import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.operator.TaskLocation;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.snapshot.QueryRecoveryManager;
@@ -161,6 +162,7 @@ public class SqlQueryScheduler
     private final QuerySnapshotManager snapshotManager;
     private final QueryRecoveryManager queryRecoveryManager;
     private final Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes = new ConcurrentHashMap<>();
+    private final TableExecuteContextManager tableExecuteContextManager;
 
     public static SqlQueryScheduler createSqlQueryScheduler(
             QueryStateMachine queryStateMachine,
@@ -184,7 +186,8 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager,
             Map<StageId, Integer> stageTaskCounts,
-            boolean isResume)
+            boolean isResume,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -208,7 +211,8 @@ public class SqlQueryScheduler
                 snapshotManager,
                 queryRecoveryManager,
                 stageTaskCounts,
-                isResume);
+                isResume,
+                tableExecuteContextManager);
         sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
@@ -235,7 +239,8 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager,
             Map<StageId, Integer> stageTaskCounts,
-            boolean isResumeScheduler)
+            boolean isResumeScheduler,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -243,7 +248,7 @@ public class SqlQueryScheduler
         this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         this.summarizeTaskInfo = summarizeTaskInfo;
-
+        this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
         this.snapshotManager = snapshotManager;
         this.queryRecoveryManager = queryRecoveryManager;
         if (SystemSessionProperties.isRecoveryEnabled(session)) {
@@ -284,7 +289,8 @@ public class SqlQueryScheduler
                 snapshotManager,
                 queryRecoveryManager,
                 stageTaskCounts,
-                isResumeScheduler);
+                isResumeScheduler,
+                tableExecuteContextManager);
 
         SqlStageExecution rootStage = stageExecutions.get(0);
         rootStage.setOutputBuffers(rootOutputBuffers);
@@ -439,7 +445,8 @@ public class SqlQueryScheduler
             QuerySnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager,
             Map<StageId, Integer> stageTaskCounts,
-            boolean isResumeScheduler)
+            boolean isResumeScheduler,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         ImmutableList.Builder<SqlStageExecution> localStages = ImmutableList.builder();
 
@@ -485,7 +492,7 @@ public class SqlQueryScheduler
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
 
             stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stageExecution, planNodeId, splitSource,
-                    placementPolicy, splitBatchSize, session, heuristicIndexerManager));
+                    placementPolicy, splitBatchSize, session, heuristicIndexerManager, tableExecuteContextManager));
 
             bucketToPartition = Optional.of(new int[1]);
         }
@@ -567,7 +574,8 @@ public class SqlQueryScheduler
                         nodeScheduler.createNodeSelector(catalogName, keepConsumerOnFeederNodes, feederScheduledNodes),
                         connectorPartitionHandles,
                         session,
-                        heuristicIndexerManager));
+                        heuristicIndexerManager,
+                        tableExecuteContextManager));
             }
             else {
                 // all sources are remote
@@ -609,7 +617,8 @@ public class SqlQueryScheduler
                     snapshotManager,
                     queryRecoveryManager,
                     stageTaskCounts,
-                    isResumeScheduler);
+                    isResumeScheduler,
+                    tableExecuteContextManager);
             localStages.addAll(subTree);
 
             SqlStageExecution childStage = subTree.get(0);

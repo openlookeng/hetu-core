@@ -27,6 +27,7 @@ import io.prestosql.metadata.OperatorNotFoundException;
 import io.prestosql.operator.scalar.FormatFunction;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.DenyAllAccessControl;
+import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.QualifiedObjectName;
@@ -127,6 +128,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.metadata.CastType.CAST;
 import static io.prestosql.metadata.FunctionAndTypeManager.qualifyObjectName;
+import static io.prestosql.spi.StandardErrorCode.EXPRESSION_NOT_CONSTANTS;
 import static io.prestosql.spi.function.OperatorType.SUBSCRIPT;
 import static io.prestosql.spi.type.ArrayParametricType.ARRAY;
 import static io.prestosql.spi.type.BigintType.BIGINT;
@@ -161,6 +163,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.STANDALONE_LAMBDA;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TOO_MANY_ARGUMENTS;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
+import static io.prestosql.sql.analyzer.SemanticException.semanticException;
 import static io.prestosql.sql.analyzer.SemanticExceptions.missingAttributeException;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.SymbolUtils.from;
@@ -1846,6 +1849,67 @@ public class ExpressionAnalyzer
 
     public static ExpressionAnalyzer createWithoutSubqueries(
             Metadata metadata,
+            Session session,
+            TypeProvider symbolTypes,
+            List<Expression> parameters,
+            Function<? super Node, ? extends RuntimeException> statementAnalyzerRejection,
+            WarningCollector warningCollector,
+            boolean isDescribe)
+    {
+        return new ExpressionAnalyzer(
+                metadata,
+                node -> {
+                    throw statementAnalyzerRejection.apply(node);
+                },
+                session,
+                symbolTypes,
+                parameters,
+                warningCollector,
+                isDescribe);
+    }
+
+    public static ExpressionAnalyzer createConstantAnalyzers(
+            Metadata metadata,
+            AccessControl accessControl,
+            Session session,
+            List<Expression> parameters,
+            WarningCollector warningCollector)
+    {
+        return createWithoutSubqueriess(
+                metadata,
+                accessControl,
+                session,
+                parameters,
+                EXPRESSION_NOT_CONSTANTS,
+                "Constant expression cannot contain a subquery",
+                warningCollector,
+                false);
+    }
+
+    public static ExpressionAnalyzer createWithoutSubqueriess(
+            Metadata metadata,
+            AccessControl accessControl,
+            Session session,
+            List<Expression> parameters,
+            ErrorCodeSupplier errorCode,
+            String message,
+            WarningCollector warningCollector,
+            boolean isDescribe)
+    {
+        return createWithoutSubqueriesss(
+                metadata,
+                accessControl,
+                session,
+                TypeProvider.empty(),
+                parameters,
+                node -> semanticException(errorCode, node, message),
+                warningCollector,
+                isDescribe);
+    }
+
+    public static ExpressionAnalyzer createWithoutSubqueriesss(
+            Metadata metadata,
+            AccessControl accessControl,
             Session session,
             TypeProvider symbolTypes,
             List<Expression> parameters,

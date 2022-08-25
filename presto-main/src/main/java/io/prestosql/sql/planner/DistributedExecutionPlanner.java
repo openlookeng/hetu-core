@@ -78,6 +78,7 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -297,6 +298,13 @@ public class DistributedExecutionPlanner
         public Map<PlanNodeId, SplitSource> visitExplainAnalyze(ExplainAnalyzeNode node, Void context)
         {
             return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitTableExecute(PlanNode node, Void context)
+        {
+            TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
+            return tableExecuteNode.getSource().accept(this, context);
         }
 
         @Override

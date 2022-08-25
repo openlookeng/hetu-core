@@ -553,11 +553,13 @@ public class GroupedTopNBuilder
             this.topN = topN;
         }
 
+        @Override
         public void enqueue(Row row)
         {
             super.enqueue(row);
         }
 
+        @Override
         public Row dequeue()
         {
             return super.dequeue();
@@ -570,21 +572,25 @@ public class GroupedTopNBuilder
             return super.size() < topN;
         }
 
+        @Override
         public boolean isEmpty()
         {
             return super.isEmpty();
         }
 
+        @Override
         public Row first()
         {
             return super.first();
         }
 
+        @Override
         public void clear()
         {
             super.clear();
         }
 
+        @Override
         public int size()
         {
             return size;
@@ -787,6 +793,7 @@ public class GroupedTopNBuilder
             super.enqueue(row);
         }
 
+        @Override
         public List<Row> tryRemoveFirst(boolean isEqual, Row newRow)
         {
             if (!isEqual) {
@@ -891,7 +898,7 @@ public class GroupedTopNBuilder
         }
     }
 
-    @RestorableConfig(uncapturedFields = {"comparator"})
+    @RestorableConfig(uncapturedFields = "comparator")
     private static class RankNumberBuilder
             implements RankingNumberBuilder
     {
@@ -950,7 +957,7 @@ public class GroupedTopNBuilder
         }
     }
 
-    @RestorableConfig(uncapturedFields = {"comparator"})
+    @RestorableConfig(uncapturedFields = "comparator")
     private static class DenseRankNumberBuilder
             implements RankingNumberBuilder
     {

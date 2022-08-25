@@ -37,6 +37,13 @@ public class Page
     public static final int INSTANCE_SIZE = ClassLayout.parseClass(Page.class).instanceSize() +
             (3 * ClassLayout.parseClass(AtomicLong.class).instanceSize());
 
+    private static final Block[] EMPTY_BLOCKS = new Block[0];
+
+    static Page wrapBlocksWithoutCopy(int positionCount, Block[] blocks)
+    {
+        return new Page(false, positionCount, blocks);
+    }
+
     private final Block[] blocks;
     private final int positionCount;
     private final AtomicLong sizeInBytes = new AtomicLong(-1);
@@ -60,6 +67,22 @@ public class Page
         requireNonNull(blocks, "blocks is null");
         this.blocks = Arrays.copyOf(blocks, blocks.length);
         this.positionCount = positionCount;
+    }
+
+    private Page(boolean blocksCopyRequired, int positionCount, Block[] blocks)
+    {
+        requireNonNull(blocks, "blocks is null");
+        this.positionCount = positionCount;
+        if (blocks.length == 0) {
+            this.blocks = EMPTY_BLOCKS;
+            this.sizeInBytes.set(0L);
+            this.logicalSizeInBytes.set(0L);
+            // Empty blocks are not considered "retained" by any particular page
+            this.retainedSizeInBytes.set(INSTANCE_SIZE);
+        }
+        else {
+            this.blocks = blocksCopyRequired ? blocks.clone() : blocks;
+        }
     }
 
     public Page(int positionCount, Properties pageMetadata, Block... blocks)
@@ -315,6 +338,17 @@ public class Page
         Block[] blockArrays = new Block[this.blocks.length];
         Arrays.setAll(blockArrays, i -> this.blocks[i].getPositions(retainedPositions, offset, length));
         return new Page(length, blockArrays);
+    }
+
+    public Page getColumns(int... columns)
+    {
+        requireNonNull(columns, "columns is null");
+
+        Block[] blocks = new Block[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            blocks[i] = this.blocks[columns[i]];
+        }
+        return wrapBlocksWithoutCopy(positionCount, blocks);
     }
 
     public Page prependColumn(Block column)

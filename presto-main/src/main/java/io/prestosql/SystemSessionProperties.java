@@ -20,6 +20,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.memory.MemoryManagerConfig;
+import io.prestosql.operator.RetryPolicy;
 import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.session.PropertyMetadata;
@@ -42,6 +43,7 @@ import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_CLASS_PA
 import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_ENABLED;
 import static io.prestosql.spi.HetuConstant.EXTENSION_EXECUTION_PLANNER_JAR_PATH;
 import static io.prestosql.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.session.PropertyMetadata.booleanProperty;
 import static io.prestosql.spi.session.PropertyMetadata.dataSizeProperty;
 import static io.prestosql.spi.session.PropertyMetadata.doubleProperty;
@@ -61,6 +63,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class SystemSessionProperties
 {
+    public static final String RETRY_POLICY = "retry_policy";
     public static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
     public static final String JOIN_DISTRIBUTION_TYPE = "join_distribution_type";
     public static final String JOIN_MAX_BROADCAST_TABLE_SIZE = "join_max_broadcast_table_size";
@@ -262,6 +265,12 @@ public final class SystemSessionProperties
                         "Distribute index joins on join keys instead of executing inline",
                         featuresConfig.isDistributedIndexJoinsEnabled(),
                         false),
+                enumProperty(
+                        RETRY_POLICY,
+                        "Retry policy",
+                        RetryPolicy.class,
+                        queryManagerConfig.getRetryPolicy(),
+                        true),
                 integerProperty(
                         HASH_PARTITION_COUNT,
                         "Number of partitions for distributed joins and aggregations",
@@ -1504,5 +1513,21 @@ public final class SystemSessionProperties
     public static boolean isEliminateDuplicateSpillFilesEnabled(Session session)
     {
         return session.getSystemProperty(ELIMINATE_DUPLICATE_SPILL_FILES, Boolean.class);
+    }
+
+    public static boolean isDynamicScheduleForGroupedExecution(Session session)
+    {
+        return session.getSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, Boolean.class);
+    }
+
+    public static RetryPolicy getRetryPolicy(Session session)
+    {
+        RetryPolicy retryPolicy = session.getSystemProperty(RETRY_POLICY, RetryPolicy.class);
+        if (retryPolicy == RetryPolicy.TASK) {
+            if (isGroupedExecutionEnabled(session) || isDynamicScheduleForGroupedExecution(session)) {
+                throw new PrestoException(NOT_SUPPORTED, "Grouped execution is not supported with task level retries enabled");
+            }
+        }
+        return retryPolicy;
     }
 }

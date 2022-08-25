@@ -22,6 +22,7 @@ import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.block.Int128ArrayBlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.ScalarOperator;
 import io.prestosql.spi.type.AbstractType;
 import io.prestosql.spi.type.FixedWidthType;
 import io.prestosql.spi.type.StandardTypes;
@@ -30,7 +31,10 @@ import java.util.UUID;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.spi.block.Int128ArrayBlock.INT128_BYTES;
+import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static java.lang.Long.reverseBytes;
+import static java.lang.String.format;
 
 public class UuidType
         extends AbstractType
@@ -158,5 +162,41 @@ public class UuidType
         return Slices.wrappedLongArray(
                 block.getLong(position, 0),
                 block.getLong(position, SIZE_OF_LONG));
+    }
+
+    public static UUID trinoUuidToJavaUuid(Slice uuid)
+    {
+        if (uuid.length() != INT128_BYTES) {
+            throw new IllegalStateException(format("Expected value to be exactly %d bytes but was %d", INT128_BYTES, uuid.length()));
+        }
+        return new UUID(
+                reverseBytes(uuid.getLong(0)),
+                reverseBytes(uuid.getLong(SIZE_OF_LONG)));
+    }
+
+    public static Slice javaUuidToTrinoUuid(UUID uuid)
+    {
+        return Slices.wrappedLongArray(
+                reverseBytes(uuid.getMostSignificantBits()),
+                reverseBytes(uuid.getLeastSignificantBits()));
+    }
+
+    @ScalarOperator(COMPARISON_UNORDERED_LAST)
+    private static long comparisonOperator(Slice left, Slice right)
+    {
+        return compareLittleEndian(
+                left.getLong(0),
+                left.getLong(SIZE_OF_LONG),
+                right.getLong(0),
+                right.getLong(SIZE_OF_LONG));
+    }
+
+    private static int compareLittleEndian(long leftLow64le, long leftHigh64le, long rightLow64le, long rightHigh64le)
+    {
+        int compare = Long.compareUnsigned(reverseBytes(leftLow64le), reverseBytes(rightLow64le));
+        if (compare != 0) {
+            return compare;
+        }
+        return Long.compareUnsigned(reverseBytes(leftHigh64le), reverseBytes(rightHigh64le));
     }
 }

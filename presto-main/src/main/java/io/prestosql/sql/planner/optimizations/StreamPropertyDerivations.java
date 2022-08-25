@@ -176,6 +176,14 @@ public final class StreamPropertyDerivations
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
 
+        @Override
+        public StreamProperties visitTableExecute(PlanNode node, List<StreamProperties> inputProperties)
+        {
+            StreamProperties properties = Iterables.getOnlyElement(inputProperties);
+            // table execute only outputs the row count and fragments
+            return properties.withUnspecifiedPartitioning();
+        }
+
         //
         // Joins
         //

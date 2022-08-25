@@ -263,6 +263,12 @@ public class TestCachingOrcDataSource
         private static final long LAST_MODIFIED_TIME = System.currentTimeMillis();
 
         @Override
+        public long getEstimatedSize()
+        {
+            return 0;
+        }
+
+        @Override
         public OrcDataSourceId getId()
         {
             return new OrcDataSourceId("fake");
@@ -293,6 +299,12 @@ public class TestCachingOrcDataSource
         }
 
         @Override
+        public Slice readTail(int length) throws IOException
+        {
+            return null;
+        }
+
+        @Override
         public Slice readFully(long position, int length)
         {
             return Slices.allocate(length);
@@ -302,6 +314,12 @@ public class TestCachingOrcDataSource
         public <K> Map<K, OrcDataReader> readFully(Map<K, DiskRange> diskRanges)
         {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public long getRetainedSize()
+        {
+            return 0;
         }
     }
 }

@@ -15,6 +15,8 @@ package io.prestosql.spi;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import io.hetu.core.common.util.SizeOfUtil;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -58,6 +60,7 @@ import static java.util.Objects.requireNonNull;
  */
 public class HostAddress
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HostAddress.class).instanceSize();
     /**
      * Magic value indicating the absence of a port number.
      */
@@ -293,5 +296,10 @@ public class HostAddress
     private static boolean isValidPort(int port)
     {
         return port >= 0 && port <= 65535;
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE + SizeOfUtil.estimatedSizeOf(host);
     }
 }

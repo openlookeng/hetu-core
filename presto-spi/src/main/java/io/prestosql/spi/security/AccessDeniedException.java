@@ -41,6 +41,16 @@ public class AccessDeniedException
         throw new AccessDeniedException(format("User %s cannot impersonate user %s%s", originalUser, newUser, formatExtraInfo(extraInfo)));
     }
 
+    public static void denySetTableProperties(String tableName)
+    {
+        denySetTableProperties(tableName, null);
+    }
+
+    public static void denySetTableProperties(String tableName, String extraInfo)
+    {
+        throw new AccessDeniedException(format("Cannot set table properties to %s%s", tableName, formatExtraInfo(extraInfo)));
+    }
+
     public static void denySetUser(Optional<Principal> principal, String userName)
     {
         denySetUser(principal, userName, null);

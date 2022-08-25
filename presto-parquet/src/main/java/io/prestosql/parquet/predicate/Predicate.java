@@ -17,8 +17,12 @@ import io.prestosql.parquet.ParquetCorruptionException;
 import io.prestosql.parquet.ParquetDataSourceId;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.statistics.Statistics;
+import org.apache.parquet.filter2.predicate.FilterPredicate;
+import org.apache.parquet.internal.filter2.columnindex.ColumnIndexStore;
+import org.joda.time.DateTimeZone;
 
 import java.util.Map;
+import java.util.Optional;
 
 public interface Predicate
 {
@@ -34,6 +38,30 @@ public interface Predicate
         public boolean matches(Map<ColumnDescriptor, DictionaryDescriptor> dictionaries)
         {
             return true;
+        }
+
+        @Override
+        public boolean matches(long numberOfRows, Map<ColumnDescriptor, Statistics<?>> statistics, ParquetDataSourceId id) throws ParquetCorruptionException
+        {
+            return true;
+        }
+
+        @Override
+        public boolean matches(long numberOfRows, ColumnIndexStore columnIndex, ParquetDataSourceId id) throws ParquetCorruptionException
+        {
+            return true;
+        }
+
+        @Override
+        public boolean matches(DictionaryDescriptor dictionary)
+        {
+            return true;
+        }
+
+        @Override
+        public Optional<FilterPredicate> toParquetFilter(DateTimeZone timeZone)
+        {
+            return Optional.empty();
         }
     };
 
@@ -55,4 +83,14 @@ public interface Predicate
      * @param dictionaries dictionaries per column
      */
     boolean matches(Map<ColumnDescriptor, DictionaryDescriptor> dictionaries);
+
+    boolean matches(long numberOfRows, Map<ColumnDescriptor, Statistics<?>> statistics, ParquetDataSourceId id)
+            throws ParquetCorruptionException;
+
+    boolean matches(long numberOfRows, ColumnIndexStore columnIndex, ParquetDataSourceId id)
+            throws ParquetCorruptionException;
+
+    boolean matches(DictionaryDescriptor dictionary);
+
+    Optional<FilterPredicate> toParquetFilter(DateTimeZone timeZone);
 }

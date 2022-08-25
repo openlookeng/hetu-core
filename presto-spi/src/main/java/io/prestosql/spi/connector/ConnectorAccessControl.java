@@ -22,6 +22,7 @@ import io.prestosql.spi.type.Type;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -52,6 +53,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyRevokeTablePri
 import static io.prestosql.spi.security.AccessDeniedException.denySelectColumns;
 import static io.prestosql.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static io.prestosql.spi.security.AccessDeniedException.denySetRole;
+import static io.prestosql.spi.security.AccessDeniedException.denySetTableProperties;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowColumnsMetadata;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowCurrentRoles;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowIndex;
@@ -65,6 +67,11 @@ import static java.util.Collections.emptySet;
 
 public interface ConnectorAccessControl
 {
+    default void checkCanSetTableProperties(Identity identity, SchemaTableName tableName, Map<String, Optional<Object>> properties)
+    {
+        denySetTableProperties(tableName.toString());
+    }
+
     /**
      * Check if identity is allowed to create the specified schema in this catalog.
      *

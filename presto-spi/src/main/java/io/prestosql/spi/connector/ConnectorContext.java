@@ -87,4 +87,14 @@ public interface ConnectorContext
     {
         throw new UnsupportedOperationException();
     }
+
+    default ClassLoader duplicatePluginClassLoader()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default String getSpiVersion()
+    {
+        return SpiVersionHolder.SPI_VERSION;
+    }
 }

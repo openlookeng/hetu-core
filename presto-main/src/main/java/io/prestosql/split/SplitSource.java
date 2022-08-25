@@ -21,12 +21,18 @@ import io.prestosql.spi.connector.ConnectorPartitionHandle;
 
 import java.io.Closeable;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
 public interface SplitSource
         extends Closeable
 {
+    default Optional<List<Object>> getTableExecuteSplitsInfo()
+    {
+        return Optional.empty();
+    }
+
     CatalogName getCatalogName();
 
     ListenableFuture<SplitBatch> getNextBatch(ConnectorPartitionHandle partitionHandle, Lifespan lifespan, int maxSize);

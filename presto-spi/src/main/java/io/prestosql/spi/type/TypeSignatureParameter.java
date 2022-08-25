@@ -24,6 +24,11 @@ public class TypeSignatureParameter
     private final ParameterKind kind;
     private final Object value;
 
+    public static TypeSignatureParameter typeParameter(TypeSignature typeSignature)
+    {
+        return new TypeSignatureParameter(ParameterKind.TYPE, typeSignature);
+    }
+
     public static TypeSignatureParameter of(TypeSignature typeSignature)
     {
         return new TypeSignatureParameter(ParameterKind.TYPE, typeSignature);

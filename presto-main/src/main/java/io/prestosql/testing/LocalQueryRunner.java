@@ -94,6 +94,7 @@ import io.prestosql.metadata.ColumnPropertyManager;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InMemoryNodeManager;
+import io.prestosql.metadata.MaterializedViewPropertyManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metadata.MetadataUtil;
@@ -111,6 +112,7 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OutputFactory;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.StageExecutionDescriptor;
+import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.security.GroupProviderManager;
@@ -274,7 +276,7 @@ public class LocalQueryRunner
     private final SpillerFactory spillerFactory;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
     private final HetuMetaStoreManager hetuMetaStoreManager;
-
+    private final MaterializedViewPropertyManager materializedViewPropertyManager;
     private final PageFunctionCompiler pageFunctionCompiler;
     private final ExpressionCompiler expressionCompiler;
     private final JoinFilterFunctionCompiler joinFilterFunctionCompiler;
@@ -317,6 +319,7 @@ public class LocalQueryRunner
         requireNonNull(defaultSession, "defaultSession is null");
         checkArgument(!defaultSession.getTransactionId().isPresent() || !withInitialTransaction, "Already in transaction");
 
+        this.materializedViewPropertyManager = new MaterializedViewPropertyManager();
         this.taskManagerConfig = new TaskManagerConfig().setTaskConcurrency(4);
         this.nodeSpillConfig = requireNonNull(nodeSpillConfig, "nodeSpillConfig is null");
         this.alwaysRevokeMemory = alwaysRevokeMemory;
@@ -381,6 +384,7 @@ public class LocalQueryRunner
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         this.connectorManager = new ConnectorManager(
+                materializedViewPropertyManager,
                 hetuMetaStoreManager,
                 metadata,
                 catalogManager,
@@ -805,6 +809,8 @@ public class LocalQueryRunner
         FileSystemClientManager fileSystemClientManager = new FileSystemClientManager();
         SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
+        TableExecuteContextManager tableExecuteContextManager = new TableExecuteContextManager();
+        tableExecuteContextManager.registerTableExecuteContextForQuery(taskContext.getQueryContext().getQueryId());
         LocalExecutionPlanner executionPlanner = new LocalExecutionPlanner(
                 metadata,
                 new TypeAnalyzer(sqlParser, metadata),
@@ -831,6 +837,7 @@ public class LocalQueryRunner
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
+                tableExecuteContextManager,
                 cubeManager);
 
         // plan query

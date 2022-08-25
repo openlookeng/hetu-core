@@ -134,4 +134,9 @@ public final class ColumnarRow
     {
         return fields[index];
     }
+
+    public boolean mayHaveNull()
+    {
+        return nullCheckBlock != null;
+    }
 }

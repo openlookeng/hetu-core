@@ -19,7 +19,7 @@ import io.prestosql.spi.snapshot.RestorableConfig;
 
 import java.io.Serializable;
 
-@RestorableConfig(uncapturedFields = {"windowIndex"})
+@RestorableConfig(uncapturedFields = "windowIndex")
 public abstract class RankingWindowFunction
         implements WindowFunction
 {

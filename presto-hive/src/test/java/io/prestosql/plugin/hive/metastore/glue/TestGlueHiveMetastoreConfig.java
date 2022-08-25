@@ -14,6 +14,7 @@
 package io.prestosql.plugin.hive.metastore.glue;
 
 import com.google.common.collect.ImmutableMap;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -24,6 +25,14 @@ import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 
 public class TestGlueHiveMetastoreConfig
 {
+    private GlueHiveMetastoreConfig glueHiveMetastoreConfigtest;
+
+    @BeforeMethod
+    public void setup()
+    {
+        glueHiveMetastoreConfigtest = new GlueHiveMetastoreConfig();
+    }
+
     @Test
     public void testDefaults()
     {
@@ -63,5 +72,14 @@ public class TestGlueHiveMetastoreConfig
                 .setCatalogId("0123456789");
 
         assertFullMapping(properties, expected);
+    }
+
+    @Test
+    public void testGetExternalId()
+    {
+        glueHiveMetastoreConfigtest.getExternalId();
+        glueHiveMetastoreConfigtest.getAwsCredentialsProvider();
+        glueHiveMetastoreConfigtest.getGlueEndpointUrl();
+        glueHiveMetastoreConfigtest.setGlueEndpointUrl("glueEndpointUrl");
     }
 }

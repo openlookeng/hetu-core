@@ -41,6 +41,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.memory.VersionedMemoryPoolId;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.ForScheduler;
+import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.query.CachedSqlQueryExecution;
 import io.prestosql.query.CachedSqlQueryExecutionPlan;
 import io.prestosql.security.AccessControl;
@@ -173,8 +174,10 @@ public class SqlQueryExecution
     private final QueryRecoveryManager queryRecoveryManager;
     private final WarningCollector warningCollector;
     private final AtomicBoolean suspendedWithRecoveryManager = new AtomicBoolean();
+    private final TableExecuteContextManager tableExecuteContextManager;
 
     public SqlQueryExecution(
+            TableExecuteContextManager tableExecuteContextManager,
             PreparedQuery preparedQuery,
             QueryStateMachine stateMachine,
             String slug,
@@ -235,11 +238,12 @@ public class SqlQueryExecution
 
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
-
+            this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
                 if (isEnableDynamicFiltering(stateMachine.getSession()) && state.isDone()) {
                     dynamicFilterService.clearDynamicFiltersForQuery(stateMachine.getQueryId().getId());
+                    tableExecuteContextManager.unregisterTableExecuteContextForQuery(stateMachine.getQueryId());
                 }
             });
 
@@ -510,6 +514,7 @@ public class SqlQueryExecution
                 // if query is not finished, start the scheduler, otherwise cancel it
                 SqlQueryScheduler scheduler = queryScheduler.get();
 
+                tableExecuteContextManager.registerTableExecuteContextForQuery(getQueryId());
                 if (!stateMachine.isDone()) {
                     scheduler.start();
                 }
@@ -583,7 +588,8 @@ public class SqlQueryExecution
                 queryRecoveryManager,
                 // Require same number of tasks to be scheduled, but do not require it if starting from beginning
                 snapshotId.isPresent() ? queryScheduler.get().getStageTaskCounts() : null,
-                true);
+                true,
+                tableExecuteContextManager);
         if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
             // Restore going to happen first, mark the restore state for all stages
             scheduler.setResuming(snapshotId.getAsLong());
@@ -850,7 +856,8 @@ public class SqlQueryExecution
                 snapshotManager,
                 queryRecoveryManager,
                 null,
-                false);
+                false,
+                tableExecuteContextManager);
 
         queryScheduler.set(scheduler);
 
@@ -1084,6 +1091,7 @@ public class SqlQueryExecution
         private final HeuristicIndexerManager heuristicIndexerManager;
         private final StateStoreProvider stateStoreProvider;
         private final RecoveryUtils recoveryUtils;
+        private final TableExecuteContextManager tableExecuteContextManager;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1111,7 +1119,8 @@ public class SqlQueryExecution
                 DynamicFilterService dynamicFilterService,
                 HeuristicIndexerManager heuristicIndexerManager,
                 StateStoreProvider stateStoreProvider,
-                RecoveryUtils recoveryUtils)
+                RecoveryUtils recoveryUtils,
+                TableExecuteContextManager tableExecuteContextManager)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1139,6 +1148,7 @@ public class SqlQueryExecution
             this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.recoveryUtils = requireNonNull(recoveryUtils, "recoveryUtils is null");
+            this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -1199,7 +1209,8 @@ public class SqlQueryExecution
                     this.cache,
                     heuristicIndexerManager,
                     stateStoreProvider,
-                    recoveryUtils);
+                    recoveryUtils,
+                    tableExecuteContextManager);
         }
     }
 }

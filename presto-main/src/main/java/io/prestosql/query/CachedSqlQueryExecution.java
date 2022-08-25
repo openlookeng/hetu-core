@@ -37,6 +37,7 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.security.AccessControl;
 import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PrestoException;
@@ -119,9 +120,10 @@ public class CachedSqlQueryExecution
             QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
             StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
             DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
-            HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, RecoveryUtils recoveryUtils)
+            HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, RecoveryUtils recoveryUtils,
+                                   TableExecuteContextManager tableExecuteContextManager)
     {
-        super(preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
+        super(tableExecuteContextManager, preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider, recoveryUtils);

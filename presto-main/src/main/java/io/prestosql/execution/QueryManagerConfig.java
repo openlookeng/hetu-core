@@ -19,6 +19,7 @@ import io.airlift.configuration.DefunctConfig;
 import io.airlift.configuration.LegacyConfig;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
+import io.prestosql.operator.RetryPolicy;
 
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
@@ -63,6 +64,20 @@ public class QueryManagerConfig
 
     private int requiredWorkers = 1;
     private Duration requiredWorkersMaxWait = new Duration(5, TimeUnit.MINUTES);
+    private RetryPolicy retryPolicy = RetryPolicy.NONE;
+
+    @NotNull
+    public RetryPolicy getRetryPolicy()
+    {
+        return retryPolicy;
+    }
+
+    @Config("retry-policy")
+    public QueryManagerConfig setRetryPolicy(RetryPolicy retryPolicy)
+    {
+        this.retryPolicy = retryPolicy;
+        return this;
+    }
 
     @Min(1)
     public int getScheduleSplitBatchSize()

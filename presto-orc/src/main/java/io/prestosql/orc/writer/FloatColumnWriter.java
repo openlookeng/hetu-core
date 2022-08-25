@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -65,6 +66,8 @@ public class FloatColumnWriter
 
     private boolean closed;
 
+    private final Supplier<DoubleStatisticsBuilder> statisticsBuilderSupplier;
+
     public FloatColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
@@ -72,6 +75,18 @@ public class FloatColumnWriter
         this.compressed = requireNonNull(compression, "compression is null") != NONE;
         this.dataStream = new FloatOutputStream(compression, bufferSize);
         this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.statisticsBuilderSupplier = null;
+    }
+
+    public FloatColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<DoubleStatisticsBuilder> statisticsBuilderSupplier)
+    {
+        this.columnId = requireNonNull(columnId, "columnId is null");
+        this.type = requireNonNull(type, "type is null");
+        this.compressed = requireNonNull(compression, "compression is null") != NONE;
+        this.dataStream = new FloatOutputStream(compression, bufferSize);
+        this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
     }
 
     @Override

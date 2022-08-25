@@ -13,8 +13,13 @@
  */
 package io.prestosql.spi.statistics;
 
-import java.util.Objects;
+import io.prestosql.spi.type.Type;
 
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalDouble;
+
+import static io.prestosql.spi.statistics.StatsUtil.toStatsRepresentation;
 import static java.lang.Double.isNaN;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
@@ -39,6 +44,27 @@ public class DoubleRange
         }
         this.min = min;
         this.max = max;
+    }
+
+    public static Optional<DoubleRange> from(Type type, Object minTrinoNativeValue, Object maxTrinoNativeValue)
+    {
+        requireNonNull(minTrinoNativeValue, "minTrinoNativeValue is null");
+        requireNonNull(maxTrinoNativeValue, "maxTrinoNativeValue is null");
+
+        OptionalDouble min = toStatsRepresentation(type, minTrinoNativeValue);
+        OptionalDouble max = toStatsRepresentation(type, maxTrinoNativeValue);
+
+        if (!min.isPresent() && !max.isPresent()) {
+            return Optional.empty();
+        }
+        if (!min.isPresent() || !max.isPresent()) {
+            throw new IllegalStateException(format(
+                    "One of min/max was converted to stats representation while the other was not for type %s: %s, %s",
+                    type,
+                    min,
+                    max));
+        }
+        return Optional.of(new DoubleRange(min.getAsDouble(), max.getAsDouble()));
     }
 
     public double getMin()

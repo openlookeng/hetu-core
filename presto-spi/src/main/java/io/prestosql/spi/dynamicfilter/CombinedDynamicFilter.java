@@ -16,8 +16,10 @@ package io.prestosql.spi.dynamicfilter;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static com.google.common.base.Verify.verify;
 
@@ -84,5 +86,26 @@ public class CombinedDynamicFilter
         }
 
         return builder.build();
+    }
+
+    @Override
+    public boolean isAwaitable()
+    {
+        //todo xjp 待补充
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<?> isBlocked()
+    {
+        //todo xjp 待补充
+        return null;
+    }
+
+    @Override
+    public TupleDomain<ColumnHandle> getCurrentPredicate()
+    {
+        //todo xjp 待补充
+        return null;
     }
 }

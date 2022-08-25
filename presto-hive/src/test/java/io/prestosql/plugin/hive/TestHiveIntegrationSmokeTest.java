@@ -6575,7 +6575,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void SortAggreDistinct()
+    public void sortAggreDistinct()
     {
         initSortBasedAggregation();
         computeActual("create table lineitem_orderkey_partkey_Distinct  with(transactional = false, " +
@@ -6619,7 +6619,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void UnSortAggrePartitionBucketCount1()
+    public void unSortAggrePartitionBucketCount1()
     {
         initSortBasedAggregation();
         computeActual("create table lineitem_partition_shipmode_comment_bucket1  with(transactional = false, " +
@@ -6642,7 +6642,7 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
-    public void SortAggreGroupOnlyPartitionColumns()
+    public void sortAggreGroupOnlyPartitionColumns()
     {
         initSortBasedAggregation();
         computeActual("create table lineitem_sort_partition_shipmode_comment_bucket1  with(transactional = false, " +

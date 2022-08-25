@@ -52,9 +52,11 @@ public class TableMetadata
     private final Optional<String> viewExpandedText;
 
     private final Map<String, HiveColumnStatistics> columnStatistics;
+    private final Optional<String> writerVersion;
 
     @JsonCreator
     public TableMetadata(
+            @JsonProperty("writerVersion") Optional<String> writerVersion,
             @JsonProperty("owner") String owner,
             @JsonProperty("tableType") String tableType,
             @JsonProperty("dataColumns") List<Column> dataColumns,
@@ -68,6 +70,7 @@ public class TableMetadata
             @JsonProperty("viewExpandedText") Optional<String> viewExpandedText,
             @JsonProperty("columnStatistics") Map<String, HiveColumnStatistics> columnStatistics)
     {
+        this.writerVersion = requireNonNull(writerVersion, "writerVersion is null");
         this.owner = requireNonNull(owner, "owner is null");
         this.tableType = requireNonNull(tableType, "tableType is null");
         this.dataColumns = ImmutableList.copyOf(requireNonNull(dataColumns, "dataColumns is null"));
@@ -121,6 +124,35 @@ public class TableMetadata
         viewOriginalText = table.getViewOriginalText();
         viewExpandedText = table.getViewExpandedText();
         this.columnStatistics = ImmutableMap.copyOf(requireNonNull(columnStatistics, "columnStatistics is null"));
+        this.writerVersion = Optional.empty();
+    }
+
+    public TableMetadata(String currentVersion, Table table)
+    {
+        writerVersion = Optional.of(requireNonNull(currentVersion, "currentVersion is null"));
+        owner = table.getOwner();
+        tableType = table.getTableType();
+        dataColumns = table.getDataColumns();
+        partitionColumns = table.getPartitionColumns();
+        parameters = table.getParameters();
+
+        StorageFormat tableFormat = table.getStorage().getStorageFormat();
+        storageFormat = Arrays.stream(HiveStorageFormat.values())
+                .filter(format -> tableFormat.equals(StorageFormat.fromHiveStorageFormat(format)))
+                .findFirst();
+        bucketProperty = table.getStorage().getBucketProperty();
+        serdeParameters = table.getStorage().getSerdeParameters();
+
+        if (tableType.equals(TableType.EXTERNAL_TABLE.name())) {
+            externalLocation = Optional.of(table.getStorage().getLocation());
+        }
+        else {
+            externalLocation = Optional.empty();
+        }
+
+        viewOriginalText = table.getViewOriginalText();
+        viewExpandedText = table.getViewExpandedText();
+        columnStatistics = ImmutableMap.of();
     }
 
     @JsonProperty
@@ -213,6 +245,7 @@ public class TableMetadata
     public TableMetadata withDataColumns(List<Column> dataColumns)
     {
         return new TableMetadata(
+                Optional.empty(),
                 owner,
                 tableType,
                 dataColumns,
@@ -230,6 +263,7 @@ public class TableMetadata
     public TableMetadata withParameters(Map<String, String> parameters)
     {
         return new TableMetadata(
+                Optional.empty(),
                 owner,
                 tableType,
                 dataColumns,
@@ -247,6 +281,7 @@ public class TableMetadata
     public TableMetadata withColumnStatistics(Map<String, HiveColumnStatistics> columnStatistics)
     {
         return new TableMetadata(
+                Optional.empty(),
                 owner,
                 tableType,
                 dataColumns,

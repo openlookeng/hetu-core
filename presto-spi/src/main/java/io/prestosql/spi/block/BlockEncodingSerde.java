@@ -17,6 +17,7 @@ import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
+import io.prestosql.spi.type.Type;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -59,5 +60,14 @@ public interface BlockEncodingSerde
     default Object getContext()
     {
         return null;
+    }
+
+    default Type readType(SliceInput sliceInput)
+    {
+        return null;
+    }
+
+    default void writeType(SliceOutput sliceOutput, Type type)
+    {
     }
 }

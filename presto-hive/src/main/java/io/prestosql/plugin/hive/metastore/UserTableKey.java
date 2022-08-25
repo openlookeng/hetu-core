@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.concurrent.Immutable;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -30,6 +31,7 @@ public class UserTableKey
     private final String database;
     private final String table;
     private final String column;
+    private final Optional<String> owner;
 
     public UserTableKey(HivePrincipal principal, String database, String table)
     {
@@ -47,6 +49,13 @@ public class UserTableKey
         this.database = requireNonNull(database, "database is null");
         this.table = requireNonNull(table, "table is null");
         this.column = column;
+        this.owner = null;
+    }
+
+    @JsonProperty
+    public Optional<String> getOwner()
+    {
+        return owner;
     }
 
     @JsonProperty

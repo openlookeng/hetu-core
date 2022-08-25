@@ -15,6 +15,7 @@ package io.prestosql.orc;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.metadata.ColumnMetadata;
@@ -50,6 +51,8 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
+import static io.prestosql.orc.metadata.PostScript.MAGIC;
+import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 import static org.joda.time.DateTimeZone.UTC;
@@ -59,6 +62,7 @@ public class OrcReader
     public static final int MAX_BATCH_SIZE = 1024;
     public static final int INITIAL_BATCH_SIZE = 1;
     public static final int BATCH_SIZE_GROWTH_FACTOR = 2;
+    private static final int EXPECTED_FOOTER_SIZE = 16 * 1024;
 
     private static final Logger log = Logger.get(OrcReader.class);
 
@@ -460,5 +464,54 @@ public class OrcReader
             }
             throw new IOException(executionException.getCause());
         }
+    }
+
+    public interface ProjectedLayout
+    {
+        ProjectedLayout getFieldLayout(OrcColumn orcColumn);
+    }
+
+    public static ProjectedLayout fullyProjectedLayout()
+    {
+        return orcColumn -> fullyProjectedLayout();
+    }
+
+    public static Optional<OrcReader> createOrcReader(OrcDataSource orcDataSource, OrcReaderOptions options)
+            throws IOException
+    {
+        return createOrcReader(orcDataSource, options, Optional.empty());
+    }
+
+    public interface FieldMapperFactory
+    {
+        FieldMapper create(OrcColumn orcColumn);
+    }
+
+    // Used for mapping a nested field with the appropriate OrcColumn
+    public interface FieldMapper
+    {
+        OrcColumn get(String fieldName);
+    }
+
+    private static Optional<OrcReader> createOrcReader(
+            OrcDataSource orcDataSource,
+            OrcReaderOptions options,
+            Optional<OrcWriteValidation> writeValidation)
+            throws IOException
+    {
+        orcDataSource = wrapWithCacheIfTiny(orcDataSource, options.getTinyStripeThreshold());
+
+        // read the tail of the file, and check if the file is actually empty
+        long estimatedFileSize = orcDataSource.getEstimatedSize();
+        if (estimatedFileSize > 0 && estimatedFileSize <= MAGIC.length()) {
+            throw new OrcCorruptionException(orcDataSource.getId(), "Invalid file size %s", estimatedFileSize);
+        }
+
+        long expectedReadSize = min(estimatedFileSize, EXPECTED_FOOTER_SIZE);
+        Slice fileTail = orcDataSource.readTail(toIntExact(expectedReadSize));
+        if (fileTail.length() == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(new OrcReader(orcDataSource, options.getMaxMergeDistance(), options.getTinyStripeThreshold(), options.getMaxBlockSize()));
     }
 }

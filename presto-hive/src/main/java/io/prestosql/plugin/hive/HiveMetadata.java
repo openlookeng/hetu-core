@@ -200,11 +200,14 @@ public class HiveMetadata
 {
     private static final Logger log = Logger.get(HiveMetadata.class);
 
+    public static final String TRINO_CREATED_BY = "trino_created_by";
+    public static final String STORAGE_TABLE = "storage_table";
+    public static final String PRESTO_VIEW_EXPANDED_TEXT_MARKER = "/* Presto View */";
     public static final String PRESTO_VERSION_NAME = "presto_version";
     public static final String PRESTO_QUERY_ID_NAME = "presto_query_id";
     public static final String BUCKETING_VERSION = "bucketing_version";
     public static final String TABLE_COMMENT = "comment";
-
+    public static final String PRESTO_VIEW_COMMENT = "Presto View";
     public static final String STORAGE_FORMAT = "storage_format";
 
     private static final String ORC_BLOOM_FILTER_COLUMNS_KEY = "orc.bloom.filter.columns";
@@ -290,6 +293,12 @@ public class HiveMetadata
     public SemiTransactionalHiveMetastore getMetastore()
     {
         return metastore;
+    }
+
+    @Override
+    public void setMaterializedViewProperties(ConnectorSession session, SchemaTableName viewName, Map<String, Optional<Object>> properties)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting materialized view properties");
     }
 
     @Override
@@ -1905,8 +1914,9 @@ public class HiveMetadata
     {
         HiveIdentity identity = new HiveIdentity(session);
         Map<String, String> properties = ImmutableMap.<String, String>builder()
-                .put(TABLE_COMMENT, "Presto View")
+                .put(TABLE_COMMENT, PRESTO_VIEW_COMMENT)
                 .put(PRESTO_VIEW_FLAG, "true")
+                .put(TRINO_CREATED_BY, "Trino Hive connector")
                 .put(PRESTO_VERSION_NAME, prestoVersion)
                 .put(PRESTO_QUERY_ID_NAME, session.getQueryId())
                 .build();
@@ -1922,7 +1932,7 @@ public class HiveMetadata
                 .setPartitionColumns(ImmutableList.of())
                 .setParameters(properties)
                 .setViewOriginalText(Optional.of(encodeViewData(definition)))
-                .setViewExpandedText(Optional.of("/* Presto View */"));
+                .setViewExpandedText(Optional.of(PRESTO_VIEW_EXPANDED_TEXT_MARKER));
 
         tableBuilder.getStorageBuilder()
                 .setStorageFormat(StorageFormat.VIEW_STORAGE_FORMAT)
@@ -3242,5 +3252,17 @@ public class HiveMetadata
     public void refreshMetadataCache()
     {
         metastore.refreshMetastoreCache();
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(ConnectorSession session, SchemaTableName schemaTableName, Map<String, Object> tableProperties)
+    {
+        return true;
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(ConnectorSession session, ConnectorTableHandle connectorTableHandle)
+    {
+        return true;
     }
 }

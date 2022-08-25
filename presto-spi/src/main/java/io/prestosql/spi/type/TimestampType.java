@@ -13,10 +13,13 @@
  */
 package io.prestosql.spi.type;
 
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
 
+import static io.prestosql.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static java.lang.String.format;
 
 /**
  * A timestamp is encoded as milliseconds from 1970-01-01T00:00:00 UTC and is to be interpreted as local date time without regards to any time zone.
@@ -24,11 +27,39 @@ import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 public final class TimestampType
         extends AbstractLongType
 {
+    public static final int MAX_PRECISION = 12;
+    public static final int MAX_SHORT_PRECISION = 6;
+    private static final TimestampType[] TYPES = new TimestampType[MAX_PRECISION + 1];
     public static final TimestampType TIMESTAMP = new TimestampType();
+    public static final TimestampType TIMESTAMP_MICROS = new TimestampType();
+
+    private final int precision;
+    public static final TimestampType TIMESTAMP_MILLIS = new TimestampType();
+    public static final TimestampType TIMESTAMP_NANOS = new TimestampType();
+    public static final TimestampType TIMESTAMP_TZ_MILLIS = new TimestampType();
+    public static final TimestampType TIMESTAMP_TZ_MICROS = new TimestampType();
+    public static final TimestampType TIMESTAMP_TZ_NANOS = new TimestampType();
 
     private TimestampType()
     {
         super(parseTypeSignature(StandardTypes.TIMESTAMP));
+        this.precision = 0; //xjp 此处随便写的值
+    }
+
+    public static TimestampType createTimestampWithTimeZoneType(int precision)
+    {
+        if (precision < 0 || precision > MAX_PRECISION) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, format("TIMESTAMP WITH TIME ZONE precision must be in range [0, %s]: %s", MAX_PRECISION, precision));
+        }
+        return TYPES[precision];
+    }
+
+    public static TimestampType createTimestampType(int precision)
+    {
+        if (precision < 0 || precision > MAX_PRECISION) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, format("TIMESTAMP precision must be in range [0, %s]: %s", MAX_PRECISION, precision));
+        }
+        return TYPES[precision];
     }
 
     @Override
@@ -51,5 +82,15 @@ public final class TimestampType
     public int hashCode()
     {
         return getClass().hashCode();
+    }
+
+    public final boolean isShort()
+    {
+        return precision <= MAX_SHORT_PRECISION;
+    }
+
+    public int getPrecision()
+    {
+        return precision;
     }
 }

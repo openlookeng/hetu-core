@@ -20,10 +20,12 @@ import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.block.ShortArrayBlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.ScalarOperator;
 
 import java.util.Optional;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.Long.rotateLeft;
 import static java.lang.String.format;
@@ -159,6 +161,12 @@ public final class SmallintType
     public boolean equals(Object other)
     {
         return other == SMALLINT;
+    }
+
+    @ScalarOperator(COMPARISON_UNORDERED_LAST)
+    private static long comparisonOperator(long left, long right)
+    {
+        return Short.compare((short) left, (short) right);
     }
 
     @Override

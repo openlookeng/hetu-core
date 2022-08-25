@@ -21,7 +21,10 @@ import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode;
 import io.prestosql.orc.OrcWriter;
 import io.prestosql.orc.OrcWriterOptions;
 import io.prestosql.orc.OrcWriterStats;
+import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.CompressionKind;
+import io.prestosql.orc.metadata.OrcType;
+import io.prestosql.plugin.hive.acid.AcidTransaction;
 import io.prestosql.plugin.hive.orc.OrcAcidRowId;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
@@ -48,14 +51,18 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_CLOSE_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_DATA_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITE_VALIDATION_FAILED;
@@ -70,7 +77,7 @@ public class OrcFileWriter
     private static final ThreadMXBean THREAD_MX_BEAN = ManagementFactory.getThreadMXBean();
     private static final String ACID_KEY_INDEX_NAME = "hive.acid.key.index";
 
-    private final OrcWriter orcWriter;
+    protected final OrcWriter orcWriter;
     private final Callable<Void> rollbackAction;
     private final int[] fileInputColumnIndexes;
     private final List<Block> nullBlocks;
@@ -92,6 +99,12 @@ public class OrcFileWriter
 
     private long validationCpuNanos;
     private Optional<HiveFileWriter> deleteDeltaFileWriter;
+
+    private final WriterKind writerKind;
+    private final AcidTransaction transaction;
+    private final boolean useAcidSchema;
+    private final OptionalInt bucketNumber;
+    private OptionalLong maxWriteId = OptionalLong.empty();
 
     public OrcFileWriter(
             OrcDataSink orcDataSink,
@@ -156,6 +169,63 @@ public class OrcFileWriter
             encodedBucketId = BucketCodec.V1.encode(acidOptions.get());
         }
         this.acidWriteType = acidWriteType;
+
+        this.writerKind = null;
+        this.transaction = null;
+        this.useAcidSchema = false;
+        this.bucketNumber = null;
+    }
+
+    public OrcFileWriter(
+            OrcDataSink orcDataSink,
+            WriterKind writerKind,
+            AcidTransaction transaction,
+            boolean useAcidSchema,
+            OptionalInt bucketNumber,
+            Callable<Void> rollbackAction,
+            List<String> columnNames,
+            List<Type> fileColumnTypes,
+            ColumnMetadata<OrcType> fileColumnOrcTypes,
+            CompressionKind compression,
+            OrcWriterOptions options,
+            int[] fileInputColumnIndexes,
+            Map<String, String> metadata,
+            Optional<Supplier<OrcDataSource>> validationInputFactory,
+            OrcWriteValidationMode validationMode,
+            OrcWriterStats stats)
+    {
+        requireNonNull(orcDataSink, "orcDataSink is null");
+        this.writerKind = requireNonNull(writerKind, "writerKind is null");
+        this.transaction = requireNonNull(transaction, "transaction is null");
+        this.useAcidSchema = useAcidSchema;
+        this.bucketNumber = requireNonNull(bucketNumber, "bucketNumber is null");
+
+        this.rollbackAction = requireNonNull(rollbackAction, "rollbackAction is null");
+
+        this.fileInputColumnIndexes = requireNonNull(fileInputColumnIndexes, "fileInputColumnIndexes is null");
+
+        ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+        for (Type fileColumnType : fileColumnTypes) {
+            BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
+            blockBuilder.appendNull();
+            nullBlocks.add(blockBuilder.build());
+        }
+        this.nullBlocks = nullBlocks.build();
+        this.validationInputFactory = validationInputFactory;
+        orcWriter = new OrcWriter(
+                orcDataSink,
+                columnNames,
+                fileColumnTypes,
+                fileColumnOrcTypes,
+                compression,
+                options,
+                metadata,
+                validationInputFactory.isPresent(),
+                validationMode,
+                stats);
+        this.deleteDeltaFileWriter = Optional.empty();
+        this.acidOptions = Optional.empty();
+        this.dataNullBlocks = Collections.emptyList();
     }
 
     @Override
@@ -180,6 +250,11 @@ public class OrcFileWriter
                 throw new PrestoException(HIVE_WRITER_DATA_ERROR, e);
             }
         }
+    }
+
+    public void setMaxWriteId(long maxWriteId)
+    {
+        this.maxWriteId = OptionalLong.of(maxWriteId);
     }
 
     private boolean isFullAcid()
@@ -483,5 +558,12 @@ public class OrcFileWriter
         return toStringHelper(this)
                 .add("writer", orcWriter)
                 .toString();
+    }
+
+    public static int computeBucketValue(int bucketId, int statementId)
+    {
+        checkArgument(statementId >= 0 && statementId < 1 << 16, "statementId should be non-negative and less than 1 << 16, but is %s", statementId);
+        checkArgument(bucketId >= 0 && bucketId <= 1 << 13, "bucketId should be non-negative and less than 1 << 13, but is %s", bucketId);
+        return 1 << 29 | bucketId << 16 | statementId;
     }
 }

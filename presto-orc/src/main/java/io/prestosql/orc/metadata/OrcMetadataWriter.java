@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.CountingOutputStream;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
+import io.prestosql.orc.OrcWriterOptions.WriterIdentification;
 import io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.orc.metadata.Stream.StreamKind;
@@ -37,6 +38,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 
 import static java.lang.Math.toIntExact;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 public class OrcMetadataWriter
@@ -51,9 +53,18 @@ public class OrcMetadataWriter
 
     private final boolean useLegacyVersion;
 
+    private final WriterIdentification writerIdentification;
+
     public OrcMetadataWriter(boolean useLegacyVersion)
     {
         this.useLegacyVersion = useLegacyVersion;
+        this.writerIdentification = null;
+    }
+
+    public OrcMetadataWriter(WriterIdentification writerIdentification)
+    {
+        this.writerIdentification = requireNonNull(writerIdentification, "writerIdentification is null");
+        this.useLegacyVersion = false; //xjp 此处false随便写的 4.20
     }
 
     @Override

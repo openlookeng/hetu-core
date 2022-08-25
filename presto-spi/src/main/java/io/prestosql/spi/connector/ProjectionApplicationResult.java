@@ -17,6 +17,7 @@ import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.type.Type;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.unmodifiableList;
@@ -27,6 +28,7 @@ public class ProjectionApplicationResult<T>
     private final T handle;
     private final List<ConnectorExpression> projections;
     private final List<Assignment> assignments;
+    private final boolean precalculateStatistics;
 
     public ProjectionApplicationResult(T handle, List<ConnectorExpression> projections, List<Assignment> assignments)
     {
@@ -37,6 +39,15 @@ public class ProjectionApplicationResult<T>
 
         this.projections = unmodifiableList(new ArrayList<>(projections));
         this.assignments = unmodifiableList(new ArrayList<>(assignments));
+        this.precalculateStatistics = false;
+    }
+
+    public ProjectionApplicationResult(T handle, List<ConnectorExpression> projections, List<Assignment> assignments, boolean precalculateStatistics)
+    {
+        this.handle = requireNonNull(handle, "handle is null");
+        this.projections = Collections.unmodifiableList(requireNonNull(projections, "projections is null"));
+        this.assignments = Collections.unmodifiableList(requireNonNull(assignments, "assignments is null"));
+        this.precalculateStatistics = precalculateStatistics;
     }
 
     public T getHandle()

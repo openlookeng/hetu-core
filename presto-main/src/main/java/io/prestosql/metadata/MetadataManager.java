@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Streams;
 import com.google.inject.Provider;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
@@ -28,6 +29,7 @@ import io.prestosql.connector.DataCenterConnectorManager;
 import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.BeginTableExecuteResult;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -41,6 +43,7 @@ import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPartitioningHandle;
 import io.prestosql.spi.connector.ConnectorResolvedIndex;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableExecuteHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableLayout;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
@@ -78,6 +81,7 @@ import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.TypeSignatureProvider;
 import io.prestosql.sql.planner.PartitioningHandle;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 import io.prestosql.transaction.TransactionManager;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -98,17 +102,23 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.metadata.MetadataUtil.convertFromSchemaTableName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
+import static io.prestosql.metadata.RedirectionAwareTableHandle.noRedirection;
+import static io.prestosql.metadata.RedirectionAwareTableHandle.withRedirectionTo;
 import static io.prestosql.spi.StandardErrorCode.INVALID_VIEW;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.SYNTAX_ERROR;
+import static io.prestosql.spi.StandardErrorCode.TABLE_REDIRECTION_ERROR;
 import static io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
 import static io.prestosql.spi.function.OperatorType.BETWEEN;
 import static io.prestosql.spi.function.OperatorType.EQUAL;
@@ -128,6 +138,9 @@ import static java.util.Objects.requireNonNull;
 public final class MetadataManager
         implements Metadata
 {
+    @VisibleForTesting
+    public static final int MAX_TABLE_REDIRECTIONS = 10;
+
     private final FunctionAndTypeManager functionAndTypeManager;
     private final ProcedureRegistry procedures;
     private final SessionPropertyManager sessionPropertyManager;
@@ -211,6 +224,119 @@ public final class MetadataManager
                 new AnalyzePropertyManager(),
                 transactionManager,
                 null);
+    }
+
+    @Override
+    public void setMaterializedViewProperties(Session session, QualifiedObjectName viewName, Map<String, Optional<Object>> properties)
+    {
+        CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, viewName.getCatalogName());
+        CatalogName catalogName = catalogMetadata.getCatalogName();
+        ConnectorMetadata metadata = catalogMetadata.getMetadata();
+
+        metadata.setMaterializedViewProperties(session.toConnectorSession(catalogName), viewName.asSchemaTableName(), properties);
+    }
+
+    @Override
+    public void setTableProperties(Session session, TableHandle tableHandle, Map<String, Optional<Object>> properties)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
+        metadata.setTableProperties(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), properties);
+    }
+
+    @Override
+    public RedirectionAwareTableHandle getRedirectionAwareTableHandle(Session session, QualifiedObjectName tableName)
+    {
+        return getRedirectionAwareTableHandle(session, tableName, Optional.empty(), Optional.empty());
+    }
+
+    @Override
+    public Optional<TableExecuteHandle> getTableHandleForExecute(Session session, TableHandle tableHandle, String procedureName, Map<String, Object> executeProperties)
+    {
+        requireNonNull(session, "session is null");
+        requireNonNull(tableHandle, "tableHandle is null");
+        requireNonNull(procedureName, "procedure is null");
+        requireNonNull(executeProperties, "executeProperties is null");
+
+        CatalogName catalogName = tableHandle.getCatalogName();
+        CatalogMetadata catalogMetadata = getCatalogMetadata(session, catalogName);
+        ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
+
+        Optional<ConnectorTableExecuteHandle> executeHandle = metadata.getTableHandleForExecute(
+                session.toConnectorSession(catalogName),
+                tableHandle.getConnectorHandle(),
+                procedureName,
+                executeProperties,
+                getRetryPolicy(session).getRetryMode());
+
+        return executeHandle.map(handle -> new TableExecuteHandle(
+                catalogName,
+                tableHandle.getTransaction(),
+                handle));
+    }
+
+    @Override
+    public RedirectionAwareTableHandle getRedirectionAwareTableHandle(Session session, QualifiedObjectName tableName, Optional<TableVersion> startVersion, Optional<TableVersion> endVersion)
+    {
+        QualifiedObjectName targetTableName = getRedirectedTableName(session, tableName);
+        if (targetTableName.equals(tableName)) {
+            return noRedirection(getTableHandle(session, tableName));
+        }
+        Optional<TableHandle> tableHandle = getTableHandle(session, targetTableName);
+        if (tableHandle.isPresent()) {
+            return withRedirectionTo(targetTableName, tableHandle.get());
+        }
+        // Redirected table must exist
+        if (!getCatalogHandle(session, targetTableName.getCatalogName()).isPresent()) {
+            throw new PrestoException(TABLE_REDIRECTION_ERROR, format("Table '%s' redirected to '%s', but the target catalog '%s' does not exist", tableName, targetTableName, targetTableName.getCatalogName()));
+        }
+        if (!schemaExists(session, new CatalogSchemaName(targetTableName.getCatalogName(), targetTableName.getSchemaName()))) {
+            throw new PrestoException(TABLE_REDIRECTION_ERROR, format("Table '%s' redirected to '%s', but the target schema '%s' does not exist", tableName, targetTableName, targetTableName.getSchemaName()));
+        }
+        throw new PrestoException(TABLE_REDIRECTION_ERROR, format("Table '%s' redirected to '%s', but the target table '%s' does not exist", tableName, targetTableName, targetTableName));
+    }
+
+    private QualifiedObjectName getRedirectedTableName(Session session, QualifiedObjectName originalTableName)
+    {
+        requireNonNull(session, "session is null");
+        requireNonNull(originalTableName, "originalTableName is null");
+
+        if (originalTableName.getCatalogName().isEmpty() || originalTableName.getSchemaName().isEmpty() || originalTableName.getObjectName().isEmpty()) {
+            // table cannot exist
+            return originalTableName;
+        }
+        QualifiedObjectName tableName = originalTableName;
+        Set<QualifiedObjectName> visitedTableNames = new LinkedHashSet<>();
+        visitedTableNames.add(tableName);
+
+        for (int count = 0; count < MAX_TABLE_REDIRECTIONS; count++) {
+            Optional<CatalogMetadata> catalog = getOptionalCatalogMetadata(session, tableName.getCatalogName());
+
+            if (!catalog.isPresent()) {
+                // Stop redirection
+                return tableName;
+            }
+            CatalogMetadata catalogMetadata = catalog.get();
+            CatalogName catalogName = catalogMetadata.getConnectorId(session, tableName);
+            ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
+
+            Optional<QualifiedObjectName> redirectedTableName = metadata.redirectTable(session.toConnectorSession(catalogName), tableName.asSchemaTableName())
+                    .map(name -> convertFromSchemaTableName(name.getCatalogName()).apply(name.getSchemaTableName()));
+
+            if (!redirectedTableName.isPresent()) {
+                return tableName;
+            }
+            tableName = redirectedTableName.get();
+            // Check for loop in redirection
+            if (!visitedTableNames.add(tableName)) {
+                throw new PrestoException(TABLE_REDIRECTION_ERROR,
+                        format("Table redirections form a loop: %s",
+                                Streams.concat(visitedTableNames.stream(), Stream.of(tableName))
+                                        .map(QualifiedObjectName::toString)
+                                        .collect(Collectors.joining(" -> "))));
+            }
+        }
+        throw new PrestoException(TABLE_REDIRECTION_ERROR, format("Table redirected too many times (%d): %s", MAX_TABLE_REDIRECTIONS, visitedTableNames));
     }
 
     @Override
@@ -1577,6 +1703,27 @@ public final class MetadataManager
         }
     }
 
+    @Override
+    public BeginTableExecuteResult<TableExecuteHandle, TableHandle> beginTableExecute(Session session, TableExecuteHandle tableExecuteHandle, TableHandle sourceHandle)
+    {
+        CatalogName catalogName = tableExecuteHandle.getCatalogName();
+        CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, catalogName);
+        ConnectorMetadata metadata = catalogMetadata.getMetadata();
+        BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> connectorBeginResult = metadata.beginTableExecute(session.toConnectorSession(), tableExecuteHandle.getConnectorHandle(), sourceHandle.getConnectorHandle());
+
+        return new BeginTableExecuteResult<>(
+                tableExecuteHandle.withConnectorHandle(connectorBeginResult.getTableExecuteHandle()),
+                sourceHandle.withConnectorHandle(connectorBeginResult.getSourceHandle()));
+    }
+
+    @Override
+    public void finishTableExecute(Session session, TableExecuteHandle tableExecuteHandle, Collection<Slice> fragments, List<Object> tableExecuteState)
+    {
+        CatalogName catalogName = tableExecuteHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        metadata.finishTableExecute(session.toConnectorSession(catalogName), tableExecuteHandle.getConnectorHandle(), fragments, tableExecuteState);
+    }
+
     //
     // Helpers
     //
@@ -1667,5 +1814,20 @@ public final class MetadataManager
                 catalogMetadata.getMetadata().cleanupQuery(connectorSession);
             }
         }
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(Session session, TableHandle tableHandle)
+    {
+        ConnectorMetadata metadata = getMetadata(session, tableHandle.getCatalogName());
+        return metadata.supportsReportingWrittenBytes(session.toConnectorSession(tableHandle.getCatalogName()), tableHandle.getConnectorHandle());
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(Session session, QualifiedObjectName tableName, Map<String, Object> tableProperties)
+    {
+        CatalogName catalogName = new CatalogName(tableName.getCatalogName());
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        return metadata.supportsReportingWrittenBytes(session.toConnectorSession(catalogName), tableName.asSchemaTableName(), tableProperties);
     }
 }

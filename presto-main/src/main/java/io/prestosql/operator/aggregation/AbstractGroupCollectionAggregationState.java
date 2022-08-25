@@ -33,7 +33,7 @@ import static com.google.common.base.Verify.verify;
 /**
  * Instances of this state use a single PageBuilder for all groups.
  */
-@RestorableConfig(uncapturedFields = {"currentPageBuilder"})
+@RestorableConfig(uncapturedFields = "currentPageBuilder")
 public abstract class AbstractGroupCollectionAggregationState<T>
         extends AbstractGroupedAccumulatorState
 {

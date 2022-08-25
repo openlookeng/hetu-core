@@ -30,4 +30,9 @@ public interface LongValueStatisticsBuilder
     }
 
     void addValue(long value);
+
+    default long getValueFromBlock(Type type, Block block, int position)
+    {
+        return type.getLong(block, position);
+    }
 }

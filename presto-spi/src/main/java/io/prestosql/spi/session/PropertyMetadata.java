@@ -180,6 +180,23 @@ public final class PropertyMetadata<T>
                 object -> object);
     }
 
+    public static PropertyMetadata<Integer> integerProperty(String name, String description, Integer defaultValue, Consumer<Integer> validation, boolean hidden)
+    {
+        return new PropertyMetadata<>(
+                name,
+                description,
+                INTEGER,
+                Integer.class,
+                defaultValue,
+                hidden,
+                object -> {
+                    int value = (Integer) object;
+                    validation.accept(value);
+                    return value;
+                },
+                object -> object);
+    }
+
     public static PropertyMetadata<Double> doubleProperty(String name, String description, Double defaultValue, boolean hidden)
     {
         return new PropertyMetadata<>(
@@ -190,6 +207,23 @@ public final class PropertyMetadata<T>
                 defaultValue,
                 hidden,
                 value -> ((Number) value).doubleValue(),
+                object -> object);
+    }
+
+    public static PropertyMetadata<Double> doubleProperty(String name, String description, Double defaultValue, Consumer<Double> validation, boolean hidden)
+    {
+        return new PropertyMetadata<>(
+                name,
+                description,
+                DOUBLE,
+                Double.class,
+                defaultValue,
+                hidden,
+                object -> {
+                    double value = (Double) object;
+                    validation.accept(value);
+                    return value;
+                },
                 object -> object);
     }
 

@@ -26,6 +26,7 @@ import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.metastore.recording.HiveMetastoreRecording;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
@@ -62,6 +63,7 @@ public class RecordingHiveMetastore
 {
     private static final JsonCodec<Recording> RECORDING_CODEC = jsonCodec(Recording.class);
 
+    private final HiveMetastoreRecording recording;
     private final HiveMetastore delegate;
     private final Path recordingPath;
     private final boolean replay;
@@ -87,6 +89,7 @@ public class RecordingHiveMetastore
     public RecordingHiveMetastore(@ForRecordingHiveMetastore HiveMetastore delegate, HiveConfig hiveConfig)
             throws IOException
     {
+        this.recording = null;
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(hiveConfig, "hiveConfig is null");
         this.recordingPath = Paths.get(requireNonNull(hiveConfig.getRecordingPath(), "recordingPath is null"));
@@ -132,6 +135,27 @@ public class RecordingHiveMetastore
         partitionsByNamesCache.putAll(toMap(recording.getPartitionsByNames()));
         tablePrivilegesCache.putAll(toMap(recording.getTablePrivileges()));
         roleGrantsCache.putAll(toMap(recording.getRoleGrants()));
+    }
+
+    public RecordingHiveMetastore(HiveMetastore delegate, HiveMetastoreRecording recording)
+    {
+        this.delegate = requireNonNull(delegate, "delegate is null");
+        this.recording = requireNonNull(recording, "recording is null");
+        this.recordingPath = null;
+        this.replay = false;
+        this.databaseCache = null;
+        this.tableCache = null;
+        this.supportedColumnStatisticsCache = null;
+        this.tableStatisticsCache = null;
+        this.partitionStatisticsCache = null;
+        this.allTablesCache = null;
+        this.allViewsCache = null;
+        this.partitionCache = null;
+        this.partitionNamesCache = null;
+        this.partitionNamesByPartsCache = null;
+        this.partitionsByNamesCache = null;
+        this.tablePrivilegesCache = null;
+        this.roleGrantsCache = null;
     }
 
     private static <K, V> Cache<K, V> createCache(HiveConfig hiveConfig)

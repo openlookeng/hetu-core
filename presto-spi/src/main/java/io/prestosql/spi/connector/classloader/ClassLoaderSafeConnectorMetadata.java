@@ -16,6 +16,7 @@ package io.prestosql.spi.connector.classloader;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
+import io.prestosql.spi.connector.BeginTableExecuteResult;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
@@ -27,6 +28,7 @@ import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPartitioningHandle;
 import io.prestosql.spi.connector.ConnectorResolvedIndex;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableExecuteHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableLayout;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
@@ -41,6 +43,7 @@ import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.LimitApplicationResult;
 import io.prestosql.spi.connector.ProjectionApplicationResult;
+import io.prestosql.spi.connector.RetryMode;
 import io.prestosql.spi.connector.SampleType;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
@@ -75,6 +78,22 @@ public class ClassLoaderSafeConnectorMetadata
     {
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.classLoader = requireNonNull(classLoader, "classLoader is null");
+    }
+
+    @Override
+    public void setMaterializedViewProperties(ConnectorSession session, SchemaTableName viewName, Map<String, Optional<Object>> properties)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.setMaterializedViewProperties(session, viewName, properties);
+        }
+    }
+
+    @Override
+    public void setTableProperties(ConnectorSession session, ConnectorTableHandle tableHandle, Map<String, Optional<Object>> properties)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.setTableProperties(session, tableHandle, properties);
+        }
     }
 
     @Override
@@ -856,6 +875,46 @@ public class ClassLoaderSafeConnectorMetadata
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             delegate.refreshMetadataCache();
+        }
+    }
+
+    @Override
+    public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(ConnectorSession session, ConnectorTableHandle tableHandle, String procedureName, Map<String, Object> executeProperties, RetryMode retryMode)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.getTableHandleForExecute(session, tableHandle, procedureName, executeProperties, retryMode);
+        }
+    }
+
+    @Override
+    public BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> beginTableExecute(ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle, ConnectorTableHandle updatedSourceTableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.beginTableExecute(session, tableExecuteHandle, updatedSourceTableHandle);
+        }
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(ConnectorSession session, SchemaTableName schemaTableName, Map<String, Object> tableProperties)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.supportsReportingWrittenBytes(session, schemaTableName, tableProperties);
+        }
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(ConnectorSession session, ConnectorTableHandle connectorTableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.supportsReportingWrittenBytes(session, connectorTableHandle);
+        }
+    }
+
+    @Override
+    public void finishTableExecute(ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle, Collection<Slice> fragments, List<Object> tableExecuteState)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.finishTableExecute(session, tableExecuteHandle, fragments, tableExecuteState);
         }
     }
 }

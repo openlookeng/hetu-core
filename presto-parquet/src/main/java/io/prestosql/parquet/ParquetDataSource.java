@@ -13,6 +13,9 @@
  */
 package io.prestosql.parquet;
 
+import com.google.common.collect.ListMultimap;
+import io.airlift.slice.Slice;
+
 import java.io.Closeable;
 import java.io.IOException;
 
@@ -36,4 +39,12 @@ public interface ParquetDataSource
             throws IOException
     {
     }
+
+    long getEstimatedSize();
+
+    Slice readTail(int length);
+
+    Slice readFully(long position, int length);
+
+    <K> ListMultimap<K, ChunkReader> planRead(ListMultimap<K, DiskRange> diskRanges);
 }

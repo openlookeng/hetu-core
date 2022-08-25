@@ -13,6 +13,7 @@
  */
 package io.prestosql.spi;
 
+import static io.prestosql.spi.ErrorType.EXTERNAL;
 import static io.prestosql.spi.ErrorType.INSUFFICIENT_RESOURCES;
 import static io.prestosql.spi.ErrorType.INTERNAL_ERROR;
 import static io.prestosql.spi.ErrorType.USER_ERROR;
@@ -20,6 +21,13 @@ import static io.prestosql.spi.ErrorType.USER_ERROR;
 public enum StandardErrorCode
         implements ErrorCodeSupplier
 {
+    INVALID_MATERIALIZED_VIEW_PROPERTY(95, USER_ERROR),
+    EXPRESSION_NOT_CONSTANTS(75, USER_ERROR),
+    TABLE_REDIRECTION_ERROR(104, USER_ERROR),
+    DUPLICATE_PROPERTY(79, USER_ERROR),
+    INVALID_ARGUMENTS(76, USER_ERROR),
+    CATALOG_NOT_FOUND(44, USER_ERROR),
+    TABLE_NOT_FOUND(46, USER_ERROR),
     GENERIC_USER_ERROR(0x0000_0000, USER_ERROR),
     SYNTAX_ERROR(0x0000_0001, USER_ERROR),
     ABANDONED_QUERY(0x0000_0002, USER_ERROR),
@@ -110,7 +118,8 @@ public enum StandardErrorCode
     EXCEEDED_LOCAL_MEMORY_LIMIT(0x0002_0007, INSUFFICIENT_RESOURCES),
     ADMINISTRATIVELY_PREEMPTED(0x0002_0008, INSUFFICIENT_RESOURCES),
 
-    CUBE_ERROR(0x0002_0009, INTERNAL_ERROR)
+    CUBE_ERROR(0x0002_0009, INTERNAL_ERROR),
+    UNSUPPORTED_TABLE_TYPE(133001, EXTERNAL),
     /**/;
 
     // Connectors can use error codes starting at the range 0x0100_0000

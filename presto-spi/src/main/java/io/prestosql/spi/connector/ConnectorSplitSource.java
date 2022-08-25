@@ -15,6 +15,7 @@ package io.prestosql.spi.connector;
 
 import java.io.Closeable;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.requireNonNull;
@@ -62,5 +63,10 @@ public interface ConnectorSplitSource
     default List<ConnectorSplit> groupSmallSplits(List<ConnectorSplit> pendingSplits, int maxGroupSize)
     {
         return pendingSplits;
+    }
+
+    default Optional<List<Object>> getTableExecuteSplitsInfo()
+    {
+        return Optional.empty();
     }
 }

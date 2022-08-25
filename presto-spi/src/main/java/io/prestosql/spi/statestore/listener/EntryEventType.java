@@ -50,7 +50,7 @@ public enum EntryEventType
 
     public static EntryEventType fromTypeId(int typeId)
     {
-        switch (typeId){
+        switch (typeId) {
             case 1:
                 return ADDED;
             case 2:

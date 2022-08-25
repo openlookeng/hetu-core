@@ -55,4 +55,19 @@ public interface TypeManager
     Optional<Type> coerceTypeBase(Type sourceType, String resultTypeBase);
 
     MethodHandle resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes);
+
+    default TypeOperators getTypeOperators()
+    {
+        return null;
+    }
+
+    default Type getType(TypeId id)
+    {
+        return null;
+    }
+
+    default Type fromSqlType(String type)
+    {
+        return null;
+    }
 }

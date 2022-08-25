@@ -22,6 +22,7 @@ import io.airlift.units.Duration;
 import io.prestosql.execution.DriverPipelineTaskId;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.security.AccessControl;
+import io.prestosql.security.SecurityContext;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
@@ -156,6 +157,11 @@ public final class Session
         checkArgument(!transactionId.isPresent() || unprocessedCatalogProperties.isEmpty(), "Catalog session properties cannot be set if there is an open transaction");
 
         checkArgument(catalog.isPresent() || !schema.isPresent(), "schema is set but catalog is not");
+    }
+
+    public SecurityContext toSecurityContext()
+    {
+        return new SecurityContext(getRequiredTransactionId(), getIdentity(), queryId);
     }
 
     public QueryId getQueryId()

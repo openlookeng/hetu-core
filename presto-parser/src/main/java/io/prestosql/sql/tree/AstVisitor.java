@@ -52,6 +52,11 @@ public abstract class AstVisitor<R, C>
         return visitExpression(node, context);
     }
 
+    protected R visitSetProperties(SetProperties node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
     protected R visitBetweenPredicate(BetweenPredicate node, C context)
     {
         return visitExpression(node, context);
@@ -903,6 +908,11 @@ public abstract class AstVisitor<R, C>
     }
 
     protected R visitReloadCube(ReloadCube node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitTableExecute(TableExecute node, C context)
     {
         return visitStatement(node, context);
     }

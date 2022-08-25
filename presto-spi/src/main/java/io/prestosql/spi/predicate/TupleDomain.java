@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.stream.Collector;
 
@@ -127,6 +129,41 @@ public final class TupleDomain<T>
         }
         return withColumnDomains(columnDomains.get().stream()
                 .collect(toLinkedMap(ColumnDomain::getColumn, ColumnDomain::getDomain)));
+    }
+
+    public <U> TupleDomain<U> transformKeys(Function<T, U> function)
+    {
+        if (isNone()) {
+            return none();
+        }
+        if (isAll()) {
+            return all();
+        }
+
+        Map<T, Domain> domains = this.domains.get();
+        HashMap<U, Domain> result = new LinkedHashMap<>(domains.size());
+        for (Map.Entry<T, Domain> entry : domains.entrySet()) {
+            U key = function.apply(entry.getKey());
+            requireNonNull(key, () -> format("mapping function %s returned null for %s", function, entry.getKey()));
+
+            Domain previous = result.put(key, entry.getValue());
+            if (previous != null) {
+                throw new IllegalArgumentException(format("Every argument must have a unique mapping. %s maps to %s and %s", entry.getKey(), entry.getValue(), previous));
+            }
+        }
+
+        return TupleDomain.withColumnDomains(result);
+    }
+
+    public TupleDomain<T> filter(BiPredicate<T, Domain> predicate)
+    {
+        requireNonNull(predicate, "predicate is null");
+        return transformDomains((key, domain) -> {
+            if (!predicate.test(key, domain)) {
+                return Domain.all(domain.getType());
+            }
+            return domain;
+        });
     }
 
     @JsonProperty
@@ -413,6 +450,27 @@ public final class TupleDomain<T>
                 .collect(toLinkedMap(Map.Entry::getKey, e -> e.getValue().simplify()));
 
         return TupleDomain.withColumnDomains(simplified);
+    }
+
+    public TupleDomain<T> simplify(int threshold)
+    {
+        return transformDomains((key, domain) -> domain.simplify(threshold));
+    }
+
+    public TupleDomain<T> transformDomains(BiFunction<T, Domain, Domain> transformation)
+    {
+        requireNonNull(transformation, "transformation is null");
+        if (isNone() || isAll()) {
+            return this;
+        }
+
+        return withColumnDomains(domains.get().entrySet().stream()
+                .collect(toLinkedMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            Domain newDomain = transformation.apply(entry.getKey(), entry.getValue());
+                            return requireNonNull(newDomain, "newDomain is null");
+                        })));
     }
 
     // Available for Jackson serialization only!

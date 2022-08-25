@@ -45,6 +45,11 @@ public class QualifiedObjectName
         return new QualifiedObjectName(parts[0], parts[1], parts[2]);
     }
 
+    public CatalogSchemaTableName asCatalogSchemaTableName()
+    {
+        return new CatalogSchemaTableName(catalogName, schemaName, objectName);
+    }
+
     public static QualifiedObjectName valueOfDefaultFunction(String objectName)
     {
         return new QualifiedObjectName(DEFAULT_NAMESPACE.getCatalogName(), DEFAULT_NAMESPACE.getSchemaName(), objectName.toLowerCase(ENGLISH));

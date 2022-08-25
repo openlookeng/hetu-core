@@ -37,6 +37,12 @@ class TestingOrcDataSource
     }
 
     @Override
+    public long getEstimatedSize()
+    {
+        return 0;
+    }
+
+    @Override
     public OrcDataSourceId getId()
     {
         return delegate.getId();
@@ -77,6 +83,12 @@ class TestingOrcDataSource
     }
 
     @Override
+    public Slice readTail(int length) throws IOException
+    {
+        return null;
+    }
+
+    @Override
     public Slice readFully(long position, int length)
             throws IOException
     {
@@ -92,5 +104,11 @@ class TestingOrcDataSource
         readCount += diskRanges.size();
         lastReadRanges = ImmutableList.copyOf(diskRanges.values());
         return delegate.readFully(diskRanges);
+    }
+
+    @Override
+    public long getRetainedSize()
+    {
+        return 0;
     }
 }

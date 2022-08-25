@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -64,6 +65,8 @@ public class DoubleColumnWriter
 
     private boolean closed;
 
+    private final Supplier<DoubleStatisticsBuilder> statisticsBuilderSupplier;
+
     public DoubleColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
@@ -71,6 +74,18 @@ public class DoubleColumnWriter
         this.compressed = requireNonNull(compression, "compression is null") != NONE;
         this.dataStream = new DoubleOutputStream(compression, bufferSize);
         this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.statisticsBuilderSupplier = null;
+    }
+
+    public DoubleColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<DoubleStatisticsBuilder> statisticsBuilderSupplier)
+    {
+        this.columnId = requireNonNull(columnId, "columnId is null");
+        this.type = requireNonNull(type, "type is null");
+        this.compressed = requireNonNull(compression, "compression is null") != NONE;
+        this.dataStream = new DoubleOutputStream(compression, bufferSize);
+        this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
     }
 
     @Override

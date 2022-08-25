@@ -42,6 +42,11 @@ public class AllowAllSystemAccessControl
     private static final AllowAllSystemAccessControl INSTANCE = new AllowAllSystemAccessControl();
 
     @Override
+    public void checkCanSetTableProperties(Identity context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+    {
+    }
+
+    @Override
     public void checkCanSetUser(Optional<Principal> principal, String userName)
     {
     }

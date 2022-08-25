@@ -21,6 +21,7 @@ import java.math.BigInteger;
 
 import static io.prestosql.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static io.prestosql.spi.type.Decimals.overflows;
+import static io.prestosql.spi.type.Int128Math.compareAbsolute;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.compareAbsolute;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.rescale;
 import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimal;
@@ -66,6 +67,17 @@ public final class DecimalConversions
         // If both decimal and scale can be represented exactly in double then compute rescaled and rounded result directly in double.
         if (scale < DOUBLE_10_POW.length && compareAbsolute(decimal, MAX_EXACT_DOUBLE) <= 0) {
             return (double) unscaledDecimalToUnscaledLongUnsafe(decimal) / DOUBLE_10_POW[intScale(scale)];
+        }
+
+        // TODO: optimize and convert directly to double in similar fashion as in double to decimal casts
+        return parseDouble(Decimals.toString(decimal, intScale(scale)));
+    }
+
+    public static double longDecimalToDouble(Int128 decimal, long scale)
+    {
+        // If both decimal and scale can be represented exactly in double then compute rescaled and rounded result directly in double.
+        if (scale < DOUBLE_10_POW.length && io.prestosql.spi.type.Int128Math.compareAbsolute(decimal, Int128.fromBigEndian(MAX_EXACT_DOUBLE.getBytes())) <= 0) {
+            return (double) decimal.toLong() / DOUBLE_10_POW[intScale(scale)];
         }
 
         // TODO: optimize and convert directly to double in similar fashion as in double to decimal casts

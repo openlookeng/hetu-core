@@ -25,12 +25,18 @@ import io.prestosql.spi.security.ViewExpression;
 import io.prestosql.spi.type.Type;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 public class AllowAllAccessControl
         implements ConnectorAccessControl
 {
+    @Override
+    public void checkCanSetTableProperties(Identity identity, SchemaTableName tableName, Map<String, Optional<Object>> properties)
+    {
+    }
+
     @Override
     public void checkCanCreateSchema(ConnectorTransactionHandle transactionHandle, ConnectorIdentity identity, String schemaName)
     {

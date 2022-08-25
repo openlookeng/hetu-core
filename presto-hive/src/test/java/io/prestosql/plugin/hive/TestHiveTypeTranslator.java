@@ -16,7 +16,20 @@ package io.prestosql.plugin.hive;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.CharType;
+import io.prestosql.spi.type.DateType;
+import io.prestosql.spi.type.DecimalType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.SmallintType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.VarbinaryType;
+import io.prestosql.spi.type.VarcharType;
 import org.testng.annotations.Test;
 
 import java.util.HashMap;
@@ -74,6 +87,24 @@ public class TestHiveTypeTranslator
         }
 
         assertInvalidTypeTranslation("row(integer,varbinary)", NOT_SUPPORTED.toErrorCode(), "Anonymous row type is not supported in Hive. Please give each field a name: row(integer,varbinary)");
+    }
+
+    @Test
+    public void testToTypeInfo()
+    {
+        HiveTypeTranslator.toTypeInfo(BooleanType.BOOLEAN);
+        HiveTypeTranslator.toTypeInfo(BigintType.BIGINT);
+        HiveTypeTranslator.toTypeInfo(IntegerType.INTEGER);
+        HiveTypeTranslator.toTypeInfo(SmallintType.SMALLINT);
+        HiveTypeTranslator.toTypeInfo(TinyintType.TINYINT);
+        HiveTypeTranslator.toTypeInfo(RealType.REAL);
+        HiveTypeTranslator.toTypeInfo(DoubleType.DOUBLE);
+        HiveTypeTranslator.toTypeInfo(VarcharType.createUnboundedVarcharType());
+        HiveTypeTranslator.toTypeInfo(CharType.createCharType(2));
+        HiveTypeTranslator.toTypeInfo(VarbinaryType.VARBINARY);
+        HiveTypeTranslator.toTypeInfo(DateType.DATE);
+        HiveTypeTranslator.toTypeInfo(TimestampType.TIMESTAMP);
+        HiveTypeTranslator.toTypeInfo(DecimalType.createDecimalType());
     }
 
     private void assertTypeTranslation(String typeName, HiveType hiveType)

@@ -41,7 +41,7 @@ import static it.unimi.dsi.fastutil.HashCommon.murmurHash3;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"updateMemory"})
+@RestorableConfig(uncapturedFields = "updateMemory")
 public class BigintGroupByHash
         extends BigintGroupBy implements GroupByHash
 {
@@ -250,6 +250,7 @@ public class BigintGroupByHash
         return groupId;
     }
 
+    @Override
     public boolean tryToIncreaseCapacity()
     {
         long newCapacityLong = hashCapacity * 2L;

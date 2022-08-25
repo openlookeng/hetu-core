@@ -89,9 +89,13 @@ statement
         DROP COLUMN column=qualifiedName                               #dropColumn
     | ALTER TABLE tableName=qualifiedName
         ADD COLUMN column=columnDefinition                             #addColumn
+    | ALTER TABLE tableName=qualifiedName
+        SET PROPERTIES propertyAssignments                             #setTableProperties
     | ANALYZE qualifiedName (WITH properties)?                         #analyze
     | CREATE (OR REPLACE)? VIEW qualifiedName
         (SECURITY (DEFINER | INVOKER))? AS query                       #createView
+    | ALTER MATERIALIZED VIEW qualifiedName
+        SET PROPERTIES propertyAssignments                             #setMaterializedViewProperties
     | DROP VIEW (IF EXISTS)? qualifiedName                             #dropView
     | CALL qualifiedName '(' (callArgument (',' callArgument)*)? ')'   #call
     | CREATE ROLE name=identifier
@@ -147,6 +151,11 @@ statement
     | PREPARE identifier FROM statement                                #prepare
     | DEALLOCATE PREPARE identifier                                    #deallocate
     | EXECUTE identifier (USING expression (',' expression)*)?         #execute
+    | ALTER TABLE tableName=qualifiedName
+            EXECUTE procedureName=identifier
+            ('(' (callArgument (',' callArgument)*)? ')')?
+            (WHERE where=booleanExpression)?                           #tableExecute
+    | EXECUTE identifier (USING expression (',' expression)*)?         #execute
     | DESCRIBE INPUT identifier                                        #describeInput
     | DESCRIBE OUTPUT identifier                                       #describeOutput
     | SET PATH pathSpecification                                       #setPath
@@ -199,6 +208,11 @@ cubeProperty
 
 properties
     : '(' property (',' property)* ')'
+    | '(' propertyAssignments ')'
+    ;
+
+propertyAssignments
+    : property (',' property)*
     ;
 
 property

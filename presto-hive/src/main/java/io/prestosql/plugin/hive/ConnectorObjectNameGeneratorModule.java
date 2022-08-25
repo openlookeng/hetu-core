@@ -35,10 +35,21 @@ public class ConnectorObjectNameGeneratorModule
     private static final String DEFAULT_DOMAIN_BASE = "presto.plugin.hive";
 
     private final String catalogName;
+    private final String packageName;
+    private final String defaultDomainBase;
 
     public ConnectorObjectNameGeneratorModule(String catalogName)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
+        this.packageName = null;
+        this.defaultDomainBase = null;
+    }
+
+    public ConnectorObjectNameGeneratorModule(String catalogName, String packageName, String defaultDomainBase)
+    {
+        this.catalogName = requireNonNull(catalogName, "catalogName is null");
+        this.packageName = requireNonNull(packageName, "packageName is null");
+        this.defaultDomainBase = requireNonNull(defaultDomainBase, "defaultDomainBase is null");
     }
 
     @Override

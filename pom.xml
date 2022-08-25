@@ -157,8 +157,9 @@
         <module>hetu-greenplum</module>
         <module>hetu-clickhouse</module>
         <module>hetu-kylin</module>
-	<module>hetu-mpp</module>
-	<module>hetu-mariadb</module>
+        <module>hetu-mpp</module>
+	    <module>hetu-mariadb</module>
+        <module>hetu-iceberg</module>
     </modules>
 
     <dependencyManagement>

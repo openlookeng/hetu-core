@@ -30,6 +30,21 @@ import static java.util.Collections.emptySet;
 
 public interface Connector
 {
+    default ConnectorMetadata getMetadata(ConnectorSession session, ConnectorTransactionHandle transactionHandle)
+    {
+        return getMetadata(transactionHandle);
+    }
+
+    default Set<TableProcedureMetadata> getTableProcedures()
+    {
+        return emptySet();
+    }
+
+    default List<PropertyMetadata<?>> getMaterializedViewProperties()
+    {
+        return emptyList();
+    }
+
     ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly);
 
     /**

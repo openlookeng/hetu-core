@@ -26,6 +26,8 @@ import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.LongValueStatisticsBuilder;
+import io.prestosql.orc.metadata.statistics.TimestampStatisticsBuilder;
 import io.prestosql.orc.stream.LongOutputStream;
 import io.prestosql.orc.stream.LongOutputStreamV2;
 import io.prestosql.orc.stream.PresentOutputStream;
@@ -40,6 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -47,12 +50,28 @@ import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
 import static io.prestosql.orc.metadata.Stream.StreamKind.SECONDARY;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MICROS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MILLIS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_NANOS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_MICROS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_MILLIS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_NANOS;
 import static java.time.ZoneOffset.UTC;
 import static java.util.Objects.requireNonNull;
 
 public class TimestampColumnWriter
         implements ColumnWriter
 {
+    private enum TimestampKind
+    {
+        TIMESTAMP_MILLIS,
+        TIMESTAMP_MICROS,
+        TIMESTAMP_NANOS,
+        INSTANT_MILLIS,
+        INSTANT_MICROS,
+        INSTANT_NANOS,
+    }
+
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(TimestampColumnWriter.class).instanceSize();
     private static final int MILLIS_PER_SECOND = 1000;
     private static final int MILLIS_TO_NANOS_TRAILING_ZEROS = 5;
@@ -72,6 +91,10 @@ public class TimestampColumnWriter
 
     private boolean closed;
 
+    private final TimestampKind timestampKind;
+    private final Supplier<TimestampStatisticsBuilder> statisticsBuilderSupplier;
+    private LongValueStatisticsBuilder statisticsBuilder;
+
     public TimestampColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
@@ -82,6 +105,46 @@ public class TimestampColumnWriter
         this.nanosStream = new LongOutputStreamV2(compression, bufferSize, false, SECONDARY);
         this.presentStream = new PresentOutputStream(compression, bufferSize);
         this.baseTimestampInSeconds = OffsetDateTime.of(2015, 1, 1, 0, 0, 0, 0, UTC).toEpochSecond();
+        this.timestampKind = null;
+        this.statisticsBuilderSupplier = null;
+    }
+
+    public TimestampColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<TimestampStatisticsBuilder> statisticsBuilderSupplier)
+    {
+        this.columnId = requireNonNull(columnId, "columnId is null");
+        this.type = requireNonNull(type, "type is null");
+        this.timestampKind = timestampKindForType(type);
+        this.compressed = requireNonNull(compression, "compression is null") != NONE;
+        this.columnEncoding = new ColumnEncoding(DIRECT_V2, 0);
+        this.secondsStream = new LongOutputStreamV2(compression, bufferSize, true, DATA);
+        this.nanosStream = new LongOutputStreamV2(compression, bufferSize, false, SECONDARY);
+        this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
+        this.baseTimestampInSeconds = 0L;
+    }
+
+    private static TimestampKind timestampKindForType(Type type)
+    {
+        if (type.equals(TIMESTAMP_MILLIS)) {
+            return TimestampKind.TIMESTAMP_MILLIS;
+        }
+        if (type.equals(TIMESTAMP_MICROS)) {
+            return TimestampKind.TIMESTAMP_MICROS;
+        }
+        if (type.equals(TIMESTAMP_NANOS)) {
+            return TimestampKind.TIMESTAMP_NANOS;
+        }
+        if (type.equals(TIMESTAMP_TZ_MILLIS)) {
+            return TimestampKind.INSTANT_MILLIS;
+        }
+        if (type.equals(TIMESTAMP_TZ_MICROS)) {
+            return TimestampKind.INSTANT_MICROS;
+        }
+        if (type.equals(TIMESTAMP_TZ_NANOS)) {
+            return TimestampKind.INSTANT_NANOS;
+        }
+        throw new IllegalArgumentException("Unsupported type for ORC timestamp writer: " + type);
     }
 
     @Override

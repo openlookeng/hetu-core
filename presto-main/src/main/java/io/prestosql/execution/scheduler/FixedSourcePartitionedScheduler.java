@@ -30,6 +30,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.StageExecutionDescriptor;
+import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.SplitSource;
@@ -77,13 +78,15 @@ public class FixedSourcePartitionedScheduler
             NodeSelector nodeSelector,
             List<ConnectorPartitionHandle> partitionHandles,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         requireNonNull(stage, "stage is null");
         requireNonNull(splitSources, "splitSources is null");
         requireNonNull(bucketNodeMap, "bucketNodeMap is null");
         checkArgument(!requireNonNull(nodes, "nodes is null").isEmpty(), "nodes is empty");
         requireNonNull(partitionHandles, "partitionHandles is null");
+        requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
 
         this.stage = stage;
         this.nodes = ImmutableList.copyOf(nodes);
@@ -120,7 +123,8 @@ public class FixedSourcePartitionedScheduler
                     Math.max(splitBatchSize / concurrentLifespans, 1),
                     groupedExecutionForScanNode,
                     session,
-                    heuristicIndexerManager);
+                    heuristicIndexerManager,
+                    tableExecuteContextManager);
 
             if (stageExecutionDescriptor.isStageGroupedExecution() && !groupedExecutionForScanNode) {
                 sourceScheduler = new AsGroupedSourceScheduler(sourceScheduler);

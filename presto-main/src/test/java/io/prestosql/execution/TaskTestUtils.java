@@ -179,6 +179,7 @@ public final class TaskTestUtils
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
+                null,
                 cubeManager);
     }
 

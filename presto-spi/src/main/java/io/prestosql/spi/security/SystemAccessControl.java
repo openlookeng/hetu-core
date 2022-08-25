@@ -22,6 +22,7 @@ import io.prestosql.spi.type.Type;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -57,9 +58,15 @@ import static io.prestosql.spi.security.AccessDeniedException.denyShowRoles;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowSchemas;
 import static io.prestosql.spi.security.AccessDeniedException.denyShowTablesMetadata;
 import static io.prestosql.spi.security.AccessDeniedException.denyUpdateIndex;
+import static java.lang.String.format;
 
 public interface SystemAccessControl
 {
+    default void checkCanSetTableProperties(Identity context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+    {
+        throw new AccessDeniedException(format("Cannot set table properties to %s%s", table.toString()));
+    }
+
     /**
      * Check if the principal is allowed to be the specified user.
      *

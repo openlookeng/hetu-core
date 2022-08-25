@@ -36,7 +36,9 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleResolver;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.metadata.MaterializedViewPropertyManager;
 import io.prestosql.metadata.MetadataManager;
+import io.prestosql.metadata.TableProceduresRegistry;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.security.AccessControlManager;
 import io.prestosql.server.ServerConfig;
@@ -59,6 +61,7 @@ import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorRecordSetProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.SystemTable;
+import io.prestosql.spi.connector.TableProcedureMetadata;
 import io.prestosql.spi.function.ExternalFunctionHub;
 import io.prestosql.spi.function.SqlInvokedFunction;
 import io.prestosql.spi.procedure.Procedure;
@@ -69,6 +72,7 @@ import io.prestosql.split.PageSinkManager;
 import io.prestosql.split.PageSourceManager;
 import io.prestosql.split.RecordPageSourceProvider;
 import io.prestosql.split.SplitManager;
+import io.prestosql.sql.analyzer.TableProceduresPropertyManager;
 import io.prestosql.sql.planner.ConnectorPlanOptimizerManager;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.relational.ConnectorRowExpressionService;
@@ -146,9 +150,13 @@ public class ConnectorManager
     private final DomainTranslator domainTranslator;
     private final DeterminismEvaluator determinismEvaluator;
     private final FilterStatsCalculator filterStatsCalculator;
+    private final TableProceduresRegistry tableProceduresRegistry;
+    private final TableProceduresPropertyManager tableProceduresPropertyManager;
+    private final MaterializedViewPropertyManager materializedViewPropertyManager;
 
     @Inject
     public ConnectorManager(
+            MaterializedViewPropertyManager materializedViewPropertyManager,
             HetuMetaStoreManager hetuMetaStoreManager,
             MetadataManager metadataManager,
             CatalogManager catalogManager,
@@ -175,6 +183,7 @@ public class ConnectorManager
             DeterminismEvaluator determinismEvaluator,
             FilterStatsCalculator filterStatsCalculator)
     {
+        this.materializedViewPropertyManager = materializedViewPropertyManager;
         this.hetuMetaStoreManager = hetuMetaStoreManager;
         this.metadataManager = metadataManager;
         this.catalogManager = catalogManager;
@@ -200,6 +209,8 @@ public class ConnectorManager
         this.domainTranslator = domainTranslator;
         this.determinismEvaluator = determinismEvaluator;
         this.filterStatsCalculator = filterStatsCalculator;
+        this.tableProceduresRegistry = TableProceduresRegistry.getInstance();
+        this.tableProceduresPropertyManager = TableProceduresPropertyManager.getInstance();
     }
 
     @PreDestroy
@@ -397,12 +408,17 @@ public class ConnectorManager
 
         connector.getAccessControl()
                 .ifPresent(accessControl -> accessControlManager.addCatalogAccessControl(catalogName, accessControl));
-
+        materializedViewPropertyManager.addProperties(catalogName, connector.getMaterializedViewProperties());
         metadataManager.getTablePropertyManager().addProperties(catalogName, connector.getTableProperties());
         metadataManager.getColumnPropertyManager().addProperties(catalogName, connector.getColumnProperties());
         metadataManager.getSchemaPropertyManager().addProperties(catalogName, connector.getSchemaProperties());
         metadataManager.getAnalyzePropertyManager().addProperties(catalogName, connector.getAnalyzeProperties());
         metadataManager.getSessionPropertyManager().addConnectorSessionProperties(catalogName, connector.getSessionProperties());
+        Set<TableProcedureMetadata> tableProcedures = connector.connector.getTableProcedures();
+        for (TableProcedureMetadata tableProcedure : tableProcedures) {
+            tableProceduresPropertyManager.addProperties(catalogName, tableProcedure.getName(), tableProcedure.getProperties());
+        }
+        tableProceduresRegistry.addTableProcedures(catalogName, tableProcedures);
     }
 
     public synchronized void dropConnection(String catalogName)
@@ -432,6 +448,7 @@ public class ConnectorManager
         metadataManager.getAnalyzePropertyManager().removeProperties(catalogName);
         metadataManager.getSessionPropertyManager().removeConnectorSessionProperties(catalogName);
         connectorPlanOptimizerManager.removePlanOptimizerProvider(catalogName);
+        tableProceduresPropertyManager.removeProperties(catalogName);
 
         MaterializedConnector materializedConnector = connectors.remove(catalogName);
         if (materializedConnector != null) {
@@ -570,9 +587,14 @@ public class ConnectorManager
         private final List<PropertyMetadata<?>> schemaProperties;
         private final List<PropertyMetadata<?>> columnProperties;
         private final List<PropertyMetadata<?>> analyzeProperties;
+        private final List<PropertyMetadata<?>> materializedViewProperties;
 
         public MaterializedConnector(CatalogName catalogName, Connector connector)
         {
+            List<PropertyMetadata<?>> materializedViewProperties = connector.getMaterializedViewProperties();
+            requireNonNull(materializedViewProperties, format("Connector '%s' returned a null materialized view properties set", catalogName));
+            this.materializedViewProperties = ImmutableList.copyOf(materializedViewProperties);
+
             this.catalogName = requireNonNull(catalogName, "catalogName is null");
             this.connector = requireNonNull(connector, "connector is null");
 
@@ -745,6 +767,11 @@ public class ConnectorManager
         public List<PropertyMetadata<?>> getTableProperties()
         {
             return tableProperties;
+        }
+
+        public List<PropertyMetadata<?>> getMaterializedViewProperties()
+        {
+            return materializedViewProperties;
         }
 
         public List<PropertyMetadata<?>> getColumnProperties()

@@ -50,6 +50,17 @@ public final class TableStatistics
         this.columnStatistics = unmodifiableMap(requireNonNull(columnStatistics, "columnStatistics can not be null"));
     }
 
+    public TableStatistics(Estimate rowCount, Map<ColumnHandle, ColumnStatistics> columnStatistics)
+    {
+        this.rowCount = requireNonNull(rowCount, "rowCount cannot be null");
+        if (!rowCount.isUnknown() && rowCount.getValue() < 0) {
+            throw new IllegalArgumentException(format("rowCount must be greater than or equal to 0: %s", rowCount.getValue()));
+        }
+        this.columnStatistics = unmodifiableMap(requireNonNull(columnStatistics, "columnStatistics cannot be null"));
+        this.fileCount = 0L;
+        this.onDiskDataSizeInBytes = 0L;
+    }
+
     public Estimate getRowCount()
     {
         return rowCount;

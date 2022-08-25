@@ -32,6 +32,7 @@ import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.TableExecuteContext;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -111,6 +112,7 @@ public class TestTableFinishOperator
                         ImmutableList.of(LONG_MAX.bind(ImmutableList.of(2), Optional.empty())),
                         true),
                 descriptor,
+                null,
                 session);
         DriverContext driverContext = createTaskContext(scheduledExecutor, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)
@@ -186,6 +188,7 @@ public class TestTableFinishOperator
                         ImmutableList.of(LONG_MAX.bind(ImmutableList.of(2), Optional.empty())),
                         true),
                 descriptor,
+                null,
                 session);
         DriverContext driverContext = createTaskContext(scheduledExecutor, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)
@@ -292,7 +295,7 @@ public class TestTableFinishOperator
         private Collection<ComputedStatistics> computedStatistics;
 
         @Override
-        public Optional<ConnectorOutputMetadata> finishTable(Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+        public Optional<ConnectorOutputMetadata> finishTable(Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics, TableExecuteContext tableExecuteContext)
         {
             checkState(!finished, "already finished");
             finished = true;

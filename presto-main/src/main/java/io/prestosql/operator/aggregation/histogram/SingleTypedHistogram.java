@@ -33,7 +33,7 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 import static it.unimi.dsi.fastutil.HashCommon.murmurHash3;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"type"})
+@RestorableConfig(uncapturedFields = "type")
 public class SingleTypedHistogram
         implements TypedHistogram
 {

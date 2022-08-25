@@ -31,6 +31,18 @@ public class DoubleStatisticsBuilder
     private double minimum = Double.POSITIVE_INFINITY;
     private double maximum = Double.NEGATIVE_INFINITY;
 
+    private final BloomFilterBuilder bloomFilterBuilder;
+
+    public DoubleStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
+    {
+        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder is null");
+    }
+
+    public DoubleStatisticsBuilder()
+    {
+        this.bloomFilterBuilder = null;
+    }
+
     @Override
     public void addBlock(Type type, Block block)
     {

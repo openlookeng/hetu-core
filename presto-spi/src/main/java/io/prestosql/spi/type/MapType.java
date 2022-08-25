@@ -20,6 +20,7 @@ import io.prestosql.spi.block.MapBlock;
 import io.prestosql.spi.block.MapBlockBuilder;
 import io.prestosql.spi.block.SingleMapBlock;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.IcebergInvocationConvention;
 
 import java.lang.invoke.MethodHandle;
 import java.util.Collections;
@@ -28,9 +29,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationArgumentConvention.BLOCK_POSITION;
+import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationArgumentConvention.NEVER_NULL;
+import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationReturnConvention.FAIL_ON_NULL;
+import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationReturnConvention.NULLABLE_RETURN;
+import static io.prestosql.spi.function.IcebergInvocationConvention.simpleConvention;
 import static io.prestosql.spi.type.TypeUtils.checkElementNotNull;
 import static io.prestosql.spi.type.TypeUtils.hashPosition;
 import static java.lang.String.format;
+import static java.lang.invoke.MethodType.methodType;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
@@ -41,11 +48,15 @@ public class MapType<K extends Type, V extends Type>
     private final V valueType;
     private static final String MAP_NULL_ELEMENT_MSG = "MAP comparison not supported for null value elements";
     private static final int EXPECTED_BYTES_PER_ENTRY = 32;
+    private static final IcebergInvocationConvention HASH_CODE_CONVENTION = simpleConvention(FAIL_ON_NULL, NEVER_NULL);
 
     private final MethodHandle keyNativeHashCode;
     private final MethodHandle keyBlockHashCode;
     private final MethodHandle keyBlockNativeEquals;
     private final MethodHandle keyBlockEquals;
+
+    private final MethodHandle keyBlockNativeEqual;
+    private final MethodHandle keyBlockEqual;
 
     public MapType(
             K keyType,
@@ -71,6 +82,32 @@ public class MapType<K extends Type, V extends Type>
         this.keyNativeHashCode = keyNativeHashCode;
         this.keyBlockHashCode = keyBlockHashCode;
         this.keyBlockEquals = keyBlockEquals;
+        this.keyBlockNativeEqual = null;
+        this.keyBlockEqual = null;
+    }
+
+    public MapType(K keyType, V valueType, TypeOperators typeOperators)
+    {
+        super(
+                new TypeSignature(
+                        StandardTypes.MAP,
+                        TypeSignatureParameter.typeParameter(keyType.getTypeSignature()),
+                        TypeSignatureParameter.typeParameter(valueType.getTypeSignature())),
+                Block.class);
+        if (!keyType.isComparable()) {
+            throw new IllegalArgumentException(format("key type must be comparable, got %s", keyType));
+        }
+        this.keyType = keyType;
+        this.valueType = valueType;
+        this.keyBlockNativeEquals = null;
+        this.keyBlockEquals = null;
+
+        keyBlockNativeEqual = typeOperators.getEqualOperator(keyType, simpleConvention(NULLABLE_RETURN, BLOCK_POSITION, NEVER_NULL))
+                .asType(methodType(Boolean.class, Block.class, int.class, keyType.getJavaType().isPrimitive() ? keyType.getJavaType() : Object.class));
+        keyBlockEqual = typeOperators.getEqualOperator(keyType, simpleConvention(NULLABLE_RETURN, BLOCK_POSITION, BLOCK_POSITION));
+        keyNativeHashCode = typeOperators.getHashCodeOperator(keyType, HASH_CODE_CONVENTION)
+                .asType(methodType(long.class, keyType.getJavaType().isPrimitive() ? keyType.getJavaType() : Object.class));
+        keyBlockHashCode = typeOperators.getHashCodeOperator(keyType, simpleConvention(FAIL_ON_NULL, BLOCK_POSITION));
     }
 
     @Override

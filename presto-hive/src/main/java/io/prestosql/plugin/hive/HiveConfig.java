@@ -24,6 +24,7 @@ import io.airlift.units.Duration;
 import io.airlift.units.MaxDataSize;
 import io.airlift.units.MinDataSize;
 import io.airlift.units.MinDuration;
+import io.hetu.core.common.util.DataSizeOfUtil;
 import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode;
 import io.prestosql.plugin.hive.s3.S3FileSystemType;
 import io.prestosql.spi.function.Mandatory;
@@ -209,6 +210,7 @@ public class HiveConfig
     private boolean autoVacuumEnabled;
     private boolean orcPredicatePushdownEnabled;
     private int hmsWriteBatchSize = 8;
+    private boolean deleteSchemaLocationsFallback;
 
     public int getMaxInitialSplits()
     {
@@ -225,6 +227,21 @@ public class HiveConfig
     private int maxNumbSplitsToGroup = 1;
 
     private boolean workerMetaStoreCacheEnabled;
+
+    private DataSize targetMaxFileSize = DataSizeOfUtil.of(1, GIGABYTE);
+
+    @Config("hive.target-max-file-size")
+    @ConfigDescription("Target maximum size of written files; the actual size may be larger")
+    public HiveConfig setTargetMaxFileSize(DataSize targetMaxFileSize)
+    {
+        this.targetMaxFileSize = targetMaxFileSize;
+        return this;
+    }
+
+    public DataSize getTargetMaxFileSize()
+    {
+        return targetMaxFileSize;
+    }
 
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
@@ -1891,5 +1908,18 @@ public class HiveConfig
     public boolean getWorkerMetaStoreCacheEnabled()
     {
         return this.workerMetaStoreCacheEnabled;
+    }
+
+    public boolean isDeleteSchemaLocationsFallback()
+    {
+        return this.deleteSchemaLocationsFallback;
+    }
+
+    @Config("hive.delete-schema-locations-fallback")
+    @ConfigDescription("Whether schema locations should be deleted when Trino can't determine whether they contain external files.")
+    public HiveConfig setDeleteSchemaLocationsFallback(boolean deleteSchemaLocationsFallback)
+    {
+        this.deleteSchemaLocationsFallback = deleteSchemaLocationsFallback;
+        return this;
     }
 }

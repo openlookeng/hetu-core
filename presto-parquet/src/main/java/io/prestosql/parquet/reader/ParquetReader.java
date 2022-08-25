@@ -13,15 +13,24 @@
  */
 package io.prestosql.parquet.reader;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Multimap;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.parquet.ChunkKey;
+import io.prestosql.parquet.ChunkReader;
+import io.prestosql.parquet.DiskRange;
 import io.prestosql.parquet.Field;
 import io.prestosql.parquet.GroupField;
 import io.prestosql.parquet.ParquetCorruptionException;
 import io.prestosql.parquet.ParquetDataSource;
+import io.prestosql.parquet.ParquetReaderOptions;
 import io.prestosql.parquet.PrimitiveField;
 import io.prestosql.parquet.RichColumnDescriptor;
+import io.prestosql.parquet.predicate.Predicate;
+import io.prestosql.parquet.reader.FilteredOffsetIndex.OffsetRange;
 import io.prestosql.spi.block.ArrayBlock;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RowBlock;
@@ -34,18 +43,29 @@ import it.unimi.dsi.fastutil.booleans.BooleanList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.filter2.compat.FilterCompat;
+import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
+import org.apache.parquet.internal.column.columnindex.OffsetIndex;
+import org.apache.parquet.internal.filter2.columnindex.ColumnIndexFilter;
+import org.apache.parquet.internal.filter2.columnindex.ColumnIndexStore;
+import org.apache.parquet.internal.filter2.columnindex.RowRanges;
 import org.apache.parquet.io.MessageColumnIO;
 import org.apache.parquet.io.PrimitiveColumnIO;
 import org.joda.time.DateTimeZone;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.parquet.ParquetValidationUtils.validateParquet;
@@ -87,6 +107,15 @@ public class ParquetReader
 
     private AggregatedMemoryContext currentRowGroupMemoryContext;
 
+    private final List<Long> firstRowsOfBlocks;
+    private final AggregatedMemoryContext memoryContext;
+    private final ParquetReaderOptions options;
+    private final Multimap<ChunkKey, ChunkReader> chunkReaders;
+    private final List<Optional<ColumnIndexStore>> columnIndexStore;
+    private final List<RowRanges> blockRowRanges;
+    private final Map<ColumnPath, ColumnDescriptor> paths = new HashMap<>();
+    private final Optional<FilterPredicate> filter;
+
     public ParquetReader(Optional<String> fileCreatedBy,
                          MessageColumnIO messageColumnIO,
                          List<BlockMetaData> blocks,
@@ -95,6 +124,13 @@ public class ParquetReader
                          AggregatedMemoryContext systemMemoryContext,
                          DataSize maxReadBlockSize)
     {
+        this.blockRowRanges = null;
+        this.columnIndexStore = null;
+        this.chunkReaders = null;
+        this.options = null;
+        this.memoryContext = null;
+        this.firstRowsOfBlocks = null;
+        this.filter = null;
         this.fileCreatedBy = requireNonNull(fileCreatedBy, "fileCreatedBy is null");
         this.blocks = blocks;
         this.dataSource = requireNonNull(dataSource, "dataSource is null");
@@ -105,6 +141,143 @@ public class ParquetReader
         columns = messageColumnIO.getLeaves();
         columnReaders = new PrimitiveColumnReader[columns.size()];
         maxBytesPerCell = new long[columns.size()];
+    }
+
+    public ParquetReader(
+            Optional<String> fileCreatedBy,
+            MessageColumnIO messageColumnIO,
+            List<BlockMetaData> blocks,
+            List<Long> firstRowsOfBlocks,
+            ParquetDataSource dataSource,
+            DateTimeZone timeZone,
+            AggregatedMemoryContext memoryContext,
+            ParquetReaderOptions options)
+            throws IOException
+    {
+        this(fileCreatedBy, messageColumnIO, blocks, firstRowsOfBlocks, dataSource, timeZone, memoryContext, options, null, null);
+    }
+
+    public ParquetReader(
+            Optional<String> fileCreatedBy,
+            MessageColumnIO messageColumnIO,
+            List<BlockMetaData> blocks,
+            List<Long> firstRowsOfBlocks,
+            ParquetDataSource dataSource,
+            DateTimeZone timeZone,
+            AggregatedMemoryContext memoryContext,
+            ParquetReaderOptions options,
+            Predicate parquetPredicate,
+            List<Optional<ColumnIndexStore>> columnIndexStore)
+            throws IOException
+    {
+        this.maxReadBlockBytes = 0L;
+        this.fileCreatedBy = requireNonNull(fileCreatedBy, "fileCreatedBy is null");
+        this.columns = requireNonNull(messageColumnIO, "messageColumnIO is null").getLeaves();
+        this.blocks = requireNonNull(blocks, "blocks is null");
+        this.firstRowsOfBlocks = requireNonNull(firstRowsOfBlocks, "firstRowsOfBlocks is null");
+        this.dataSource = requireNonNull(dataSource, "dataSource is null");
+        this.timeZone = requireNonNull(timeZone, "timeZone is null");
+        this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
+        this.systemMemoryContext = this.memoryContext;
+        this.currentRowGroupMemoryContext = memoryContext.newAggregatedMemoryContext();
+        this.options = requireNonNull(options, "options is null");
+        this.columnReaders = new PrimitiveColumnReader[columns.size()];
+        this.maxBytesPerCell = new long[columns.size()];
+
+        checkArgument(blocks.size() == firstRowsOfBlocks.size(), "elements of firstRowsOfBlocks must correspond to blocks");
+
+        this.columnIndexStore = columnIndexStore;
+        this.blockRowRanges = listWithNulls(this.blocks.size());
+        for (PrimitiveColumnIO column : columns) {
+            ColumnDescriptor columnDescriptor = column.getColumnDescriptor();
+            this.paths.put(ColumnPath.get(columnDescriptor.getPath()), columnDescriptor);
+        }
+        if (parquetPredicate != null && options.isUseColumnIndex()) {
+            this.filter = parquetPredicate.toParquetFilter(timeZone);
+        }
+        else {
+            this.filter = Optional.empty();
+        }
+        ListMultimap<ChunkKey, DiskRange> ranges = ArrayListMultimap.create();
+        for (int rowGroup = 0; rowGroup < blocks.size(); rowGroup++) {
+            BlockMetaData metadata = blocks.get(rowGroup);
+            for (PrimitiveColumnIO column : columns) {
+                int columnId = column.getId();
+                ColumnChunkMetaData chunkMetadata = getColumnChunkMetaData(metadata, column.getColumnDescriptor());
+                ColumnPath columnPath = chunkMetadata.getPath();
+                long rowGroupRowCount = metadata.getRowCount();
+                long startingPosition = chunkMetadata.getStartingPos();
+                long totalLength = chunkMetadata.getTotalSize();
+                FilteredOffsetIndex filteredOffsetIndex = getFilteredOffsetIndex(rowGroup, rowGroupRowCount, columnPath);
+                if (filteredOffsetIndex == null) {
+                    DiskRange range = new DiskRange(startingPosition, toIntExact(totalLength));
+                    ranges.put(new ChunkKey(columnId, rowGroup), range);
+                }
+                else {
+                    List<OffsetRange> offsetRanges = filteredOffsetIndex.calculateOffsetRanges(startingPosition);
+                    for (OffsetRange offsetRange : offsetRanges) {
+                        DiskRange range = new DiskRange(offsetRange.getOffset(), toIntExact(offsetRange.getLength()));
+                        ranges.put(new ChunkKey(columnId, rowGroup), range);
+                    }
+                }
+            }
+        }
+
+        this.chunkReaders = dataSource.planRead(ranges);
+    }
+
+    private FilteredOffsetIndex getFilteredOffsetIndex(int rowGroup, long rowGroupRowCount, ColumnPath columnPath)
+    {
+        if (filter.isPresent()) {
+            RowRanges rowRanges = getRowRanges(filter.get(), rowGroup);
+            if (rowRanges != null && rowRanges.rowCount() < rowGroupRowCount) {
+                Optional<ColumnIndexStore> columnIndexStore = this.columnIndexStore.get(rowGroup);
+                if (columnIndexStore.isPresent()) {
+                    OffsetIndex offsetIndex = columnIndexStore.get().getOffsetIndex(columnPath);
+                    if (offsetIndex != null) {
+                        return FilteredOffsetIndex.filterOffsetIndex(offsetIndex, rowRanges, rowGroupRowCount);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private RowRanges getRowRanges(FilterPredicate filter, int blockIndex)
+    {
+        requireNonNull(filter, "filter is null");
+
+        RowRanges rowRanges = blockRowRanges.get(blockIndex);
+        if (rowRanges == null) {
+            Optional<ColumnIndexStore> columnIndexStore = this.columnIndexStore.get(blockIndex);
+            if (columnIndexStore.isPresent()) {
+                rowRanges = ColumnIndexFilter.calculateRowRanges(
+                        FilterCompat.get(filter),
+                        columnIndexStore.get(),
+                        paths.keySet(),
+                        blocks.get(blockIndex).getRowCount());
+                blockRowRanges.set(blockIndex, rowRanges);
+            }
+        }
+        return rowRanges;
+    }
+
+    private ColumnChunkMetaData getColumnChunkMetaData(BlockMetaData blockMetaData, ColumnDescriptor columnDescriptor)
+            throws IOException
+    {
+        for (ColumnChunkMetaData metadata : blockMetaData.getColumns()) {
+            if (metadata.getPath().equals(ColumnPath.get(columnDescriptor.getPath()))) {
+                return metadata;
+            }
+        }
+        throw new ParquetCorruptionException("Metadata is missing for column: %s", columnDescriptor);
+    }
+
+    private static <T> List<T> listWithNulls(int size)
+    {
+        return Stream.generate(() -> (T) null)
+                .limit(size)
+                .collect(Collectors.toCollection(ArrayList<T>::new));
     }
 
     @Override
@@ -301,5 +474,10 @@ public class ParquetReader
     public AggregatedMemoryContext getSystemMemoryContext()
     {
         return systemMemoryContext;
+    }
+
+    public long lastBatchStartRow()
+    {
+        return currentGroupRowCount + nextRowInGroup - batchSize;
     }
 }

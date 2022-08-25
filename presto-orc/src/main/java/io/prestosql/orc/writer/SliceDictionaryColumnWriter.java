@@ -29,6 +29,7 @@ import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.SliceColumnStatisticsBuilder;
 import io.prestosql.orc.metadata.statistics.StringStatisticsBuilder;
 import io.prestosql.orc.stream.ByteArrayOutputStream;
 import io.prestosql.orc.stream.LongOutputStream;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -97,6 +99,9 @@ public class SliceDictionaryColumnWriter
     private boolean directEncoded;
     private SliceDirectColumnWriter directColumnWriter;
 
+    private final Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier;
+    private SliceColumnStatisticsBuilder sliceColumnStatisticsBuilder;
+
     public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, DataSize stringStatisticsLimit)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
@@ -109,6 +114,24 @@ public class SliceDictionaryColumnWriter
         this.dictionaryDataStream = new ByteArrayOutputStream(compression, bufferSize, StreamKind.DICTIONARY_DATA);
         this.dictionaryLengthStream = createLengthOutputStream(compression, bufferSize);
         values = new IntBigArray();
+        this.statisticsBuilder = newStringStatisticsBuilder();
+        this.statisticsBuilderSupplier = null;
+    }
+
+    public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier)
+    {
+        this.columnId = requireNonNull(columnId, "columnId is null");
+        this.type = requireNonNull(type, "type is null");
+        this.compression = requireNonNull(compression, "compression is null");
+        this.bufferSize = bufferSize;
+        this.dataStream = new LongOutputStreamV2(compression, bufferSize, false, DATA);
+        this.presentStream = new PresentOutputStream(compression, bufferSize);
+        this.dictionaryDataStream = new ByteArrayOutputStream(compression, bufferSize, StreamKind.DICTIONARY_DATA);
+        this.dictionaryLengthStream = createLengthOutputStream(compression, bufferSize);
+        values = new IntBigArray();
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.sliceColumnStatisticsBuilder = statisticsBuilderSupplier.get();
+        this.stringStatisticsLimitInBytes = 0;
         this.statisticsBuilder = newStringStatisticsBuilder();
     }
 

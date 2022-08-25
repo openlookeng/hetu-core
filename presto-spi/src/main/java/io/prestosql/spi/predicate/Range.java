@@ -30,6 +30,8 @@ public final class Range
 {
     private final Marker low;
     private final Marker high;
+    private final boolean lowInclusive;
+    private final boolean highInclusive;
 
     @JsonCreator
     public Range(
@@ -52,6 +54,8 @@ public final class Range
         }
         this.low = low;
         this.high = high;
+        this.lowInclusive = !low.isLowerUnbounded() && !low.isUpperUnbounded();
+        this.highInclusive = !high.isUpperUnbounded() && !high.isLowerUnbounded();
     }
 
     public static Range all(Type type)
@@ -82,6 +86,26 @@ public final class Range
     public static Range equal(Type type, Object value)
     {
         return new Range(Marker.exactly(type, value), Marker.exactly(type, value));
+    }
+
+    public Object getLowBoundedValue()
+    {
+        return low.getValueBlock().orElseThrow(() -> new IllegalStateException("The range is low-unbounded"));
+    }
+
+    public Object getHighBoundedValue()
+    {
+        return high.getValueBlock().orElseThrow(() -> new IllegalStateException("The range is high-unbounded"));
+    }
+
+    public boolean isLowUnbounded()
+    {
+        return !low.getValueBlock().isPresent();
+    }
+
+    public boolean isHighUnbounded()
+    {
+        return !high.getValueBlock().isPresent();
     }
 
     public static Range range(Type type, Object low, boolean lowInclusive, Object high, boolean highInclusive)
@@ -214,5 +238,15 @@ public final class Range
             buffer.append((high.getBound() == Marker.Bound.EXACTLY) ? ']' : ')');
         }
         return buffer.toString();
+    }
+
+    public boolean isLowInclusive()
+    {
+        return lowInclusive;
+    }
+
+    public boolean isHighInclusive()
+    {
+        return highInclusive;
     }
 }

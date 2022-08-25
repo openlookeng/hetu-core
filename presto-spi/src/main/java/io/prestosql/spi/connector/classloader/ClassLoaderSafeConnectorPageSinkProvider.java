@@ -20,6 +20,7 @@ import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorTableExecuteHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
@@ -75,6 +76,14 @@ public final class ClassLoaderSafeConnectorPageSinkProvider
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return new ClassLoaderSafeConnectorPageSink(delegate.createPageSink(transactionHandle, session, vacuumTableHandle), classLoader);
+        }
+    }
+
+    @Override
+    public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return new ClassLoaderSafeConnectorPageSink(delegate.createPageSink(transactionHandle, session, tableExecuteHandle), classLoader);
         }
     }
 }

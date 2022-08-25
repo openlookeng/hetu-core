@@ -94,6 +94,22 @@ public final class Domain
         return new Domain(ValueSet.of(type, values.get(0), values.subList(1, values.size()).toArray()), false);
     }
 
+    public static Domain multipleValues(Type type, List<?> values, boolean nullAllowed)
+    {
+        if (values.isEmpty()) {
+            throw new IllegalArgumentException("values cannot be empty");
+        }
+        if (values.size() == 1) {
+            return singleValue(type, values.get(0), nullAllowed);
+        }
+        return new Domain(ValueSet.of(type, values.get(0), values.subList(1, values.size()).toArray()), nullAllowed);
+    }
+
+    public static Domain singleValue(Type type, Object value, boolean nullAllowed)
+    {
+        return new Domain(ValueSet.of(type, value), nullAllowed);
+    }
+
     public Type getType()
     {
         return values.getType();
@@ -275,6 +291,28 @@ public final class Domain
                 allOrNone -> Optional.empty())
                 .orElse(values);
         return Domain.create(simplifiedValueSet, nullAllowed);
+    }
+
+    public Domain simplify(int threshold)
+    {
+        Optional<ValueSet> simplifiedValueSet = values.getValuesProcessor().transform(
+                ranges -> {
+                    if (ranges.getRangeCount() <= threshold) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(ValueSet.ofRanges(ranges.getSpan()));
+                },
+                discreteValues -> {
+                    if (discreteValues.getValuesCount() <= threshold) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(ValueSet.all(values.getType()));
+                },
+                allOrNone -> Optional.empty());
+        if (!simplifiedValueSet.isPresent()) {
+            return this;
+        }
+        return Domain.create(simplifiedValueSet.get(), nullAllowed);
     }
 
     public String toString(ConnectorSession session)

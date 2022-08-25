@@ -88,6 +88,15 @@ public final class TableHandle
         return String.format("%s.%s", this.catalogName.getCatalogName(), this.connectorHandle.getSchemaPrefixedTableName());
     }
 
+    public TableHandle withConnectorHandle(ConnectorTableHandle connectorHandle)
+    {
+        return new TableHandle(
+                catalogName,
+                connectorHandle,
+                transaction,
+                Optional.empty());
+    }
+
     @Override
     public String toString()
     {

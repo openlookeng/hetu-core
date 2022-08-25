@@ -140,7 +140,7 @@ public class TestHiveDistributedJoinQueriesWithDynamicFiltering
 
         TestingConnectorSession session = new TestingConnectorSession(new HiveSessionProperties(config, new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
         ConnectorTableHandle table = new HiveTableHandle("db", "table", ImmutableMap.of(), ImmutableList.of(), Optional.empty());
-        HiveTransactionHandle transaction = new HiveTransactionHandle();
+        HiveTransactionHandle transaction = new HiveTransactionHandle(false);
 
         try {
             ConnectorPageSource result = provider.createPageSource(transaction, session, split, table, ImmutableList.of(testColumnHandle), dynamicFilterSupplier);

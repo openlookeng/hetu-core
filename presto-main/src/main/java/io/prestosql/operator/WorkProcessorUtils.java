@@ -108,7 +108,7 @@ public final class WorkProcessorUtils
         return create(
                 new WorkProcessor.Process<T>()
                 {
-                    @RestorableConfig(uncapturedFields = {"val$iterator"})
+                    @RestorableConfig(uncapturedFields = "val$iterator")
                     private final RestorableConfig restorableConfig = null;
 
                     int position;
@@ -163,7 +163,7 @@ public final class WorkProcessorUtils
 
         return create(new WorkProcessor.Process<T>()
         {
-            @RestorableConfig(stateClassName = "MergeSortedState", uncapturedFields = {"val$queue"})
+            @RestorableConfig(stateClassName = "MergeSortedState", uncapturedFields = "val$queue")
             private final RestorableConfig restorableConfig = null;
 
             int nextProcessor;
@@ -588,7 +588,7 @@ public final class WorkProcessorUtils
         requireNonNull(transformation, "transformation is null");
         return create(new WorkProcessor.Process<R>()
         {
-            @RestorableConfig(stateClassName = "TransformState", uncapturedFields = {"element"})
+            @RestorableConfig(stateClassName = "TransformState", uncapturedFields = "element")
             private final RestorableConfig restorableConfig = null;
 
             T element;
