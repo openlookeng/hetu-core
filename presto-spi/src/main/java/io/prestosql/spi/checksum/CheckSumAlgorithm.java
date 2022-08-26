@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,23 +12,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.exchange;
+package io.prestosql.spi.checksum;
 
-import io.airlift.slice.Slice;
-
-import java.util.concurrent.CompletableFuture;
-
-public interface ExchangeSink
+public enum CheckSumAlgorithm
 {
-    CompletableFuture<Void> NOT_BLOCKED = CompletableFuture.completedFuture(null);
+    SHA256("SHA-256"), SHA512("SHA-512"), MD5("MD5"), MURMUR3("MURMUR3");
 
-    CompletableFuture<Void> isBlocked();
+    private final String algorithm;
 
-    void add(String taskFullId, int partitionId, Slice data, int rowCount);
+    CheckSumAlgorithm(String algorithm)
+    {
+        this.algorithm = algorithm;
+    }
 
-    long getMemoryUsage();
-
-    CompletableFuture<Void> finish();
-
-    CompletableFuture<Void> abort();
+    public String getAlgorithm()
+    {
+        return algorithm;
+    }
 }

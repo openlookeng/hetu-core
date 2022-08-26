@@ -23,8 +23,14 @@ import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.hetu.core.plugin.exchange.filesystem.storage.ExchangeStorageWriter;
 import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.checksum.CheckSumAlgorithm;
 import io.prestosql.spi.exchange.ExchangeSink;
+import io.prestosql.spi.exchange.checksum.ExchangeMarkerChecksumFactory;
+import io.prestosql.spi.exchange.marker.ExchangeMarker;
+import io.prestosql.spi.exchange.marker.ExchangeMarkerFactory;
+import io.prestosql.spi.exchange.marker.HetuFileSystemExchangeMarkerFactory;
 import io.prestosql.spi.util.SizeOf;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.openjdk.jol.info.ClassLayout;
@@ -39,7 +45,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -66,9 +71,10 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 public class FileSystemExchangeSink
         implements ExchangeSink
 {
-    private static final Logger LOG = Logger.get(FileSystemExchangeSink.class);
+    private static final Logger log = Logger.get(FileSystemExchangeSink.class);
     public static final String COMMITTED_MARKER_FILE_NAME = "committed";
     public static final String DATA_FILE_SUFFIX = ".data";
+    public static final String MARKER_FILE_SUFFIX = ".marker";
 
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(FileSystemExchangeSink.class).instanceSize();
 
@@ -82,6 +88,9 @@ public class FileSystemExchangeSink
     private final int maxPageStorageSizeInBytes;
     private final long maxFileSizeInBytes;
     private final BufferPool bufferPool;
+    private final CheckSumAlgorithm checkSumAlgorithm;
+    private final int maxNumberOfPagesPerMarker;
+    private final long maxSizePerMarkerInBytes;
 
     private final Map<Integer, BufferedStorageWriter> writerMap = new ConcurrentHashMap<>();
     private final AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -98,10 +107,14 @@ public class FileSystemExchangeSink
             int maxPageStorageSizeInBytes,
             int exchangeSinkBufferPoolMinSize,
             int exchangeSinkBuffersPerPartition,
-            long maxFileSizeInBytes)
+            long maxFileSizeInBytes,
+            CheckSumAlgorithm checkSumAlgorithm,
+            int maxNumberOfPagesPerMarker,
+            long maxSizePerMarkerInBytes)
     {
         checkArgument(maxPageStorageSizeInBytes <= maxFileSizeInBytes,
                 format("maxPageStorageSizeInBytes %s exceeded maxFileSizeInBytes %s", succinctBytes(maxPageStorageSizeInBytes), succinctBytes(maxFileSizeInBytes)));
+        requireNonNull(checkSumAlgorithm, "checkSumAlgorithm is null");
         this.exchangeStorage = requireNonNull(exchangeStorage, "exchangeStorage is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory is null");
@@ -111,6 +124,9 @@ public class FileSystemExchangeSink
         this.preserveRecordsOrder = preserveRecordsOrder;
         this.maxPageStorageSizeInBytes = maxPageStorageSizeInBytes;
         this.maxFileSizeInBytes = maxFileSizeInBytes;
+        this.checkSumAlgorithm = checkSumAlgorithm;
+        this.maxNumberOfPagesPerMarker = maxNumberOfPagesPerMarker;
+        this.maxSizePerMarkerInBytes = maxSizePerMarkerInBytes;
         this.bufferPool = new BufferPool(
                 stats,
                 max(outputPartitionCount * exchangeSinkBuffersPerPartition, exchangeSinkBufferPoolMinSize),
@@ -124,7 +140,7 @@ public class FileSystemExchangeSink
     }
 
     @Override
-    public void add(int partitionId, Slice data)
+    public void add(String taskFullId, int partitionId, Slice data, int rowCount)
     {
         throwIfFailed();
 
@@ -137,7 +153,7 @@ public class FileSystemExchangeSink
             }
             writer = writerMap.computeIfAbsent(partitionId, this::createWriter);
         }
-        writer.write(data);
+        writer.write(taskFullId, data, rowCount);
     }
 
     private BufferedStorageWriter createWriter(int partitionId)
@@ -153,7 +169,10 @@ public class FileSystemExchangeSink
                 bufferPool,
                 failure,
                 maxPageStorageSizeInBytes,
-                maxFileSizeInBytes);
+                maxFileSizeInBytes,
+                checkSumAlgorithm,
+                maxNumberOfPagesPerMarker,
+                maxSizePerMarkerInBytes);
     }
 
     private void throwIfFailed()
@@ -255,15 +274,28 @@ public class FileSystemExchangeSink
         private final AtomicReference<Throwable> failure;
         private final int maxPageStorageSizeInBytes;
         private final long maxFileSizeInBytes;
+        private final CheckSumAlgorithm checkSumAlgorithm;
+        private final int maxNumberOfPagesPerMarker;
+        private final long maxSizePerMarkerInBytes;
 
         @GuardedBy("this")
         private ExchangeStorageWriter currentWriter;
         @GuardedBy("this")
+        private ExchangeStorageWriter currentMarkerWriter;
+        @GuardedBy("this")
         private long currentFileSize;
+        @GuardedBy("this")
+        private final ExchangeMarkerFactory markerFactory;
         @GuardedBy("this")
         private SliceOutput currentBuffer;
         @GuardedBy("this")
+        private SliceOutput currentMarkerBuffer;
+        @GuardedBy("this")
+        private ExchangeMarker currentMarker;
+        @GuardedBy("this")
         private final List<ExchangeStorageWriter> writers = new ArrayList<>();
+        @GuardedBy("this")
+        private final List<ExchangeStorageWriter> markerWriters = new ArrayList<>();
         @GuardedBy("this")
         private boolean closed;
 
@@ -277,7 +309,10 @@ public class FileSystemExchangeSink
                                      BufferPool bufferPool,
                                      AtomicReference<Throwable> failure,
                                      int maxPageStorageSizeInBytes,
-                                     long maxFileSizeInBytes)
+                                     long maxFileSizeInBytes,
+                                     CheckSumAlgorithm checkSumAlgorithm,
+                                     int maxNumberOfPagesPerMarker,
+                                     long maxSizePerMarkerInBytes)
         {
             this.exchangeStorage = requireNonNull(exchangeStorage, "exchangeStorage is null");
             this.stats = requireNonNull(stats, "stats is null");
@@ -290,8 +325,13 @@ public class FileSystemExchangeSink
             this.failure = requireNonNull(failure, "failure is null");
             this.maxPageStorageSizeInBytes = maxPageStorageSizeInBytes;
             this.maxFileSizeInBytes = maxFileSizeInBytes;
+            this.markerFactory = new HetuFileSystemExchangeMarkerFactory(new ExchangeMarkerChecksumFactory());
+            this.checkSumAlgorithm = requireNonNull(checkSumAlgorithm, "checkSumAlgorithm is null");
+            this.maxNumberOfPagesPerMarker = maxNumberOfPagesPerMarker;
+            this.maxSizePerMarkerInBytes = maxSizePerMarkerInBytes;
 
             addExchangeStorageWriter();
+            addMarkerWriter();
         }
 
         private void addExchangeStorageWriter()
@@ -302,44 +342,73 @@ public class FileSystemExchangeSink
             writers.add(currentWriter);
         }
 
-        private String propertiesToString(Properties properties)
+        private void addMarkerWriter()
         {
-            StringBuilder stringBuilder = new StringBuilder();
-            if (properties.size() > 0) {
-                for (Map.Entry<Object, Object> entry : properties.entrySet()) {
-                    stringBuilder.append(entry.getKey()).append("=")
-                            .append(entry.getValue()).append(System.lineSeparator());
-                }
-                stringBuilder.replace(stringBuilder.length() - 1, stringBuilder.length(), System.lineSeparator());
-            }
-            return stringBuilder.toString();
+            currentMarkerWriter = exchangeStorage.createExchangeWriter(
+                    outputDirectory.resolve(partitionId + "_" + markerWriters.size() + MARKER_FILE_SUFFIX),
+                    secretKey, exchangeCompressionEnabled);
+            markerWriters.add(currentMarkerWriter);
         }
 
-        public synchronized void write(Slice data)
+        public synchronized void write(String taskFullId, Slice data, int rowCount)
         {
             if (closed) {
                 return;
             }
-
-            int requiredPageStorageSize = Integer.BYTES + data.length();
+            if (currentMarker == null) {
+                currentMarker = markerFactory.create(taskFullId, 0, checkSumAlgorithm);
+            }
+            Slice markerPageSlice = null;
+            if (currentMarker.getPageCount() == maxNumberOfPagesPerMarker || currentMarker.getSizeInBytes() + data.length() > maxSizePerMarkerInBytes) {
+                currentMarker.calculateChecksum();
+                markerPageSlice = SerializedPage.forExchangeMarker(currentMarker).toSlice();
+                currentMarker = markerFactory.create(taskFullId, currentMarker.getOffset() + currentMarker.getSizeInBytes(), checkSumAlgorithm);
+            }
+            currentMarker.addPage(data, rowCount);
+            int requiredPageStorageSize = data.length();
+            if (markerPageSlice != null) {
+                writeMarkerInternal(markerPageSlice);
+                requiredPageStorageSize += markerPageSlice.length();
+            }
             if (requiredPageStorageSize > maxPageStorageSizeInBytes) {
                 throw new PrestoException(NOT_SUPPORTED, format("Max page storage size of %s exceeded: %s",
                         succinctBytes(maxPageStorageSizeInBytes),
                         succinctBytes(requiredPageStorageSize)));
             }
-
             if (currentFileSize + requiredPageStorageSize > maxFileSizeInBytes && !preserveRecordsOrder) {
                 stats.getFileSizeInBytes().add(currentFileSize);
                 flushIfNeeded(true);
+                flushMarkerBufferIfNeeded(true);
                 addExchangeStorageWriter();
+                addMarkerWriter();
                 currentFileSize = 0;
                 currentBuffer = null;
+                currentMarkerBuffer = null;
             }
-
-            writeInternal(Slices.wrappedIntArray(data.length()));
+            if (markerPageSlice != null) {
+                writeInternal(markerPageSlice);
+            }
             writeInternal(data);
 
             currentFileSize += requiredPageStorageSize;
+        }
+
+        private void writeMarkerInternal(Slice slice)
+        {
+            int position = 0;
+            while (position < slice.length()) {
+                if (currentMarkerBuffer == null) {
+                    currentMarkerBuffer = bufferPool.take();
+                    if (currentMarkerBuffer == null) {
+                        return;
+                    }
+                }
+                int writableBytes = min(currentMarkerBuffer.writableBytes(), slice.length() - position);
+                currentMarkerBuffer.writeBytes(slice.getBytes(position, writableBytes));
+                position += writableBytes;
+
+                flushMarkerBufferIfNeeded(false);
+            }
         }
 
         private void writeInternal(Slice slice)
@@ -368,9 +437,8 @@ public class FileSystemExchangeSink
 
             stats.getFileSizeInBytes().add(currentFileSize);
             flushIfNeeded(true);
-            if (writers.size() == 1) {
-                return currentWriter.finish();
-            }
+            flushMarkerBufferIfNeeded(true);
+            markerWriters.forEach(ExchangeStorageWriter::finish);
             return Futures.transform(Futures.allAsList(writers.stream().map(ExchangeStorageWriter::finish).collect(toImmutableList())), val -> null, directExecutor());
         }
 
@@ -380,7 +448,7 @@ public class FileSystemExchangeSink
                 return immediateFuture(null);
             }
             closed = true;
-
+            markerWriters.forEach(ExchangeStorageWriter::abort);
             if (writers.size() == 1) {
                 return currentWriter.abort();
             }
@@ -389,7 +457,7 @@ public class FileSystemExchangeSink
 
         public synchronized long getRetainedSize()
         {
-            return INSTANCE_SIZE + estimatedSizeOf(writers, ExchangeStorageWriter::getRetainedSize);
+            return INSTANCE_SIZE + estimatedSizeOf(writers, ExchangeStorageWriter::getRetainedSize) + estimatedSizeOf(markerWriters, ExchangeStorageWriter::getRetainedSize);
         }
 
         private void flushIfNeeded(boolean finished)
@@ -400,6 +468,20 @@ public class FileSystemExchangeSink
                     currentBuffer = null;
                 }
                 ListenableFuture<Void> writeFuture = currentWriter.write(buffer.slice());
+                writeFuture.addListener(() -> bufferPool.offer(buffer), directExecutor());
+                addExceptionCallback(writeFuture, throwable -> failure.compareAndSet(null, throwable));
+            }
+        }
+
+        private void flushMarkerBufferIfNeeded(boolean finished)
+        {
+            // small query, last few pages -> not exceed marker's page/size limit
+            SliceOutput buffer = currentMarkerBuffer;
+            if (buffer != null && (!buffer.isWritable() || finished)) {
+                if (!buffer.isWritable()) {
+                    currentMarkerBuffer = null;
+                }
+                ListenableFuture<Void> writeFuture = currentMarkerWriter.write(buffer.slice());
                 writeFuture.addListener(() -> bufferPool.offer(buffer), directExecutor());
                 addExceptionCallback(writeFuture, throwable -> failure.compareAndSet(null, throwable));
             }
