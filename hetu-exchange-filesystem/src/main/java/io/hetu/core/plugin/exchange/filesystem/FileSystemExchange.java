@@ -77,6 +77,7 @@ public class FileSystemExchange
     private final int outputPartitionCount;
     private final int fileListingParallelism;
     private final Optional<SecretKey> secretKey;
+    private final boolean exchangeCompressionEnabled;
     private final ExecutorService executor;
 
     private final Map<Integer, String> randomizedPrefixes = new ConcurrentHashMap<>();
@@ -100,6 +101,7 @@ public class FileSystemExchange
             int outputPartitionCount,
             int fileListingParallelism,
             Optional<SecretKey> secretKey,
+            boolean exchangeCompressionEnabled,
             ExecutorService executor)
     {
         this.baseDirectories = ImmutableList.copyOf(baseDirectories);
@@ -109,13 +111,14 @@ public class FileSystemExchange
         this.outputPartitionCount = outputPartitionCount;
         this.fileListingParallelism = fileListingParallelism;
         this.secretKey = requireNonNull(secretKey, "secretKey is null");
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
         this.executor = requireNonNull(executor, "executor is null");
     }
 
     @Override
     public ExchangeSinkHandle addSink(int taskPartitionId)
     {
-        FileSystemExchangeSinkHandle sinkHandle = new FileSystemExchangeSinkHandle(taskPartitionId, secretKey.map(Key::getEncoded));
+        FileSystemExchangeSinkHandle sinkHandle = new FileSystemExchangeSinkHandle(taskPartitionId, secretKey.map(Key::getEncoded), exchangeCompressionEnabled);
         allSinks.add(taskPartitionId);
         return sinkHandle;
     }
@@ -180,7 +183,8 @@ public class FileSystemExchange
                     return Optional.of(new FileSystemExchangeSourceHandle(
                             sourceHandle.getPartitionId(),
                             ImmutableList.of(filesIterator.next()),
-                            secretKey.map(SecretKey::getEncoded)));
+                            secretKey.map(SecretKey::getEncoded),
+                            exchangeCompressionEnabled));
                 }
                 return Optional.empty();
             }
@@ -251,7 +255,7 @@ public class FileSystemExchange
                     partitionsList.forEach(partitions -> partitions.forEach(partitionFiles::put));
                     ImmutableList.Builder<ExchangeSourceHandle> result = ImmutableList.builder();
                     for (Integer partitionId : partitionFiles.keySet()) {
-                        result.add(new FileSystemExchangeSourceHandle(partitionId, ImmutableList.copyOf(partitionFiles.get(partitionId)), secretKey.map(SecretKey::getEncoded)));
+                        result.add(new FileSystemExchangeSourceHandle(partitionId, ImmutableList.copyOf(partitionFiles.get(partitionId)), secretKey.map(SecretKey::getEncoded), exchangeCompressionEnabled));
                     }
                     return result.build();
                 },

@@ -35,6 +35,7 @@ public class FileSystemExchangeConfig
 {
     private List<URI> baseDirectories = ImmutableList.of();
     private boolean exchangeEncryptionEnabled;
+    private boolean exchangeCompressionEnabled;
 
     private DataSize maxPageStorageSize = new DataSize(16, MEGABYTE);
     private int exchangeSinkBufferPoolMinSize = 10;
@@ -78,6 +79,18 @@ public class FileSystemExchangeConfig
     public FileSystemExchangeConfig setExchangeEncryptionEnabled(boolean exchangeEncryptionEnabled)
     {
         this.exchangeEncryptionEnabled = exchangeEncryptionEnabled;
+        return this;
+    }
+
+    public boolean isExchangeCompressionEnabled()
+    {
+        return exchangeCompressionEnabled;
+    }
+
+    @Config("exchange.compression-enabled")
+    public FileSystemExchangeConfig setExchangeCompressionEnabled(boolean exchangeCompressionEnabled)
+    {
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
         return this;
     }
 

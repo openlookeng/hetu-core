@@ -62,14 +62,14 @@ public class FileSystemExchangeSinkTest
         FileSystemExchangeConfig config = new FileSystemExchangeConfig()
                 .setExchangeEncryptionEnabled(false)
                 .setBaseDirectories(baseDir);
-        FileSystemExchangeStorage exchangeStorage = new HetuFileSystemExchangeStorage(config);
+        FileSystemExchangeStorage exchangeStorage = new HetuFileSystemExchangeStorage();
         exchangeStorage.setFileSystemClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), basePath));
         ExchangeManager exchangeManager = new FileSystemExchangeManager(
                 exchangeStorage,
                 new FileSystemExchangeStats(),
                 config);
         exchangeSink = exchangeManager.createSink(new FileSystemExchangeSinkInstanceHandle(
-                new FileSystemExchangeSinkHandle(0, Optional.empty()),
+                new FileSystemExchangeSinkHandle(0, Optional.empty(), false),
                 config.getBaseDirectories().get(0),
                 10), false);
         PagesSerde serde = new TestingPagesSerdeFactory().createPagesSerde();

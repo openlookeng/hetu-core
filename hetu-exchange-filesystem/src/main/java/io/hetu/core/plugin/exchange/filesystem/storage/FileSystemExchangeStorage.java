@@ -35,7 +35,7 @@ public interface FileSystemExchangeStorage
 
     ExchangeStorageReader createExchangeReader(Queue<ExchangeSourceFile> sourceFiles, int maxPageSize);
 
-    ExchangeStorageWriter createExchangeWriter(URI file, Optional<SecretKey> secretKey);
+    ExchangeStorageWriter createExchangeWriter(URI file, Optional<SecretKey> secretKey, boolean exchangeCompressionEnabled);
 
     ListenableFuture<Void> createEmptyFile(URI file);
 

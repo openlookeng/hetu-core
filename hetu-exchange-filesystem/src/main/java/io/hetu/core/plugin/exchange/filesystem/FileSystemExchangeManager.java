@@ -56,6 +56,7 @@ public class FileSystemExchangeManager
     private final FileSystemExchangeStats stats;
     private final List<URI> baseDirectories;
     private final boolean exchangeEncryptionEnabled;
+    private final boolean exchangeCompressionEnabled;
     private final int maxPageStorageSizeInBytes;
     private final int exchangeSinkBufferPoolMinSize;
     private final int exchangeSinkBuffersPerPartition;
@@ -78,6 +79,7 @@ public class FileSystemExchangeManager
         this.stats = requireNonNull(stats, "stats is null");
         this.baseDirectories = ImmutableList.copyOf(requireNonNull(config.getBaseDirectories(), "baseDirectories is null"));
         this.exchangeEncryptionEnabled = config.isExchangeEncryptionEnabled();
+        this.exchangeCompressionEnabled = config.isExchangeCompressionEnabled();
         this.maxPageStorageSizeInBytes = toIntExact(config.getMaxPageStorageSize().toBytes());
         this.exchangeSinkBufferPoolMinSize = config.getExchangeSinkBufferPoolMinSize();
         this.exchangeSinkBuffersPerPartition = config.getExchangeSinkBuffersPerPartition();
@@ -115,6 +117,7 @@ public class FileSystemExchangeManager
                 outputPartitionCount,
                 exchangeFileListingParallelism,
                 secretKey,
+                exchangeCompressionEnabled,
                 executor);
     }
 
@@ -128,6 +131,7 @@ public class FileSystemExchangeManager
                 instanceHandle.getOutputDirectory(),
                 instanceHandle.getOutputPartitionCount(),
                 instanceHandle.getSinkHandle().getSecretKey().map(key -> new SecretKeySpec(key, 0, key.length, "AES")),
+                instanceHandle.getSinkHandle().getExchangeCompressionEnabled(),
                 preserveRecordsOrder,
                 maxPageStorageSizeInBytes,
                 exchangeSinkBufferPoolMinSize,
@@ -142,12 +146,15 @@ public class FileSystemExchangeManager
                 .map(FileSystemExchangeSourceHandle.class::cast)
                 .map(handle -> {
                     Optional<SecretKey> secretKey = handle.getSecretKey().map(key -> new SecretKeySpec(key, 0, key.length, "AES"));
-                    return new AbstractMap.SimpleEntry<>(handle, secretKey);
+                    boolean compressionEnabled = handle.getExchangeCompressionEnabled();
+                    Object[] encryptionAndCompression = new Object[]{secretKey, compressionEnabled};
+                    return new AbstractMap.SimpleEntry<>(handle, encryptionAndCompression);
                 })
                 .flatMap(entry -> entry.getKey().getFiles().stream().map(fileStatus ->
                         new ExchangeSourceFile(
                                 URI.create(fileStatus.getFilePath()),
-                                entry.getValue(),
+                                (Optional<SecretKey>) entry.getValue()[0],
+                                (boolean) entry.getValue()[1],
                                 fileStatus.getFileSize())))
                 .collect(toImmutableList());
         return new FileSystemExchangeSource(

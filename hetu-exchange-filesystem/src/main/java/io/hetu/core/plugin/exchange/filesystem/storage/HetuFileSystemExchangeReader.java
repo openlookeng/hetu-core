@@ -14,6 +14,7 @@
 package io.hetu.core.plugin.exchange.filesystem.storage;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.compress.snappy.SnappyFramedInputStream;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.slice.Slice;
@@ -21,6 +22,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.plugin.exchange.filesystem.ExchangeSourceFile;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
+import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.crypto.Cipher;
@@ -31,8 +33,10 @@ import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.Optional;
 import java.util.Queue;
 
@@ -45,6 +49,9 @@ import static java.util.Objects.requireNonNull;
 public class HetuFileSystemExchangeReader
         implements ExchangeStorageReader
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HetuFileSystemExchangeReader.class).instanceSize();
+    private static final String CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding";
+
     private static final Logger LOG = Logger.get(HetuFileSystemExchangeReader.class);
 
     private static final int BUFFER_SIZE_IN_BYTES = toIntExact(new DataSize(4, KILOBYTE).toBytes());
@@ -52,16 +59,18 @@ public class HetuFileSystemExchangeReader
     HetuFileSystemClient fsClient;
 
     private final Queue<ExchangeSourceFile> sourceFiles;
+    private final AlgorithmParameterSpec algorithmParameterSpec;
 
     @GuardedBy("this")
     private InputStreamSliceInput sliceInput;
     @GuardedBy("this")
     private boolean closed;
 
-    public HetuFileSystemExchangeReader(Queue<ExchangeSourceFile> sourceFiles, HetuFileSystemClient fileSystemClient)
+    public HetuFileSystemExchangeReader(Queue<ExchangeSourceFile> sourceFiles, HetuFileSystemClient fileSystemClient, AlgorithmParameterSpec algorithmParameterSpec)
     {
         this.sourceFiles = requireNonNull(sourceFiles, "sourceFiles is null");
         this.fsClient = requireNonNull(fileSystemClient, "fileSystemClient is null");
+        this.algorithmParameterSpec = requireNonNull(algorithmParameterSpec, "gcmParameterSpec is null");
     }
 
     @Override
@@ -73,24 +82,22 @@ public class HetuFileSystemExchangeReader
             return null;
         }
 
-        if (sliceInput == null) {
-            ExchangeSourceFile sourceFile = sourceFiles.poll();
-            if (sourceFile == null) {
-                close();
-                return null;
-            }
-            sliceInput = getSliceInput(sourceFile);
-        }
-
-        if (sliceInput.isReadable()) {
+        if (sliceInput != null && sliceInput.isReadable()) {
             markerData = sliceInput.readInt();
             LOG.debug("reading: markerData: " + markerData);
             // Currently marker contains size of serialized page
             return sliceInput.readSlice(markerData);
         }
-        else {
+
+        ExchangeSourceFile sourceFile = sourceFiles.poll();
+        if (sourceFile == null) {
+            close();
             return null;
         }
+
+        sliceInput = getSliceInput(sourceFile);
+        markerData = sliceInput.readInt();
+        return sliceInput.readSlice(markerData);
     }
 
     @Override
@@ -102,7 +109,7 @@ public class HetuFileSystemExchangeReader
     @Override
     public synchronized long getRetainedSize()
     {
-        return sliceInput == null ? 0 : sliceInput.getRetainedSize();
+        return INSTANCE_SIZE + (sliceInput == null ? 0 : sliceInput.getRetainedSize());
     }
 
     @Override
@@ -126,25 +133,30 @@ public class HetuFileSystemExchangeReader
 
     private InputStreamSliceInput getSliceInput(ExchangeSourceFile sourceFile)
     {
-        Path file = Paths.get(sourceFile.getFileUri());
-        Optional<SecretKey> secretKey = sourceFile.getSecretKey();
-        if (secretKey.isPresent()) {
-            try {
-                Cipher cipher = Cipher.getInstance("AES/GCM/PKCS5Padding");
-                cipher.init(Cipher.DECRYPT_MODE, secretKey.get());
+        try {
+            Path file = Paths.get(sourceFile.getFileUri());
+            Optional<SecretKey> secretKey = sourceFile.getSecretKey();
+            boolean exchangeCompressionEnabled = sourceFile.isExchangeCompressionEnabled();
+            if (secretKey.isPresent() && exchangeCompressionEnabled) {
+                Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
+                cipher.init(Cipher.DECRYPT_MODE, secretKey.get(), algorithmParameterSpec);
+                return new InputStreamSliceInput(new SnappyFramedInputStream(new CipherInputStream(fsClient.newInputStream(file), cipher)), BUFFER_SIZE_IN_BYTES);
+            }
+            else if (secretKey.isPresent()) {
+                Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
+                cipher.init(Cipher.DECRYPT_MODE, secretKey.get(), algorithmParameterSpec);
                 return new InputStreamSliceInput(new CipherInputStream(fsClient.newInputStream(file), cipher), BUFFER_SIZE_IN_BYTES);
             }
-            catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IOException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create CipherInputStream: " + e.getMessage(), e);
+            else if (exchangeCompressionEnabled) {
+                return new InputStreamSliceInput(new SnappyFramedInputStream(fsClient.newInputStream(file)), BUFFER_SIZE_IN_BYTES);
             }
-        }
-        else {
-            try {
+            else {
                 return new InputStreamSliceInput(fsClient.newInputStream(file), BUFFER_SIZE_IN_BYTES);
             }
-            catch (IOException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create CipherInputStream: " + e.getMessage(), e);
-            }
+        }
+        catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | NoSuchPaddingException |
+               InvalidKeyException | IOException e) {
+            throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create InputStream: " + e.getMessage(), e);
         }
     }
 }

@@ -30,11 +30,14 @@ public class FileSystemExchangeSinkHandle
     private final int partitionId;
     private final Optional<byte[]> secretKey;
 
+    private final boolean exchangeCompressionEnabled;
+
     @JsonCreator
-    public FileSystemExchangeSinkHandle(@JsonProperty("partitionId") int partitionId, @JsonProperty("secretKey") Optional<byte[]> secretKey)
+    public FileSystemExchangeSinkHandle(@JsonProperty("partitionId") int partitionId, @JsonProperty("secretKey") Optional<byte[]> secretKey, boolean exchangeCompressionEnabled)
     {
         this.partitionId = partitionId;
         this.secretKey = requireNonNull(secretKey, "secretKey is null");
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
     }
 
     @JsonProperty
@@ -49,6 +52,12 @@ public class FileSystemExchangeSinkHandle
         return secretKey;
     }
 
+    @JsonProperty
+    public boolean getExchangeCompressionEnabled()
+    {
+        return exchangeCompressionEnabled;
+    }
+
     @Override
     public boolean equals(Object o)
     {
@@ -60,17 +69,17 @@ public class FileSystemExchangeSinkHandle
         }
         FileSystemExchangeSinkHandle that = (FileSystemExchangeSinkHandle) o;
         if (secretKey.isPresent() && that.secretKey.isPresent()) {
-            return partitionId == that.partitionId && Arrays.equals(secretKey.get(), that.secretKey.get());
+            return partitionId == that.partitionId && Arrays.equals(secretKey.get(), that.secretKey.get()) && exchangeCompressionEnabled == that.exchangeCompressionEnabled;
         }
         else {
-            return partitionId == that.partitionId && !secretKey.isPresent() && !that.secretKey.isPresent();
+            return partitionId == that.partitionId && !secretKey.isPresent() && !that.secretKey.isPresent() && exchangeCompressionEnabled == that.exchangeCompressionEnabled;
         }
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(partitionId, secretKey);
+        return Objects.hash(partitionId, secretKey, exchangeCompressionEnabled);
     }
 
     @Override
@@ -79,6 +88,7 @@ public class FileSystemExchangeSinkHandle
         return toStringHelper(this)
                 .add("partitionId", partitionId)
                 .add("secretKey", secretKey.map(val -> "[EDITED]"))
+                .add("exchangeCompressionEnabled", exchangeCompressionEnabled)
                 .toString();
     }
 }

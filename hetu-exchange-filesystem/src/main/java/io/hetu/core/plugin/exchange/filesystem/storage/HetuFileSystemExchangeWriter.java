@@ -14,19 +14,26 @@
 package io.hetu.core.plugin.exchange.filesystem.storage;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.compress.snappy.SnappyFramedOutputStream;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.openjdk.jol.info.ClassLayout;
 
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
-import javax.ws.rs.NotSupportedException;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.Optional;
 
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -37,20 +44,32 @@ public class HetuFileSystemExchangeWriter
         implements ExchangeStorageWriter
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(HetuFileSystemExchangeWriter.class).instanceSize();
+    private static final String CIPHER_TRANSFORMATION = "AES/CBC/PKCS5Padding";
     private final OutputStream outputStream;
 
-    public HetuFileSystemExchangeWriter(URI file, HetuFileSystemClient fileSystemClient, Optional<SecretKey> secretKey)
+    public HetuFileSystemExchangeWriter(URI file, HetuFileSystemClient fileSystemClient, Optional<SecretKey> secretKey, boolean exchangeCompressionEnabled, AlgorithmParameterSpec algorithmParameterSpec)
     {
         try {
             Path path = Paths.get(file.toString());
-            if (secretKey.isPresent()) {
-                throw new NotSupportedException();
+            if (secretKey.isPresent() && exchangeCompressionEnabled) {
+                Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
+                cipher.init(Cipher.ENCRYPT_MODE, secretKey.get(), algorithmParameterSpec);
+                this.outputStream = new SnappyFramedOutputStream(new CipherOutputStream(fileSystemClient.newOutputStream(path), cipher));
+            }
+            else if (secretKey.isPresent()) {
+                Cipher cipher = Cipher.getInstance(CIPHER_TRANSFORMATION);
+                cipher.init(Cipher.ENCRYPT_MODE, secretKey.get(), algorithmParameterSpec);
+                this.outputStream = new CipherOutputStream(fileSystemClient.newOutputStream(path), cipher);
+            }
+            else if (exchangeCompressionEnabled) {
+                this.outputStream = new SnappyFramedOutputStream(fileSystemClient.newOutputStream(path));
             }
             else {
                 this.outputStream = fileSystemClient.newOutputStream(path);
             }
         }
-        catch (IOException e) {
+        catch (IOException | NoSuchAlgorithmException | InvalidAlgorithmParameterException | NoSuchPaddingException |
+               InvalidKeyException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create OutputStream: " + e.getMessage(), e);
         }
     }

@@ -77,6 +77,7 @@ public class FileSystemExchangeSink
     private final URI outputDirectory;
     private final int outputPartitionCount;
     private final Optional<SecretKey> secretKey;
+    private final boolean exchangeCompressionEnabled;
     private final boolean preserveRecordsOrder;
     private final int maxPageStorageSizeInBytes;
     private final long maxFileSizeInBytes;
@@ -92,6 +93,7 @@ public class FileSystemExchangeSink
             URI outputDirectory,
             int outputPartitionCount,
             Optional<SecretKey> secretKey,
+            boolean exchangeCompressionEnabled,
             boolean preserveRecordsOrder,
             int maxPageStorageSizeInBytes,
             int exchangeSinkBufferPoolMinSize,
@@ -105,6 +107,7 @@ public class FileSystemExchangeSink
         this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory is null");
         this.outputPartitionCount = outputPartitionCount;
         this.secretKey = requireNonNull(secretKey, "secretKey is null");
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
         this.preserveRecordsOrder = preserveRecordsOrder;
         this.maxPageStorageSizeInBytes = maxPageStorageSizeInBytes;
         this.maxFileSizeInBytes = maxFileSizeInBytes;
@@ -144,6 +147,7 @@ public class FileSystemExchangeSink
                 stats,
                 outputDirectory,
                 secretKey,
+                exchangeCompressionEnabled,
                 preserveRecordsOrder,
                 partitionId,
                 bufferPool,
@@ -244,6 +248,7 @@ public class FileSystemExchangeSink
         private final FileSystemExchangeStats stats;
         private final URI outputDirectory;
         private final Optional<SecretKey> secretKey;
+        private final boolean exchangeCompressionEnabled;
         private final boolean preserveRecordsOrder;
         private final int partitionId;
         private final BufferPool bufferPool;
@@ -266,6 +271,7 @@ public class FileSystemExchangeSink
                                      FileSystemExchangeStats stats,
                                      URI outputDirectory,
                                      Optional<SecretKey> secretKey,
+                                     boolean exchangeCompressionEnabled,
                                      boolean preserveRecordsOrder,
                                      int partitionId,
                                      BufferPool bufferPool,
@@ -277,6 +283,7 @@ public class FileSystemExchangeSink
             this.stats = requireNonNull(stats, "stats is null");
             this.outputDirectory = requireNonNull(outputDirectory, "outputDirectory is null");
             this.secretKey = requireNonNull(secretKey, "secretKey is null");
+            this.exchangeCompressionEnabled = exchangeCompressionEnabled;
             this.preserveRecordsOrder = preserveRecordsOrder;
             this.partitionId = partitionId;
             this.bufferPool = requireNonNull(bufferPool, "bufferPool is null");
@@ -291,7 +298,7 @@ public class FileSystemExchangeSink
         {
             currentWriter = exchangeStorage.createExchangeWriter(
                     outputDirectory.resolve(partitionId + "_" + writers.size() + DATA_FILE_SUFFIX),
-                    secretKey);
+                    secretKey, exchangeCompressionEnabled);
             writers.add(currentWriter);
         }
 
