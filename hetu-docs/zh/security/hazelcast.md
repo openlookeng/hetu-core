@@ -47,7 +47,7 @@ state-store启用后，在state-store的配置文件state-store.properties中增
 
 
 注意：
-所有节点的配置文件相同，包括机机用户的principal，ketTab。
+所有节点的配置文件相同，包括机机用户的principal，keyTab。
 
 ## Hazelcast SSL/TLS
 
@@ -55,7 +55,7 @@ state-store启用后，在state-store的配置文件state-store.properties中增
 误的节点将无法与其他节点进行通信。
 
 为了Hazelcast通信启用SSL/TLS功能，需要执行以下步骤：
-1.  生成Java密钥库文件。可以使用每台主机的fully-qualified主机名为每个节点创建唯一的证书，创建时包含所有主机的所有公钥的密钥库，并为客户端
+1.  生成Java密钥库文件。可以使用每台主机的全限定主机名为每个节点创建唯一的证书，创建时包含所有主机的所有公钥的密钥库，并为客户端
 指定密钥库。在大多数情况下，使用通配符进行证书的创建更加方便，如下所示：
 
     > ``` 

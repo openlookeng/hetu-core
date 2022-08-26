@@ -158,7 +158,15 @@ See [Connectors](../connector/_index.md) for more information about configuring 
 
 ## Running openLooKeng
 
-The installation directory contains the launcher script in `bin/launcher`. openLooKeng can be started as a daemon by running the following:
+The installation directory contains the launcher script in `bin/launcher`. There is a preparation before running:
+
+Edit `bin/launcher.py` in the installation directory, and respectively replace `options.launcher_log_file` and `options.server_log_file` with `node_properties.get('node.launcher-log-file')` and `node_properties.get('node.server-log-file')` on lines 440 and 441.
+The modified code should be as follows:
+```
+o.launcher_log = realpath(node_properties.get('node.launcher-log-file' ) or pathjoin(o.data_dir, 'var/log/launcher.log'))
+o.server_log = realpath(node_properties.get('node.server-log-file' ) or pathjoin(o.data_dir, 'var/log/server.log'))
+```
+When the cluster starts, the log files will be preferentially saved in the path specified by `etc/node.properties`. openLooKeng can be started as a daemon by running the following:
 
 ``` shell
 bin/launcher start
