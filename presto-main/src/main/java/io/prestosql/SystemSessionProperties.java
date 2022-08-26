@@ -204,6 +204,8 @@ public final class SystemSessionProperties
 
     public static final String RETRY_POLICY = "retry_policy";
 
+    public static final String EXCHANGE_FILESYSTEM_BASE_DIRECTORY = "exchange_filesystem_base_directory";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     private static Logger log = Logger.get(SystemSessionProperties.class);
@@ -990,7 +992,12 @@ public final class SystemSessionProperties
                         memoryManagerConfig.getFaultTolerantExecutionTaskMemoryEstimationQuantile(),
                         false,
                         value -> validateDoubleRange(value, FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, 0.0, 1.0),
-                        value -> value));
+                        value -> value),
+                stringProperty(
+                        EXCHANGE_FILESYSTEM_BASE_DIRECTORY,
+                        "Name of the exchange filesystem base directory",
+                        queryManagerConfig.getExchangeFilesystemBaseDirectory(),
+                        false));
     }
 
     private static double validateDoubleRange(Object value, String property, double lowerBoundIncluded, double upperBoundIncluded)
@@ -1737,5 +1744,10 @@ public final class SystemSessionProperties
     public static double getFaultTolerantExecutionTaskMemoryEstimationQuantile(Session session)
     {
         return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, Double.class);
+    }
+
+    public static String getExchangeFilesystemBaseDirectory(Session session)
+    {
+        return session.getSystemProperty(EXCHANGE_FILESYSTEM_BASE_DIRECTORY, String.class);
     }
 }

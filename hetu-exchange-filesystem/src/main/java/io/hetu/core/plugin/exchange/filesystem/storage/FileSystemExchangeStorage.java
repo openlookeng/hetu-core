@@ -11,9 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.hetu.core.plugin.exchange.filesystem;
+package io.hetu.core.plugin.exchange.filesystem.storage;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.hetu.core.plugin.exchange.filesystem.ExchangeSourceFile;
+import io.hetu.core.plugin.exchange.filesystem.FileStatus;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import javax.crypto.SecretKey;
 
@@ -26,6 +29,8 @@ import java.util.Queue;
 public interface FileSystemExchangeStorage
         extends AutoCloseable
 {
+    public void setFileSystemClient(HetuFileSystemClient fsClient);
+
     void createDirectories(URI dir) throws IOException;
 
     ExchangeStorageReader createExchangeReader(Queue<ExchangeSourceFile> sourceFiles, int maxPageSize);

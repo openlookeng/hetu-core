@@ -39,6 +39,8 @@ import io.airlift.jmx.testing.TestingJmxModule;
 import io.airlift.json.JsonModule;
 import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
+import io.hetu.core.filesystem.HdfsFileSystemClientFactory;
+import io.hetu.core.filesystem.LocalFileSystemClientFactory;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dispatcher.DispatchManager;
@@ -307,6 +309,10 @@ public class TestingPrestoServer
         lifeCycleManager = injector.getInstance(LifeCycleManager.class);
 
         pluginManager = injector.getInstance(PluginManager.class);
+        FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
+        fileSystemClientManager.addFileSystemClientFactories(new HdfsFileSystemClientFactory());
+        fileSystemClientManager.addFileSystemClientFactories(new LocalFileSystemClientFactory());
+        fileSystemClientManager.loadFactoryConfigs();
 
         connectorManager = injector.getInstance(ConnectorManager.class);
 
@@ -349,7 +355,7 @@ public class TestingPrestoServer
         announcer = injector.getInstance(Announcer.class);
 
         injector.getInstance(ServerInfoResource.class).startupComplete();
-        injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager();
+        injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager(fileSystemClientManager);
         announcer.forceAnnounce();
 
         exchangeManagerRegistry = injector.getInstance(ExchangeManagerRegistry.class);
@@ -485,9 +491,9 @@ public class TestingPrestoServer
     /**
      * Hetu DC Connector requires this method to create DC catalogs in the testing server for unit test.
      *
-     * @param catalogName the catalog name
+     * @param catalogName   the catalog name
      * @param connectorName connector name
-     * @param properties catalog properties
+     * @param properties    catalog properties
      * @return the set of dynamic catalog names
      */
     public Set<CatalogName> createDCCatalog(String catalogName, String connectorName, Map<String, String> properties)

@@ -92,6 +92,10 @@ public class QueryManagerConfig
 
     private DataSize faultTolerantExecutionTaskDescriptorStorageMaxMemory = new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE);
 
+    private String exchangeFilesystemType = "local";
+
+    private String exchangeFilesystemBaseDirectory = "/tmp/hetu-exchange-manager";
+
     @Min(1)
     public int getScheduleSplitBatchSize()
     {
@@ -581,6 +585,32 @@ public class QueryManagerConfig
     public QueryManagerConfig setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(DataSize faultTolerantExecutionTaskDescriptorStorageMaxMemory)
     {
         this.faultTolerantExecutionTaskDescriptorStorageMaxMemory = faultTolerantExecutionTaskDescriptorStorageMaxMemory;
+        return this;
+    }
+
+    @NotNull
+    public String getExchangeFilesystemType()
+    {
+        return exchangeFilesystemType;
+    }
+
+    @Config("exchange-filesystem-type")
+    public QueryManagerConfig setExchangeFilesystemType(String exchangeFilesystemType)
+    {
+        this.exchangeFilesystemType = exchangeFilesystemType;
+        return this;
+    }
+
+    @NotNull
+    public String getExchangeFilesystemBaseDirectory()
+    {
+        return exchangeFilesystemBaseDirectory;
+    }
+
+    @Config("exchange-filesystem-base-directory")
+    public QueryManagerConfig setExchangeFilesystemBaseDirectory(String exchangeFilesystemBaseDirectory)
+    {
+        this.exchangeFilesystemBaseDirectory = exchangeFilesystemBaseDirectory;
         return this;
     }
 }

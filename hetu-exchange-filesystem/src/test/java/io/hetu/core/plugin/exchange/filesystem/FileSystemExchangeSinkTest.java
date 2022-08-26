@@ -13,11 +13,16 @@
  */
 package io.hetu.core.plugin.exchange.filesystem;
 
-import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Output;
 import io.airlift.slice.Slice;
-import io.hetu.core.plugin.exchange.filesystem.local.LocalFileSystemExchangeStorage;
+import io.airlift.slice.Slices;
+import io.hetu.core.filesystem.HetuLocalFileSystemClient;
+import io.hetu.core.filesystem.LocalConfig;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
+import io.hetu.core.plugin.exchange.filesystem.storage.HetuFileSystemExchangeStorage;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.hetu.core.transport.execution.buffer.SerializedPageSerde;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
@@ -37,22 +42,18 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class FileSystemExchangeSinkTest
 {
     private ExchangeSink exchangeSink;
-    private SerializedPage page;
-    private final Kryo kryo = new Kryo();
+    private Slice serializedPageSlice;
 
     @BeforeMethod
     public void setUp() throws IOException
     {
-        kryo.register(SerializedPage.class);
-        kryo.register(Slice.class);
-        kryo.register(byte[].class);
-        kryo.register(Properties.class);
-        String baseDir = "file:///opt/hetu-server-1.8.0-SNAPSHOT/exchange-base-dir";
+        String baseDir = "/opt/hetu-server-1.8.0/exchange-base-dir";
         Path basePath = Paths.get(baseDir);
         File base = new File(baseDir);
         if (!base.exists()) {
@@ -61,8 +62,10 @@ public class FileSystemExchangeSinkTest
         FileSystemExchangeConfig config = new FileSystemExchangeConfig()
                 .setExchangeEncryptionEnabled(false)
                 .setBaseDirectories(baseDir);
+        FileSystemExchangeStorage exchangeStorage = new HetuFileSystemExchangeStorage(config);
+        exchangeStorage.setFileSystemClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), basePath));
         ExchangeManager exchangeManager = new FileSystemExchangeManager(
-                new LocalFileSystemExchangeStorage(),
+                exchangeStorage,
                 new FileSystemExchangeStats(),
                 config);
         exchangeSink = exchangeManager.createSink(new FileSystemExchangeSinkInstanceHandle(
@@ -78,7 +81,12 @@ public class FileSystemExchangeSinkTest
         Block expectedBlock = expectedBlockBuilder.build();
 
         Page expectedPage = new Page(expectedBlock, expectedBlock, expectedBlock);
-        page = serde.serialize(expectedPage);
+        SerializedPage page = serde.serialize(expectedPage);
+
+        int sizeRequired = calculateSerializedPageSizeInBytes(page);
+        Output output = new Output(sizeRequired);
+        SerializedPageSerde.serialize(output, page);
+        serializedPageSlice = Slices.wrappedBuffer(output.getBuffer());
     }
 
     @AfterMethod
@@ -91,13 +99,32 @@ public class FileSystemExchangeSinkTest
     {
     }
 
+    private int calculateSerializedPageSizeInBytes(SerializedPage page)
+    {
+        int sizeInBytes = Integer.BYTES     // positionCount
+                + Byte.BYTES                // pageCodecMarkers
+                + Integer.BYTES             // uncompressedSizeInBytes
+                + Integer.BYTES             // slice length
+                + page.getSlice().length(); // slice data
+        if (page.getPageMetadata().size() != 0) {
+            String pageProperties = page.getPageMetadata().toString();
+            byte[] propertiesByte = pageProperties
+                    .replaceAll(",", System.lineSeparator())
+                    .substring(1, pageProperties.length() - 1)
+                    .getBytes(UTF_8);
+            sizeInBytes += Integer.BYTES + propertiesByte.length;
+        }
+        else {
+            sizeInBytes += Integer.BYTES;
+        }
+        return sizeInBytes;
+    }
+
     @Test
     public void testAdd()
     {
         requireNonNull(exchangeSink, "exchangeSink is null");
-//        Slice pageSlice = SerDeInSliceUtils.serialize(page, kryo);
-        Slice pageSlice = null;
-        exchangeSink.add(0, pageSlice);
+        exchangeSink.add(0, serializedPageSlice);
         exchangeSink.finish();
     }
 
@@ -105,9 +132,7 @@ public class FileSystemExchangeSinkTest
     public void testAbort()
     {
         requireNonNull(exchangeSink, "exchangeSink is null");
-//        Slice pageSlice = SerDeInSliceUtils.serialize(page, kryo);
-        Slice pageSlice = null;
-        exchangeSink.add(0, pageSlice);
+        exchangeSink.add(0, serializedPageSlice);
         exchangeSink.abort();
     }
 }

@@ -15,6 +15,7 @@ package io.hetu.core.plugin.exchange.filesystem;
 
 import com.google.inject.Injector;
 import io.airlift.bootstrap.Bootstrap;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.plugin.base.jmx.MBeanServerModule;
 import io.prestosql.server.PrefixObjectNameGeneratorModule;
 import io.prestosql.spi.exchange.ExchangeManager;
@@ -22,6 +23,7 @@ import io.prestosql.spi.exchange.ExchangeManagerFactory;
 import io.prestosql.spi.exchange.ExchangeManagerHandleResolver;
 import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.spi.exchange.ExchangeSourceHandle;
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
 import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
@@ -38,7 +40,7 @@ public class FileSystemExchangeManagerFactory
     }
 
     @Override
-    public ExchangeManager create(Map<String, String> config)
+    public ExchangeManager create(Map<String, String> config, HetuFileSystemClient fileSystemClient)
     {
         requireNonNull(config, "config is null");
         Bootstrap app = new Bootstrap(
@@ -49,6 +51,8 @@ public class FileSystemExchangeManagerFactory
         Injector injector = app.doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();
+        FileSystemExchangeStorage fileSystemExchangeStorage = injector.getInstance(FileSystemExchangeStorage.class);
+        fileSystemExchangeStorage.setFileSystemClient(fileSystemClient);
         return injector.getInstance(FileSystemExchangeManager.class);
     }
 

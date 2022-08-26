@@ -25,6 +25,14 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-transport</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <optional>true</optional>
@@ -32,10 +40,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-transport</artifactId>
         </dependency>
         <dependency>
             <groupId>javax.validation</groupId>
@@ -108,10 +112,6 @@
             <artifactId>bootstrap</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>log</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
@@ -153,10 +153,6 @@
             </exclusions>
             <groupId>com.fasterxml.jackson.core</groupId>
             <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.prestosql.hadoop</groupId>
-            <artifactId>hadoop-apache</artifactId>
         </dependency>
 
         <!-- for testing -->
@@ -207,21 +203,25 @@
             <version>${version.mockito-all}</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-plugin-toolkit</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>javax.ws.rs-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
-            <exclusions>
-                <exclusion>
-                    <artifactId>objenesis</artifactId>
-                    <groupId>org.objenesis</groupId>
-                </exclusion>
-            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-filesystem-client</artifactId>
         </dependency>
     </dependencies>
 

@@ -559,7 +559,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-filesystem-client</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>

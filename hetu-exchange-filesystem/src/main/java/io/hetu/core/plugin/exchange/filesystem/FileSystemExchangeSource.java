@@ -15,6 +15,8 @@ package io.hetu.core.plugin.exchange.filesystem;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
+import io.hetu.core.plugin.exchange.filesystem.storage.ExchangeStorageReader;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.exchange.ExchangeSource;
 
 import javax.annotation.Nullable;

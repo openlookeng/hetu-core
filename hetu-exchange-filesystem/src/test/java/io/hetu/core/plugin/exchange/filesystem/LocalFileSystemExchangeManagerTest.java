@@ -13,28 +13,26 @@
  */
 package io.hetu.core.plugin.exchange.filesystem;
 
+import com.google.common.collect.ImmutableMap;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.prestosql.spi.exchange.ExchangeManager;
-import org.testng.annotations.Test;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
-import static org.testng.Assert.assertNotNull;
-
-public class FileSystemExchangeManagerFactoryTest
+public class LocalFileSystemExchangeManagerTest
+        extends AbstractTestExchangeManager
 {
-    private final FileSystemExchangeManagerFactory factory = new FileSystemExchangeManagerFactory();
-
-    @Test
-    public void testCreate()
+    @Override
+    protected ExchangeManager createExchangeManager()
     {
-        Map<String, String> config = new HashMap<>();
-        config.put("exchange.base-directories", "/opt/hetu-server-1.8.0-SNAPSHOT/exchange-base-dir");
-        ExchangeManager exchangeManager = factory.create(config, new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
-        assertNotNull(exchangeManager);
+        String baseDirectory1 = System.getProperty("java.io.tmpdir") + "/local-file-system-exchange-manager-1";
+        String baseDirectory2 = System.getProperty("java.io.tmpdir") + "/local-file-system-exchange-manager-2";
+        return new FileSystemExchangeManagerFactory().create(ImmutableMap.of(
+                "exchange.base-directories", baseDirectory1 + "," + baseDirectory2,
+                "exchange.sink-max-file-size", "32MB",
+                "exchange.max-page-storage-size", "32MB"
+        ), new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
     }
 }

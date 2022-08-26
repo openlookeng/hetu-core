@@ -13,13 +13,15 @@
  */
 package io.prestosql.spi.exchange;
 
+import io.prestosql.spi.filesystem.HetuFileSystemClient;
+
 import java.util.Map;
 
 public interface ExchangeManagerFactory
 {
     String getName();
 
-    ExchangeManager create(Map<String, String> config);
+    ExchangeManager create(Map<String, String> config, HetuFileSystemClient fileSystemClient);
 
     ExchangeManagerHandleResolver getHandleResolver();
 }

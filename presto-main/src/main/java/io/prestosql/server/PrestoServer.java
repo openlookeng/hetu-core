@@ -197,7 +197,7 @@ public class PrestoServer
 
             injector.getInstance(ServerInfoResource.class).startupComplete();
 
-            injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager();
+            injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager(fileSystemClientManager);
 
             log.info("======== SERVER STARTED ========");
         }

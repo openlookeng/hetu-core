@@ -21,6 +21,8 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
+import io.hetu.core.plugin.exchange.filesystem.storage.ExchangeStorageWriter;
+import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.exchange.ExchangeSink;
 import io.prestosql.spi.util.SizeOf;
