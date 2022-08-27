@@ -360,7 +360,14 @@
 > - **默认值：** `32MB`
 > 
 >等待上游任务拉取的任务数据的输出缓冲区大小。如果任务输出是哈希分区的，则缓冲区将在所有分区的消费者之间共享。如果网络延迟高或集群中有许多节点，则增加此值可以提高阶段之间传输数据的网络吞吐量。
- 
+
+### `query-resource-tracking`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+>禁用查询级别资源跟踪和减缓操作。
+
  ## 故障恢复处理属性
  
  ### 失败重试策略
@@ -986,3 +993,234 @@
 > -   **默认值:** `false`
 >
 > 不区分大小写匹配数据库和集合名称，默认区分大小写。
+
+## 查询故障容错配置
+
+### `exchange-manager.name`
+
+> - **类型：**`string`
+> - **默认值：**`filesystem`
+>
+> Task快照管理器的名称。
+
+### `exchange-filesystem-type`
+
+> - **类型：**`string`
+> - **默认值：**`exchange`
+>
+> 存储Task快照的文件系统客户端名称。如果exchange-filesystem-type=exchange，名称为exchange客户端将用于存储查询执行产生的Task快照。文件系统客户端的配置文件路径etc/filesystem/exchange.properties，参见[交换文件系统客户端配置](<./properties.md#交换文件系统客户端配置>)。
+
+### `exchange.base-directories`
+
+> - **类型：**`URI`
+>
+> 文件系统的根目录，存储Task快照的起始文件路径。存在多个根目录则以逗号分隔区分。
+
+### `exchange.compression-enabled`
+
+> - **类型：**`boolean`
+> - **默认值：**`false`
+>
+> 该属性启停Task快照的压缩功能。
+
+### `exchange.max-page-storage-size`
+>
+> -  **类型：** `data size`
+> -  **默认值：** `16MB`
+>
+> 可写入Task快照数据空间的最大页面大小，包含页面数据内容和记录页面大小的int类型元数据共同占用的空间。
+
+### `exchange.sink-buffer-pool-min-size`
+>
+> -  **类型：** `int`
+> -  **默认值：** `10`
+>
+> Task快照数据空间的最小缓冲池大小。缓冲池大小越大，写入并行度和内存使用量就越大。
+
+### `exchange.sink-buffers-per-partition`
+>
+> -  **类型：** `int`
+> -  **最小值：** `2`
+> -  **默认值：** `2`
+>
+> 缓冲池中每个分区的写入缓冲区个数。缓冲区个数越大，写入并行度和内存使用量就越大。
+
+### `exchange.sink-max-file-size`
+>
+> -  **类型：** `data size`
+> -  **默认值：** `1GB`
+>
+> Task快照数据空间可写入的最大文件大小。
+
+### `exchange.source-concurrent-readers`
+>
+> -  **类型：** `int`
+> -  **默认值：** `4`
+>
+> Task快照数据空间中并发阅读器的数量。并发阅读器的数量越多，读取并行度和内存使用量就越大。
+
+### `exchange.max-output-partition-count`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `50`
+>
+> Task快照数据空间中可创建分区的最大数量。
+
+### `exchange.file-listing-parallelism`
+>
+> -  **类型：** `int`
+> -  **默认值：** `50`
+>
+> 枚举task快照文件时，调用文件列表的最大并行度。
+
+### `retry-policy`
+>
+> -  **类型：** `string`
+> -  **允许值：** `NONE`, `TASK`
+> -  **默认值：** `NONE`
+>
+> 在查询发生故障时的重试策略，`TASK策略`表示在任务失败时，只单独重试失败的task。
+
+### `task-retry-attempts-overall`
+>
+> -  **类型：** `int`
+> -  **默认值：** `null（(无限制）`
+>
+> 查询返回失败前，查询中所有task允许的最大重试次数。
+
+### `task-retry-attempts-per-task`
+>
+> -  **类型：** `int`
+> -  **最小值：** `0`
+> -  **默认值：** `4`
+>
+> 查询返回失败前，查询中单个task允许的最大重试次数。
+
+### `retry-initial-delay`
+>
+> -  **类型：** `duration`
+> -  **默认值：** `10s`
+>
+> Task在重试之前必须等待的最短时间，也可以使用retry_initial_delay会话属性进行配置。
+
+### `retry-max-delay`
+>
+> -  **类型：** `duration`
+> -  **默认值：** `1m`
+>
+> Task在重试之前必须等待的最长时间，每次故障后的等待时间都会相应增加，也可以使用retry_max_delay会话属性进行配置。
+
+### `retry-delay-scale-factor`
+>
+> -  **类型：** `double`
+> -  **默认值：** `2.0`
+>
+> 每次任务失败后，等待重试增加的系数。也可以使用retry_delay_scale_factor会话属性进行配置。
+
+### `max-tasks-waiting-for-node-per-stage`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `5`
+>
+> 每个阶段中允许等待分配节点的task最大个数，超过该个数的task将被暂停调度。
+
+### `fault-tolerant-execution-target-task-input-size`
+>
+> -  **类型：** `data size`
+> -  **默认值：** `4GB`
+>
+> 重试的task从快照文件中最大读取的数据大小（以字节为单位）。也可以使用fault_tolerant_execution_target_task_input_size会话属性进行配置。
+
+### `fault-tolerant-execution-target-task-split-count`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `64`
+>
+> 单个task从源表中读取“标准”数据分片的个数。该配置会考虑数据分片权重，如果源表拆分的数据分片权重比“标准”更轻或更重，则由单个task处理的数据分片个数将相应地进行调整。
+> 也可以使用fault_tolerant_execution_target_task_split_count会话属性进行配置。
+
+### `fault-tolerant-execution-preserve-input-partitions-in-write-stage`
+>
+> -  **类型：** `boolean`
+> -  **默认值：** `true`
+>
+> 向数据表写入数据的阶段，是否要求一个task只读取一个分区的输入。
+
+### `fault-tolerant-execution-min-task-split-count`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `16`
+>
+> 单个task处理的最小数据分片个数。此值不会按数据分片权重进行重新调整，在源表返回不正确的分片权重的情况下，依然对配置的数据提供保护不调整。
+> 也可以使用fault_tolerant_execution_min_task_split_count会话属性进行配置。
+
+### `fault-tolerant-execution-max-task-split-count`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `256`
+>
+> 单个task处理的最大数据分片个数。此值不会按数据分片权重进行重新调整，在源表返回不正确的分片权重的情况下，依然对配置的数据提供保护不调整。
+> 也可以使用fault_tolerant_execution_max_task_split_count会话属性进行配置。
+
+### `fault-tolerant-execution-partition-count`
+>
+> -  **类型：** `int`
+> -  **最小值：** `1`
+> -  **默认值：** `50`
+>
+> 用于分布式join和聚合的分区数。也可以使用fault_tolerant_execution_partition_count会话属性进行配置。
+
+### `fault-tolerant-execution-task-descriptor-storage-max-memory`
+>
+> -  **类型：** `data size`
+> -  **默认值：** `(JVM heap size * 0.15)`
+>
+> 在协调节点上，存储容错查询的task描述符的最大内存量。需要额外的内存才能在发生故障时重新调度task。
+
+### `node-scheduler.allowed-no-matching-node-period`
+>
+> -  **类型：** `duration`
+> -  **默认值：** `2m`
+>
+> 在分配不到符合task运行要求的节点前，调度允许的等待时间。
+
+### `node-scheduler.allocator-type`
+>
+> -  **类型：** `string`
+> -  **允许值：** `BIN_PACKING`, `FIXED_COUNT`
+> -  **默认值：** `BIN_PACKING`
+>
+> 配置节点分配器类型。
+> 
+## 交换文件系统客户端配置
+
+### `fs.client.type`
+
+> - **类型：**`string`
+> - **允许值：** `local`，`hdfs`
+> - **默认值：**`local`
+>
+> 配置文件系统客户端的类型。如果`fs.client.type=local`，恢复框架使用local文件系统客户端。反之如果`fs.client.type=hdfs`，恢复框架使用hdfs文件系统客户端。
+
+### `hdfs.config.resources`
+
+> - **类型：**`string`
+> - **默认值：**`etc/filesystem/core-site.xml,etc/filesystem/hdfs-site.xml`
+>
+> hdfs文件系统所依赖的资源配置文件的路径。
+>
+>（注意这是hdfs文件系统需要的配置属性，当资源配置文件不止一个时，用','隔开！）
+
+### `hdfs.authentication.type`
+
+> - **类型：**`string`
+> - **默认值：**`NONE`
+>
+> 指定hdfs文件系统的身份验证类型。
+>
+>（注意这是hdfs文件系统所需的配置属性！）
