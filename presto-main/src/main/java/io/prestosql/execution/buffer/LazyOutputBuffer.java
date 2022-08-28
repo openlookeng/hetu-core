@@ -19,16 +19,19 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.ExtendedSettableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.ExchangeManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.ExchangeSink;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.TaskContext;
-import io.prestosql.spi.exchange.ExchangeManager;
-import io.prestosql.spi.exchange.ExchangeSink;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.spi.Page;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -458,5 +461,31 @@ public class LazyOutputBuffer
             outputBuffer = delegate;
         }
         outputBuffer.addInputChannel(inputId);
+    }
+
+    @Override
+    public boolean isSpoolingOutputBuffer()
+    {
+        return delegate != null && delegate.isSpoolingOutputBuffer();
+    }
+
+    public DirectSerialisationType getExchangeDirectSerialisationType()
+    {
+        DirectSerialisationType type = DirectSerialisationType.OFF;
+        if (delegate != null) {
+            type = delegate.getExchangeDirectSerialisationType();
+        }
+        return type;
+    }
+
+    @Override
+    public void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    {
+        OutputBuffer outputBuffer;
+        synchronized (this) {
+            checkState(delegate != null, "delegate is null");
+            outputBuffer = delegate;
+        }
+        outputBuffer.enqueuePages(pages, id, directSerde);
     }
 }

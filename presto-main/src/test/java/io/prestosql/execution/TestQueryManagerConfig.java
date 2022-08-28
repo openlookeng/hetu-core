@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.exchange.RetryPolicy;
 import org.testng.annotations.Test;
 
 import java.util.Map;

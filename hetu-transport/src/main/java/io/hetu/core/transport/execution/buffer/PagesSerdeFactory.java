@@ -38,7 +38,7 @@ public class PagesSerdeFactory
         return createPagesSerdeInternal(Optional.empty(), false, false);
     }
 
-    public PagesSerde createPagesSerdeForSpill(Optional<SpillCipher> spillCipher, boolean useDirectSerde, boolean useKryo)
+    public PagesSerde createDirectPagesSerde(Optional<SpillCipher> spillCipher, boolean useDirectSerde, boolean useKryo)
     {
         return createPagesSerdeInternal(spillCipher, useDirectSerde, useKryo);
     }

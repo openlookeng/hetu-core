@@ -16,13 +16,13 @@ package io.prestosql.operator;
 import io.airlift.concurrent.ThreadPoolExecutorMBean;
 import io.airlift.http.client.HttpClient;
 import io.airlift.units.DataSize;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.ExchangeId;
-import io.prestosql.spi.exchange.RetryPolicy;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 

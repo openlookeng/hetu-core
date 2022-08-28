@@ -26,6 +26,7 @@ import io.prestosql.Session;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dispatcher.DispatchQuery;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.metadata.Catalog;
@@ -42,7 +43,6 @@ import io.prestosql.spi.block.BlockEncodingSerde;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
-import io.prestosql.spi.exchange.ExchangeId;
 import io.prestosql.spi.security.Identity;
 
 import javax.annotation.Nullable;

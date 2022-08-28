@@ -114,6 +114,7 @@ public class TaskContext
     private final PlanNodeId consumerId;
 
     private final PagesSerdeFactory serdeFactory;
+    private final PagesSerdeFactory kryoSerdeFactory;
     private final TaskSnapshotManager snapshotManager;
     private final QueryRecoveryManager queryRecoveryManager;
 
@@ -132,10 +133,11 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager, queryRecoveryManager);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, kryoSerdeFactory, snapshotManager, queryRecoveryManager);
         taskContext.initialize();
         return taskContext;
     }
@@ -152,6 +154,7 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
@@ -169,6 +172,7 @@ public class TaskContext
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
         this.consumerId = consumerId;
         this.serdeFactory = serdeFactory;
+        this.kryoSerdeFactory = kryoSerdeFactory;
         this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
         this.queryRecoveryManager = queryRecoveryManager;
     }
@@ -633,6 +637,11 @@ public class TaskContext
     public PagesSerdeFactory getSerdeFactory()
     {
         return serdeFactory;
+    }
+
+    public PagesSerdeFactory getKryoSerdeFactory()
+    {
+        return kryoSerdeFactory;
     }
 
     public QueryRecoveryManager getRecoveryManager()

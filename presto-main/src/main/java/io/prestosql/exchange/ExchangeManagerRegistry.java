@@ -16,9 +16,6 @@ package io.prestosql.exchange;
 import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.spi.classloader.ThreadContextClassLoader;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
-import io.prestosql.spi.exchange.ExchangeManager;
-import io.prestosql.spi.exchange.ExchangeManagerFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import javax.inject.Inject;
@@ -29,13 +26,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static io.airlift.configuration.ConfigurationLoader.loadPropertiesFrom;
-import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class ExchangeManagerRegistry
@@ -47,22 +42,12 @@ public class ExchangeManagerRegistry
 
     private final ExchangeHandleResolver handleResolver;
 
-    private final Map<String, ExchangeManagerFactory> exchangeManagerFactories = new ConcurrentHashMap<>();
-
     private volatile ExchangeManager exchangeManager;
 
     @Inject
     public ExchangeManagerRegistry(ExchangeHandleResolver handleResolver)
     {
         this.handleResolver = requireNonNull(handleResolver, "handleResolver is null");
-    }
-
-    public void addExchangeManagerFactory(ExchangeManagerFactory factory)
-    {
-        requireNonNull(factory, "factory is null");
-        if (exchangeManagerFactories.putIfAbsent(factory.getName(), factory) != null) {
-            throw new IllegalArgumentException(format("Exchange manager factory '%s' is already registered", factory.getName()));
-        }
     }
 
     public void loadExchangeManager(FileSystemClientManager fileSystemClientManager)
@@ -93,8 +78,7 @@ public class ExchangeManagerRegistry
 
         checkState(exchangeManager == null, "exchangeManager is already loaded");
 
-        ExchangeManagerFactory factory = exchangeManagerFactories.get(name);
-        checkArgument(factory != null, "Exchange manager factory '%s' is not registered. Available factories: %s", name, exchangeManagerFactories.keySet());
+        ExchangeManagerFactory factory = new FileSystemExchangeManagerFactory();
 
         ExchangeManager exchangeManagerInstance;
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(factory.getClass().getClassLoader())) {

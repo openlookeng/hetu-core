@@ -17,12 +17,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.ExchangeSink;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.TaskContext;
-import io.prestosql.spi.exchange.ExchangeSink;
+import io.prestosql.spi.Page;
 
 import java.util.List;
 import java.util.Optional;
@@ -278,5 +281,35 @@ public class SpoolingExchangeOutputBuffer
         catch (RuntimeException ignored) {
             return null;
         }
+    }
+
+    @Override
+    public boolean isSpoolingOutputBuffer()
+    {
+        return true;
+    }
+
+    public DirectSerialisationType getExchangeDirectSerialisationType()
+    {
+        ExchangeSink sink = exchangeSink;
+        checkState(sink != null, "exchangeSink is null");
+        return sink.getDirectSerialisationType();
+    }
+
+    @Override
+    public void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    {
+        requireNonNull(pages, "pages is null");
+        if (!stateMachine.getState().canAddPages()) {
+            return;
+        }
+        ExchangeSink sink = exchangeSink;
+        checkState(sink != null, "exchangeSink is null");
+        for (Page page : pages) {
+            sink.add(0, page, directSerde);
+            totalRowsAdded.addAndGet(page.getPositionCount());
+        }
+        updateMemoryUsage(sink.getMemoryUsage());
+        totalPagesAdded.addAndGet(pages.size());
     }
 }

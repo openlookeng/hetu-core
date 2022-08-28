@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.collect.ImmutableMap;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.sql.planner.PartitioningHandle;
 
 import java.util.HashMap;

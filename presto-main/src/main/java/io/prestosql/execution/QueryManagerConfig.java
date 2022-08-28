@@ -20,7 +20,7 @@ import io.airlift.configuration.LegacyConfig;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
-import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.exchange.RetryPolicy;
 
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;

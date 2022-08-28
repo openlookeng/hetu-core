@@ -16,8 +16,6 @@ package io.prestosql.exchange;
 import io.airlift.log.Logger;
 import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.server.testing.TestingPrestoServer;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
-import io.prestosql.spi.exchange.ExchangeManager;
 import org.testng.annotations.Test;
 
 import java.io.File;
