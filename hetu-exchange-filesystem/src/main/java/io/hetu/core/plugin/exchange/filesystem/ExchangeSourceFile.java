@@ -26,12 +26,14 @@ public class ExchangeSourceFile
 {
     private final URI fileUri;
     private final Optional<SecretKey> secretKey;
+    private final boolean exchangeCompressionEnabled;
     private final long fileSize;
 
-    public ExchangeSourceFile(URI fileUri, Optional<SecretKey> secretKey, long fileSize)
+    public ExchangeSourceFile(URI fileUri, Optional<SecretKey> secretKey, boolean exchangeCompressionEnabled, long fileSize)
     {
         this.fileUri = requireNonNull(fileUri, "fileUri is null");
         this.secretKey = requireNonNull(secretKey, "secretKey is null");
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
         this.fileSize = fileSize;
     }
 
@@ -43,6 +45,11 @@ public class ExchangeSourceFile
     public Optional<SecretKey> getSecretKey()
     {
         return secretKey;
+    }
+
+    public boolean isExchangeCompressionEnabled()
+    {
+        return exchangeCompressionEnabled;
     }
 
     public long getFileSize()

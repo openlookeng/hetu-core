@@ -37,17 +37,20 @@ public class FileSystemExchangeSourceHandle
 
     private final int partitionId;
     private final Optional<byte[]> secretKey;
+    private final boolean exchangeCompressionEnabled;
     private final List<FileStatus> files;
 
     @JsonCreator
     public FileSystemExchangeSourceHandle(
             @JsonProperty("partitionId") int partitionId,
             @JsonProperty("files") List<FileStatus> files,
-            @JsonProperty("secretKey") Optional<byte[]> secretKey)
+            @JsonProperty("secretKey") Optional<byte[]> secretKey,
+            @JsonProperty("exchangeCompressionEnabled") boolean exchangeCompressionEnabled)
     {
         this.partitionId = partitionId;
         this.files = ImmutableList.copyOf(requireNonNull(files, "files is null"));
         this.secretKey = requireNonNull(secretKey, "secretKey is null");
+        this.exchangeCompressionEnabled = exchangeCompressionEnabled;
     }
 
     @Override
@@ -72,6 +75,12 @@ public class FileSystemExchangeSourceHandle
     }
 
     @JsonProperty
+    public boolean getExchangeCompressionEnabled()
+    {
+        return exchangeCompressionEnabled;
+    }
+
+    @JsonProperty
     public List<FileStatus> getFiles()
     {
         return files;
@@ -88,17 +97,17 @@ public class FileSystemExchangeSourceHandle
         }
         FileSystemExchangeSourceHandle that = (FileSystemExchangeSourceHandle) o;
         if (secretKey.isPresent() && that.secretKey.isPresent()) {
-            return partitionId == that.getPartitionId() && Arrays.equals(secretKey.get(), that.secretKey.get());
+            return partitionId == that.getPartitionId() && Arrays.equals(secretKey.get(), that.secretKey.get()) && exchangeCompressionEnabled == that.exchangeCompressionEnabled;
         }
         else {
-            return partitionId == that.getPartitionId() && !secretKey.isPresent() && !that.secretKey.isPresent();
+            return partitionId == that.getPartitionId() && !secretKey.isPresent() && !that.secretKey.isPresent() && exchangeCompressionEnabled == that.exchangeCompressionEnabled;
         }
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(partitionId, files, secretKey);
+        return Objects.hash(partitionId, files, secretKey, exchangeCompressionEnabled);
     }
 
     @Override
@@ -108,6 +117,7 @@ public class FileSystemExchangeSourceHandle
                 .add("partitionId", partitionId)
                 .add("files", files)
                 .add("secretKey", secretKey.map(value -> "[REDACTED]"))
+                .add("exchangeCompressionEnabled", exchangeCompressionEnabled)
                 .toString();
     }
 }

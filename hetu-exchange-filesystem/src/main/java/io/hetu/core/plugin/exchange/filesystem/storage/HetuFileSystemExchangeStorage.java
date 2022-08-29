@@ -18,15 +18,17 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.plugin.exchange.filesystem.ExchangeSourceFile;
 import io.hetu.core.plugin.exchange.filesystem.FileStatus;
-import io.hetu.core.plugin.exchange.filesystem.FileSystemExchangeConfig;
 import io.prestosql.spi.filesystem.HetuFileSystemClient;
 
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import javax.inject.Inject;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.security.SecureRandom;
+import java.security.spec.AlgorithmParameterSpec;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -40,11 +42,15 @@ public class HetuFileSystemExchangeStorage
         implements FileSystemExchangeStorage
 {
     private HetuFileSystemClient fileSystemClient;
+    private final AlgorithmParameterSpec algorithmParameterSpec;
     private static final int BUFFER_SIZE_IN_BYTES = toIntExact(new DataSize(4, KILOBYTE).toBytes());
 
     @Inject
-    public HetuFileSystemExchangeStorage(FileSystemExchangeConfig config)
+    public HetuFileSystemExchangeStorage()
     {
+        byte[] iv = new byte[16];
+        new SecureRandom().nextBytes(iv);
+        this.algorithmParameterSpec = new IvParameterSpec(iv);
     }
 
     public void setFileSystemClient(HetuFileSystemClient fsClient)
@@ -133,12 +139,12 @@ public class HetuFileSystemExchangeStorage
     @Override
     public ExchangeStorageReader createExchangeReader(Queue<ExchangeSourceFile> sourceFiles, int maxPageSize)
     {
-        return new HetuFileSystemExchangeReader(sourceFiles, fileSystemClient);
+        return new HetuFileSystemExchangeReader(sourceFiles, fileSystemClient, algorithmParameterSpec);
     }
 
     @Override
-    public ExchangeStorageWriter createExchangeWriter(URI file, Optional<SecretKey> secretKey)
+    public ExchangeStorageWriter createExchangeWriter(URI file, Optional<SecretKey> secretKey, boolean exchangeCompressionEnabled)
     {
-        return new HetuFileSystemExchangeWriter(file, fileSystemClient, secretKey);
+        return new HetuFileSystemExchangeWriter(file, fileSystemClient, secretKey, exchangeCompressionEnabled, algorithmParameterSpec);
     }
 }
