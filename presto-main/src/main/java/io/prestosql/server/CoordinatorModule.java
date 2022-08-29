@@ -99,7 +99,9 @@ import io.prestosql.execution.resourcegroups.LegacyResourceGroupConfigurationMan
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.scheduler.AllAtOnceExecutionPolicy;
 import io.prestosql.execution.scheduler.BinPackingNodeAllocatorService;
+import io.prestosql.execution.scheduler.ConstantPartitionMemoryEstimator;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
+import io.prestosql.execution.scheduler.FixedCountNodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
@@ -199,6 +201,7 @@ import static io.prestosql.execution.DataDefinitionExecution.DataDefinitionExecu
 import static io.prestosql.execution.QueryExecution.QueryExecutionFactory;
 import static io.prestosql.execution.SqlQueryExecution.SqlQueryExecutionFactory;
 import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NodeAllocatorType.BIN_PACKING;
+import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NodeAllocatorType.FIXED_COUNT;
 import static io.prestosql.util.StatementUtils.getAllQueryTypes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -326,6 +329,10 @@ public class CoordinatorModule
             binder.bind(BinPackingNodeAllocatorService.class).in(Scopes.SINGLETON);
             binder.bind(NodeAllocatorService.class).to(BinPackingNodeAllocatorService.class);
             binder.bind(PartitionMemoryEstimatorFactory.class).to(BinPackingNodeAllocatorService.class);
+        }
+        else if (nodeSchedulerConfig.getNodeAllocatorType() == FIXED_COUNT) {
+            binder.bind(NodeAllocatorService.class).to(FixedCountNodeAllocatorService.class).in(Scopes.SINGLETON);
+            binder.bind(PartitionMemoryEstimatorFactory.class).toInstance(ConstantPartitionMemoryEstimator::new);
         }
 
         // node monitor

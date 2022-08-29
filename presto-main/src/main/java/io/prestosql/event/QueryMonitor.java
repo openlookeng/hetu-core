@@ -171,11 +171,16 @@ public class QueryMonitor
                         0,
                         0,
                         0,
+                        0,
                         ImmutableList.of(),
                         0,
                         true,
                         ImmutableList.of(),
                         ImmutableList.of(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
+                        Optional.empty(),
                         Optional.empty()),
                 createQueryContext(queryInfo.getSession(), queryInfo.getResourceGroupId()),
                 new QueryIOMetadata(ImmutableList.of(), Optional.empty()),
@@ -259,12 +264,17 @@ public class QueryMonitor
                 queryStats.getLogicalWrittenDataSize().toBytes(),
                 queryStats.getWrittenPositions(),
                 queryStats.getCumulativeUserMemory(),
+                queryStats.getFailedCumulativeUserMemory(),
                 queryStats.getStageGcStatistics(),
                 queryStats.getCompletedDrivers(),
                 queryInfo.isCompleteInfo(),
                 getCpuDistributions(queryInfo),
                 operatorSummaries.build(),
-                serializedPlanNodeStatsAndCosts);
+                serializedPlanNodeStatsAndCosts,
+                Optional.of(ofMillis(queryStats.getInputBlockedTime().toMillis())),
+                Optional.of(ofMillis(queryStats.getFailedInputBlockedTime().toMillis())),
+                Optional.of(ofMillis(queryStats.getOutputBlockedTime().toMillis())),
+                Optional.of(ofMillis(queryStats.getFailedOutputBlockedTime().toMillis())));
     }
 
     private QueryContext createQueryContext(SessionRepresentation session, Optional<ResourceGroupId> resourceGroup)

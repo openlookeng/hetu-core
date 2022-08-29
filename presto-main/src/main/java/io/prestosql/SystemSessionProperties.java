@@ -185,7 +185,6 @@ public final class SystemSessionProperties
     public static final String SKIP_NON_APPLICABLE_RULES_ENABLED = "skip_non_applicable_rules_enabled";
     public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "eliminate_duplicate_spill_files";
     // Task Level Retry
-    public static final String QUERY_RETRY_ATTEMPTS = "query_retry_attempts";
     public static final String TASK_RETRY_ATTEMPTS_OVERALL = "task_retry_attempts_overall";
     public static final String TASK_RETRY_ATTEMPTS_PER_TASK = "task_retry_attempts_per_task";
     public static final String MAX_TASKS_WAITING_FOR_NODE_PER_STAGE = "max_tasks_waiting_for_node_per_stage";
@@ -897,11 +896,6 @@ public final class SystemSessionProperties
                         RetryPolicy.class,
                         queryManagerConfig.getRetryPolicy(),
                         true),
-                integerProperty(
-                        QUERY_RETRY_ATTEMPTS,
-                        "Maximum number of query retry attempts",
-                        queryManagerConfig.getQueryRetryAttempts(),
-                        false),
                 integerProperty(
                         TASK_RETRY_ATTEMPTS_OVERALL,
                         "Maximum number of task retry attempts overall",
@@ -1664,11 +1658,6 @@ public final class SystemSessionProperties
             }
         }
         return retryPolicy;
-    }
-
-    public static int getQueryRetryAttempts(Session session)
-    {
-        return session.getSystemProperty(QUERY_RETRY_ATTEMPTS, Integer.class);
     }
 
     public static int getTaskRetryAttemptsOverall(Session session)

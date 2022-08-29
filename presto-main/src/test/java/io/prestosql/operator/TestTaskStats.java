@@ -77,7 +77,9 @@ public class TestTaskStats
             26,
             new Duration(27, NANOSECONDS),
 
-            ImmutableList.of(TestPipelineStats.EXPECTED));
+            ImmutableList.of(TestPipelineStats.EXPECTED),
+            new Duration(27, NANOSECONDS),
+            new Duration(27, NANOSECONDS));
 
     @Test
     public void testJson()

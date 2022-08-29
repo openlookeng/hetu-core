@@ -22,7 +22,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.airlift.http.client.HttpStatus;
 import io.airlift.log.Logger;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
@@ -437,8 +436,7 @@ public final class SqlStageExecution
             OutputBuffers outputBuffers,
             Multimap<PlanNodeId, Split> splits,
             Multimap<PlanNodeId, Lifespan> noMoreSplitsForLifespan,
-            Set<PlanNodeId> noMoreSplits,
-            Optional<DataSize> estimatedMemory)
+            Set<PlanNodeId> noMoreSplits)
     {
         if (stateMachine.getState().isDone()) {
             return Optional.empty();
@@ -448,7 +446,6 @@ public final class SqlStageExecution
 
         stateMachine.transitionToScheduling();
 
-        //TODO(SURYA): total partitions is being passed as empty here. Need to see what to add to substitute it. And removed estimatedMemory. estimtedMemory is required in updating TaskInfo
         RemoteTask task = remoteTaskFactory.createRemoteTask(
                 stateMachine.getSession(),
                 taskId,
@@ -630,7 +627,7 @@ public final class SqlStageExecution
 
         if (sinkExchange.isPresent()) {
             ExchangeSinkHandle sinkHandle = sinkExchange.get().addSink(taskId.getId());
-            ExchangeSinkInstanceHandle exchangeSinkInstanceHandle = sinkExchange.get().instantiateSink(sinkHandle, taskId.getAttemptId()); //TODO(Surya): get the attemptid
+            ExchangeSinkInstanceHandle exchangeSinkInstanceHandle = sinkExchange.get().instantiateSink(sinkHandle, taskId.getAttemptId());
             localOutputBuffers.setExchangeSinkInstanceHandle(exchangeSinkInstanceHandle);
         }
 

@@ -326,8 +326,7 @@ public class PipelinedStageExecution
                 outputBuffers,
                 initialSplits,
                 ImmutableMultimap.of(),
-                ImmutableSet.of(),
-                Optional.empty());
+                ImmutableSet.of());
 
         if (!optionalTask.isPresent()) {
             return Optional.empty();

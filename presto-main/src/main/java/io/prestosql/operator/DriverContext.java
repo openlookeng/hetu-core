@@ -345,6 +345,8 @@ public class DriverContext
         long processedInputPositions;
         DataSize outputDataSize;
         long outputPositions;
+        Duration inputBlockedTime;
+        Duration outputBlockedTime;
         if (inputOperator != null) {
             physicalInputDataSize = inputOperator.getPhysicalInputDataSize();
             physicalInputPositions = inputOperator.getPhysicalInputPositions();
@@ -364,6 +366,9 @@ public class DriverContext
             OperatorStats outputOperator = requireNonNull(getLast(operators, null));
             outputDataSize = outputOperator.getOutputDataSize();
             outputPositions = outputOperator.getOutputPositions();
+
+            inputBlockedTime = inputOperator.getBlockedWall();
+            outputBlockedTime = outputOperator.getBlockedWall();
         }
         else {
             physicalInputDataSize = new DataSize(0, BYTE);
@@ -383,6 +388,8 @@ public class DriverContext
 
             outputDataSize = new DataSize(0, BYTE);
             outputPositions = 0;
+            inputBlockedTime = new Duration(0, MILLISECONDS);
+            outputBlockedTime = new Duration(0, MILLISECONDS);
         }
 
         long physicalWrittenDataSize = operators.stream()
@@ -442,7 +449,9 @@ public class DriverContext
                 outputDataSize.convertToMostSuccinctDataSize(),
                 outputPositions,
                 succinctBytes(physicalWrittenDataSize),
-                operators);
+                operators,
+                inputBlockedTime,
+                outputBlockedTime);
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)

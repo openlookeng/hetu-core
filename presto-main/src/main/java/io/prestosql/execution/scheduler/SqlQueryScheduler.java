@@ -133,7 +133,6 @@ import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.getConcurrentLifespansPerNode;
 import static io.prestosql.SystemSessionProperties.getFaultTolerantExecutionPartitionCount;
 import static io.prestosql.SystemSessionProperties.getMaxTasksWaitingForNodePerStage;
-import static io.prestosql.SystemSessionProperties.getQueryRetryAttempts;
 import static io.prestosql.SystemSessionProperties.getRetryDelayScaleFactor;
 import static io.prestosql.SystemSessionProperties.getRetryInitialDelay;
 import static io.prestosql.SystemSessionProperties.getRetryMaxDelay;
@@ -228,7 +227,6 @@ public class SqlQueryScheduler
     private final CoordinatorStagesScheduler coordinatorStagesScheduler;
 
     private final RetryPolicy retryPolicy;
-    private final int maxQueryRetryAttempts;
     private final int maxTaskRetryAttemptsOverall;
     private final int maxTaskRetryAttemptsPerTask;
     private final int maxTasksWaitingForNodePerStage;
@@ -474,7 +472,6 @@ public class SqlQueryScheduler
         this.stageSchedulers = stageSchedulerBuilder.build();
         this.stageLinkages = stageLinkageBuilder.build();
 
-        maxQueryRetryAttempts = getQueryRetryAttempts(queryStateMachine.getSession());
         maxTaskRetryAttemptsOverall = getTaskRetryAttemptsOverall(queryStateMachine.getSession());
         maxTaskRetryAttemptsPerTask = getTaskRetryAttemptsPerTask(queryStateMachine.getSession());
         maxTasksWaitingForNodePerStage = getMaxTasksWaitingForNodePerStage(queryStateMachine.getSession());
@@ -1286,7 +1283,6 @@ public class SqlQueryScheduler
             return Optional.empty();
         }
 
-        //TODO(SURYA): this function is not implemented in olk, need to see if it is required.
         DistributedStagesScheduler stagesScheduler;
         switch (retryPolicy) {
             case TASK:
@@ -1624,7 +1620,6 @@ public class SqlQueryScheduler
             if (childStages.isEmpty()) {
                 return parent;
             }
-            //Todo(SURYA): add a flag to indicate coordinator only. Introduced as part of adding failure injection tests
             return new StageInfo(
                     parent.getStageId(),
                     parent.getState(),
@@ -1899,7 +1894,6 @@ public class SqlQueryScheduler
             queryStateMachine.addOutputTaskFailureListener(failureReporter);
 
             String catalogName = queryStateMachine.getSession().getCatalog().orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog is not present"));
-            //TODO(SURYA): passing keepConsumerOnFeederNodes as false and feederScheduledNOdes as emptyMap.
             InternalNode coordinator = nodeScheduler.createNodeSelector(new CatalogName(catalogName), false, ImmutableMap.of()).selectCurrentNode();
             for (StageExecution stageExecution : stageExecutions) {
                 Optional<RemoteTask> remoteTask = stageExecution.scheduleTask(
@@ -1908,7 +1902,6 @@ public class SqlQueryScheduler
                         ImmutableMultimap.of(),
                         ImmutableMultimap.of());
                 stageExecution.schedulingComplete();
-                //TODO(SURYA): addSourceTaskFailureListener -> sqlTaskManager needs to have many changes to be done.
                 remoteTask.ifPresent(task -> coordinatorTaskManager.addSourceTaskFailureListener(task.getTaskId(), failureReporter));
             }
         }
@@ -1965,7 +1958,6 @@ public class SqlQueryScheduler
         }
     }
 
-    //TODO(SURYA): This is used in pipelinedDistributedStagesScheduler
     private static class TaskLifecycleListenerBridge
             implements TaskLifecycleListener
     {
