@@ -14,7 +14,7 @@ MinMaxIndex用于调度时的分片过滤，被coordinator节点使用。
 
 在对数据进行排序的列上具有过滤predicate的query可以从MinMaxIndex中得到好的效果。
 
-例如，如果一下数据是根据`age`来排序的，那么一个像`SELECT name from users WHERE age> 25`
+例如，如果以下数据是根据`age`来排序的，那么一个像`SELECT name from users WHERE age> 25`
 之类的query则可以因有效地在`age`上利用MinMaxIndex，而从中得到好的效果。
 
 ## 支持的运算符
