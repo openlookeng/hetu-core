@@ -96,7 +96,8 @@ public class SqlTaskExecutionFactory
                 cpuTimerEnabled,
                 totalPartitions,
                 consumer,
-                new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), isExchangeCompressionEnabled(session)));
+                new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockEncodingSerde(), isExchangeCompressionEnabled(session)),
+                new PagesSerdeFactory(metadata.getFunctionAndTypeManager().getBlockKryoEncodingSerde(), isExchangeCompressionEnabled(session)));
 
         LocalExecutionPlan localExecutionPlan = null;
         try (SetThreadName ignored = new SetThreadName("Task-%s", taskStateMachine.getTaskId())) {

@@ -15,10 +15,13 @@ package io.prestosql.execution.buffer;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.Page;
 
 import javax.validation.constraints.NotNull;
 
@@ -155,4 +158,22 @@ public interface OutputBuffer
      * @return the peak memory usage of this output buffer.
      */
     long getPeakMemoryUsage();
+
+    /**
+     * @return true in case of spooling output buffer.
+     */
+    default boolean isSpoolingOutputBuffer()
+    {
+        return false;
+    }
+
+    default DirectSerialisationType getExchangeDirectSerialisationType()
+    {
+        return DirectSerialisationType.OFF;
+    }
+
+    default void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    {
+        return;
+    }
 }

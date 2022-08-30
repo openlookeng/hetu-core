@@ -19,9 +19,16 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.ExchangeId;
+import io.prestosql.exchange.ExchangeManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.ExchangeSource;
+import io.prestosql.exchange.ExchangeSourceHandle;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -32,11 +39,6 @@ import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.UpdatablePageSource;
-import io.prestosql.spi.exchange.ExchangeId;
-import io.prestosql.spi.exchange.ExchangeManager;
-import io.prestosql.spi.exchange.ExchangeSource;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
@@ -255,24 +257,37 @@ public class ExchangeOperator
     @Override
     public Page getOutput()
     {
-        SerializedPage page;
-        if (snapshotState != null) {
-            page = snapshotState.processSerializedPage(() -> exchangeDataSource.pollPage(id)).orElse(null);
+        DirectSerialisationType directSerialisationType = exchangeDataSource.getDirectSerialisationType();
+        if (exchangeDataSource.isSpoolingExchangeSource() && directSerialisationType != DirectSerialisationType.OFF) {
+            Page page;
+            PagesSerde directSerde = (directSerialisationType == DirectSerialisationType.JAVA) ? operatorContext.getDriverContext().getJavaSerde() : operatorContext.getDriverContext().getKryoSerde();
+            page = exchangeDataSource.pollPageDirect(id, directSerde);
+            if (page == null) {
+                return null;
+            }
+            operatorContext.recordNetworkInput(page.getSizeInBytes(), page.getPositionCount());
+            operatorContext.recordProcessedInput(page.getSizeInBytes(), page.getPositionCount());
+            return page;
         }
         else {
-            // origin not needed in this case
-            page = exchangeDataSource.pollPage(id).getLeft();
+            SerializedPage page;
+            if (snapshotState != null) {
+                page = snapshotState.processSerializedPage(() -> exchangeDataSource.pollPage(id)).orElse(null);
+            }
+            else {
+                // origin not needed in this case
+                page = exchangeDataSource.pollPage(id).getLeft();
+            }
+            if (page == null) {
+                return null;
+            }
+
+            operatorContext.recordNetworkInput(page.getSizeInBytes(), page.getPositionCount());
+
+            Page deserializedPage = operatorContext.getDriverContext().getSerde().deserialize(page);
+            operatorContext.recordProcessedInput(deserializedPage.getSizeInBytes(), page.getPositionCount());
+            return deserializedPage;
         }
-        if (page == null) {
-            return null;
-        }
-
-        operatorContext.recordNetworkInput(page.getSizeInBytes(), page.getPositionCount());
-
-        Page deserializedPage = operatorContext.getDriverContext().getSerde().deserialize(page);
-        operatorContext.recordProcessedInput(deserializedPage.getSizeInBytes(), page.getPositionCount());
-
-        return deserializedPage;
     }
 
     @Override
@@ -343,6 +358,21 @@ public class ExchangeOperator
 
         @Override
         void close();
+
+        default boolean isSpoolingExchangeSource()
+        {
+            return false;
+        }
+
+        default DirectSerialisationType getDirectSerialisationType()
+        {
+            return DirectSerialisationType.OFF;
+        }
+
+        default Page pollPageDirect(String id, PagesSerde directSerde)
+        {
+            return null;
+        }
     }
 
     private static class LazyExchangeDataSource
@@ -560,6 +590,33 @@ public class ExchangeOperator
                 directExchangeDataSource.noMoreTargets();
             }
         }
+
+        @Override
+        public boolean isSpoolingExchangeSource()
+        {
+            return delegate.get() != null && delegate.get().isSpoolingExchangeSource();
+        }
+
+        @Override
+        public DirectSerialisationType getDirectSerialisationType()
+        {
+            DirectSerialisationType type = DirectSerialisationType.OFF;
+            if (delegate.get() != null) {
+                type = delegate.get().getDirectSerialisationType();
+            }
+            return type;
+        }
+
+        @Override
+        public Page pollPageDirect(String id, PagesSerde directSerde)
+        {
+            ExchangeDataSource dataSource = delegate.get();
+            if (dataSource instanceof SpoolingExchangeDataSource) {
+                SpoolingExchangeDataSource spoolingExchangeDataSource = (SpoolingExchangeDataSource) dataSource;
+                return spoolingExchangeDataSource.pollPageDirect(id, directSerde);
+            }
+            return null;
+        }
     }
 
     private static class DirectExchangeDataSource
@@ -698,6 +755,23 @@ public class ExchangeOperator
         }
 
         @Override
+        public Page pollPageDirect(String id, PagesSerde directSerde)
+        {
+            ExchangeSource spoolExchangeSource = this.exchangeSource;
+            if (spoolExchangeSource == null) {
+                return null;
+            }
+
+            Page page = spoolExchangeSource.readPage(directSerde);
+            systemMemoryContext.setBytes(spoolExchangeSource.getMemoryUsage());
+            // If the data source has been closed in a meantime reset memory usage back to 0
+            if (closed) {
+                systemMemoryContext.setBytes(0);
+            }
+            return page;
+        }
+
+        @Override
         public boolean isFinished()
         {
             ExchangeSource spoolExchangeSource = this.exchangeSource;
@@ -762,6 +836,22 @@ public class ExchangeOperator
                 exchangeSource = null;
                 systemMemoryContext.setBytes(0);
             }
+        }
+
+        @Override
+        public boolean isSpoolingExchangeSource()
+        {
+            return true;
+        }
+
+        @Override
+        public DirectSerialisationType getDirectSerialisationType()
+        {
+            ExchangeSource spoolExchangeSource = this.exchangeSource;
+            if (spoolExchangeSource == null) {
+                return null;
+            }
+            return spoolExchangeSource.getDirectSerialisationType();
         }
     }
 }

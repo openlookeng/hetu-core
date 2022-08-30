@@ -20,13 +20,15 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.ExchangeSink;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.spi.Page;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.ExchangeSink;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -315,6 +317,11 @@ public class TestSpoolingExchangeOutputBuffer
         public void add(String taskFullId, int partitionId, Slice data, int rowCount)
         {
             this.dataBuffer.put(partitionId, data);
+        }
+
+        @Override
+        public void add(int partitionId, Page page, PagesSerde directSerde)
+        {
         }
 
         public ListMultimap<Integer, Slice> getDataBuffer()

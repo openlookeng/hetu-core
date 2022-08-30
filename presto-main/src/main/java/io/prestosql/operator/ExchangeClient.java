@@ -25,6 +25,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
@@ -34,7 +35,6 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.apache.commons.lang3.tuple.Pair;
 
