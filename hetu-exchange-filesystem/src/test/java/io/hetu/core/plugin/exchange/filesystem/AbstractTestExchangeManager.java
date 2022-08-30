@@ -20,6 +20,7 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.exchange.Exchange;
 import io.prestosql.spi.exchange.ExchangeContext;
@@ -240,7 +241,7 @@ public abstract class AbstractTestExchangeManager
             SliceOutput sliceOutput = Slices.allocate(slice.length() + Integer.BYTES).getOutput();
             sliceOutput.writeInt(slice.length());
             sliceOutput.writeBytes(slice);
-            sink.add(key, sliceOutput.slice());
+            sink.add("query.0.0.0", key, sliceOutput.slice(), 1);
         });
         if (finish) {
             getFutureValue(sink.finish());
@@ -262,8 +263,13 @@ public abstract class AbstractTestExchangeManager
             while (!source.isFinished()) {
                 Slice data = source.read();
                 if (data != null) {
-                    String s = data.toStringUtf8();
-                    result.add(s);
+                    try {
+                        PagesSerdeUtil.readSerializedPage(data);
+                    }
+                    catch (IndexOutOfBoundsException e) { // not a marker page
+                        String s = data.toStringUtf8();
+                        result.add(s);
+                    }
                 }
             }
         }

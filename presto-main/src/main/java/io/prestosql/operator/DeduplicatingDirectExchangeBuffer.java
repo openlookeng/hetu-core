@@ -550,11 +550,14 @@ public class DeduplicatingDirectExchangeBuffer
             for (SerializedPage page : pages) {
                 // wait for the sink to unblock
                 getUnchecked(exchangeSink.isBlocked());
+                int sizeRequired = page.calculateSerializationSizeInBytes()
+                        + Integer.BYTES * 3;
+                writeBuffer.writeInt(sizeRequired);
                 writeBuffer.writeInt(taskId.getStageId().getId());
                 writeBuffer.writeInt(taskId.getId());
                 writeBuffer.writeInt(taskId.getAttemptId());
                 PagesSerdeUtil.writeSerializedPage(writeBuffer, page);
-                exchangeSink.add(0, writeBuffer.slice());
+                exchangeSink.add(taskId.toString(), 0, writeBuffer.slice(), page.getPositionCount());
                 writeBuffer.reset();
                 spilledBytes += page.getSizeInBytes();
                 spilledPageCount++;
@@ -785,7 +788,11 @@ public class DeduplicatingDirectExchangeBuffer
                 if (!selectedTasks.contains(taskId)) {
                     continue;
                 }
-                return PagesSerdeUtil.readSerializedPage(buffer.slice(Integer.BYTES * 3, buffer.length() - Integer.BYTES * 3));
+                SerializedPage serializedPage = PagesSerdeUtil.readSerializedPage(buffer.slice(Integer.BYTES * 3, buffer.length() - Integer.BYTES * 3));
+                if (serializedPage.isExchangeMarkerPage()) {
+                    return getNext();
+                }
+                return serializedPage;
             }
             close();
             return null;

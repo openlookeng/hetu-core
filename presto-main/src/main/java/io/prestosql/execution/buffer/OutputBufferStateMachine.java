@@ -35,16 +35,25 @@ import static java.util.Objects.requireNonNull;
 public class OutputBufferStateMachine
 {
     private final StateMachine<BufferState> state;
+    private final TaskId taskId;
+
+    public TaskId getTaskId()
+    {
+        return taskId;
+    }
+
     private final AtomicReference<Throwable> failure = new AtomicReference<>();
 
     public OutputBufferStateMachine(TaskId taskId, Executor executor)
     {
+        this.taskId = taskId;
         state = new StateMachine<>(taskId + "-buffer", executor, OPEN, TERMINAL_BUFFER_STATES);
     }
 
     public OutputBufferStateMachine(String name, Executor executor)
     {
         state = new StateMachine<>(name, executor, OPEN, TERMINAL_BUFFER_STATES);
+        this.taskId = null;
     }
 
     public boolean setIf(BufferState newState, Predicate<BufferState> predicate)

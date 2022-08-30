@@ -312,7 +312,7 @@ public class TestSpoolingExchangeOutputBuffer
         }
 
         @Override
-        public void add(int partitionId, Slice data)
+        public void add(String taskFullId, int partitionId, Slice data, int rowCount)
         {
             this.dataBuffer.put(partitionId, data);
         }

@@ -16,6 +16,7 @@ package io.hetu.core.plugin.exchange.filesystem;
 import com.google.common.collect.ImmutableList;
 import io.hetu.core.plugin.exchange.filesystem.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.checksum.CheckSumAlgorithm;
 import io.prestosql.spi.exchange.Exchange;
 import io.prestosql.spi.exchange.ExchangeContext;
 import io.prestosql.spi.exchange.ExchangeManager;
@@ -28,6 +29,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.inject.Inject;
+import javax.validation.constraints.NotNull;
 
 import java.net.URI;
 import java.security.NoSuchAlgorithmException;
@@ -64,6 +66,9 @@ public class FileSystemExchangeManager
     private final int exchangeSourceConcurrentReaders;
     private final int maxOutputPartitionCount;
     private final int exchangeFileListingParallelism;
+    private final int maxNumberOfPagesPerMarker;
+    private final long maxSizePerMarkerInBytes;
+    private final @NotNull CheckSumAlgorithm checkSumAlgorithm;
     private final ExecutorService executor;
 
     FileSystemExchangeConfig exchangeConfig;
@@ -88,6 +93,9 @@ public class FileSystemExchangeManager
         this.maxOutputPartitionCount = config.getMaxOutputPartitionCount();
         this.exchangeFileListingParallelism = config.getExchangeFileListingParallelism();
         this.executor = newCachedThreadPool(daemonThreadsNamed("exchange-source-handles-creation-%s"));
+        this.maxNumberOfPagesPerMarker = config.getMaxNumberOfPagesPerMarker();
+        this.maxSizePerMarkerInBytes = config.getMaxSizePerMarker().toBytes();
+        this.checkSumAlgorithm = config.getCheckSumAlgorithm();
         this.exchangeConfig = config;
     }
 
@@ -106,7 +114,7 @@ public class FileSystemExchangeManager
                 secretKey = Optional.of(keyGenerator.generateKey());
             }
             catch (NoSuchAlgorithmException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to generate secret key: " + e.getMessage(), e);
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to digest secret key: " + e.getMessage(), e);
             }
         }
         return new FileSystemExchange(
@@ -136,7 +144,10 @@ public class FileSystemExchangeManager
                 maxPageStorageSizeInBytes,
                 exchangeSinkBufferPoolMinSize,
                 exchangeSinkBuffersPerPartition,
-                exchangeSinkMaxFileSizeInBytes);
+                exchangeSinkMaxFileSizeInBytes,
+                checkSumAlgorithm,
+                maxNumberOfPagesPerMarker,
+                maxSizePerMarkerInBytes);
     }
 
     @Override

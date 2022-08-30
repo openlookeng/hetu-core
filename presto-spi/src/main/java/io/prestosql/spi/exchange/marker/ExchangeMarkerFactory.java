@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,23 +12,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.spi.exchange;
+package io.prestosql.spi.exchange.marker;
 
-import io.airlift.slice.Slice;
+import io.prestosql.spi.checksum.CheckSumAlgorithm;
 
-import java.util.concurrent.CompletableFuture;
-
-public interface ExchangeSink
+public interface ExchangeMarkerFactory
 {
-    CompletableFuture<Void> NOT_BLOCKED = CompletableFuture.completedFuture(null);
-
-    CompletableFuture<Void> isBlocked();
-
-    void add(String taskFullId, int partitionId, Slice data, int rowCount);
-
-    long getMemoryUsage();
-
-    CompletableFuture<Void> finish();
-
-    CompletableFuture<Void> abort();
+    ExchangeMarker create(String taskId, long offset, CheckSumAlgorithm algorithm);
 }
