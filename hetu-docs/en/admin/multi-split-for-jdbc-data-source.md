@@ -6,7 +6,7 @@ This function applies to JDBC data sources. Data tables to be read are divided i
 
 ## Properties
 
-Multi-split management is based on connectors. For a data table with this function enabled, add the following attributes to the configuration file of the connector to which the data table belong. For example, the configuration file corresponding to the **mysql** connector is **etc/mysql.properties**.
+Multi-split management is based on connectors. For a data table with this function enabled, add the following attributes to the configuration file of the connector to which the data table belong. For example, the configuration file corresponding to the **mysql** connector is **etc/catalog/mysql.properties**.
 
 Property list:
 
