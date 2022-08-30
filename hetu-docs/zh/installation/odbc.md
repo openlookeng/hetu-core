@@ -22,9 +22,9 @@ ODBC驱动为应用提供了连接到数据库的能力，本产品为openLooKen
 
 **本产品支持以下版本:**
 
-- Winodows 10 64bit
+- Windows 10 64bit
 
-- Winodows Server 2016 64bit
+- Windows Server 2016 64bit
 
 > 其他版本的Windows系统未经过严格测试，用户可以自己尝试，本产品不做任何质量保证
 
