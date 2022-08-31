@@ -52,7 +52,7 @@ public class ExampleNullFunction
 ```
 
 函数 ``is_null`` 接受单个 ``VARCHAR`` 参数并返回一个 ``BOOLEAN`` 值，指示该参数是否为 ``NULL``。
-请注意，该函数的参数类型是 ``slice``。
+请注意，该函数的参数类型是 ``Slice``。
 ``VARCHAR`` 使用 ``Slice``，后者本质上是一个对 ``byte[]`` 进行包装的包装器，而不是用于其本地容器类型的 ``String``。
 
 
