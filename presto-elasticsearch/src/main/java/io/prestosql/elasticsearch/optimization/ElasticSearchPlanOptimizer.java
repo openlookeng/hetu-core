@@ -25,6 +25,6 @@ public class ElasticSearchPlanOptimizer implements ConnectorPlanOptimizer {
         if (!elasticsearchConfig.isPushDownEnabled()) {
             return maxSubPlan;
         }
-        return null;
+        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator,session,types, symbolAllocator), null);
     }
 }
