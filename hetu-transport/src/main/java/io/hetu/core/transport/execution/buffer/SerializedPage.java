@@ -13,13 +13,10 @@
  */
 package io.hetu.core.transport.execution.buffer;
 
-import com.esotericsoftware.kryo.io.Output;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
-import io.prestosql.spi.exchange.marker.ExchangeMarker;
-import io.prestosql.spi.exchange.marker.HetuFileSystemExchangeMarker;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.snapshot.Restorable;
@@ -33,10 +30,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.COMPRESSED;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.ENCRYPTED;
-import static io.hetu.core.transport.execution.buffer.PageCodecMarker.EXCHANGE_MARKER_PAGE;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.MARKER_PAGE;
 import static io.hetu.core.transport.execution.buffer.PageCodecMarker.MarkerSet.fromByteValue;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class SerializedPage
@@ -53,15 +48,7 @@ public class SerializedPage
     public static SerializedPage forMarker(MarkerPage marker)
     {
         byte[] bytes = marker.serialize();
-        return new SerializedPage(bytes, MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
-    }
-
-    public static SerializedPage forExchangeMarker(ExchangeMarker marker)
-    {
-        byte[] bytes = marker.serialize();
-        Properties properties = new Properties();
-        properties.put("markerid", marker.getId());
-        return new SerializedPage(bytes, EXCHANGE_MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length, properties);
+        return new SerializedPage(bytes, PageCodecMarker.MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
     }
 
     @JsonCreator
@@ -111,15 +98,6 @@ public class SerializedPage
     public SerializedPage(Slice slice, PageCodecMarker.MarkerSet markers, int positionCount, int uncompressedSizeInBytes)
     {
         this(slice, markers, positionCount, uncompressedSizeInBytes, null);
-    }
-
-    public Slice toSlice()
-    {
-        int sizeRequired = calculateSerializationSizeInBytes();
-        Output output = new Output(sizeRequired + Integer.BYTES);
-        output.writeInt(sizeRequired);
-        SerializedPageSerde.serialize(output, this);
-        return Slices.wrappedBuffer(output.getBuffer());
     }
 
     public int getSizeInBytes()
@@ -182,17 +160,6 @@ public class SerializedPage
         return MarkerPage.deserialize(getSliceArray());
     }
 
-    public boolean isExchangeMarkerPage()
-    {
-        return EXCHANGE_MARKER_PAGE.isSet(pageCodecMarkers);
-    }
-
-    public ExchangeMarker toExchangeMarker()
-    {
-        checkState(isExchangeMarkerPage());
-        return HetuFileSystemExchangeMarker.deserialize(getSliceArray());
-    }
-
     @JsonProperty
     public Properties getPageMetadata()
     {
@@ -230,27 +197,6 @@ public class SerializedPage
                 serializedPageState.pageCodecMarkers,
                 serializedPageState.positionCount,
                 serializedPageState.uncompressedSizeInBytes);
-    }
-
-    public int calculateSerializationSizeInBytes()
-    {
-        int sizeInBytes = Integer.BYTES     // positionCount
-                + Byte.BYTES                // pageCodecMarkers
-                + Integer.BYTES             // uncompressedSizeInBytes
-                + Integer.BYTES             // slice length
-                + slice.length(); // slice data
-        if (pageMetadata.size() != 0) {
-            String pageProperties = pageMetadata.toString();
-            byte[] propertiesByte = pageProperties
-                    .replaceAll(",", System.lineSeparator())
-                    .substring(1, pageProperties.length() - 1)
-                    .getBytes(UTF_8);
-            sizeInBytes += Integer.BYTES + propertiesByte.length;
-        }
-        else {
-            sizeInBytes += Integer.BYTES;
-        }
-        return sizeInBytes;
     }
 
     private static class SerializedPageState

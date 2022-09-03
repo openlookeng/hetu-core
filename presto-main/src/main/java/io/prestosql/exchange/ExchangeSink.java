@@ -26,7 +26,7 @@ public interface ExchangeSink
 
     CompletableFuture<Void> isBlocked();
 
-    void add(String taskFullId, int partitionId, Slice data, int rowCount);
+    void add(int partitionId, Slice page);
 
     void add(int partitionId, Page page, PagesSerde directSerde);
 

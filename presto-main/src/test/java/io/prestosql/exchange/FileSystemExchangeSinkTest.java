@@ -40,13 +40,13 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class FileSystemExchangeSinkTest
 {
     private ExchangeSink exchangeSink;
     private Slice serializedPageSlice;
-    private SerializedPage serializedPage;
 
     @BeforeMethod
     public void setUp() throws IOException
@@ -79,11 +79,11 @@ public class FileSystemExchangeSinkTest
         Block expectedBlock = expectedBlockBuilder.build();
 
         Page expectedPage = new Page(expectedBlock, expectedBlock, expectedBlock);
-        serializedPage = serde.serialize(expectedPage);
+        SerializedPage page = serde.serialize(expectedPage);
 
-        int sizeRequired = serializedPage.calculateSerializationSizeInBytes();
+        int sizeRequired = calculateSerializedPageSizeInBytes(page);
         Output output = new Output(sizeRequired);
-        SerializedPageSerde.serialize(output, serializedPage);
+        SerializedPageSerde.serialize(output, page);
         serializedPageSlice = Slices.wrappedBuffer(output.getBuffer());
     }
 
@@ -97,11 +97,32 @@ public class FileSystemExchangeSinkTest
     {
     }
 
+    private int calculateSerializedPageSizeInBytes(SerializedPage page)
+    {
+        int sizeInBytes = Integer.BYTES     // positionCount
+                + Byte.BYTES                // pageCodecMarkers
+                + Integer.BYTES             // uncompressedSizeInBytes
+                + Integer.BYTES             // slice length
+                + page.getSlice().length(); // slice data
+        if (page.getPageMetadata().size() != 0) {
+            String pageProperties = page.getPageMetadata().toString();
+            byte[] propertiesByte = pageProperties
+                    .replaceAll(",", System.lineSeparator())
+                    .substring(1, pageProperties.length() - 1)
+                    .getBytes(UTF_8);
+            sizeInBytes += Integer.BYTES + propertiesByte.length;
+        }
+        else {
+            sizeInBytes += Integer.BYTES;
+        }
+        return sizeInBytes;
+    }
+
     @Test
     public void testAdd()
     {
         requireNonNull(exchangeSink, "exchangeSink is null");
-        exchangeSink.add("query.0.0.0", 0, serializedPageSlice, 1);
+        exchangeSink.add(0, serializedPageSlice);
         exchangeSink.finish();
     }
 
@@ -109,7 +130,7 @@ public class FileSystemExchangeSinkTest
     public void testAbort()
     {
         requireNonNull(exchangeSink, "exchangeSink is null");
-        exchangeSink.add("", 0, serializedPageSlice, serializedPage.getPositionCount());
+        exchangeSink.add(0, serializedPageSlice);
         exchangeSink.abort();
     }
 }
