@@ -83,7 +83,7 @@ public class HetuFileSystemExchangeWriter
                     this.outputStream = new OutputStreamSliceOutput(fileSystemClient.newOutputStream(path), directSerialisationBufferSize);
                 }
                 else {
-                    this.outputStream = fileSystemClient.newOutputStream(path);
+                    this.outputStream = new OutputStreamSliceOutput(fileSystemClient.newOutputStream(path), directSerialisationBufferSize);
                 }
             }
         }

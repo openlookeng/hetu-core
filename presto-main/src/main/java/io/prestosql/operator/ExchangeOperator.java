@@ -742,15 +742,13 @@ public class ExchangeOperator
 
             Slice slice = spoolExchangeSource.read();
             SerializedPage page = slice != null ? PagesSerdeUtil.readSerializedPage(slice) : null;
-            if (page != null && page.isExchangeMarkerPage()) {
-                return pollPage(target);
-            }
             systemMemoryContext.setBytes(spoolExchangeSource.getMemoryUsage());
 
             // If the data source has been closed in a meantime reset memory usage back to 0
             if (closed) {
                 systemMemoryContext.setBytes(0);
             }
+
             return Pair.of(page, null);
         }
 

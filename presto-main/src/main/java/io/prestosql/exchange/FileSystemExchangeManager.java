@@ -17,13 +17,11 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.exchange.storage.FileSystemExchangeStorage;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.checksum.CheckSumAlgorithm;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import javax.inject.Inject;
-import javax.validation.constraints.NotNull;
 
 import java.net.URI;
 import java.security.NoSuchAlgorithmException;
@@ -60,9 +58,6 @@ public class FileSystemExchangeManager
     private final int exchangeSourceConcurrentReaders;
     private final int maxOutputPartitionCount;
     private final int exchangeFileListingParallelism;
-    private final int maxNumberOfPagesPerMarker;
-    private final long maxSizePerMarkerInBytes;
-    private final @NotNull CheckSumAlgorithm checkSumAlgorithm;
     private final ExecutorService executor;
     private final DirectSerialisationType directSerialisationType;
     private final int directSerialisationBufferSize;
@@ -90,9 +85,6 @@ public class FileSystemExchangeManager
         this.exchangeFileListingParallelism = config.getExchangeFileListingParallelism();
         this.directSerialisationBufferSize = toIntExact(config.getDirectSerialisationBufferSize().toBytes());
         this.executor = newCachedThreadPool(daemonThreadsNamed("exchange-source-handles-creation-%s"));
-        this.maxNumberOfPagesPerMarker = config.getMaxNumberOfPagesPerMarker();
-        this.maxSizePerMarkerInBytes = config.getMaxSizePerMarker().toBytes();
-        this.checkSumAlgorithm = config.getCheckSumAlgorithm();
         this.exchangeConfig = config;
         //TODO(Kishore): Need to enable compression and encryption for direct serde later
         directSerialisationType = (exchangeCompressionEnabled || exchangeEncryptionEnabled) ? DirectSerialisationType.OFF : config.getDirectSerializationType();
@@ -113,7 +105,7 @@ public class FileSystemExchangeManager
                 secretKey = Optional.of(keyGenerator.generateKey());
             }
             catch (NoSuchAlgorithmException e) {
-                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to digest secret key: " + e.getMessage(), e);
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to generate secret key: " + e.getMessage(), e);
             }
         }
         return new FileSystemExchange(
@@ -144,9 +136,6 @@ public class FileSystemExchangeManager
                 exchangeSinkBufferPoolMinSize,
                 exchangeSinkBuffersPerPartition,
                 exchangeSinkMaxFileSizeInBytes,
-                checkSumAlgorithm,
-                maxNumberOfPagesPerMarker,
-                maxSizePerMarkerInBytes,
                 directSerialisationType,
                 directSerialisationBufferSize);
     }

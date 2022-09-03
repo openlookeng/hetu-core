@@ -17,7 +17,6 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
 import io.airlift.units.DataSize;
-import io.prestosql.spi.checksum.CheckSumAlgorithm;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotEmpty;
@@ -32,7 +31,6 @@ import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.exchange.FileSystemExchangeManager.PATH_SEPARATOR;
-import static io.prestosql.spi.checksum.CheckSumAlgorithm.MURMUR3;
 
 public class FileSystemExchangeConfig
 {
@@ -48,10 +46,7 @@ public class FileSystemExchangeConfig
     private int maxOutputPartitionCount = 50;
     private int exchangeFileListingParallelism = 50;
     private String exchangeFilesystemType = "local";
-    private int maxNumberOfPagesPerMarker = 10;
-    private DataSize maxSizePerMarker = new DataSize(1, MEGABYTE);
-    private CheckSumAlgorithm checkSumAlgorithm = MURMUR3;
-    DirectSerialisationType directSerialisationType = DirectSerialisationType.OFF;
+    DirectSerialisationType directSerialisationType = DirectSerialisationType.JAVA;
     private DataSize directSerialisationBufferSize = new DataSize(16, KILOBYTE);
 
     public enum DirectSerialisationType
@@ -211,47 +206,6 @@ public class FileSystemExchangeConfig
     public FileSystemExchangeConfig setExchangeFilesystemType(String exchangeFilesystemType)
     {
         this.exchangeFilesystemType = exchangeFilesystemType;
-        return this;
-    }
-
-    @NotNull
-    public int getMaxNumberOfPagesPerMarker()
-    {
-        return maxNumberOfPagesPerMarker;
-    }
-
-    @Config("exchange.max-number-of-pages-per-marker")
-    public FileSystemExchangeConfig setMaxNumberOfPagesPerMarker(int numberOfPagesPerMarker)
-    {
-        this.maxNumberOfPagesPerMarker = numberOfPagesPerMarker;
-        return this;
-    }
-
-    @NotNull
-    public DataSize getMaxSizePerMarker()
-    {
-        return maxSizePerMarker;
-    }
-
-    @Config("exchange.max-size-per-marker")
-    @ConfigDescription("max size per marker (MB)")
-    public FileSystemExchangeConfig setMaxSizePerMarker(DataSize sizePerMarkerInBytes)
-    {
-        this.maxSizePerMarker = sizePerMarkerInBytes;
-        return this;
-    }
-
-    @NotNull
-    public CheckSumAlgorithm getCheckSumAlgorithm()
-    {
-        return checkSumAlgorithm;
-    }
-
-    @Config("exchange.checksum-algorithm")
-    @ConfigDescription("valid values {MD5, SHA256, SHA512, MURMUR3}")
-    public FileSystemExchangeConfig setCheckSumAlgorithm(String checkSumAlgorithm)
-    {
-        this.checkSumAlgorithm = CheckSumAlgorithm.valueOf(checkSumAlgorithm);
         return this;
     }
 

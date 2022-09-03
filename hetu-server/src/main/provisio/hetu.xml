@@ -317,12 +317,6 @@
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/hetu-exchange-filesystem">
-        <artifact id="${project.groupId}:hetu-exchange-filesystem:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
     <artifactSet to="plugin/hetu-metastore">
         <artifact id="${project.groupId}:hetu-metastore:zip:${project.version}">
             <unpack />

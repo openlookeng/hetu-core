@@ -2447,7 +2447,6 @@ public class SqlQueryScheduler
                     boolean allFinished = true;
                     for (FaultTolerantStageScheduler scheduler : schedulers) {
                         if (scheduler.isFinished()) {
-                            log.info("[SURYA] scheduler finished: " + scheduler.getStageId());
                             continue;
                         }
                         allFinished = false;

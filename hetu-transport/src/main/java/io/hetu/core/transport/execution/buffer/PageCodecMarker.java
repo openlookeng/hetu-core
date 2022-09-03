@@ -27,8 +27,7 @@ public enum PageCodecMarker
 {
     COMPRESSED(1),
     ENCRYPTED(2),
-    MARKER_PAGE(3),
-    EXCHANGE_MARKER_PAGE(4);
+    MARKER_PAGE(3);
 
     private final int mask;
 

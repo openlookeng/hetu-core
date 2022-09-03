@@ -795,7 +795,6 @@ public class StageTaskSourceFactory
                     currentSplitBatchFuture,
                     splitBatch -> {
                         synchronized (this) {
-                            log.info("[SURYA] number of splits in batch: " + splitBatch.getSplits().size());
                             for (Split split : splitBatch.getSplits()) {
                                 if (split.isRemotelyAccessible()) {
                                     remotelyAccessibleSplitBuffer.add(split);
@@ -811,7 +810,6 @@ public class StageTaskSourceFactory
 
                             ImmutableList.Builder<TaskDescriptor> readyTasksBuilder = ImmutableList.builder();
                             boolean isLastBatch = splitBatch.isLastBatch();
-                            log.info("[SURYA] isLastBatch: " + splitBatch.isLastBatch());
                             readyTasksBuilder.addAll(getReadyTasks(
                                     remotelyAccessibleSplitBuffer,
                                     ImmutableList.of(),
@@ -908,7 +906,6 @@ public class StageTaskSourceFactory
         @Override
         public synchronized boolean isFinished()
         {
-            log.info("[SURYA] taskSource is Finished");
             return finished;
         }
 

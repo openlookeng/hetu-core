@@ -13,12 +13,15 @@
  */
 package io.prestosql.execution.buffer;
 
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
+import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.hetu.core.transport.execution.buffer.SerializedPageSerde;
 import io.prestosql.exchange.ExchangeSink;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -36,6 +39,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static io.hetu.core.transport.execution.buffer.PagesSerde.getSerializedPagePositionCount;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class SpoolingExchangeOutputBuffer
@@ -188,6 +192,27 @@ public class SpoolingExchangeOutputBuffer
         enqueue(0, pages, origin);
     }
 
+    private int calculateSerializedPageSizeInBytes(SerializedPage page)
+    {
+        int sizeInBytes = Integer.BYTES     // positionCount
+                + Byte.BYTES                // pageCodecMarkers
+                + Integer.BYTES             // uncompressedSizeInBytes
+                + Integer.BYTES             // slice length
+                + page.getSlice().length(); // slice data
+        if (page.getPageMetadata().size() != 0) {
+            String pageProperties = page.getPageMetadata().toString();
+            byte[] propertiesByte = pageProperties
+                    .replaceAll(",", System.lineSeparator())
+                    .substring(1, pageProperties.length() - 1)
+                    .getBytes(UTF_8);
+            sizeInBytes += Integer.BYTES + propertiesByte.length;
+        }
+        else {
+            sizeInBytes += Integer.BYTES;
+        }
+        return sizeInBytes;
+    }
+
     @Override
     public void enqueue(int partition, List<SerializedPage> pages, String origin)
     {
@@ -197,9 +222,11 @@ public class SpoolingExchangeOutputBuffer
         }
         ExchangeSink sink = exchangeSink;
         checkState(sink != null, "exchangeSink is null");
-        String taskFullId = stateMachine.getTaskId().toString();
         for (SerializedPage page : pages) {
-            sink.add(taskFullId, partition, page.toSlice(), page.getPositionCount());
+            int sizeRequired = calculateSerializedPageSizeInBytes(page);
+            Output output = new Output(sizeRequired);
+            SerializedPageSerde.serialize(output, page);
+            sink.add(partition, Slices.wrappedBuffer(output.getBuffer()));
             totalRowsAdded.addAndGet(getSerializedPagePositionCount(page.getSlice()));
         }
         updateMemoryUsage(sink.getMemoryUsage());
