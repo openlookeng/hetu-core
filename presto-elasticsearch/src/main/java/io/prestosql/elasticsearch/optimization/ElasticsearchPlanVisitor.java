@@ -65,12 +65,13 @@ public class ElasticsearchPlanVisitor extends PlanVisitor<PlanNode, Void> {
         if (!esQuery.isPresent()) {
             return Optional.empty();
         }
-        return Optional.empty();
-        /*TableScanNode tableScanNodeOriginal = (TableScanNode) node.getSource();
+
+        TableScanNode tableScanNodeOriginal = (TableScanNode) node.getSource();
         TableHandle tableHandleOriginal = tableScanNodeOriginal.getTable();
         ElasticsearchTableHandle connectorHandle = (ElasticsearchTableHandle)tableHandleOriginal.getConnectorHandle();
-        TableScanNode tableScanNodeNew = new TableScanNode(idAllocator.getNextId(), tableHandleOriginal, tableScanNodeOriginal.getOutputSymbols(), tableScanNodeOriginal.getAssignments(), tableScanNodeOriginal.getEnforcedConstraint(), Optional.of(predicate), tableScanNodeOriginal.getStrategy(), )
-        FilterNode filterNodeNew = new FilterNode(idAllocator.getNextId(), , predicate)*/
+        TableScanNode tableScanNodeNew = new TableScanNode(idAllocator.getNextId(), tableHandleOriginal, tableScanNodeOriginal.getOutputSymbols(), tableScanNodeOriginal.getAssignments(), tableScanNodeOriginal.getEnforcedConstraint(), Optional.of(predicate), tableScanNodeOriginal.getStrategy(), tableScanNodeOriginal.getReuseTableScanMappingId(), tableScanNodeOriginal.getConsumerTableScanNodeCount(), tableScanNodeOriginal.isForDelete());
+        FilterNode filterNodeNew = new FilterNode(idAllocator.getNextId(), tableScanNodeNew, predicate);
+        return Optional.of(filterNodeNew);
     }
 
     private Optional<String> convertPredicateToESQuery(RowExpression predicate) {
