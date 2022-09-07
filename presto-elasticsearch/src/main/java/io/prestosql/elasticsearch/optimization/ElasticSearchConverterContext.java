@@ -11,7 +11,7 @@ public class ElasticSearchConverterContext {
         return hasConversionFailed;
     }
 
-    public void setHasConversionFailed(boolean hasConversionFailed) {
-        this.hasConversionFailed = hasConversionFailed;
+    public void setConversionFailed() {
+        this.hasConversionFailed = true;
     }
 }
