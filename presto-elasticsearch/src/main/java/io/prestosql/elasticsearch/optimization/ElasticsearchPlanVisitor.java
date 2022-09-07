@@ -4,7 +4,6 @@ import com.google.inject.Inject;
 import io.prestosql.elasticsearch.ElasticsearchTableHandle;
 import io.prestosql.spi.SymbolAllocator;
 import io.prestosql.spi.connector.ConnectorSession;
-import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.*;
 import io.prestosql.spi.relation.RowExpression;
@@ -22,12 +21,15 @@ public class ElasticsearchPlanVisitor extends PlanVisitor<PlanNode, Void> {
     private final Map<String, Type> types;
     private final SymbolAllocator symbolAllocator;
 
+    private final ElasticSearchRowExpressionConverter rowExpressionConverter;
+
     @Inject
-    public ElasticsearchPlanVisitor(PlanNodeIdAllocator idAllocator, ConnectorSession session, Map<String, Type> types, SymbolAllocator symbolAllocator) {
+    public ElasticsearchPlanVisitor(PlanNodeIdAllocator idAllocator, ConnectorSession session, Map<String, Type> types, SymbolAllocator symbolAllocator, ElasticSearchRowExpressionConverter elasticSearchRowExpressionConverter) {
         this.idAllocator = idAllocator;
         this.session = session;
         this.types = types;
         this.symbolAllocator = symbolAllocator;
+        this.rowExpressionConverter = elasticSearchRowExpressionConverter;
     }
 
     private static PlanNode replaceChildren(PlanNode node, List<PlanNode> children)
@@ -69,12 +71,23 @@ public class ElasticsearchPlanVisitor extends PlanVisitor<PlanNode, Void> {
         TableScanNode tableScanNodeOriginal = (TableScanNode) node.getSource();
         TableHandle tableHandleOriginal = tableScanNodeOriginal.getTable();
         ElasticsearchTableHandle connectorHandle = (ElasticsearchTableHandle)tableHandleOriginal.getConnectorHandle();
-        TableScanNode tableScanNodeNew = new TableScanNode(idAllocator.getNextId(), tableHandleOriginal, tableScanNodeOriginal.getOutputSymbols(), tableScanNodeOriginal.getAssignments(), tableScanNodeOriginal.getEnforcedConstraint(), Optional.of(predicate), tableScanNodeOriginal.getStrategy(), tableScanNodeOriginal.getReuseTableScanMappingId(), tableScanNodeOriginal.getConsumerTableScanNodeCount(), tableScanNodeOriginal.isForDelete());
+
+        ElasticsearchTableHandle connectorHandleNew = new ElasticsearchTableHandle(connectorHandle.getSchema(), connectorHandle.getIndex(), connectorHandle.getQuery());
+        TableHandle tableHandleNew = new TableHandle(tableHandleOriginal.getCatalogName(), connectorHandleNew, tableHandleOriginal.getTransaction(), tableHandleOriginal.getLayout());
+        TableScanNode tableScanNodeNew = new TableScanNode(idAllocator.getNextId(), tableHandleNew, tableScanNodeOriginal.getOutputSymbols(), tableScanNodeOriginal.getAssignments(), tableScanNodeOriginal.getEnforcedConstraint(), Optional.of(predicate), tableScanNodeOriginal.getStrategy(), tableScanNodeOriginal.getReuseTableScanMappingId(), tableScanNodeOriginal.getConsumerTableScanNodeCount(), tableScanNodeOriginal.isForDelete());
         FilterNode filterNodeNew = new FilterNode(idAllocator.getNextId(), tableScanNodeNew, predicate);
+
         return Optional.of(filterNodeNew);
     }
 
     private Optional<String> convertPredicateToESQuery(RowExpression predicate) {
-        return null;
+        ElasticSearchConverterContext converterContext = new ElasticSearchConverterContext();
+        String queryString =  predicate.accept(this.rowExpressionConverter, converterContext);
+        if (converterContext.isHasConversionFailed()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(queryString);
+        }
+
     }
 }

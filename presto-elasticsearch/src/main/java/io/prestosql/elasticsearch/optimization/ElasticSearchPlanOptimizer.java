@@ -13,7 +13,7 @@ import java.util.Map;
 
 public class ElasticSearchPlanOptimizer implements ConnectorPlanOptimizer {
 
-    private ElasticsearchConfig elasticsearchConfig;
+    private final ElasticsearchConfig elasticsearchConfig;
 
     @Inject
     public ElasticSearchPlanOptimizer(ElasticsearchConfig elasticsearchConfig) {
@@ -25,6 +25,6 @@ public class ElasticSearchPlanOptimizer implements ConnectorPlanOptimizer {
         if (!elasticsearchConfig.isPushDownEnabled()) {
             return maxSubPlan;
         }
-        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator,session,types, symbolAllocator), null);
+        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator,session,types, symbolAllocator, new ElasticSearchRowExpressionConverter()), null);
     }
 }
