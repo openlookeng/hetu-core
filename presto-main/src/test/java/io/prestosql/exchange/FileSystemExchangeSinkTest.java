@@ -14,8 +14,6 @@
 package io.prestosql.exchange;
 
 import com.esotericsoftware.kryo.io.Output;
-import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
 import io.hetu.core.filesystem.HetuLocalFileSystemClient;
 import io.hetu.core.filesystem.LocalConfig;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
@@ -27,12 +25,15 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.testing.TestingPagesSerdeFactory;
+import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -46,7 +47,7 @@ import static java.util.Objects.requireNonNull;
 public class FileSystemExchangeSinkTest
 {
     private ExchangeSink exchangeSink;
-    private Slice serializedPageSlice;
+    private SerializedPage serializedPageSlice;
 
     @BeforeMethod
     public void setUp() throws IOException
@@ -84,7 +85,7 @@ public class FileSystemExchangeSinkTest
         int sizeRequired = calculateSerializedPageSizeInBytes(page);
         Output output = new Output(sizeRequired);
         SerializedPageSerde.serialize(output, page);
-        serializedPageSlice = Slices.wrappedBuffer(output.getBuffer());
+        serializedPageSlice = page;
     }
 
     @AfterMethod
@@ -124,6 +125,22 @@ public class FileSystemExchangeSinkTest
         requireNonNull(exchangeSink, "exchangeSink is null");
         exchangeSink.add(0, serializedPageSlice);
         exchangeSink.finish();
+    }
+
+    @Test
+    public void readDirectSer() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, ClassNotFoundException
+    {
+        FileSystemExchangeSink fileSystemExchangeSink = Mockito.mock(FileSystemExchangeSink.class);
+
+        Class<?> bufferedStorageWriter = Class.forName("FileSystemExchangeSink$BufferedStorageWriter");
+
+        Method createWriter = FileSystemExchangeSink.class.getDeclaredMethod("createWriter", Integer.TYPE);
+        createWriter.setAccessible(true);
+
+        Method write = bufferedStorageWriter.getDeclaredMethod("write", SerializedPage.class);
+        write.setAccessible(true);
+        Object writer = createWriter.invoke(fileSystemExchangeSink);
+        write.invoke(writer);
     }
 
     @Test

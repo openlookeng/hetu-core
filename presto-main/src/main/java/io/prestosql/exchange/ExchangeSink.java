@@ -13,8 +13,8 @@
  */
 package io.prestosql.exchange;
 
-import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.spi.Page;
 
@@ -26,7 +26,7 @@ public interface ExchangeSink
 
     CompletableFuture<Void> isBlocked();
 
-    void add(int partitionId, Slice page);
+    void add(int partitionId, SerializedPage page);
 
     void add(int partitionId, Page page, PagesSerde directSerde);
 

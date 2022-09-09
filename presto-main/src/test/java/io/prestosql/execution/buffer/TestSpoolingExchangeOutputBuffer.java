@@ -18,7 +18,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
@@ -226,7 +225,7 @@ public class TestSpoolingExchangeOutputBuffer
         outputBuffer.enqueue(0, ImmutableList.of(getSerializedPage()), "id");
         outputBuffer.enqueue(1, ImmutableList.of(getSerializedPage(), getSerializedPage()), "id");
 
-        ListMultimap<Integer, Slice> pageList = exchangeSink.getDataBuffer();
+        ListMultimap<Integer, SerializedPage> pageList = exchangeSink.getDataBuffer();
         assertEquals(pageList.size(), 3);
 
         outputBuffer.setNoMorePages();
@@ -255,7 +254,7 @@ public class TestSpoolingExchangeOutputBuffer
         outputBuffer.enqueue(0, ImmutableList.of(getSerializedPage()), "id");
         outputBuffer.enqueue(1, ImmutableList.of(getSerializedPage(), getSerializedPage()), "id");
 
-        ListMultimap<Integer, Slice> pageList = exchangeSink.getDataBuffer();
+        ListMultimap<Integer, SerializedPage> pageList = exchangeSink.getDataBuffer();
         assertEquals(pageList.size(), 3);
 
         outputBuffer.abort();
@@ -294,7 +293,7 @@ public class TestSpoolingExchangeOutputBuffer
     private static class TestingExchangeSink
             implements ExchangeSink
     {
-        private final ListMultimap<Integer, Slice> dataBuffer = ArrayListMultimap.create();
+        private final ListMultimap<Integer, SerializedPage> dataBuffer = ArrayListMultimap.create();
         private CompletableFuture<Void> blocked = CompletableFuture.completedFuture(null);
         private CompletableFuture<Void> finish = CompletableFuture.completedFuture(null);
         private CompletableFuture<Void> abort = CompletableFuture.completedFuture(null);
@@ -314,9 +313,9 @@ public class TestSpoolingExchangeOutputBuffer
         }
 
         @Override
-        public void add(int partitionId, Slice data)
+        public void add(int partitionId, SerializedPage page)
         {
-            this.dataBuffer.put(partitionId, data);
+            this.dataBuffer.put(partitionId, page);
         }
 
         @Override
@@ -324,7 +323,7 @@ public class TestSpoolingExchangeOutputBuffer
         {
         }
 
-        public ListMultimap<Integer, Slice> getDataBuffer()
+        public ListMultimap<Integer, SerializedPage> getDataBuffer()
         {
             return dataBuffer;
         }

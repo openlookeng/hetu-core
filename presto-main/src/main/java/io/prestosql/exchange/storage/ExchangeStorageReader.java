@@ -16,6 +16,7 @@ package io.prestosql.exchange.storage;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.spi.Page;
 
 import java.io.Closeable;
@@ -25,6 +26,8 @@ public interface ExchangeStorageReader
         extends Closeable
 {
     Slice read() throws IOException;
+
+    SerializedPage readSer() throws IOException;
 
     Page read(PagesSerde serde) throws IOException;
 

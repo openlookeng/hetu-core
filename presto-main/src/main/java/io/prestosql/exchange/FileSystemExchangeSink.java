@@ -22,6 +22,8 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.exchange.storage.ExchangeStorageWriter;
 import io.prestosql.exchange.storage.FileSystemExchangeStorage;
@@ -144,7 +146,7 @@ public class FileSystemExchangeSink
     }
 
     @Override
-    public void add(int partitionId, Slice data)
+    public void add(int partitionId, SerializedPage data)
     {
         throwIfFailed();
 
@@ -365,13 +367,13 @@ public class FileSystemExchangeSink
             return stringBuilder.toString();
         }
 
-        public synchronized void write(Slice data)
+        public synchronized void write(SerializedPage page)
         {
             if (closed) {
                 return;
             }
 
-            int requiredPageStorageSize = Integer.BYTES + data.length();
+            int requiredPageStorageSize = Integer.BYTES + page.getSizeInBytes();
             if (requiredPageStorageSize > maxPageStorageSizeInBytes) {
                 throw new PrestoException(NOT_SUPPORTED, format("Max page storage size of %s exceeded: %s",
                         succinctBytes(maxPageStorageSizeInBytes),
@@ -386,9 +388,9 @@ public class FileSystemExchangeSink
                 currentBuffer = null;
             }
 
-            writeInternal(Slices.wrappedIntArray(data.length()));
-            writeInternal(data);
-
+            if (bufferPool != null) {
+                PagesSerdeUtil.writeSerializedPage(bufferPool.take(), page);
+            }
             currentFileSize += requiredPageStorageSize;
         }
 

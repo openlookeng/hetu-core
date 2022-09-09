@@ -17,7 +17,6 @@ import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
@@ -226,7 +225,7 @@ public class SpoolingExchangeOutputBuffer
             int sizeRequired = calculateSerializedPageSizeInBytes(page);
             Output output = new Output(sizeRequired);
             SerializedPageSerde.serialize(output, page);
-            sink.add(partition, Slices.wrappedBuffer(output.getBuffer()));
+            sink.add(partition, page);
             totalRowsAdded.addAndGet(getSerializedPagePositionCount(page.getSlice()));
         }
         updateMemoryUsage(sink.getMemoryUsage());

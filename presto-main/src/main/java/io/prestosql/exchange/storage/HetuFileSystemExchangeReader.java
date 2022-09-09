@@ -19,8 +19,11 @@ import io.airlift.compress.snappy.SnappyFramedInputStream;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.ExchangeSourceFile;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.spi.Page;
@@ -108,6 +111,35 @@ public class HetuFileSystemExchangeReader
         sliceInput = getSliceInput(sourceFile);
         markerData = sliceInput.readInt();
         return sliceInput.readSlice(markerData);
+    }
+
+    @Override
+    public synchronized SerializedPage readSer()
+    {
+        int markerData;
+
+        if (closed) {
+            return null;
+        }
+
+        if (sliceInput != null && sliceInput.isReadable()) {
+            markerData = sliceInput.readInt();
+            LOG.debug("reading: markerData: " + markerData);
+            // Currently marker contains size of serialized page
+            Slice slice = Slices.allocate(markerData);
+            return PagesSerdeUtil.readSerializedPage(slice);
+        }
+
+        ExchangeSourceFile sourceFile = sourceFiles.poll();
+        if (sourceFile == null) {
+            close();
+            return null;
+        }
+
+        sliceInput = getSliceInput(sourceFile);
+        markerData = sliceInput.readInt();
+        Slice slice = Slices.allocate(markerData);
+        return PagesSerdeUtil.readSerializedPage(slice);
     }
 
     @Override

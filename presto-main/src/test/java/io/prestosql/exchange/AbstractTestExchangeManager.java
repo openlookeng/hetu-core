@@ -20,7 +20,10 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PageCodecMarker;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.snapshot.MarkerPage;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -232,7 +235,11 @@ public abstract class AbstractTestExchangeManager
             SliceOutput sliceOutput = Slices.allocate(slice.length() + Integer.BYTES).getOutput();
             sliceOutput.writeInt(slice.length());
             sliceOutput.writeBytes(slice);
-            sink.add(key, sliceOutput.slice());
+
+            MarkerPage marker = new MarkerPage(1, false);
+            byte[] bytes = marker.serialize();
+            SerializedPage page = new SerializedPage(bytes, PageCodecMarker.MARKER_PAGE.set(PageCodecMarker.none()), 1, bytes.length);
+            sink.add(key, page);
         });
         if (finish) {
             getFutureValue(sink.finish());

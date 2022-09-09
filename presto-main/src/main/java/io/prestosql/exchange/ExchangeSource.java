@@ -15,6 +15,7 @@ package io.prestosql.exchange;
 
 import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.spi.Page;
 
@@ -36,6 +37,9 @@ public interface ExchangeSource
 
     @Nullable
     Slice read();
+
+    @Nullable
+    SerializedPage readSer();
 
     long getMemoryUsage();
 

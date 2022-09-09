@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.exchange.storage.ExchangeStorageReader;
 import io.prestosql.exchange.storage.FileSystemExchangeStorage;
@@ -125,6 +126,28 @@ public class FileSystemExchangeSource
             if (reader.isBlocked().isDone() && !reader.isFinished()) {
                 try {
                     return reader.read();
+                }
+                catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public SerializedPage readSer()
+    {
+        if (closed) {
+            return null;
+        }
+
+        for (ExchangeStorageReader reader : readers) {
+            if (reader.isBlocked().isDone() && !reader.isFinished()) {
+                try {
+                    return reader.readSer();
                 }
                 catch (IOException e) {
                     throw new UncheckedIOException(e);

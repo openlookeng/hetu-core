@@ -589,6 +589,11 @@
             <artifactId>checker-qual</artifactId>
             <version>2.5.2</version>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

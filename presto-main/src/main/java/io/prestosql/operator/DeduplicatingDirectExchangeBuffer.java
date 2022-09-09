@@ -553,7 +553,7 @@ public class DeduplicatingDirectExchangeBuffer
                 writeBuffer.writeInt(taskId.getId());
                 writeBuffer.writeInt(taskId.getAttemptId());
                 PagesSerdeUtil.writeSerializedPage(writeBuffer, page);
-                exchangeSink.add(0, writeBuffer.slice());
+                exchangeSink.add(0, page);
                 writeBuffer.reset();
                 spilledBytes += page.getSizeInBytes();
                 spilledPageCount++;

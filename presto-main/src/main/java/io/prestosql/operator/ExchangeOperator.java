@@ -18,9 +18,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
-import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.exchange.ExchangeId;
 import io.prestosql.exchange.ExchangeManager;
@@ -740,8 +738,7 @@ public class ExchangeOperator
                 return null;
             }
 
-            Slice slice = spoolExchangeSource.read();
-            SerializedPage page = slice != null ? PagesSerdeUtil.readSerializedPage(slice) : null;
+            SerializedPage page = spoolExchangeSource.readSer();
             systemMemoryContext.setBytes(spoolExchangeSource.getMemoryUsage());
 
             // If the data source has been closed in a meantime reset memory usage back to 0
