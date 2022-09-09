@@ -26,12 +26,14 @@ import io.prestosql.orc.metadata.RowGroupIndex;
 import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
+import io.prestosql.orc.metadata.statistics.TimestampStatisticsBuilder;
 import io.prestosql.orc.stream.LongOutputStream;
 import io.prestosql.orc.stream.LongOutputStreamV2;
 import io.prestosql.orc.stream.PresentOutputStream;
 import io.prestosql.orc.stream.StreamDataOutput;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.IOException;
@@ -39,10 +41,13 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind.DIRECT_V2;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
 import static io.prestosql.orc.metadata.Stream.StreamKind.DATA;
@@ -68,11 +73,12 @@ public class TimestampColumnWriter
     private final List<ColumnStatistics> rowGroupColumnStatistics = new ArrayList<>();
     private final long baseTimestampInSeconds;
 
-    private int nonNullValueCount;
+    private final Supplier<TimestampStatisticsBuilder> statisticsBuilderSupplier;
+    private TimestampStatisticsBuilder statisticsBuilder;
 
     private boolean closed;
 
-    public TimestampColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize)
+    public TimestampColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<TimestampStatisticsBuilder> statisticsBuilderSupplier)
     {
         this.columnId = requireNonNull(columnId, "columnId is null");
         this.type = requireNonNull(type, "type is null");
@@ -82,6 +88,8 @@ public class TimestampColumnWriter
         this.nanosStream = new LongOutputStreamV2(compression, bufferSize, false, SECONDARY);
         this.presentStream = new PresentOutputStream(compression, bufferSize);
         this.baseTimestampInSeconds = OffsetDateTime.of(2015, 1, 1, 0, 0, 0, 0, UTC).toEpochSecond();
+        this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
     }
 
     @Override
@@ -141,7 +149,7 @@ public class TimestampColumnWriter
 
                 secondsStream.writeLong(seconds);
                 nanosStream.writeLong(encodedNanos);
-                nonNullValueCount++;
+                statisticsBuilder.addValue(value);
             }
         }
     }
@@ -150,9 +158,9 @@ public class TimestampColumnWriter
     public Map<OrcColumnId, ColumnStatistics> finishRowGroup()
     {
         checkState(!closed);
-        ColumnStatistics statistics = new ColumnStatistics((long) nonNullValueCount, 0, null, null, null, null, null, null, null, null);
+        ColumnStatistics statistics = statisticsBuilder.buildColumnStatistics();
         rowGroupColumnStatistics.add(statistics);
-        nonNullValueCount = 0;
+        statisticsBuilder = statisticsBuilderSupplier.get();
         return ImmutableMap.of(columnId, statistics);
     }
 
@@ -232,7 +240,7 @@ public class TimestampColumnWriter
     @Override
     public long getRetainedBytes()
     {
-        long retainedBytes = secondsStream.getRetainedBytes() + nanosStream.getRetainedBytes() + presentStream.getRetainedBytes();
+        long retainedBytes = INSTANCE_SIZE + secondsStream.getRetainedBytes() + nanosStream.getRetainedBytes() + presentStream.getRetainedBytes();
         for (ColumnStatistics statistics : rowGroupColumnStatistics) {
             retainedBytes += statistics.getRetainedSizeInBytes();
         }
@@ -246,7 +254,25 @@ public class TimestampColumnWriter
         secondsStream.reset();
         nanosStream.reset();
         presentStream.reset();
+        statisticsBuilder = statisticsBuilderSupplier.get();
         rowGroupColumnStatistics.clear();
-        nonNullValueCount = 0;
+    }
+
+    @Override
+    public List<StreamDataOutput> getBloomFilters(CompressedMetadataWriter metadataWriter)
+            throws IOException
+    {
+        List<BloomFilter> bloomFilters = rowGroupColumnStatistics.stream()
+                .map(ColumnStatistics::getBloomFilter)
+                .filter(Objects::nonNull)
+                .collect(toImmutableList());
+
+        if (!bloomFilters.isEmpty()) {
+            Slice slice = metadataWriter.writeBloomFilters(bloomFilters);
+            Stream stream = new Stream(columnId, StreamKind.BLOOM_FILTER_UTF8, slice.length(), false);
+            return ImmutableList.of(new StreamDataOutput(slice, stream));
+        }
+
+        return ImmutableList.of();
     }
 }

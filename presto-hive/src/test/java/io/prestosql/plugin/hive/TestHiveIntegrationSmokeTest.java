@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.plugin.hive;
 
 import com.google.common.base.Joiner;
@@ -186,6 +187,7 @@ import static io.prestosql.testing.TestingRecoveryUtils.NOOP_RECOVERY_UTILS;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static io.prestosql.tests.QueryAssertions.assertEqualsIgnoreOrder;
+import static io.prestosql.tests.sql.TestTable.randomTableSuffix;
 import static io.prestosql.transaction.TransactionBuilder.transaction;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -6948,5 +6950,110 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(computeActual("SELECT * FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
         assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
         assertUpdate("DROP SCHEMA testReadSchema4");
+    }
+
+    @Test
+    public void testInvalidOrcBloomFilterProperty()
+    {
+        assertThatThrownBy(() -> assertUpdate("CREATE TABLE invalid_bloom_fpp (col1 bigint) WITH (format = 'ORC', orc_bloom_filter_columns = ARRAY['col1'], orc_bloom_filter_fpp=2)"))
+                .hasMessageMatching("Invalid value for orc_bloom_filter_fpp property: 2.0");
+        assertThatThrownBy(() -> assertUpdate("CREATE TABLE invalid_bloom_fpp (col1 bigint) WITH (format = 'ORC', orc_bloom_filter_columns = ARRAY['col1'], orc_bloom_filter_fpp=a)"))
+                .hasMessageStartingWith("Invalid value for table property 'orc_bloom_filter_fpp'");
+    }
+
+    @Test
+    public void testOrcBloomFilterWrittenForTransactionalTables()
+    {
+        String tableName = "bloom_for_txn_table_" + randomTableSuffix();
+        test_bloom_written_during_create(tableName, true);
+
+        tableName = "bloom_for_txn_table_" + randomTableSuffix();
+        test_bloom_written_during_insert(tableName, true);
+    }
+
+    @Test
+    public void testOrcBloomFilterWrittenForNonTransactionalTables()
+    {
+        String tableName = "bloom_for_non_txn_table_" + randomTableSuffix();
+        test_bloom_written_during_create(tableName, false);
+
+        tableName = "bloom_for_non_txn_table_" + randomTableSuffix();
+        test_bloom_written_during_insert(tableName, false);
+    }
+
+    private void test_bloom_written_during_create(String tableName, boolean transactional)
+    {
+        // test for bloom is getting written for create table query
+        assertUpdate(format("drop table if exists %s", tableName));
+        assertUpdate(
+                format(
+                        "create table %s WITH (%s) as select * from tpch.tiny.lineitem",
+                        tableName,
+                        addTableProperties("ORC", transactional, "orderkey", 0.001)),
+                60175);
+        assertBloomFilterBasedRowGroupPruning(format("select * from %s where orderkey = 29989", tableName));
+
+        // test to check bloom still takes effect on rename column
+        assertUpdate(
+                format(
+                        "alter table %s rename column orderkey to alt_orderkey", tableName));
+        assertBloomFilterBasedRowGroupPruning(format("select * from %s where alt_orderkey = 29989", tableName));
+        assertUpdate(format("DROP TABLE %s", tableName));
+    }
+
+    private void test_bloom_written_during_insert(String tableName, boolean transactional)
+    {
+        // test for bloom is getting written for insert query
+        assertUpdate(format("drop table if exists %s", tableName));
+        assertUpdate(
+                format(
+                        "create table %s (orderkey bigint, partkey bigint, shipmode VARCHAR(10)) WITH (%s)",
+                        tableName,
+                        addTableProperties("ORC", transactional, "orderkey", 0.001)));
+        assertUpdate(
+                format(
+                        "INSERT INTO %s SELECT orderkey, partkey, shipmode from tpch.tiny.lineitem",
+                        tableName),
+                60175);
+        assertBloomFilterBasedRowGroupPruning(format("select * from %s where orderkey = 29989", tableName));
+        assertUpdate(format("DROP TABLE %s", tableName));
+    }
+
+    private String addTableProperties(String fileFormat, boolean transactional, String bloomFilterColumnName, double fpp)
+    {
+        return format(
+                "format = '%s', transactional = %s, orc_bloom_filter_columns = ARRAY['%s'], orc_bloom_filter_fpp = %s",
+                fileFormat,
+                transactional,
+                bloomFilterColumnName,
+                fpp);
+    }
+
+    private void assertBloomFilterBasedRowGroupPruning(@Language("SQL") String sql)
+    {
+        assertQueryStats(
+                enableBloomFilters(getSession(), false),
+                sql,
+                queryStats -> {
+                    assertThat(queryStats.getPhysicalInputPositions()).isGreaterThan(0);
+                    assertThat(queryStats.getProcessedInputPositions()).isEqualTo(queryStats.getPhysicalInputPositions());
+                },
+                results -> assertThat(results.getRowCount()).isEqualTo(2));
+
+        assertQueryStats(
+                enableBloomFilters(getSession(), true),
+                sql,
+                queryStats -> {
+                    assertThat(queryStats.getPhysicalInputPositions()).isGreaterThan(0);
+                    assertThat(queryStats.getProcessedInputPositions()).isGreaterThan(0);
+                },
+                results -> assertThat(results.getRowCount()).isEqualTo(2));
+    }
+
+    private Session enableBloomFilters(Session session, boolean value)
+    {
+        return Session.builder(session)
+                .setCatalogSessionProperty(session.getCatalog().get(), "orc_bloom_filters_enabled", String.valueOf(value))
+                .build();
     }
 }

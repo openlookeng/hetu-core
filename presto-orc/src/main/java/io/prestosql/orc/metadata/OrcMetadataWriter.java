@@ -15,6 +15,7 @@ package io.prestosql.orc.metadata;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.CountingOutputStream;
+import com.google.common.primitives.Longs;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.prestosql.orc.metadata.ColumnEncoding.ColumnEncodingKind;
@@ -29,6 +30,7 @@ import io.prestosql.orc.proto.OrcProto.Type.Builder;
 import io.prestosql.orc.proto.OrcProto.UserMetadataItem;
 import io.prestosql.orc.protobuf.ByteString;
 import io.prestosql.orc.protobuf.MessageLite;
+import io.prestosql.spi.util.BloomFilter;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -321,6 +323,8 @@ public class OrcMetadataWriter
                 return OrcProto.Stream.Kind.SECONDARY;
             case ROW_INDEX:
                 return OrcProto.Stream.Kind.ROW_INDEX;
+            case BLOOM_FILTER_UTF8:
+                return OrcProto.Stream.Kind.BLOOM_FILTER_UTF8;
         }
         throw new IllegalArgumentException("Unsupported stream kind: " + streamKind);
     }
@@ -367,6 +371,26 @@ public class OrcMetadataWriter
                         .map(Integer::longValue)
                         .collect(toList()))
                 .setStatistics(toColumnStatistics(rowGroupIndex.getColumnStatistics()))
+                .build();
+    }
+
+    @Override
+    public int writeBloomFilters(SliceOutput output, List<BloomFilter> bloomFilters)
+            throws IOException
+    {
+        OrcProto.BloomFilterIndex bloomFilterIndex = OrcProto.BloomFilterIndex.newBuilder()
+                .addAllBloomFilter(bloomFilters.stream()
+                        .map(OrcMetadataWriter::toBloomFilter)
+                        .collect(toList()))
+                .build();
+        return writeProtobufObject(output, bloomFilterIndex);
+    }
+
+    private static OrcProto.BloomFilter toBloomFilter(BloomFilter bloomFilter)
+    {
+        return OrcProto.BloomFilter.newBuilder()
+                .addAllBitset(Longs.asList(bloomFilter.getBitSet()))
+                .setNumHashFunctions(bloomFilter.getNumHashFunctions())
                 .build();
     }
 

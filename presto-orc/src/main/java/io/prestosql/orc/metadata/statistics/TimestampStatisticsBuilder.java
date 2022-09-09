@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,24 +12,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.prestosql.orc.metadata.statistics;
 
 import java.util.List;
 import java.util.Optional;
 
-import static io.prestosql.orc.metadata.statistics.DateStatistics.DATE_VALUE_BYTES;
-import static java.lang.Math.toIntExact;
+import static io.prestosql.orc.metadata.statistics.TimestampStatistics.TIMESTAMP_VALUE_BYTES;
 import static java.util.Objects.requireNonNull;
 
-public class DateStatisticsBuilder
+public class TimestampStatisticsBuilder
         implements LongValueStatisticsBuilder
 {
     private long nonNullValueCount;
-    private int minimum = Integer.MAX_VALUE;
-    private int maximum = Integer.MIN_VALUE;
+    private long minimum = Integer.MAX_VALUE;
+    private long maximum = Integer.MIN_VALUE;
     private final BloomFilterBuilder bloomFilterBuilder;
 
-    public DateStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
+    public TimestampStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
     {
         this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder is null");
     }
@@ -38,13 +39,12 @@ public class DateStatisticsBuilder
     {
         nonNullValueCount++;
 
-        int intValue = toIntExact(value);
-        minimum = Math.min(intValue, minimum);
-        maximum = Math.max(intValue, maximum);
+        minimum = Math.min(value, minimum);
+        maximum = Math.max(value, maximum);
         bloomFilterBuilder.addLong(value);
     }
 
-    private void addDateStatistics(long valueCount, DateStatistics value)
+    private void addTimestampStatistics(long valueCount, TimestampStatistics value)
     {
         requireNonNull(value, "value is null");
         requireNonNull(value.getMin(), "value.getMin() is null");
@@ -55,45 +55,45 @@ public class DateStatisticsBuilder
         maximum = Math.max(value.getMax(), maximum);
     }
 
-    private Optional<DateStatistics> buildDateStatistics()
+    private Optional<TimestampStatistics> buildTimestampStatistics()
     {
         if (nonNullValueCount == 0) {
             return Optional.empty();
         }
-        return Optional.of(new DateStatistics(minimum, maximum));
+        return Optional.of(new TimestampStatistics(minimum, maximum));
     }
 
     @Override
     public ColumnStatistics buildColumnStatistics()
     {
-        Optional<DateStatistics> dateStatistics = buildDateStatistics();
+        Optional<TimestampStatistics> timestampStatistics = buildTimestampStatistics();
         return new ColumnStatistics(
                 nonNullValueCount,
-                dateStatistics.map(s -> DATE_VALUE_BYTES).orElse(0L),
+                timestampStatistics.map(s -> TIMESTAMP_VALUE_BYTES).orElse(0L),
                 null,
                 null,
                 null,
                 null,
-                dateStatistics.orElse(null),
                 null,
+                timestampStatistics.orElse(null),
                 null,
                 null,
                 bloomFilterBuilder.buildBloomFilter());
     }
 
-    public static Optional<DateStatistics> mergeDateStatistics(List<ColumnStatistics> stats)
+    public static Optional<TimestampStatistics> mergeTimestampStatistics(List<ColumnStatistics> stats)
     {
-        DateStatisticsBuilder dateStatisticsBuilder = new DateStatisticsBuilder(new NoOpBloomFilterBuilder());
+        TimestampStatisticsBuilder timestampStatisticsBuilder = new TimestampStatisticsBuilder(new NoOpBloomFilterBuilder());
         for (ColumnStatistics columnStatistics : stats) {
-            DateStatistics partialStatistics = columnStatistics.getDateStatistics();
+            TimestampStatistics partialStatistics = columnStatistics.getTimestampStatistics();
             if (columnStatistics.getNumberOfValues() > 0) {
                 if (partialStatistics == null) {
                     // there are non-null values but no statistics, so we can not say anything about the data
                     return Optional.empty();
                 }
-                dateStatisticsBuilder.addDateStatistics(columnStatistics.getNumberOfValues(), partialStatistics);
+                timestampStatisticsBuilder.addTimestampStatistics(columnStatistics.getNumberOfValues(), partialStatistics);
             }
         }
-        return dateStatisticsBuilder.buildDateStatistics();
+        return timestampStatisticsBuilder.buildTimestampStatistics();
     }
 }

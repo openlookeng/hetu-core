@@ -207,8 +207,9 @@ public class HiveMetadata
 
     public static final String STORAGE_FORMAT = "storage_format";
 
-    private static final String ORC_BLOOM_FILTER_COLUMNS_KEY = "orc.bloom.filter.columns";
-    private static final String ORC_BLOOM_FILTER_FPP_KEY = "orc.bloom.filter.fpp";
+    public static final String ORC_BLOOM_FILTER_COLUMNS_KEY = "orc.bloom.filter.columns";
+    public static final String ORC_BLOOM_FILTER_FPP_KEY = "orc.bloom.filter.fpp";
+    public static final Splitter COLUMN_NAMES_SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
 
     private static final String TEXT_SKIP_HEADER_COUNT_KEY = "skip.header.line.count";
     private static final String TEXT_SKIP_FOOTER_COUNT_KEY = "skip.footer.line.count";
@@ -876,8 +877,10 @@ public class HiveMetadata
         List<String> columns = HiveTableProperties.getOrcBloomFilterColumns(tableMetadata.getProperties());
         if (columns != null && !columns.isEmpty()) {
             checkFormatForProperty(hiveStorageFormat, HiveStorageFormat.ORC, HiveTableProperties.ORC_BLOOM_FILTER_COLUMNS);
+            Double bloomFilterFpp = HiveTableProperties.getOrcBloomFilterFpp(tableMetadata.getProperties());
+            checkValueForBloomFilterFpp(bloomFilterFpp);
             tableProperties.put(ORC_BLOOM_FILTER_COLUMNS_KEY, Joiner.on(",").join(columns));
-            tableProperties.put(ORC_BLOOM_FILTER_FPP_KEY, String.valueOf(HiveTableProperties.getOrcBloomFilterFpp(tableMetadata.getProperties())));
+            tableProperties.put(ORC_BLOOM_FILTER_FPP_KEY, String.valueOf(bloomFilterFpp));
         }
 
         // Avro specific properties
@@ -945,6 +948,13 @@ public class HiveMetadata
     {
         if (actualStorageFormat != expectedStorageFormat) {
             throw new PrestoException(INVALID_TABLE_PROPERTY, format("Cannot specify %s table property for storage format: %s", propertyName, actualStorageFormat));
+        }
+    }
+
+    private static void checkValueForBloomFilterFpp(Double bloomFilterFpp)
+    {
+        if (bloomFilterFpp < 0.0 || bloomFilterFpp > 1.0) {
+            throw new PrestoException(INVALID_TABLE_PROPERTY, String.format("Invalid value for %s property: %s", HiveTableProperties.ORC_BLOOM_FILTER_FPP, bloomFilterFpp));
         }
     }
 
