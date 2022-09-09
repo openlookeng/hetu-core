@@ -231,6 +231,7 @@ public class TestHiveIntegrationSmokeTest
     private Map<InternalNode, RemoteTask> taskMap;
     private ExecutorService remoteTaskExecutor;
     private ScheduledExecutorService remoteTaskScheduledExecutor;
+    private Session testSessionTaskRetry;
 
     @SuppressWarnings("unused")
     public TestHiveIntegrationSmokeTest()
@@ -5719,6 +5720,17 @@ public class TestHiveIntegrationSmokeTest
         }
     }
 
+    private void initTaskRetry()
+    {
+        synchronized (TestHiveIntegrationSmokeTest.this) {
+            if (null == testSessionTaskRetry) {
+                this.testSessionTaskRetry = Session.builder(getSession())
+                        .setSystemProperty("retry_policy", "TASK")
+                        .build();
+            }
+        }
+    }
+
     @Test
     public void sortAggSingleSort()
     {
@@ -6948,5 +6960,14 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(computeActual("SELECT * FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
         assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
         assertUpdate("DROP SCHEMA testReadSchema4");
+    }
+
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "CREATE TABLE AS is not supported for transactional tables with query retries enabled")
+    public void testTaskRetryCreateTransactionalTable()
+    {
+        initTaskRetry();
+        assertUpdate("CREATE SCHEMA testTaskRetry1");
+        assertUpdate("CREATE TABLE testTaskRetry1.testTaskRetryTable1 (id int, name string)");
+        assertEquals(computeActual(testSessionTaskRetry, "CREATE TABLE testTaskRetry1.testTaskRetryTable2  with (transactional=true) as select * from testTaskRetry1.testTaskRetryTable1").getRowCount(), 1);
     }
 }

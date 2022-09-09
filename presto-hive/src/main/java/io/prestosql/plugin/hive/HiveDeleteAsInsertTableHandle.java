@@ -46,6 +46,7 @@ public class HiveDeleteAsInsertTableHandle
                 bucketProperty,
                 tableStorageFormat,
                 partitionStorageFormat,
+                false,
                 false);
     }
 }

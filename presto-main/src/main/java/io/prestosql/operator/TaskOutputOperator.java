@@ -195,7 +195,7 @@ public class TaskOutputOperator
         if (outputBuffer.isSpoolingOutputBuffer() && serialisationType != DirectSerialisationType.OFF) {
             PagesSerde directSerde = (serialisationType == DirectSerialisationType.JAVA) ? operatorContext.getDriverContext().getJavaSerde() : operatorContext.getDriverContext().getKryoSerde();
             List<Page> pages = splitPage(inputPage, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
-            outputBuffer.enqueuePages(pages, id, directSerde);
+            outputBuffer.enqueuePages(0, pages, id, directSerde);
         }
         else {
             List<SerializedPage> serializedPages = splitPage(inputPage, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()

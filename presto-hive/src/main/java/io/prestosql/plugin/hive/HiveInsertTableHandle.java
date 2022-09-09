@@ -35,7 +35,8 @@ public class HiveInsertTableHandle
             @JsonProperty("bucketProperty") Optional<HiveBucketProperty> bucketProperty,
             @JsonProperty("tableStorageFormat") HiveStorageFormat tableStorageFormat,
             @JsonProperty("partitionStorageFormat") HiveStorageFormat partitionStorageFormat,
-            @JsonProperty("isOverwrite") boolean isOverwrite)
+            @JsonProperty("isOverwrite") boolean isOverwrite,
+            @JsonProperty("retriesEnabled") boolean retriesEnabled)
     {
         super(
                 schemaName,
@@ -46,6 +47,7 @@ public class HiveInsertTableHandle
                 bucketProperty,
                 tableStorageFormat,
                 partitionStorageFormat,
-                isOverwrite);
+                isOverwrite,
+                retriesEnabled);
     }
 }

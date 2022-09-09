@@ -479,13 +479,13 @@ public class LazyOutputBuffer
     }
 
     @Override
-    public void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    public void enqueuePages(int partition, List<Page> pages, String id, PagesSerde directSerde)
     {
         OutputBuffer outputBuffer;
         synchronized (this) {
             checkState(delegate != null, "delegate is null");
             outputBuffer = delegate;
         }
-        outputBuffer.enqueuePages(pages, id, directSerde);
+        outputBuffer.enqueuePages(partition, pages, id, directSerde);
     }
 }

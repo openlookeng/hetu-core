@@ -17,6 +17,7 @@ import com.google.common.base.CharMatcher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
+import io.airlift.log.Logger;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.MetastoreUtil;
@@ -82,6 +83,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -138,6 +140,8 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharT
 
 public final class HiveWriteUtils
 {
+    private static final Logger log = Logger.get(HiveWriteUtils.class);
+
     @SuppressWarnings("OctalInteger")
     private static final FsPermission ALL_PERMISSIONS = new FsPermission((short) 0777);
 
@@ -734,5 +738,26 @@ public final class HiveWriteUtils
             unscaledValue = Decimals.decodeUnscaledValue(decimalType.getSlice(block, position));
         }
         return HiveDecimal.create(unscaledValue, decimalType.getScale());
+    }
+
+    public static boolean isFileCreatedByQuery(String fileName, String queryId)
+    {
+        return fileName.startsWith(queryId) || fileName.endsWith(queryId);
+    }
+
+    public static void checkedDelete(FileSystem fileSystem, Path file, boolean recursive)
+            throws IOException
+    {
+        try {
+            if (!fileSystem.delete(file, recursive)) {
+                if (fileSystem.exists(file)) {
+                    // only throw exception if file still exists
+                    throw new IOException("Failed to delete " + file);
+                }
+            }
+        }
+        catch (FileNotFoundException ignored) {
+            log.debug("Failed to delete file: " + file);
+        }
     }
 }

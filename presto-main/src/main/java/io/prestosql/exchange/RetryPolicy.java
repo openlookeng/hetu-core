@@ -13,6 +13,8 @@
  */
 package io.prestosql.exchange;
 
+import io.prestosql.spi.connector.RetryMode;
+
 public enum RetryPolicy
 {
     TASK(RetryMode.RETRIES_ENABLED),
