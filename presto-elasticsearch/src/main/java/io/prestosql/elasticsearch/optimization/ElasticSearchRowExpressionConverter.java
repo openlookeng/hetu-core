@@ -51,22 +51,31 @@ import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.time.ZoneOffset.UTC;
 
-public class ElasticSearchRowExpressionConverter implements RowExpressionConverter<ElasticSearchConverterContext> {
+public class ElasticSearchRowExpressionConverter
+        implements RowExpressionConverter<ElasticSearchConverterContext>
+{
+    private static final String EMPTY_STRING = "";
 
-    private final static String EMPTY_STRING = "";
+    private static Number decodeDecimal(BigInteger unscaledValue, DecimalType type)
+    {
+        return new BigDecimal(unscaledValue, type.getScale(), new MathContext(type.getPrecision()));
+    }
 
     @Override
-    public String visitCall(CallExpression call, ElasticSearchConverterContext context) {
+    public String visitCall(CallExpression call, ElasticSearchConverterContext context)
+    {
         return RowExpressionConverter.super.visitCall(call, context);
     }
 
     @Override
-    public String visitSpecialForm(SpecialForm specialForm, ElasticSearchConverterContext context) {
+    public String visitSpecialForm(SpecialForm specialForm, ElasticSearchConverterContext context)
+    {
         return RowExpressionConverter.super.visitSpecialForm(specialForm, context);
     }
 
     @Override
-    public String visitConstant(ConstantExpression literal, ElasticSearchConverterContext context) {
+    public String visitConstant(ConstantExpression literal, ElasticSearchConverterContext context)
+    {
         Type type = literal.getType();
 
         if (literal.getValue() == null) {
@@ -101,38 +110,36 @@ public class ElasticSearchRowExpressionConverter implements RowExpressionConvert
         }
         if (type.equals(DATE)) {
             String date = printDate(Integer.parseInt(String.valueOf(literal.getValue())));
-            return  ExpressionFormatter.formatStringLiteral(date);
+            return ExpressionFormatter.formatStringLiteral(date);
         }
         if (type instanceof TimestampType) {
             DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
             Long time = (Long) literal.getValue();
-            return  formatter.format(Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
+            return formatter.format(Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
         }
         throw new PrestoException(NOT_SUPPORTED, String.format("Cannot handle the constant expression %s with value of type %s", literal.getValue(), type));
-
     }
 
     @Override
-    public String visitVariableReference(VariableReferenceExpression reference, ElasticSearchConverterContext context) {
+    public String visitVariableReference(VariableReferenceExpression reference, ElasticSearchConverterContext context)
+    {
         return RowExpressionConverter.super.visitVariableReference(reference, context);
     }
 
     @Override
-    public String visitInputReference(InputReferenceExpression reference, ElasticSearchConverterContext context) {
+    public String visitInputReference(InputReferenceExpression reference, ElasticSearchConverterContext context)
+    {
         return handleUnsupportedOptimize(context);
     }
 
     @Override
-    public String visitLambda(LambdaDefinitionExpression lambda, ElasticSearchConverterContext context) {
+    public String visitLambda(LambdaDefinitionExpression lambda, ElasticSearchConverterContext context)
+    {
         return handleUnsupportedOptimize(context);
     }
 
-    private static Number decodeDecimal(BigInteger unscaledValue, DecimalType type)
+    public String handleUnsupportedOptimize(ElasticSearchConverterContext context)
     {
-        return new BigDecimal(unscaledValue, type.getScale(), new MathContext(type.getPrecision()));
-    }
-
-    public String handleUnsupportedOptimize(ElasticSearchConverterContext context){
         context.setConversionFailed();
         return EMPTY_STRING;
     }

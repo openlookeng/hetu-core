@@ -13,18 +13,22 @@
  */
 package io.prestosql.elasticsearch.optimization;
 
-public class ElasticSearchConverterContext {
+public class ElasticSearchConverterContext
+{
     private boolean hasConversionFailed;
 
-    public ElasticSearchConverterContext() {
+    public ElasticSearchConverterContext()
+    {
         this.hasConversionFailed = false;
     }
 
-    public boolean isHasConversionFailed() {
+    public boolean isHasConversionFailed()
+    {
         return hasConversionFailed;
     }
 
-    public void setConversionFailed() {
+    public void setConversionFailed()
+    {
         this.hasConversionFailed = true;
     }
 }

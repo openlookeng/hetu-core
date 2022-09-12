@@ -75,13 +75,15 @@ public class ElasticsearchConfig
 
     private boolean isPushDownEnabled;
 
-    public boolean isPushDownEnabled() {
+    public boolean isPushDownEnabled()
+    {
         return isPushDownEnabled;
     }
 
     @Config("elasticsearch.pushdown.enabled")
     @ConfigDescription("Config to toggle whether elastic search push-down optimization is to be enabled or not")
-    public ElasticsearchConfig setPushDownEnabled(boolean pushDownEnabled) {
+    public ElasticsearchConfig setPushDownEnabled(boolean pushDownEnabled)
+    {
         isPushDownEnabled = pushDownEnabled;
         return this;
     }

@@ -24,20 +24,23 @@ import io.prestosql.spi.type.Type;
 
 import java.util.Map;
 
-public class ElasticSearchPlanOptimizer implements ConnectorPlanOptimizer {
-
+public class ElasticSearchPlanOptimizer
+        implements ConnectorPlanOptimizer
+{
     private final ElasticsearchConfig elasticsearchConfig;
 
     @Inject
-    public ElasticSearchPlanOptimizer(ElasticsearchConfig elasticsearchConfig) {
+    public ElasticSearchPlanOptimizer(ElasticsearchConfig elasticsearchConfig)
+    {
         this.elasticsearchConfig = elasticsearchConfig;
     }
 
     @Override
-    public PlanNode optimize(PlanNode maxSubPlan, ConnectorSession session, Map<String, Type> types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator) {
+    public PlanNode optimize(PlanNode maxSubPlan, ConnectorSession session, Map<String, Type> types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
+    {
         if (!elasticsearchConfig.isPushDownEnabled()) {
             return maxSubPlan;
         }
-        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator,session,types, symbolAllocator, new ElasticSearchRowExpressionConverter()), null);
+        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator, session, types, symbolAllocator, new ElasticSearchRowExpressionConverter()), null);
     }
 }
