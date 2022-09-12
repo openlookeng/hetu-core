@@ -27,12 +27,6 @@
         </dependency>
 
         <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>presto-parser</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
