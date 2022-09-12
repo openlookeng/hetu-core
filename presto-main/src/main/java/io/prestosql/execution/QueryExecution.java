@@ -94,6 +94,16 @@ public interface QueryExecution
         // no-op
     }
 
+    default int getPriority()
+    {
+        return 1;
+    }
+
+    default void setPriority(int priority)
+    {
+        // no-op
+    }
+
     interface QueryExecutionFactory<T extends QueryExecution>
     {
         T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);

@@ -44,6 +44,7 @@ import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -102,6 +103,7 @@ public class StageStateMachine
     private final AtomicLong currentTotalMemory = new AtomicLong();
     private final TableScanNode consumerScanNode;
     private final TableScanNode producerScanNode;
+    private AtomicInteger taskPriority = new AtomicInteger(1);
 
     public StageStateMachine(
             StageId stageId,
@@ -731,5 +733,10 @@ public class StageStateMachine
                 .add("stageId", stageId)
                 .add("stageState", stageState)
                 .toString();
+    }
+
+    public void setPriority(int priority)
+    {
+        taskPriority.set(priority);
     }
 }

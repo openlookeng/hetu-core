@@ -120,6 +120,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -190,6 +191,7 @@ public class SqlQueryExecution
     private final NodeAllocatorService nodeAllocatorService;
     private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
     private final TaskExecutionStats taskExecutionStats;
+    private AtomicInteger queryPriority = new AtomicInteger(1);
 
     public SqlQueryExecution(
             PreparedQuery preparedQuery,
@@ -994,6 +996,23 @@ public class SqlQueryExecution
                 }
                 stateMachine.transitionToResumeRunning();
             }
+        }
+    }
+
+    @Override
+    public int getPriority()
+    {
+        return queryPriority.get();
+    }
+
+    @Override
+    public void setPriority(int priority)
+    {
+        queryPriority.set(priority);
+        stateMachine.setPriority(priority);
+        SqlQueryScheduler scheduler = queryScheduler.get();
+        if (scheduler != null) {
+            scheduler.setStagePriority();
         }
     }
 

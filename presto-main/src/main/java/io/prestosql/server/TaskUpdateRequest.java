@@ -42,6 +42,8 @@ public class TaskUpdateRequest
     private final OptionalInt totalPartitions;
     private final Optional<PlanNodeId> consumerId;
 
+    private final OptionalInt taskPriority;
+
     @JsonCreator
     public TaskUpdateRequest(
             @JsonProperty("taskInstanceId") String taskInstanceId,
@@ -51,7 +53,8 @@ public class TaskUpdateRequest
             @JsonProperty("sources") List<TaskSource> sources,
             @JsonProperty("outputIds") OutputBuffers outputIds,
             @JsonProperty("totalPartitions") OptionalInt totalPartitions,
-            @JsonProperty("consumerId")Optional<PlanNodeId> consumerPlanNodeId)
+            @JsonProperty("consumerId")Optional<PlanNodeId> consumerPlanNodeId,
+            @JsonProperty("taskPriority") OptionalInt taskPriority)
     {
         requireNonNull(session, "session is null");
         requireNonNull(extraCredentials, "credentials is null");
@@ -68,6 +71,7 @@ public class TaskUpdateRequest
         this.outputIds = outputIds;
         this.totalPartitions = totalPartitions;
         this.consumerId = consumerPlanNodeId;
+        this.taskPriority = taskPriority;
     }
 
     @JsonProperty
@@ -116,6 +120,12 @@ public class TaskUpdateRequest
     public Optional<PlanNodeId> getConsumerId()
     {
         return consumerId;
+    }
+
+    @JsonProperty
+    public OptionalInt getTaskPriority()
+    {
+        return taskPriority;
     }
 
     @Override

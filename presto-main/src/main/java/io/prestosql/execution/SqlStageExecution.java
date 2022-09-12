@@ -361,6 +361,12 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::resume);
     }
 
+    public synchronized void setPriority(int priority)
+    {
+        stateMachine.setPriority(priority);
+        getAllTasks().forEach(remoteTask -> remoteTask.setPriority(priority));
+    }
+
     public void OnSnapshotXCompleted(boolean capture, long snapshotId)
     {
         log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
@@ -458,7 +464,7 @@ public final class SqlStageExecution
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 Optional.ofNullable(parentId),
-                snapshotManager);
+                snapshotManager, OptionalInt.empty());
 
         noMoreSplitsForLifespan.forEach(task::noMoreSplits);
         noMoreSplits.forEach(task::noMoreSplits);
@@ -643,7 +649,7 @@ public final class SqlStageExecution
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 Optional.ofNullable(parentId),
-                snapshotManager);
+                snapshotManager, OptionalInt.empty());
 
         completeSources.forEach(task::noMoreSplits);
 

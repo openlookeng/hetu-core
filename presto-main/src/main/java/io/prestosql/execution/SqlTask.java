@@ -414,7 +414,7 @@ public class SqlTask
     }
 
     public TaskInfo updateTask(Session session, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
-            Map<String, CommonTableExecutionContext> cteCtx)
+                               Map<String, CommonTableExecutionContext> cteCtx, int queryPriorityTag)
     {
         try {
             // The LazyOutput buffer does not support write methods, so the actual
@@ -434,7 +434,7 @@ public class SqlTask
                 if (taskExecution == null) {
                     checkState(fragment.isPresent(), "fragment must be present");
                     loadDCCatalogForUpdateTask(metadata, sources);
-                    taskExecution = sqlTaskExecutionFactory.create(taskInstanceId, session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx);
+                    taskExecution = sqlTaskExecutionFactory.create(taskInstanceId, session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx, queryPriorityTag);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
                     isRecoveryEnabled = SystemSessionProperties.isRecoveryEnabled(session);
@@ -583,6 +583,24 @@ public class SqlTask
     public String toString()
     {
         return taskId.toString();
+    }
+
+    public TaskInfo setPriority(Integer taskPriority)
+    {
+        taskStateMachine.setPriority(taskPriority);
+        SqlTaskExecution taskExecution;
+        synchronized (this) {
+            // is task already complete?
+            TaskHolder taskHolder = taskHolderReference.get();
+            if (taskHolder.isFinished()) {
+                return taskHolder.getFinalTaskInfo();
+            }
+            taskExecution = taskHolder.getTaskExecution();
+            if (taskExecution != null) {
+                taskExecution.setQueryPriorityTag();
+            }
+        }
+        return getTaskInfo();
     }
 
     private static final class TaskHolder
