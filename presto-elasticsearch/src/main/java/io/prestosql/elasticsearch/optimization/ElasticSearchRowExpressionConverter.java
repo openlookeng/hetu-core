@@ -19,6 +19,7 @@ import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.LambdaDefinitionExpression;
+import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.RowExpressionConverter;
@@ -36,6 +37,8 @@ import io.prestosql.spi.type.VarcharType;
 
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.Float.intBitsToFloat;
@@ -56,7 +59,31 @@ public class ElasticSearchRowExpressionConverter
     @Override
     public String visitSpecialForm(SpecialForm specialForm, ElasticSearchConverterContext context)
     {
-        return RowExpressionConverter.super.visitSpecialForm(specialForm, context);
+        SpecialForm.Form form = specialForm.getForm();
+        List<RowExpression> specialFormArguments = specialForm.getArguments();
+        switch (form) {
+            case IS_NULL:
+                return String.format("NOT _exists_:%s",
+                        specialFormArguments.get(0).accept(this, context));
+            case BETWEEN:
+                return String.format("(%s: (>=%s AND <=%s))",
+                        specialFormArguments.get(0).accept(this, context),
+                        specialFormArguments.get(1).accept(this, context),
+                        specialFormArguments.get(2).accept(this, context));
+            case IN:
+                RowExpression variable = specialFormArguments.get(0);
+                return specialFormArguments.stream().skip(1)
+                        .map(arg -> String.format("%s:%s", variable.accept(this, context), arg.accept(this, context)))
+                        .collect(Collectors.joining(" OR "));
+            case AND:
+            case OR:
+                return String.format("%s %s %s",
+                        specialFormArguments.get(0).accept(this, context),
+                        form,
+                        specialFormArguments.get(1).accept(this, context));
+            default:
+                return handleUnsupportedOptimize(context);
+        }
     }
 
     @Override
@@ -81,7 +108,7 @@ public class ElasticSearchRowExpressionConverter
             Long number = (Long) literal.getValue();
             return format("%f", intBitsToFloat(number.intValue()));
         }
-        
+
         if (type instanceof VarcharType) {
             return "'" + ((Slice) literal.getValue()).toStringUtf8() + "'";
         }
