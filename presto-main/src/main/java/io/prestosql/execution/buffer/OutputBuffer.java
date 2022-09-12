@@ -172,7 +172,7 @@ public interface OutputBuffer
         return DirectSerialisationType.OFF;
     }
 
-    default void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    default void enqueuePages(int partition, List<Page> pages, String id, PagesSerde directSerde)
     {
         return;
     }

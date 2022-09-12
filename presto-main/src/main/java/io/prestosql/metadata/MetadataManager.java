@@ -103,6 +103,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.metadata.MetadataUtil.convertFromSchemaTableName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.INVALID_VIEW;
@@ -751,7 +752,7 @@ public final class MetadataManager
 
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalog);
         ConnectorSession connectorSession = session.toConnectorSession(catalog);
-        ConnectorOutputTableHandle handle = metadata.beginCreateTable(connectorSession, tableMetadata, layout.map(NewTableLayout::getLayout));
+        ConnectorOutputTableHandle handle = metadata.beginCreateTable(connectorSession, tableMetadata, layout.map(NewTableLayout::getLayout), getRetryPolicy(session).getRetryMode());
         return new OutputTableHandle(catalog, transactionHandle, handle);
     }
 
@@ -772,10 +773,10 @@ public final class MetadataManager
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalogName);
         ConnectorInsertTableHandle handle;
         if (isOverwrite) {
-            handle = metadata.beginInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), true);
+            handle = metadata.beginInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), true, getRetryPolicy(session).getRetryMode());
         }
         else {
-            handle = metadata.beginInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+            handle = metadata.beginInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), getRetryPolicy(session).getRetryMode());
         }
         return new InsertTableHandle(tableHandle.getCatalogName(), transactionHandle, handle);
     }
@@ -811,7 +812,7 @@ public final class MetadataManager
         CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, catalogName);
         ConnectorMetadata metadata = catalogMetadata.getMetadata();
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalogName);
-        ConnectorUpdateTableHandle handle = metadata.beginUpdateAsInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+        ConnectorUpdateTableHandle handle = metadata.beginUpdateAsInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), getRetryPolicy(session).getRetryMode());
         return new UpdateTableHandle(tableHandle.getCatalogName(), transactionHandle, handle);
     }
 
@@ -822,7 +823,7 @@ public final class MetadataManager
         CatalogMetadata catalogMetadata = getCatalogMetadataForWrite(session, catalogName);
         ConnectorMetadata metadata = catalogMetadata.getMetadata();
         ConnectorTransactionHandle transactionHandle = catalogMetadata.getTransactionHandleFor(catalogName);
-        ConnectorDeleteAsInsertTableHandle handle = metadata.beginDeletesAsInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+        ConnectorDeleteAsInsertTableHandle handle = metadata.beginDeletesAsInsert(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), getRetryPolicy(session).getRetryMode());
         return new DeletesAsInsertTableHandle(tableHandle.getCatalogName(), transactionHandle, handle);
     }
 
@@ -933,7 +934,7 @@ public final class MetadataManager
     {
         CatalogName catalogName = tableHandle.getCatalogName();
         ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
-        ConnectorTableHandle newHandle = metadata.beginDelete(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+        ConnectorTableHandle newHandle = metadata.beginDelete(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), getRetryPolicy(session).getRetryMode());
         return new TableHandle(tableHandle.getCatalogName(), newHandle, tableHandle.getTransaction(), tableHandle.getLayout());
     }
 
@@ -950,7 +951,7 @@ public final class MetadataManager
     {
         CatalogName catalogName = tableHandle.getCatalogName();
         ConnectorMetadata metadata = getMetadataForWrite(session, catalogName);
-        ConnectorTableHandle newHandle = metadata.beginUpdate(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), updatedColumnTypes);
+        ConnectorTableHandle newHandle = metadata.beginUpdate(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle(), updatedColumnTypes, getRetryPolicy(session).getRetryMode());
         return new TableHandle(tableHandle.getCatalogName(), newHandle, tableHandle.getTransaction(), tableHandle.getLayout());
     }
 

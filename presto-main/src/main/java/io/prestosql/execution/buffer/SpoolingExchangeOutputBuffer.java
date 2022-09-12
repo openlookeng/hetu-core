@@ -324,7 +324,7 @@ public class SpoolingExchangeOutputBuffer
     }
 
     @Override
-    public void enqueuePages(List<Page> pages, String id, PagesSerde directSerde)
+    public void enqueuePages(int partition, List<Page> pages, String id, PagesSerde directSerde)
     {
         requireNonNull(pages, "pages is null");
         if (!stateMachine.getState().canAddPages()) {
@@ -333,7 +333,7 @@ public class SpoolingExchangeOutputBuffer
         ExchangeSink sink = exchangeSink;
         checkState(sink != null, "exchangeSink is null");
         for (Page page : pages) {
-            sink.add(0, page, directSerde);
+            sink.add(partition, page, directSerde);
             totalRowsAdded.addAndGet(page.getPositionCount());
         }
         updateMemoryUsage(sink.getMemoryUsage());

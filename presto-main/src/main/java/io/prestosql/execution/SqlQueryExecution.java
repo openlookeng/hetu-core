@@ -100,7 +100,6 @@ import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.InsertCube;
-import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
@@ -737,12 +736,6 @@ public class SqlQueryExecution
     private void checkTaskRetrySupport(Session session)
     {
         List<String> reasons = new ArrayList<>();
-
-        Statement statement = analysis.getStatement();
-        // Task retry is supported only for Select statements currently
-        if (!(statement instanceof Query)) {
-            reasons.add("Only support select statements currently");
-        }
 
         if (isCTEReuseEnabled(session)) {
             reasons.add("Disable Task Retry If CTEReuse is enabled");

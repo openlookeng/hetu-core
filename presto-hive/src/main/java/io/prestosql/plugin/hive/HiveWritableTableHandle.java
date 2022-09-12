@@ -35,6 +35,7 @@ public class HiveWritableTableHandle
     private final HiveStorageFormat tableStorageFormat;
     private final HiveStorageFormat partitionStorageFormat;
     private final boolean isOverwrite;
+    private final boolean retriesEnabled;
 
     public HiveWritableTableHandle(
             String schemaName,
@@ -45,7 +46,8 @@ public class HiveWritableTableHandle
             Optional<HiveBucketProperty> bucketProperty,
             HiveStorageFormat tableStorageFormat,
             HiveStorageFormat partitionStorageFormat,
-            boolean isOverwrite)
+            boolean isOverwrite,
+            boolean retriesEnabled)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
@@ -56,6 +58,7 @@ public class HiveWritableTableHandle
         this.tableStorageFormat = requireNonNull(tableStorageFormat, "tableStorageFormat is null");
         this.partitionStorageFormat = requireNonNull(partitionStorageFormat, "partitionStorageFormat is null");
         this.isOverwrite = isOverwrite;
+        this.retriesEnabled = retriesEnabled;
     }
 
     @JsonProperty
@@ -116,6 +119,12 @@ public class HiveWritableTableHandle
     public boolean getIsOverwrite()
     {
         return isOverwrite;
+    }
+
+    @JsonProperty
+    public boolean isRetriesEnabled()
+    {
+        return retriesEnabled;
     }
 
     @Override
