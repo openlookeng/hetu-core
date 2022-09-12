@@ -86,7 +86,7 @@ public class SqlTaskExecutionFactory
     }
 
     public SqlTaskExecution create(String taskInstanceId, Session session, QueryContext queryContext, TaskStateMachine taskStateMachine, OutputBuffer outputBuffer, PlanFragment fragment, List<TaskSource> sources, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
-            Map<String, CommonTableExecutionContext> cteCtx)
+                                   Map<String, CommonTableExecutionContext> cteCtx, int queryPriorityTag)
     {
         TaskContext taskContext = queryContext.addTaskContext(
                 taskInstanceId,
@@ -141,7 +141,8 @@ public class SqlTaskExecutionFactory
                 localExecutionPlan,
                 taskExecutor,
                 taskNotificationExecutor,
-                splitMonitor);
+                splitMonitor,
+                queryPriorityTag);
     }
 
     @Nullable

@@ -301,7 +301,8 @@ public class TestSqlTaskManager
                 outputBuffers,
                 OptionalInt.empty(),
                 Optional.empty(),
-                "0-test_instance_id");
+                "0-test_instance_id",
+                OptionalInt.of(1));
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, OutputBuffers outputBuffers)
@@ -321,7 +322,8 @@ public class TestSqlTaskManager
                 outputBuffers,
                 OptionalInt.empty(),
                 Optional.empty(),
-                "0-test_instance_id");
+                "0-test_instance_id",
+                OptionalInt.empty());
     }
 
     public static class MockExchangeClientSupplier

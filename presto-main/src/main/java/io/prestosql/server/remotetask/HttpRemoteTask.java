@@ -190,33 +190,35 @@ public final class HttpRemoteTask
     private Optional<PlanNodeId> parent;
     private final Duration maxErrorDuration;
     private final JsonCodec<FailTaskRequest> failTaskRequestCodec;
+    private final OptionalInt taskPriority;
 
     public HttpRemoteTask(Session session,
-            TaskId taskId,
-            String instanceId,
-            String nodeId,
-            URI location,
-            PlanFragment planFragment,
-            Multimap<PlanNodeId, Split> initialSplits,
-            OptionalInt totalPartitions,
-            OutputBuffers outputBuffers,
-            HttpClient httpClient,
-            Executor executor,
-            ScheduledExecutorService updateScheduledExecutor,
-            ScheduledExecutorService errorScheduledExecutor,
-            Duration maxErrorDuration,
-            Duration taskStatusRefreshMaxWait,
-            Duration taskInfoUpdateInterval,
-            boolean summarizeTaskInfo,
-            Codec<TaskStatus> taskStatusCodec,
-            Codec<TaskInfo> taskInfoCodec,
-            Codec<TaskUpdateRequest> taskUpdateRequestCodec,
-            PartitionedSplitCountTracker partitionedSplitCountTracker,
-            RemoteTaskStats stats,
-            boolean isBinaryEncoding,
-            Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager,
-            JsonCodec<FailTaskRequest> failTaskRequestCodec)
+                          TaskId taskId,
+                          String instanceId,
+                          String nodeId,
+                          URI location,
+                          PlanFragment planFragment,
+                          Multimap<PlanNodeId, Split> initialSplits,
+                          OptionalInt totalPartitions,
+                          OutputBuffers outputBuffers,
+                          HttpClient httpClient,
+                          Executor executor,
+                          ScheduledExecutorService updateScheduledExecutor,
+                          ScheduledExecutorService errorScheduledExecutor,
+                          Duration maxErrorDuration,
+                          Duration taskStatusRefreshMaxWait,
+                          Duration taskInfoUpdateInterval,
+                          boolean summarizeTaskInfo,
+                          Codec<TaskStatus> taskStatusCodec,
+                          Codec<TaskInfo> taskInfoCodec,
+                          Codec<TaskUpdateRequest> taskUpdateRequestCodec,
+                          PartitionedSplitCountTracker partitionedSplitCountTracker,
+                          RemoteTaskStats stats,
+                          boolean isBinaryEncoding,
+                          Optional<PlanNodeId> parent,
+                          QuerySnapshotManager snapshotManager,
+                          JsonCodec<FailTaskRequest> failTaskRequestCodec,
+                          OptionalInt taskPriority)
     {
         requireNonNull(session, "session is null");
         requireNonNull(taskId, "taskId is null");
@@ -255,6 +257,7 @@ public final class HttpRemoteTask
             this.parent = parent;
             this.maxErrorDuration = maxErrorDuration;
             this.failTaskRequestCodec = failTaskRequestCodec;
+            this.taskPriority = taskPriority;
 
             for (Entry<PlanNodeId, Split> entry : requireNonNull(initialSplits, "initialSplits is null").entries()) {
                 ScheduledSplit scheduledSplit = new ScheduledSplit(nextSplitId.getAndIncrement(), entry.getKey(), entry.getValue());
@@ -574,7 +577,8 @@ public final class HttpRemoteTask
                 sources,
                 outputBuffers.get(),
                 totalPartitions,
-                parent);
+                parent,
+                taskPriority);
         byte[] taskUpdateRequestJson = taskUpdateRequestCodec.toBytes(updateRequest);
         if (fragment.isPresent()) {
             stats.updateWithPlanBytes(taskUpdateRequestJson.length);
@@ -716,6 +720,34 @@ public final class HttpRemoteTask
 
         // send cancel to task and ignore response
         HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).appendPath("resume").addParameter("targetState", targetState.toString());
+        Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
+                .setUri(uriBuilder.build())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
+                .build();
+        scheduleAsyncSuspendRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+    }
+
+    @Override
+    public void setPriority(int priority)
+    {
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            TaskStatus taskStatus = getTaskStatus();
+            if (taskStatus.getState().isDone()) {
+                return;
+            }
+
+            sendSetPriorityRequest(priority, taskStatus, TaskState.RUNNING, "setPriority");
+        }
+    }
+
+    private void sendSetPriorityRequest(int priority, TaskStatus taskStatus, TaskState targetState, String action)
+    {
+        log.debug("segt priority (%d) task %s, with target state %s", priority, taskStatus.getTaskId(), targetState);
+
+        // send cancel to task and ignore response
+        HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).appendPath("priority")
+                .addParameter("targetState", targetState.toString())
+                .addParameter("taskPriority", String.valueOf(priority));
         Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
                 .setUri(uriBuilder.build())
                 .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)

@@ -176,7 +176,8 @@ public class SqlTaskExecution
             LocalExecutionPlan localExecutionPlan,
             TaskExecutor taskExecutor,
             Executor notificationExecutor,
-            SplitMonitor queryMonitor)
+            SplitMonitor queryMonitor,
+            int queryPriorityTag)
     {
         SqlTaskExecution task = new SqlTaskExecution(
                 taskStateMachine,
@@ -185,7 +186,8 @@ public class SqlTaskExecution
                 localExecutionPlan,
                 taskExecutor,
                 queryMonitor,
-                notificationExecutor);
+                notificationExecutor,
+                queryPriorityTag);
         try (SetThreadName ignored = new SetThreadName("Task-%s", task.getTaskId())) {
             // The scheduleDriversForTaskLifeCycle method calls enqueueDriverSplitRunner, which registers a callback with access to this object.
             // The call back is accessed from another thread, so this code can not be placed in the constructor.
@@ -202,7 +204,8 @@ public class SqlTaskExecution
             LocalExecutionPlan localExecutionPlan,
             TaskExecutor taskExecutor,
             SplitMonitor splitMonitor,
-            Executor notificationExecutor)
+            Executor notificationExecutor,
+            int queryPriorityTag)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
         this.taskId = taskStateMachine.getTaskId();
@@ -266,7 +269,7 @@ public class SqlTaskExecution
 
             // don't register the task if it is already completed (most likely failed during planning above)
             if (!taskStateMachine.getState().isDone()) {
-                taskHandle = createTaskHandle(taskStateMachine, taskContext, outputBuffer, localExecutionPlan, taskExecutor);
+                taskHandle = createTaskHandle(taskStateMachine, taskContext, outputBuffer, localExecutionPlan, taskExecutor, queryPriorityTag);
             }
             else {
                 taskHandle = null;
@@ -282,14 +285,16 @@ public class SqlTaskExecution
             TaskContext taskContext,
             OutputBuffer outputBuffer,
             LocalExecutionPlan localExecutionPlan,
-            TaskExecutor taskExecutor)
+            TaskExecutor taskExecutor,
+            int queryPriorityTag)
     {
         TaskHandle localTaskHandle = taskExecutor.addTask(
                 taskStateMachine.getTaskId(),
                 outputBuffer::getUtilization,
                 getInitialSplitsPerNode(taskContext.getSession()),
                 getSplitConcurrencyAdjustmentInterval(taskContext.getSession()),
-                getMaxDriversPerTask(taskContext.getSession()));
+                getMaxDriversPerTask(taskContext.getSession()),
+                queryPriorityTag);
         taskStateMachine.addStateChangeListener(state -> {
             if (state.isDone()) {
                 taskExecutor.removeTask(localTaskHandle);
@@ -873,6 +878,13 @@ public class SqlTaskExecution
         }
         else {
             log.warn("Task Resume requested when its not suspended: %s", taskStateMachine.getState().toString());
+        }
+    }
+
+    public void setQueryPriorityTag()
+    {
+        if (taskHandle != null) {
+            taskHandle.setQueryPriorityTag(taskStateMachine.getPriority());
         }
     }
 

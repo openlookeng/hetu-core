@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -55,11 +56,12 @@ public class TaskStateMachine
     private final Map<TaskId, Throwable> sourceTaskFailures = new HashMap<>();
     @GuardedBy("this")
     private final List<TaskFailureListener> sourceTaskFailureListeners = new ArrayList<>();
+    private AtomicInteger priority = new AtomicInteger(1);
 
     public TaskStateMachine(TaskId taskId, Executor executor)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
-        taskState = new StateMachine<>("task " + taskId, executor, TaskState.RUNNING, TERMINAL_TASK_STATES);
+        taskState = new StateMachine<>("task " + taskId, executor, RUNNING, TERMINAL_TASK_STATES);
         this.executor = executor;
         taskState.addStateChangeListener(new StateChangeListener<TaskState>()
         {
@@ -196,5 +198,15 @@ public class TaskStateMachine
                 .add("taskState", taskState)
                 .add("failureCauses", failureCauses)
                 .toString();
+    }
+
+    public void setPriority(int priority)
+    {
+        this.priority.set(priority);
+    }
+
+    public int getPriority()
+    {
+        return priority.get();
     }
 }

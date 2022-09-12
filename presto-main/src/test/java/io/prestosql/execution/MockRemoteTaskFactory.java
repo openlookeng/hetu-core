@@ -138,7 +138,7 @@ public class MockRemoteTaskFactory
             initialSplits.put(sourceId, sourceSplit);
         }
         return createRemoteTask(TEST_SESSION, taskId, instanceId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST),
-                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION));
+                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION), OptionalInt.empty());
     }
 
     @Override
@@ -154,7 +154,7 @@ public class MockRemoteTaskFactory
             PartitionedSplitCountTracker partitionedSplitCountTracker,
             boolean summarizeTaskInfo,
             Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager, OptionalInt taskPriority)
     {
         return new MockRemoteTask(taskId, instanceId, fragment, node.getNodeIdentifier(), executor, scheduledExecutor, initialSplits, totalPartitions, partitionedSplitCountTracker);
     }
@@ -454,6 +454,12 @@ public class MockRemoteTaskFactory
         public void resume()
         {
             taskStateMachine.resume();
+        }
+
+        @Override
+        public void setPriority(int priority)
+        {
+            taskStateMachine.setPriority(priority);
         }
 
         @Override

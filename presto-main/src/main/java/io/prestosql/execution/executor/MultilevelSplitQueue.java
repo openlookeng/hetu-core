@@ -217,13 +217,14 @@ public class MultilevelSplitQueue
     public Priority updatePriority(Priority oldPriority, long quantaNanos, long scheduledNanos)
     {
         int oldLevel = oldPriority.getLevel();
+        int oldTag = oldPriority.getQueryPriorityTag();
         int newLevel = computeLevel(scheduledNanos);
 
         long levelContribution = Math.min(quantaNanos, LEVEL_CONTRIBUTION_CAP);
 
         if (oldLevel == newLevel) {
             addLevelTime(oldLevel, levelContribution);
-            return new Priority(oldLevel, oldPriority.getLevelPriority() + quantaNanos);
+            return new Priority(oldLevel, oldPriority.getLevelPriority() + quantaNanos, oldTag);
         }
 
         long remainingLevelContribution = levelContribution;
@@ -241,7 +242,7 @@ public class MultilevelSplitQueue
 
         addLevelTime(newLevel, remainingLevelContribution);
         long newLevelMinPriority = getLevelMinPriority(newLevel, scheduledNanos);
-        return new Priority(newLevel, newLevelMinPriority + remainingTaskTime);
+        return new Priority(newLevel, newLevelMinPriority + remainingTaskTime, oldTag);
     }
 
     public void remove(PrioritizedSplitRunner split)

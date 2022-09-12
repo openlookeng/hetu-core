@@ -68,6 +68,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -165,6 +166,7 @@ public class QueryStateMachine
 
     private final AtomicBoolean isRunningAsync = new AtomicBoolean();
     private final boolean recoveryEnabled;
+    private AtomicInteger priority = new AtomicInteger(1);
 
     private QueryStateMachine(
             String query,
@@ -1316,6 +1318,16 @@ public class QueryStateMachine
                 queryStats.getFailedInputBlockedTime(),
                 queryStats.getOutputBlockedTime(),
                 queryStats.getFailedOutputBlockedTime());
+    }
+
+    public void setPriority(int priority)
+    {
+        this.priority.set(priority);
+    }
+
+    public int getPriority()
+    {
+        return priority.get();
     }
 
     public static class QueryOutputManager

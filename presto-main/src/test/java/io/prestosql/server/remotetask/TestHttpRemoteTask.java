@@ -228,7 +228,7 @@ public class TestHttpRemoteTask
                 new NodeTaskMap.PartitionedSplitCountTracker(i -> {}),
                 true,
                 Optional.empty(),
-                new QuerySnapshotManager(new QueryId("test"), NOOP_RECOVERY_UTILS, TEST_SESSION));
+                new QuerySnapshotManager(new QueryId("test"), NOOP_RECOVERY_UTILS, TEST_SESSION), OptionalInt.empty());
     }
 
     private static HttpRemoteTaskFactory createHttpRemoteTaskFactory(TestingTaskResource testingTaskResource)

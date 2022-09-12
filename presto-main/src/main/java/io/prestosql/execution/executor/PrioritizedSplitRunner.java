@@ -55,7 +55,7 @@ public class PrioritizedSplitRunner
 
     private final AtomicBoolean destroyed = new AtomicBoolean();
 
-    protected final AtomicReference<Priority> priority = new AtomicReference<>(new Priority(0, 0));
+    protected final AtomicReference<Priority> priority = new AtomicReference<>(new Priority(0, 0, 1));
 
     protected final AtomicLong lastRun = new AtomicLong();
     private final AtomicLong lastReady = new AtomicLong();
@@ -223,6 +223,11 @@ public class PrioritizedSplitRunner
     public int compareTo(PrioritizedSplitRunner o)
     {
         int result = Long.compare(priority.get().getLevelPriority(), o.getPriority().getLevelPriority());
+        if (result != 0) {
+            return result;
+        }
+
+        result = Long.compare(priority.get().getQueryPriorityTag(), o.getPriority().getQueryPriorityTag());
         if (result != 0) {
             return result;
         }

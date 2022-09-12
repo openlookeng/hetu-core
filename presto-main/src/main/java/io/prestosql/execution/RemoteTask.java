@@ -67,6 +67,8 @@ public interface RemoteTask
 
     void resume();
 
+    void setPriority(int priority);
+
     void abort();
 
     void fail(Throwable cause);

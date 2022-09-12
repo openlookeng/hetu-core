@@ -1174,6 +1174,14 @@ public class SqlQueryScheduler
         snapshotManager.setRestoringSnapshotId(restoringSnapshotId);
     }
 
+    public void setStagePriority()
+    {
+        log.info("set query task priority: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(stage -> stage.setPriority(queryStateMachine.getPriority()));
+        }
+    }
+
     private interface ExchangeLocationsConsumer
     {
         void addExchangeLocations(PlanFragmentId fragmentId, Set<RemoteTask> tasks, boolean noMoreExchangeLocations);
