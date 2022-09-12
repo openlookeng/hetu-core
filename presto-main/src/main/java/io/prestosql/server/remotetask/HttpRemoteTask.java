@@ -755,6 +755,35 @@ public final class HttpRemoteTask
         scheduleAsyncSuspendRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
     }
 
+    @Override
+    public void spillRevocableMemory()
+    {
+        try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
+            TaskStatus taskStatus = getTaskStatus();
+            if (taskStatus.getState().isDone()) {
+                return;
+            }
+            if (!taskStatus.getState().equals(TaskState.RUNNING)) {
+                return;
+            }
+
+            sendSpillMemoryRequest(taskStatus, TaskState.RUNNING, "spillRevocableMemory");
+        }
+    }
+
+    private void sendSpillMemoryRequest(TaskStatus taskStatus, TaskState targetState, String action)
+    {
+        log.debug("Spill task %s, with target state %s", taskStatus.getTaskId(), targetState);
+
+        // send cancel to task and ignore response
+        HttpUriBuilder uriBuilder = getHttpUriBuilder(taskStatus).appendPath("spill").addParameter("targetState", targetState.toString());
+        Request request = setContentTypeHeaders(isBinaryEncoding, prepareDelete())
+                .setUri(uriBuilder.build())
+                .addHeader(PRESTO_TASK_INSTANCE_ID, instanceId)
+                .build();
+        scheduleAsyncSuspendRequest(createCleanupBackoff(), request, targetState.toString()); //todo(nitin) check if separate response handler needed here?
+    }
+
     private synchronized void cleanUpTask(TaskState newState)
     {
         checkState(getTaskStatus().getState().isDone(), "attempt to clean up a task that is not done yet");

@@ -70,7 +70,8 @@ public class TestQueryManagerConfig
                 .setFaultTolerantExecutionPartitionCount(50)
                 .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE))
                 .setExchangeFilesystemBaseDirectory("/tmp/hetu-exchange-manager")
-                .setExchangeFilesystemType("local"));
+                .setExchangeFilesystemType("local")
+                .setQueryResourceTracking(false));
     }
 
     @Test
@@ -114,6 +115,7 @@ public class TestQueryManagerConfig
                 .put("fault-tolerant-execution-task-descriptor-storage-max-memory", "1GB")
                 .put("exchange-filesystem-base-directory", "/opt/hetu-1.8.0/exchange-base-dir")
                 .put("exchange-filesystem-type", "hdfs")
+                .put("query-resource-tracking", "true")
                 .build();
 
         QueryManagerConfig expected = new QueryManagerConfig()
@@ -153,7 +155,8 @@ public class TestQueryManagerConfig
                 .setFaultTolerantExecutionPartitionCount(51)
                 .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(1, DataSize.Unit.GIGABYTE))
                 .setExchangeFilesystemBaseDirectory("/opt/hetu-1.8.0/exchange-base-dir")
-                .setExchangeFilesystemType("hdfs");
+                .setExchangeFilesystemType("hdfs")
+                .setQueryResourceTracking(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

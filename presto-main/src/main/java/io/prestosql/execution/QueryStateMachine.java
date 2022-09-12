@@ -80,6 +80,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.execution.BasicStageStats.EMPTY_STAGE_STATS;
 import static io.prestosql.execution.QueryState.DISPATCHING;
+import static io.prestosql.execution.QueryState.ESTIMATING;
 import static io.prestosql.execution.QueryState.FAILED;
 import static io.prestosql.execution.QueryState.FINISHED;
 import static io.prestosql.execution.QueryState.FINISHING;
@@ -858,6 +859,11 @@ public class QueryStateMachine
     {
         queryStateTimer.beginPlanning();
         return queryState.setIf(PLANNING, currentState -> currentState.ordinal() < PLANNING.ordinal());
+    }
+
+    public boolean transitionToRequeue()
+    {
+        return queryState.setIf(ESTIMATING, currentState -> currentState.ordinal() <= PLANNING.ordinal());
     }
 
     public boolean transitionToStarting()

@@ -99,6 +99,7 @@ public final class InternalResourceGroupManager<C>
     private int memoryMarginPercent;
     private int queryProgressMarginPercent;
     private InternalNodeManager internalNodeManager;
+    private final int noResourceRetry;
 
     @Inject
     public InternalResourceGroupManager(LegacyResourceGroupConfigurationManager legacyManager,
@@ -120,6 +121,7 @@ public final class InternalResourceGroupManager<C>
         this.memoryMarginPercent = 10;
         this.queryProgressMarginPercent = 5;
         this.internalNodeManager = internalNodeManager;
+        this.noResourceRetry = hetuConfig.getNoResourceRetryCount();
     }
 
     @Override
@@ -385,7 +387,7 @@ public final class InternalResourceGroupManager<C>
             return new DistributedResourceGroupTemp(Optional.empty(), name, this::exportGroup, executor, stateStoreProvider.getStateStore(), internalNodeManager);
         }
         else {
-            return new InternalResourceGroup(Optional.empty(), name, this::exportGroup, executor);
+            return new InternalResourceGroup(Optional.empty(), name, this::exportGroup, executor, noResourceRetry);
         }
     }
 
@@ -405,5 +407,17 @@ public final class InternalResourceGroupManager<C>
     public boolean isGroupRegistered(ResourceGroupId resourceGroupId)
     {
         return groups.containsKey(resourceGroupId);
+    }
+
+    @Override
+    public long getSoftCpuLimit(ResourceGroupId resourceGroupId)
+    {
+        return groups.get(resourceGroupId).getSoftCpuLimit().toMillis();
+    }
+
+    @Override
+    public long getHardCpuLimit(ResourceGroupId resourceGroupId)
+    {
+        return groups.get(resourceGroupId).getHardCpuLimit().toMillis();
     }
 }

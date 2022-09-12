@@ -125,6 +125,8 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryhistory.QueryHistoryModule;
+import io.prestosql.resourcemanager.ForResourceMonitor;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -453,6 +455,10 @@ public class CoordinatorModule
         binder.bind(TaskExecutionStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(TaskExecutionStats.class).withGeneratedName();
         binder.bind(SplitSourceFactory.class).in(Scopes.SINGLETON);
+
+        binder.bind(ExecutorService.class).annotatedWith(ForResourceMonitor.class)
+                .toInstance(newCachedThreadPool(threadsNamed("query-resource-service-%s")));
+        binder.bind(QueryResourceManagerService.class).in(Scopes.SINGLETON);
 
         // cleanup
         binder.bind(ExecutorCleanup.class).in(Scopes.SINGLETON);

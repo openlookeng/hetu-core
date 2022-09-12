@@ -95,6 +95,8 @@ public class QueryManagerConfig
 
     private String exchangeFilesystemBaseDirectory = "/tmp/hetu-exchange-manager";
 
+    private boolean queryResourceTracking;
+
     @Min(1)
     public int getScheduleSplitBatchSize()
     {
@@ -596,6 +598,18 @@ public class QueryManagerConfig
     public QueryManagerConfig setExchangeFilesystemBaseDirectory(String exchangeFilesystemBaseDirectory)
     {
         this.exchangeFilesystemBaseDirectory = exchangeFilesystemBaseDirectory;
+        return this;
+    }
+
+    public boolean isQueryResourceTracking()
+    {
+        return queryResourceTracking;
+    }
+
+    @Config("query-resource-tracking")
+    public QueryManagerConfig setQueryResourceTracking(Boolean queryResourceTracking)
+    {
+        this.queryResourceTracking = queryResourceTracking;
         return this;
     }
 }

@@ -50,6 +50,7 @@ import io.prestosql.sql.planner.PlanFragment;
 import org.joda.time.DateTime;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 import java.net.URI;
 import java.util.List;
@@ -468,38 +469,9 @@ public class SqlTask
                     return taskHolder.getFinalTaskInfo();
                 }
 
-                if (taskStateMachine.getState() == RUNNING) {
-                    taskExecution = taskHolder.getTaskExecution();
-                    if (taskExecution != null) {
-                        AtomicLong bytesRevokedAtomic = new AtomicLong();
-                        queryContext.accept(new VoidTraversingQueryContextVisitor<AtomicLong>()
-                        {
-                            @Override
-                            public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
-                            {
-                                if (remainingBytesToRevoke.get() < 0) {
-                                    // exit immediately if no work needs to be done
-                                    return null;
-                                }
-                                return super.visitQueryContext(queryContext, remainingBytesToRevoke);
-                            }
-
-                            @Override
-                            public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
-                            {
-                                if (remainingBytesToRevoke.get() > 0) {
-                                    long revokedBytes = operatorContext.requestMemoryRevoking();
-                                    if (revokedBytes > 0) {
-                                        remainingBytesToRevoke.addAndGet(revokedBytes);
-                                        log.debug("revoked bytes current: %s, total: %s", revokedBytes, remainingBytesToRevoke.get());
-                                    }
-                                }
-                                return null;
-                            }
-                        }, bytesRevokedAtomic);
-
-                        taskExecution.suspendTask();
-                    }
+                taskExecution = taskHolder.getTaskExecution();
+                if (spillRevocableMem(taskExecution) > 0) {
+                    taskExecution.suspendTask();
                 }
             }
         }
@@ -512,6 +484,45 @@ public class SqlTask
         }
 
         return getTaskInfo();
+    }
+
+    @GuardedBy("this")
+    private long spillRevocableMem(SqlTaskExecution taskExecution)
+    {
+        if (taskStateMachine.getState() == RUNNING) {
+            if (taskExecution != null) {
+                AtomicLong bytesRevokedAtomic = new AtomicLong(1);
+                queryContext.accept(new VoidTraversingQueryContextVisitor<AtomicLong>()
+                {
+                    @Override
+                    public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
+                    {
+                        if (remainingBytesToRevoke.get() < 0) {
+                            // exit immediately if no work needs to be done
+                            return null;
+                        }
+                        return super.visitQueryContext(queryContext, remainingBytesToRevoke);
+                    }
+
+                    @Override
+                    public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
+                    {
+                        if (remainingBytesToRevoke.get() >= 0) {
+                            long revokedBytes = operatorContext.requestMemoryRevoking();
+                            if (revokedBytes > 0) {
+                                remainingBytesToRevoke.addAndGet(revokedBytes);
+                                log.debug("revoked bytes current: %s, total: %s", revokedBytes, remainingBytesToRevoke.get());
+                            }
+                        }
+                        return null;
+                    }
+                }, bytesRevokedAtomic);
+
+                return bytesRevokedAtomic.get();
+            }
+        }
+
+        return 0;
     }
 
     public TaskInfo resume(TaskState targetState)
@@ -528,6 +539,32 @@ public class SqlTask
                 if (taskExecution != null) {
                     taskExecution.resumeTask();
                 }
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
+    public TaskInfo spill(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+
+                taskExecution = taskHolder.getTaskExecution();
+                spillRevocableMem(taskExecution);
             }
         }
         catch (Error e) {

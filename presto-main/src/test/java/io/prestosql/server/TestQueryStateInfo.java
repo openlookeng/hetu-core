@@ -45,7 +45,7 @@ public class TestQueryStateInfo
     @Test
     public void testQueryStateInfo()
     {
-        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor());
+        InternalResourceGroup root = new InternalResourceGroup(Optional.empty(), "root", (group, export) -> {}, directExecutor(), 5);
         root.setSoftMemoryLimit(new DataSize(1, MEGABYTE));
         root.setMaxQueuedQueries(40);
         root.setHardConcurrencyLimit(0);

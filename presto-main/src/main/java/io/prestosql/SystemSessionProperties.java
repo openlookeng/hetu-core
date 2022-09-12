@@ -205,6 +205,8 @@ public final class SystemSessionProperties
 
     public static final String EXCHANGE_FILESYSTEM_BASE_DIRECTORY = "exchange_filesystem_base_directory";
 
+    public static final String QUERY_RESOURCE_TRACKING = "query_resource_tracking_enabled";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     private static Logger log = Logger.get(SystemSessionProperties.class);
@@ -991,6 +993,11 @@ public final class SystemSessionProperties
                         EXCHANGE_FILESYSTEM_BASE_DIRECTORY,
                         "Name of the exchange filesystem base directory",
                         queryManagerConfig.getExchangeFilesystemBaseDirectory(),
+                        false),
+                booleanProperty(
+                        QUERY_RESOURCE_TRACKING,
+                        "Query tracking feature enabled for current session",
+                        queryManagerConfig.isQueryResourceTracking(),
                         false));
     }
 
@@ -1738,5 +1745,10 @@ public final class SystemSessionProperties
     public static String getExchangeFilesystemBaseDirectory(Session session)
     {
         return session.getSystemProperty(EXCHANGE_FILESYSTEM_BASE_DIRECTORY, String.class);
+    }
+
+    public static boolean isQueryResourceTrackingEnabled(Session session)
+    {
+        return session.getSystemProperty(QUERY_RESOURCE_TRACKING, Boolean.class);
     }
 }
