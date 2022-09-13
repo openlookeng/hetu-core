@@ -134,6 +134,7 @@ import static org.apache.hadoop.hive.metastore.conf.MetastoreConf.getTimeVar;
 public class SemiTransactionalHiveMetastore
 {
     private static final Logger log = Logger.get(SemiTransactionalHiveMetastore.class);
+    public static final String SCHEMA_SEPARATOR = ".";
 
     private final HiveMetastore delegate;
     private final HiveMetastoreClosure closure;
@@ -1257,6 +1258,8 @@ public class SemiTransactionalHiveMetastore
         checkHoldsLock();
 
         Committer committer = new Committer();
+        Map<String, TableAndMore> ctasTablesMap = new HashMap<>();
+
         try {
             List<? extends ListenableFuture<?>> tableActionsFutures = this.tableActions.entrySet().stream()
                     .map(entry -> hiveMetastoreClientService.submit(() -> {
@@ -1270,6 +1273,7 @@ public class SemiTransactionalHiveMetastore
                                 committer.prepareAlterTable(action.getHdfsContext(), action.getIdentity(), action.getData(), action.getQueryId());
                                 break;
                             case ADD:
+                                ctasTablesMap.put(schemaTableName.toString(), action.getData());
                                 committer.prepareAddTable(action.getHdfsContext(), action.getData(), action.getQueryId());
                                 break;
                             case INSERT_EXISTING:
@@ -1290,6 +1294,20 @@ public class SemiTransactionalHiveMetastore
                 HiveIdentity identity = values.iterator().next().getIdentity();
                 Table table = getTable(identity, schemaTableName.getSchemaName(), schemaTableName.getTableName())
                         .orElseThrow(() -> new TableNotFoundException(schemaTableName));
+                String tableKey = table.getDatabaseName() + SCHEMA_SEPARATOR + table.getTableName();
+                TableAndMore tableData = ctasTablesMap.get(tableKey);
+                if (null != tableData) {
+                    //do the rename operation here from the staging dir to actual table dir for ctas operation
+                    long partitionsSize = tableEntry.getValue().entrySet().stream().count();
+                    if (partitionsSize > 0) {
+                        Optional<Path> ctasTableCurrentPath = tableData.getCurrentLocation();
+                        if (ctasTableCurrentPath.isPresent()) {
+                            HdfsContext hdfsContext = values.iterator().next().getHdfsContext();
+                            committer.renameStagingDir(hdfsContext, ctasTableCurrentPath.get(), new Path(table.getStorage().getLocation()));
+                        }
+                    }
+                }
+
                 List<? extends ListenableFuture<?>> partitionActionsFutures = tableEntry.getValue().entrySet().stream()
                         .map(partitionEntry -> hiveMetastoreClientService.submit(() -> {
                             List<String> partitionValues = partitionEntry.getKey();
@@ -1302,7 +1320,12 @@ public class SemiTransactionalHiveMetastore
                                     committer.prepareAlterPartition(table, action.getHdfsContext(), action.getIdentity(), action.getData(), action.getQueryId());
                                     break;
                                 case ADD:
-                                    committer.prepareAddPartition(table, action.getHdfsContext(), action.getIdentity(), action.getData(), action.getQueryId());
+                                    boolean isRenameRequired = true;
+                                    if (null != tableData && tableData.getCurrentLocation().isPresent() && action.getData().getCurrentLocation().getParent().equals(tableData.getCurrentLocation().get())) {
+                                        isRenameRequired = false;
+                                    }
+                                    committer.prepareAddPartition(table, action.getHdfsContext(), action.getIdentity(), action.getData(), action.getQueryId(),
+                                            isRenameRequired);
                                     break;
                                 case INSERT_EXISTING:
                                     committer.prepareInsertExistingPartition(table, action.getHdfsContext(), action.getIdentity(), action.getData(), action.getQueryId());
@@ -1704,7 +1727,8 @@ public class SemiTransactionalHiveMetastore
             }
         }
 
-        private void prepareAddPartition(Table table, HdfsContext hdfsContext, HiveIdentity identity, PartitionAndMore partitionAndMore, String queryId)
+        private void prepareAddPartition(Table table, HdfsContext hdfsContext, HiveIdentity identity, PartitionAndMore partitionAndMore, String queryId,
+                                         boolean isRenameRequired)
         {
             deleteOnly = false;
 
@@ -1719,20 +1743,17 @@ public class SemiTransactionalHiveMetastore
                     partition.getSchemaTableName(),
                     ignored -> new PartitionAdder(partitionAndMore.getIdentity(), partition.getDatabaseName(), partition.getTableName(), delegate,
                             partitionCommitBatchSize, updateStatisticsOperations));
-
-            if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
-                if (!targetPath.equals(currentPath)) {
-                    renameNewPartitionDirectory(
-                            hdfsContext,
-                            hdfsEnvironment,
-                            currentPath,
-                            targetPath,
-                            cleanUpTasksForAbort);
+            if (isRenameRequired) {
+                if (pathExists(hdfsContext, hdfsEnvironment, currentPath)) {
+                    if (!targetPath.equals(currentPath)) {
+                        renameNewPartitionDirectory(hdfsContext, hdfsEnvironment, currentPath, targetPath,
+                                cleanUpTasksForAbort);
+                    }
                 }
-            }
-            else {
-                cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true));
-                createDirectory(hdfsContext, hdfsEnvironment, targetPath);
+                else {
+                    cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true));
+                    createDirectory(hdfsContext, hdfsEnvironment, targetPath);
+                }
             }
             String partitionName = getPartitionName(table, partition.getValues());
             partitionAdder.addPartition(new PartitionWithStatistics(partition, partitionName, partitionAndMore.getStatisticsUpdate(),
@@ -2018,6 +2039,23 @@ public class SemiTransactionalHiveMetastore
             verify(partitionAndMore.hasFileNames(), "fileNames expected to be set if isCleanExtraOutputFilesOnCommit is true");
 
             SemiTransactionalHiveMetastore.cleanExtraOutputFiles(hdfsEnvironment, hdfsContext, queryId, partitionAndMore.getCurrentLocation(), ImmutableSet.copyOf(partitionAndMore.getFileNames()));
+        }
+
+        private void renameStagingDir(HdfsContext hdfsContext, Path sourcePath, Path targetPath)
+        {
+            //if the target table path already exists, then delete first and do rename
+            if (pathExists(hdfsContext, hdfsEnvironment, targetPath)) {
+                try {
+                    if (!hdfsEnvironment.getFileSystem(hdfsContext, targetPath).delete(targetPath, false)) {
+                        throw new IOException("delete returned false");
+                    }
+                }
+                catch (IOException e) {
+                    throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to delete target dir %s ", targetPath), e);
+                }
+            }
+            renameDirectory(hdfsContext, hdfsEnvironment, sourcePath, targetPath,
+                    () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(hdfsContext, targetPath, true)));
         }
     }
 
@@ -2338,11 +2376,18 @@ public class SemiTransactionalHiveMetastore
         FileStatus fileStatus = getFileStatus(context, hdfsEnvironment, source);
         if (fileStatus.isDirectory()) {
             FileStatus[] children = getChildren(context, hdfsEnvironment, source);
+            int childFileCounter = 0;
             for (FileStatus child : children) {
                 Path subTarget = new Path(target, child.getPath().getName());
-                renameDirectory(context, hdfsEnvironment, child.getPath(),
-                        subTarget,
-                        () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, subTarget, true)));
+                if (childFileCounter == 0) {
+                    renameFile(context, hdfsEnvironment, child.getPath(), subTarget,
+                            () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, subTarget, true)), true);
+                }
+                else {
+                    renameFile(context, hdfsEnvironment, child.getPath(), subTarget,
+                            () -> cleanUpTasksForAbort.add(new DirectoryCleanUpTask(context, subTarget, true)), false);
+                }
+                childFileCounter++;
             }
         }
         else {
@@ -2370,6 +2415,24 @@ public class SemiTransactionalHiveMetastore
         }
         catch (IOException e) {
             throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s", source, target), e);
+        }
+    }
+
+    private static void renameFile(HdfsEnvironment.HdfsContext context, HdfsEnvironment hdfsEnvironment, Path source, Path target, Runnable runWhenRenameSuccess, boolean createParentDir)
+    {
+        if (createParentDir) {
+            if (!pathExists(context, hdfsEnvironment, target.getParent())) {
+                createDirectory(context, hdfsEnvironment, target.getParent());
+            }
+        }
+        try {
+            if (!hdfsEnvironment.getFileSystem(context, source).rename(source, target)) {
+                throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename file from %s to %s: rename returned false", source, target));
+            }
+            runWhenRenameSuccess.run();
+        }
+        catch (IOException e) {
+            throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename file from %s to %s", source, target), e);
         }
     }
 
