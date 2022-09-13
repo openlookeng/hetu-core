@@ -38,6 +38,7 @@ import io.prestosql.exchange.ExchangeSink;
 import io.prestosql.exchange.ExchangeSinkHandle;
 import io.prestosql.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.exchange.ExchangeSource;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
@@ -516,7 +517,7 @@ public class DeduplicatingDirectExchangeBuffer
                 ExchangeSinkHandle sinkHandle = exchange.addSink(0);
                 sinkInstanceHandle = exchange.instantiateSink(sinkHandle, 0);
                 exchange.noMoreSinks();
-                exchangeSink = exchangeManager.createSink(sinkInstanceHandle, true);
+                exchangeSink = exchangeManager.createSink(sinkInstanceHandle, DirectSerialisationType.OFF, true);
 
                 writeBuffer = new DynamicSliceOutput(DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
             }
