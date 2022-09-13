@@ -13,6 +13,8 @@
  */
 package io.prestosql.exchange;
 
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
+
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -76,6 +78,12 @@ public abstract class TestExchangeManager
 
             @Override
             public ExchangeSink createSink(ExchangeSinkInstanceHandle handle, boolean preserveRecordsOrder)
+            {
+                return null;
+            }
+
+            @Override
+            public ExchangeSink createSink(ExchangeSinkInstanceHandle handle, DirectSerialisationType serType, boolean preserveRecordsOrder)
             {
                 return null;
             }

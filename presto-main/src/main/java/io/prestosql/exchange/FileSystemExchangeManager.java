@@ -141,6 +141,26 @@ public class FileSystemExchangeManager
     }
 
     @Override
+    public ExchangeSink createSink(ExchangeSinkInstanceHandle handle, DirectSerialisationType serType, boolean preserveRecordsOrder)
+    {
+        FileSystemExchangeSinkInstanceHandle instanceHandle = (FileSystemExchangeSinkInstanceHandle) handle;
+        return new FileSystemExchangeSink(
+                exchangeStorage,
+                stats,
+                instanceHandle.getOutputDirectory(),
+                instanceHandle.getOutputPartitionCount(),
+                instanceHandle.getSinkHandle().getSecretKey().map(key -> new SecretKeySpec(key, 0, key.length, "AES")),
+                instanceHandle.getSinkHandle().getExchangeCompressionEnabled(),
+                preserveRecordsOrder,
+                maxPageStorageSizeInBytes,
+                exchangeSinkBufferPoolMinSize,
+                exchangeSinkBuffersPerPartition,
+                exchangeSinkMaxFileSizeInBytes,
+                serType,
+                directSerialisationBufferSize);
+    }
+
+    @Override
     public ExchangeSource createSource(List<ExchangeSourceHandle> handles)
     {
         List<ExchangeSourceFile> sourceFiles = handles.stream()

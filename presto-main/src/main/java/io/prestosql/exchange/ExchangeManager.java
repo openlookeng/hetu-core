@@ -13,6 +13,8 @@
  */
 package io.prestosql.exchange;
 
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
+
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.util.List;
@@ -34,6 +36,8 @@ public interface ExchangeManager
     Exchange createExchange(ExchangeContext context, int outputPartitionCount);
 
     ExchangeSink createSink(ExchangeSinkInstanceHandle handle, boolean preserveRecordsOrder);
+
+    ExchangeSink createSink(ExchangeSinkInstanceHandle handle, DirectSerialisationType serType, boolean preserveRecordsOrder);
 
     ExchangeSource createSource(List<ExchangeSourceHandle> handles);
 }
