@@ -25,10 +25,10 @@ import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.sql.RowExpressionConverter;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
-import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.IntegerType;
 import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.SmallintType;
 import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.TinyintType;
@@ -38,6 +38,7 @@ import io.prestosql.spi.type.VarcharType;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -49,6 +50,7 @@ public class ElasticSearchRowExpressionConverter
         implements RowExpressionConverter<ElasticSearchConverterContext>
 {
     private static final String EMPTY_STRING = "";
+    private static final String DEREFERENCE_SEPERATOR = "|";
 
     @Override
     public String visitCall(CallExpression call, ElasticSearchConverterContext context)
@@ -81,9 +83,36 @@ public class ElasticSearchRowExpressionConverter
                         specialFormArguments.get(0).accept(this, context),
                         form,
                         specialFormArguments.get(1).accept(this, context));
+            case DEREFERENCE:
+                int index;
+                try {
+                    index = Integer.parseInt(specialFormArguments.get(1).accept(this, context));
+                }
+                catch (NumberFormatException e) {
+                    return handleUnsupportedOptimize(context);
+                }
+                context.stepInDeference();
+                String innerName = specialFormArguments.get(0).accept(this, context);
+                context.stepOutDeference();
+
+                String[] splitNames = innerName.split(Pattern.quote(DEREFERENCE_SEPERATOR));
+                Type type = specialForm.getType();
+                return constructTypedNames(type, splitNames[index]);
             default:
                 return handleUnsupportedOptimize(context);
         }
+    }
+
+    private String constructTypedNames(Type type, String splitName)
+    {
+        if (!(type instanceof RowType)) {
+            return splitName;
+        }
+        RowType rowType = (RowType) type;
+        return rowType.getFields().stream().filter(typeField -> typeField.getName().isPresent())
+                .map(typeField -> typeField.getName().get())
+                .map(typeFieldName -> String.format("%s.%s", splitName, typeFieldName))
+                .collect(Collectors.joining(DEREFERENCE_SEPERATOR));
     }
 
     @Override
@@ -124,7 +153,11 @@ public class ElasticSearchRowExpressionConverter
     @Override
     public String visitVariableReference(VariableReferenceExpression reference, ElasticSearchConverterContext context)
     {
-        return RowExpressionConverter.super.visitVariableReference(reference, context);
+        String name = reference.getName();
+        if (!context.isInDeference()) {
+            return name;
+        }
+        return constructTypedNames(reference.getType(), name);
     }
 
     @Override

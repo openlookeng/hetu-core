@@ -17,9 +17,12 @@ public class ElasticSearchConverterContext
 {
     private boolean hasConversionFailed;
 
+    private int derefereneceLevel;
+
     public ElasticSearchConverterContext()
     {
         this.hasConversionFailed = false;
+        this.derefereneceLevel = 0;
     }
 
     public boolean isHasConversionFailed()
@@ -30,5 +33,22 @@ public class ElasticSearchConverterContext
     public void setConversionFailed()
     {
         this.hasConversionFailed = true;
+    }
+
+    public boolean isInDeference()
+    {
+        return derefereneceLevel > 0;
+    }
+
+    public void stepInDeference()
+    {
+        ++derefereneceLevel;
+    }
+
+    public void stepOutDeference()
+    {
+        if (derefereneceLevel > 0) {
+            --derefereneceLevel;
+        }
     }
 }
