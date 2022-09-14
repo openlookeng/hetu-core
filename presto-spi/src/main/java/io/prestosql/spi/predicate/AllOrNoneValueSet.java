@@ -18,7 +18,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.Type;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -84,6 +88,18 @@ public class AllOrNoneValueSet
     }
 
     @Override
+    public boolean isDiscreteSet()
+    {
+        return false;
+    }
+
+    @Override
+    public List<Object> getDiscreteSet()
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean containsValue(Object value)
     {
         if (!Primitives.wrap(type.getJavaType()).isInstance(value)) {
@@ -140,6 +156,15 @@ public class AllOrNoneValueSet
     public String toString(ConnectorSession session)
     {
         return "[" + (all ? "ALL" : "NONE") + "]";
+    }
+
+    @Override
+    public Optional<Collection<Object>> tryExpandRanges(int valuesLimit)
+    {
+        if (this.isNone()) {
+            return Optional.of(Collections.emptyList());
+        }
+        return Optional.empty();
     }
 
     @Override

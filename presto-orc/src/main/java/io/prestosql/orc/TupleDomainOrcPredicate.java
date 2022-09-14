@@ -69,18 +69,21 @@ public class TupleDomainOrcPredicate
     private final boolean orcBloomFiltersEnabled;
     private final Set<Integer> missingColumns;
 
+    private final int domainCompactionThreshold;
+
     public static TupleDomainOrcPredicateBuilder builder()
     {
         return new TupleDomainOrcPredicateBuilder();
     }
 
     private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, List<ColumnDomain> orColumns, boolean orcBloomFiltersEnabled,
-                                    Set<Integer> missingColumns)
+                                    Set<Integer> missingColumns, int domainCompactionThreshold)
     {
         this.columnDomains = ImmutableList.copyOf(requireNonNull(columnDomains, "columnDomains is null"));
         this.orColumnDomains = ImmutableList.copyOf(orColumns);
         this.orcBloomFiltersEnabled = orcBloomFiltersEnabled;
         this.missingColumns = missingColumns;
+        this.domainCompactionThreshold = domainCompactionThreshold;
     }
 
     @Override
@@ -153,22 +156,13 @@ public class TupleDomainOrcPredicate
         return true;
     }
 
-    @VisibleForTesting
-    public static Optional<Collection<Object>> extractDiscreteValues(ValueSet valueSet)
+    private Optional<Collection<Object>> extractDiscreteValues(ValueSet valueSet)
     {
-        return valueSet.getValuesProcessor().transform(
-                ranges -> {
-                    ImmutableList.Builder<Object> discreteValues = ImmutableList.builder();
-                    for (Range range : ranges.getOrderedRanges()) {
-                        if (!range.isSingleValue()) {
-                            return Optional.empty();
-                        }
-                        discreteValues.add(range.getSingleValue());
-                    }
-                    return Optional.of(discreteValues.build());
-                },
-                discreteValues -> Optional.of(discreteValues.getValues()),
-                allOrNone -> allOrNone.isAll() ? Optional.empty() : Optional.of(ImmutableList.of()));
+        if (!valueSet.isDiscreteSet()) {
+            return valueSet.tryExpandRanges(domainCompactionThreshold);
+        }
+
+        return Optional.of(valueSet.getDiscreteSet());
     }
 
     // checks whether a value part of the effective predicate is likely to be part of this bloom filter
@@ -283,10 +277,18 @@ public class TupleDomainOrcPredicate
         private Set<Integer> missingColumns = new HashSet<>();
         private boolean bloomFiltersEnabled;
 
+        private int domainCompactionThreshold;
+
         public TupleDomainOrcPredicateBuilder addColumn(OrcColumnId columnId, Domain domain)
         {
             requireNonNull(domain, "domain is null");
             columns.add(new ColumnDomain(columnId, domain));
+            return this;
+        }
+
+        public TupleDomainOrcPredicateBuilder setDomainCompactionThreshold(int domainCompactionThreshold)
+        {
+            this.domainCompactionThreshold = domainCompactionThreshold;
             return this;
         }
 
@@ -311,7 +313,7 @@ public class TupleDomainOrcPredicate
 
         public TupleDomainOrcPredicate build()
         {
-            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled, missingColumns);
+            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled, missingColumns, domainCompactionThreshold);
         }
     }
 

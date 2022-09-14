@@ -21,6 +21,9 @@ import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
 
 import java.math.BigInteger;
+import java.util.Optional;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.spi.type.Decimals.MAX_SHORT_PRECISION;
@@ -120,5 +123,10 @@ final class ShortDecimalType
     public void writeLong(BlockBuilder blockBuilder, long value)
     {
         blockBuilder.writeLong(value).closeEntry();
+    }
+
+    public Optional<Stream<?>> getDiscreteValues(Range range)
+    {
+        return Optional.of(LongStream.rangeClosed((long) range.getMin(), (long) range.getMax()).boxed());
     }
 }

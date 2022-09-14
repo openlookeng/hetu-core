@@ -13,20 +13,20 @@
  */
 package io.prestosql.operator.aggregation.state;
 
-import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.prestosql.array.BooleanBigArray;
 import io.prestosql.array.LongBigArray;
-import io.prestosql.array.ObjectBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.Restorable;
 import org.openjdk.jol.info.ClassLayout;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.function.Function;
 
-import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.UNSCALED_DECIMAL_128_SLICE_LENGTH;
-import static java.util.Objects.requireNonNull;
+import static io.airlift.slice.SizeOf.sizeOf;
 
 public class LongDecimalWithOverflowStateFactory
         implements AccumulatorStateFactory<LongDecimalWithOverflowState>
@@ -60,60 +60,99 @@ public class LongDecimalWithOverflowStateFactory
             implements LongDecimalWithOverflowState
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(GroupedLongDecimalWithOverflowState.class).instanceSize();
-        protected final ObjectBigArray<Slice> unscaledDecimals = new ObjectBigArray<>();
-        protected final LongBigArray overflows = new LongBigArray();
-        protected long numberOfElements;
+        protected final BooleanBigArray isNotNull = new BooleanBigArray();
+        /**
+         * Stores 128-bit decimals as pairs of longs
+         */
+        protected final LongBigArray unscaledDecimals = new LongBigArray();
+        @Nullable
+        protected LongBigArray overflows; // lazily initialized on the first overflow
 
         @Override
         public void ensureCapacity(long size)
         {
-            unscaledDecimals.ensureCapacity(size);
-            overflows.ensureCapacity(size);
-        }
-
-        @Override
-        public Slice getLongDecimal()
-        {
-            return unscaledDecimals.get(getGroupId());
-        }
-
-        @Override
-        public void setLongDecimal(Slice value)
-        {
-            requireNonNull(value, "value is null");
-            if (getLongDecimal() == null) {
-                numberOfElements++;
+            isNotNull.ensureCapacity(size);
+            unscaledDecimals.ensureCapacity(size * 2);
+            if (overflows != null) {
+                overflows.ensureCapacity(size);
             }
-            unscaledDecimals.set(getGroupId(), value);
+        }
+
+        @Override
+        public boolean isNotNull()
+        {
+            return isNotNull.get(getGroupId());
+        }
+
+        @Override
+        public void setNotNull()
+        {
+            isNotNull.set(getGroupId(), true);
+        }
+
+        @Override
+        public long[] getDecimalArray()
+        {
+            return unscaledDecimals.getSegment(getGroupId() * 2);
+        }
+
+        @Override
+        public int getDecimalArrayOffset()
+        {
+            return unscaledDecimals.getOffset(getGroupId() * 2);
         }
 
         @Override
         public long getOverflow()
         {
+            if (overflows == null) {
+                return 0;
+            }
             return overflows.get(getGroupId());
         }
 
         @Override
         public void setOverflow(long overflow)
         {
-            overflows.set(getGroupId(), overflow);
+            // setOverflow(0) must overwrite any existing overflow value
+            if (overflow == 0 && overflows == null) {
+                return;
+            }
+            long groupId = getGroupId();
+            if (overflows == null) {
+                overflows = new LongBigArray();
+                overflows.ensureCapacity(isNotNull.getCapacity());
+            }
+            overflows.set(groupId, overflow);
+        }
+
+        @Override
+        public void addOverflow(long overflow)
+        {
+            if (overflow != 0) {
+                long groupId = getGroupId();
+                if (overflows == null) {
+                    overflows = new LongBigArray();
+                    overflows.ensureCapacity(isNotNull.getCapacity());
+                }
+                overflows.add(groupId, overflow);
+            }
         }
 
         @Override
         public long getEstimatedSize()
         {
-            return INSTANCE_SIZE + unscaledDecimals.sizeOf() + overflows.sizeOf() + numberOfElements * SingleLongDecimalWithOverflowState.SIZE;
+            return INSTANCE_SIZE + isNotNull.sizeOf() + unscaledDecimals.sizeOf() + (overflows == null ? 0 : overflows.sizeOf());
         }
 
         @Override
         public Object capture(BlockEncodingSerdeProvider serdeProvider)
         {
             GroupedLongDecimalWithOverflowStateState myState = new GroupedLongDecimalWithOverflowStateState();
-            Function<Object, Object> unscaledDecimalsCapture = content -> ((Slice) content).getBytes();
-            myState.unscaledDecimals = unscaledDecimals.capture(unscaledDecimalsCapture);
+            myState.unscaledDecimals = unscaledDecimals.capture(serdeProvider);
             myState.overflows = overflows.capture(serdeProvider);
-            myState.numberOfElements = numberOfElements;
             myState.baseState = super.capture(serdeProvider);
+            myState.isNotNull = isNotNull.capture(serdeProvider);
             return myState;
         }
 
@@ -122,9 +161,9 @@ public class LongDecimalWithOverflowStateFactory
         {
             GroupedLongDecimalWithOverflowStateState myState = (GroupedLongDecimalWithOverflowStateState) state;
             Function<Object, Object> unscaledDecimalsRestore = content -> Slices.wrappedBuffer((byte[]) content);
-            this.unscaledDecimals.restore(unscaledDecimalsRestore, myState.unscaledDecimals);
+            this.unscaledDecimals.restore(myState.unscaledDecimals, serdeProvider);
             this.overflows.restore(myState.overflows, serdeProvider);
-            this.numberOfElements = myState.numberOfElements;
+            this.isNotNull.restore(myState.isNotNull, serdeProvider);
             super.restore(myState.baseState, serdeProvider);
         }
 
@@ -133,8 +172,8 @@ public class LongDecimalWithOverflowStateFactory
         {
             private Object unscaledDecimals;
             private Object overflows;
-            private long numberOfElements;
             private Object baseState;
+            private Object isNotNull;
         }
     }
 
@@ -142,21 +181,34 @@ public class LongDecimalWithOverflowStateFactory
             implements LongDecimalWithOverflowState, Restorable
     {
         private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleLongDecimalWithOverflowState.class).instanceSize();
-        public static final int SIZE = ClassLayout.parseClass(Slice.class).instanceSize() + UNSCALED_DECIMAL_128_SLICE_LENGTH;
+        protected static final int SIZE = (int) sizeOf(new long[2]);
 
-        protected Slice unscaledDecimal;
+        protected long[] unscaledDecimal = new long[2];
+        protected boolean isNotNull;
         protected long overflow;
 
         @Override
-        public Slice getLongDecimal()
+        public boolean isNotNull()
+        {
+            return isNotNull;
+        }
+
+        @Override
+        public void setNotNull()
+        {
+            isNotNull = true;
+        }
+
+        @Override
+        public long[] getDecimalArray()
         {
             return unscaledDecimal;
         }
 
         @Override
-        public void setLongDecimal(Slice unscaledDecimal)
+        public int getDecimalArrayOffset()
         {
-            this.unscaledDecimal = unscaledDecimal;
+            return 0;
         }
 
         @Override
@@ -172,11 +224,14 @@ public class LongDecimalWithOverflowStateFactory
         }
 
         @Override
+        public void addOverflow(long overflow)
+        {
+            this.overflow += overflow;
+        }
+
+        @Override
         public long getEstimatedSize()
         {
-            if (getLongDecimal() == null) {
-                return INSTANCE_SIZE;
-            }
             return INSTANCE_SIZE + SIZE;
         }
 
@@ -184,10 +239,9 @@ public class LongDecimalWithOverflowStateFactory
         public Object capture(BlockEncodingSerdeProvider serdeProvider)
         {
             SingleLongDecimalWithOverflowStateState myState = new SingleLongDecimalWithOverflowStateState();
-            if (this.unscaledDecimal != null) {
-                myState.unscaledDecimal = unscaledDecimal.getBytes();
-            }
+            myState.unscaledDecimal = unscaledDecimal;
             myState.overflow = overflow;
+            myState.isNotNull = isNotNull;
             return myState;
         }
 
@@ -195,20 +249,17 @@ public class LongDecimalWithOverflowStateFactory
         public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
         {
             SingleLongDecimalWithOverflowStateState myState = (SingleLongDecimalWithOverflowStateState) state;
-            if (myState.unscaledDecimal == null) {
-                this.unscaledDecimal = null;
-            }
-            else {
-                this.unscaledDecimal = Slices.wrappedBuffer(myState.unscaledDecimal);
-            }
+            this.unscaledDecimal = myState.unscaledDecimal;
             this.overflow = myState.overflow;
+            this.isNotNull = myState.isNotNull;
         }
 
         private static class SingleLongDecimalWithOverflowStateState
                 implements Serializable
         {
-            private byte[] unscaledDecimal;
+            private long[] unscaledDecimal;
             private long overflow;
+            private boolean isNotNull;
         }
     }
 }

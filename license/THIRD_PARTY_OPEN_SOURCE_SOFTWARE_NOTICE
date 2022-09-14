@@ -687,3 +687,14 @@ Source: https://github.com/google/material-design-icons
 
 License: Apache License V2.0
 Please see above.
+
+Software: DecimalAverageAggregation.java, LongDecimalWithOverflowState.java, DecimalCasts.java, DecimalCasts.java, TestDecimalAverageAggregation.java, Predicate.java, PredicateUtils.java, TupleDomainParquetPredicate.java, TestTupleDomainParquetPredicate.java, AllOrNoneValueSet.java, DiscreteValues.java, Domain.java, EquatableValueSet.java, Range.java, SortedRangeSet.java, ValueSet.java, BigintType.java, IntegerType.java, ShortDecimalType.java, SmallintType.java, TinyintType.java, UnscaledDecimal128Arithmetic.java, TestAllOrNoneValueSet.java, TestSortedRangeSet.java, TestDoubleRange.java, TestUnscaledDecimal128Arithmetic.java
+
+License: Apache License V2.0
+Please see above.
+
+Copyright notice:
+These files are obtained from presto version 369
+Copyright (c) 2006; Ivan Sagalaev
+Copyright (c) 2011-2016 Twitter; Inc.
+Copyright 2010-2016 Mike Bostock

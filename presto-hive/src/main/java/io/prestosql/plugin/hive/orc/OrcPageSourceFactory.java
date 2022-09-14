@@ -144,14 +144,25 @@ public class OrcPageSourceFactory
     @Inject
     public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore)
     {
+        this(
+                typeManager,
+                config,
+                hdfsEnvironment,
+                stats,
+                orcCacheStore,
+                requireNonNull(config, "hiveConfig is null").getDomainCompactionThreshold());
+    }
+
+    public OrcPageSourceFactory(TypeManager typeManager, HiveConfig config, HdfsEnvironment hdfsEnvironment, FileFormatDataSourceStats stats, OrcCacheStore orcCacheStore, int domainCompactionThreshold)
+    {
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         requireNonNull(config, "config is null");
         this.useOrcColumnNames = config.isUseOrcColumnNames();
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.orcCacheStore = orcCacheStore;
-        this.domainCompactionThreshold = config.getDomainCompactionThreshold();
         this.legacyTimeZone = requireNonNull(config, "hiveConfig is null").getOrcLegacyDateTimeZone();
+        this.domainCompactionThreshold = domainCompactionThreshold;
     }
 
     @Override
@@ -352,7 +363,8 @@ public class OrcPageSourceFactory
             }
 
             TupleDomainOrcPredicateBuilder predicateBuilder = TupleDomainOrcPredicate.builder()
-                    .setBloomFiltersEnabled(orcBloomFiltersEnabled);
+                    .setBloomFiltersEnabled(orcBloomFiltersEnabled)
+                    .setDomainCompactionThreshold(domainCompactionThreshold);
             Map<HiveColumnHandle, Domain> effectivePredicateDomains = effectivePredicate.getDomains()
                     .orElseThrow(() -> new IllegalArgumentException("Effective predicate is none"));
             for (HiveColumnHandle column : columns) {
