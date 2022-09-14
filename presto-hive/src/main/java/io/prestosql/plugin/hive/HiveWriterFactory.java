@@ -108,7 +108,7 @@ import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.COMPRESSRESULT;
 
 public class HiveWriterFactory
 {
-    private static Logger log = Logger.get(HiveWriterFactory.class);
+    private static final Logger log = Logger.get(HiveWriterFactory.class);
 
     private static final int MAX_BUCKET_COUNT = 100_000;
     private static final int BUCKET_NUMBER_PADDING = Integer.toString(MAX_BUCKET_COUNT - 1).length();
