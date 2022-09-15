@@ -29,10 +29,13 @@ public class ElasticSearchPlanOptimizer
 {
     private final ElasticsearchConfig elasticsearchConfig;
 
+    private final ElasticSearchRowExpressionConverter elasticSearchRowExpressionConverter;
+
     @Inject
-    public ElasticSearchPlanOptimizer(ElasticsearchConfig elasticsearchConfig)
+    public ElasticSearchPlanOptimizer(ElasticsearchConfig elasticsearchConfig, ElasticSearchRowExpressionConverter elasticSearchRowExpressionConverter)
     {
         this.elasticsearchConfig = elasticsearchConfig;
+        this.elasticSearchRowExpressionConverter = elasticSearchRowExpressionConverter;
     }
 
     @Override
@@ -41,6 +44,6 @@ public class ElasticSearchPlanOptimizer
         if (!elasticsearchConfig.isPushDownEnabled()) {
             return maxSubPlan;
         }
-        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator, session, types, symbolAllocator, new ElasticSearchRowExpressionConverter()), null);
+        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator, session, types, symbolAllocator, elasticSearchRowExpressionConverter), null);
     }
 }

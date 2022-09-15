@@ -13,8 +13,14 @@
  */
 package io.prestosql.elasticsearch.optimization;
 
+import com.google.inject.Inject;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionMetadata;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.OperatorType;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
@@ -38,6 +44,8 @@ import io.prestosql.spi.type.VarcharType;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -52,10 +60,77 @@ public class ElasticSearchRowExpressionConverter
     private static final String EMPTY_STRING = "";
     private static final String DEREFERENCE_SEPERATOR = "|";
 
+    public static final String COUNT_FUNCTION_NAME = "count";
+
+    protected final FunctionMetadataManager functionMetadataManager;
+    protected final StandardFunctionResolution standardFunctionResolution;
+
+    @Inject
+    public ElasticSearchRowExpressionConverter(FunctionMetadataManager functionMetadataManager, StandardFunctionResolution standardFunctionResolution)
+    {
+        this.functionMetadataManager = functionMetadataManager;
+        this.standardFunctionResolution = standardFunctionResolution;
+    }
+
     @Override
     public String visitCall(CallExpression call, ElasticSearchConverterContext context)
     {
-        return RowExpressionConverter.super.visitCall(call, context);
+        FunctionHandle functionHandle = call.getFunctionHandle();
+        if (standardFunctionResolution.isNotFunction(functionHandle)) {
+            return format("(NOT %s)", call.getArguments().get(0).accept(this, context));
+        }
+
+        FunctionMetadata functionMetadata = functionMetadataManager.getFunctionMetadata(functionHandle);
+
+        if (standardFunctionResolution.isOperator(functionHandle)) {
+            return handleOperator(call, functionMetadata, context);
+        }
+        return handleFunction(call, functionMetadata, context);
+    }
+
+    private String handleOperator(CallExpression call, FunctionMetadata functionMetadata, ElasticSearchConverterContext context)
+    {
+        FunctionHandle functionHandle = call.getFunctionHandle();
+
+        List<RowExpression> arguments = call.getArguments();
+
+        if (call.getArguments().size() == 1 && standardFunctionResolution.isNegateFunction(functionHandle)) {
+            String value = call.getArguments().get(0).accept(this, context);
+            String separator = value.startsWith("-") ? " " : "";
+            return format("-%s%s", separator, value);
+        }
+        if (functionMetadata.getOperatorType().get() == OperatorType.NOT_EQUAL) {
+            String variable = call.getArguments().get(0).accept(this, context);
+            String value = call.getArguments().get(0).accept(this, context);
+            return format("NOT (%s: %s)", variable, value);
+        }
+        Optional<OperatorType> operatorTypeOptional = functionMetadata.getOperatorType();
+        if (operatorTypeOptional.isPresent() && arguments.size() == 2 && (standardFunctionResolution.isComparisonFunction(functionHandle) || standardFunctionResolution.isArithmeticFunction(functionHandle))) {
+            return format(
+                    "(%s %s %s)",
+                    arguments.get(0).accept(this, context),
+                    operatorTypeOptional.get().getOperator(),
+                    arguments.get(1).accept(this, context));
+        }
+        throw new PrestoException(NOT_SUPPORTED, String.format("Unknown operator %s in push down", operatorTypeOptional));
+    }
+
+    private String handleFunction(CallExpression callExpression, FunctionMetadata functionMetadata, ElasticSearchConverterContext context)
+    {
+        String functionName = functionMetadata.getName().getObjectName();
+        List<RowExpression> arguments = callExpression.getArguments();
+        if (functionName.equals(COUNT_FUNCTION_NAME) && callExpression.getArguments().size() == 0) {
+            return handleUnsupportedOptimize(context);
+        }
+        else {
+            StringBuilder builder = new StringBuilder(functionName);
+            StringJoiner joiner = new StringJoiner(", ", "(", ")");
+            for (RowExpression expression : arguments) {
+                joiner.add(expression.accept(this, context));
+            }
+            builder.append(joiner);
+            return builder.toString();
+        }
     }
 
     @Override
