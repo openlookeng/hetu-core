@@ -158,7 +158,7 @@
 
 1. Are SQL statements of the openLooKeng case-sensitive? If SQL statements of the data source are case-sensitive, how does the openLooKeng process them?
    
-   > SQL statements of the openLooKeng are case-insensitive. Uppercase letters in SQL statements are converted to lowercase letters. If SQL statements of the data source are case-sensitive, queries may fail. For example, SQL statements of the Elasticsearch is case-sensitive. If the column name in Elasticsearch is in uppercase, an error occurs when the column is queried in the openLooKeng.
+   > SQL statements of the openLooKeng are case-insensitive. Uppercase letters in SQL statements are converted to lowercase letters. If SQL statements of the data source are case-sensitive, queries may fail. For example, SQL statements of the Elasticsearch is case-sensitive. If the column name in Elasticsearch is in uppercase, an error occurs when the column is queried in the openLooKeng.Insensitive When JDBC data sources match database and schema, "case-insensitive name-matching" is specified in the corresponding data source profile. For details, see https://docs.openlookeng.io/en/docs/docs/admin/properties.html.
 
 2. What do I do If the error message "cannot change stats state for a transactional table" is displayed when an update operation fails after the openLooKeng connects to the Hive?
    
