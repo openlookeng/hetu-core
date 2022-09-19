@@ -52,7 +52,8 @@ public class TestElasticsearchConfig
                 .setTrustStorePath(null)
                 .setTruststorePassword(null)
                 .setVerifyHostnames(true)
-                .setSecurity(null));
+                .setSecurity(null)
+                .setPushDownEnabled(false));
     }
 
     @Test
@@ -81,6 +82,7 @@ public class TestElasticsearchConfig
                 .put("elasticsearch.tls.truststore-password", "truststore-password")
                 .put("elasticsearch.tls.verify-hostnames", "false")
                 .put("elasticsearch.security", "PASSWORD")
+                .put("elasticsearch.pushdown.enabled", "true")
                 .build();
 
         ElasticsearchConfig expected = new ElasticsearchConfig()
@@ -101,7 +103,8 @@ public class TestElasticsearchConfig
                 .setTrustStorePath(truststoreFile.toFile())
                 .setTruststorePassword("truststore-password")
                 .setVerifyHostnames(false)
-                .setSecurity(PASSWORD);
+                .setSecurity(PASSWORD)
+                .setPushDownEnabled(true);
 
         assertFullMapping(properties, expected);
     }
