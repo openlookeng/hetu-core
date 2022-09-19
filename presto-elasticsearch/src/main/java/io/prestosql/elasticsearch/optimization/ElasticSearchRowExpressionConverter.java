@@ -15,7 +15,6 @@ package io.prestosql.elasticsearch.optimization;
 
 import com.google.inject.Inject;
 import io.airlift.slice.Slice;
-import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.FunctionMetadataManager;
@@ -49,7 +48,6 @@ import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.time.ZoneOffset.UTC;
@@ -112,7 +110,7 @@ public class ElasticSearchRowExpressionConverter
                     operatorTypeOptional.get().getOperator(),
                     arguments.get(1).accept(this, context));
         }
-        throw new PrestoException(NOT_SUPPORTED, String.format("Unknown operator %s in push down", operatorTypeOptional));
+        return handleUnsupportedOptimize(context);
     }
 
     private String handleFunction(CallExpression callExpression, FunctionMetadata functionMetadata, ElasticSearchConverterContext context)
@@ -222,7 +220,7 @@ public class ElasticSearchRowExpressionConverter
             Long time = (Long) literal.getValue();
             return formatter.format(Instant.ofEpochMilli(time).atZone(UTC).toLocalDateTime());
         }
-        throw new PrestoException(NOT_SUPPORTED, String.format("Cannot handle the constant expression %s with value of type %s", literal.getValue(), type));
+        return handleUnsupportedOptimize(context);
     }
 
     @Override
