@@ -243,7 +243,7 @@ public class ElasticSearchPlanOptimizerTest
         PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
 
         PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
-        assertOptimizedQuery(optimize, "(first_name = 'Lisa')");
+        assertOptimizedQuerySuccess(optimize, "(first_name = 'Lisa')");
     }
 
     @Test
@@ -289,10 +289,56 @@ public class ElasticSearchPlanOptimizerTest
         PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
 
         PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
-        assertOptimizedQuery(optimize, "(first_name = 'Lisa') OR (first_name = 'Lis')");
+        assertOptimizedQuerySuccess(optimize, "(first_name = 'Lisa') OR (first_name = 'Lis')");
     }
 
-    private static void assertOptimizedQuery(PlanNode optimize, String expectedOp)
+    @Test
+    public void testPlanVisitorOptimizePushDownEnableForUnsupported(){
+        // Note: query => A dummy query which is unsupported
+        PlanNodeId planNodeId = idAllocator.getNextId();
+
+        Symbol candySymbol = new Symbol("candy");
+        Symbol first_nameSymbol = new Symbol("first_name");
+        Map<Symbol, ColumnHandle> assignments1 = new HashMap<>(2);
+        assignments1.put(candySymbol, new ElasticsearchColumnHandle("candy", VarcharType.VARCHAR));
+        assignments1.put(first_nameSymbol, new ElasticsearchColumnHandle("first_name", VarcharType.VARCHAR));
+
+        PlanNode source = new TableScanNode(planNodeId, favouriteCandyTableHandle, new ArrayList<>(assignments1.keySet()), assignments1, TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0),0, false);
+
+        //first_name = 'Lisa'
+        ArrayList<TypeSignatureParameter> typeSignatureParameters = new ArrayList<>();
+        typeSignatureParameters.add(TypeSignatureParameter.of(2147483647));
+        TypeSignature typeSignature = new TypeSignature("varchar", typeSignatureParameters);
+        TypeSignature typeSignature1 = new TypeSignature("varchar", typeSignatureParameters);
+        List<TypeSignature> typeSignatures = new ArrayList<>();
+        typeSignatures.add(typeSignature1);
+        typeSignatures.add(typeSignature);
+        Signature equalFunctionSignature = new Signature(new QualifiedObjectName("presto", "default", "$operator$equal"), FunctionKind.SCALAR, returnTypeBoolean, typeSignatures);
+        FunctionHandle functionHandle = new BuiltInFunctionHandle(equalFunctionSignature);
+        List<RowExpression> arguments = new ArrayList<>();
+        arguments.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
+        arguments.add(new ConstantExpression(new StringLiteral("Lisa").getSlice(), VarcharType.VARCHAR));
+        RowExpression equalCallExpression = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments,Optional.empty());
+        List<RowExpression> arguments1 = new ArrayList<>();
+
+
+        arguments1.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
+        arguments1.add(new ConstantExpression(new StringLiteral("Lis").getSlice(), VarcharType.VARCHAR));
+        RowExpression equalCallExpression1 = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments1,Optional.empty());
+
+
+        RowExpression specialForm = new SpecialForm(SpecialForm.Form.IF, BooleanType.BOOLEAN, equalCallExpression, equalCallExpression1);
+
+        PlanNode filterNode = new FilterNode(idAllocator.getNextId(), source, specialForm);
+
+        Assignments assignments = new Assignments((Collections.singletonMap(candySymbol, new VariableReferenceExpression("candy", VarcharType.VARCHAR))));
+        PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
+
+        PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
+        assertOptimizedQueryFail(optimize);
+    }
+
+    private static void assertOptimizedQuerySuccess(PlanNode optimize, String expectedOp)
     {
         ProjectNode optimizedProjectNode = (ProjectNode) optimize;
         FilterNode projectNodeSource = (FilterNode) optimizedProjectNode.getSource();
@@ -302,5 +348,16 @@ public class ElasticSearchPlanOptimizerTest
         Optional<String> query = newTableScanNodeTableConnectorHandle.getQuery();
         Assert.assertTrue(query.isPresent());
         Assert.assertEquals(expectedOp, query.get());
+    }
+
+    private static void assertOptimizedQueryFail(PlanNode optimize)
+    {
+        ProjectNode optimizedProjectNode = (ProjectNode) optimize;
+        FilterNode projectNodeSource = (FilterNode) optimizedProjectNode.getSource();
+        TableScanNode newTableScanNode = (TableScanNode) projectNodeSource.getSource();
+        TableHandle newTableScanNodeTable = newTableScanNode.getTable();
+        ElasticsearchTableHandle newTableScanNodeTableConnectorHandle = (ElasticsearchTableHandle) newTableScanNodeTable.getConnectorHandle();
+        Optional<String> query = newTableScanNodeTableConnectorHandle.getQuery();
+        Assert.assertTrue(!query.isPresent());
     }
 }
