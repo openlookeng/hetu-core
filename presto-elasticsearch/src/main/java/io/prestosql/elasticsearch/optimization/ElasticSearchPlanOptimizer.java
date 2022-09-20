@@ -44,6 +44,6 @@ public class ElasticSearchPlanOptimizer
         if (!elasticsearchConfig.isPushDownEnabled()) {
             return maxSubPlan;
         }
-        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator, session, types, symbolAllocator, elasticSearchRowExpressionConverter), null);
+        return maxSubPlan.accept(new ElasticsearchPlanVisitor(idAllocator, elasticSearchRowExpressionConverter), null);
     }
 }

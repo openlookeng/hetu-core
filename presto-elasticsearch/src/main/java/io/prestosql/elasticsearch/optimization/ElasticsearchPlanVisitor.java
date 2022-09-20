@@ -15,8 +15,6 @@ package io.prestosql.elasticsearch.optimization;
 
 import com.google.inject.Inject;
 import io.prestosql.elasticsearch.ElasticsearchTableHandle;
-import io.prestosql.spi.SymbolAllocator;
-import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
@@ -25,10 +23,8 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.PlanVisitor;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.type.Type;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -37,19 +33,13 @@ public class ElasticsearchPlanVisitor
         extends PlanVisitor<PlanNode, Void>
 {
     private final PlanNodeIdAllocator idAllocator;
-    private final ConnectorSession session;
-    private final Map<String, Type> types;
-    private final SymbolAllocator symbolAllocator;
 
     private final ElasticSearchRowExpressionConverter rowExpressionConverter;
 
     @Inject
-    public ElasticsearchPlanVisitor(PlanNodeIdAllocator idAllocator, ConnectorSession session, Map<String, Type> types, SymbolAllocator symbolAllocator, ElasticSearchRowExpressionConverter elasticSearchRowExpressionConverter)
+    public ElasticsearchPlanVisitor(PlanNodeIdAllocator idAllocator, ElasticSearchRowExpressionConverter elasticSearchRowExpressionConverter)
     {
         this.idAllocator = idAllocator;
-        this.session = session;
-        this.types = types;
-        this.symbolAllocator = symbolAllocator;
         this.rowExpressionConverter = elasticSearchRowExpressionConverter;
     }
 
