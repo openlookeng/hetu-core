@@ -2,31 +2,71 @@ package io.prestosql.elasticsearch.optimization;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.bootstrap.LifeCycleManager;
+import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.elasticsearch.ElasticsearchClient;
+import io.prestosql.elasticsearch.ElasticsearchColumnHandle;
 import io.prestosql.elasticsearch.ElasticsearchConfig;
 import io.prestosql.elasticsearch.ElasticsearchConnector;
 import io.prestosql.elasticsearch.ElasticsearchMetadata;
 import io.prestosql.elasticsearch.ElasticsearchPageSourceProvider;
 import io.prestosql.elasticsearch.ElasticsearchSplitManager;
+import io.prestosql.elasticsearch.ElasticsearchTableHandle;
+import io.prestosql.elasticsearch.ElasticsearchTransactionHandle;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.spi.ConnectorPlanOptimizer;
+import io.prestosql.spi.connector.CatalogName;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
+import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.function.BuiltInFunctionHandle;
+import io.prestosql.spi.function.FunctionHandle;
+import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.function.StandardFunctionResolution;
+import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
+import io.prestosql.spi.plan.Assignments;
+import io.prestosql.spi.plan.FilterNode;
+import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
+import io.prestosql.spi.plan.TableScanNode;
+import io.prestosql.spi.predicate.TupleDomain;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.ParameterKind;
+import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.spi.type.TypeSignatureParameter;
+import io.prestosql.spi.type.VarcharType;
 import io.prestosql.spi.type.testing.TestingTypeManager;
 import io.prestosql.sql.relational.FunctionResolution;
+import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.type.InternalTypeManager;
+import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.testng.asserts.Assertion;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.prestosql.elasticsearch.ElasticsearchConfig.Security.PASSWORD;
@@ -159,5 +199,60 @@ public class ElasticSearchPlanOptimizerTest
         assertTrue(logicalPlanOptimizers.contains(elasticSearchPlanOptimizer));
         Set<ConnectorPlanOptimizer> physicalPlanOptimizers = connectorPlanOptimizerProvider.getPhysicalPlanOptimizers();
         assertEquals(0, physicalPlanOptimizers.size());
+    }
+
+    @Test
+    public void testPlanVisitorOptimizePushDownEnableForEquals(){
+        // Note: query => select candy from elasticsearch.default.favorite_candy where first_name='Lisa';
+
+        PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+        PlanNodeId planNodeId = idAllocator.getNextId();
+        CatalogName catalogName = new CatalogName("elasticsearch");
+        ConnectorTableHandle connectorTableHandle = new ElasticsearchTableHandle("default", "favourite_candy", Optional.empty());
+        ConnectorTransactionHandle elasticsearchTransactionHandle = ElasticsearchTransactionHandle.INSTANCE;
+        TableHandle tablehandle = new TableHandle(catalogName, connectorTableHandle, elasticsearchTransactionHandle, Optional.empty());
+
+        Symbol candySymbol = new Symbol("candy");
+        Symbol first_nameSymbol = new Symbol("first_name");
+        Map<Symbol, ColumnHandle> assignments1 = new HashMap<>(2);
+        assignments1.put(candySymbol, new ElasticsearchColumnHandle("candy", VarcharType.VARCHAR));
+        assignments1.put(first_nameSymbol, new ElasticsearchColumnHandle("first_name", VarcharType.VARCHAR));
+
+        PlanNode source = new TableScanNode(planNodeId, tablehandle, new ArrayList<>(assignments1.keySet()), assignments1, TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0),0, false);
+
+        TypeSignature returnType = new TypeSignature("boolean");
+        ArrayList<TypeSignatureParameter> typeSignatureParameters = new ArrayList<>();
+        typeSignatureParameters.add(TypeSignatureParameter.of(2147483647));
+        TypeSignature typeSignature = new TypeSignature("varchar", typeSignatureParameters);
+        TypeSignature typeSignature1 = new TypeSignature("varchar", typeSignatureParameters);
+        List<TypeSignature> typeSignatures = new ArrayList<>();
+        typeSignatures.add(typeSignature1);
+        typeSignatures.add(typeSignature);
+        Signature equalFunctionSignature = new Signature(new QualifiedObjectName("presto", "default", "$operator$equal"), FunctionKind.SCALAR, returnType, typeSignatures);
+        FunctionHandle functionHandle = new BuiltInFunctionHandle(equalFunctionSignature);
+        List<RowExpression> arguments = new ArrayList<>();
+        arguments.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
+        arguments.add(new ConstantExpression(new StringLiteral("Lisa").getSlice(), VarcharType.VARCHAR));
+
+        RowExpression equalCallExpression = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments,Optional.empty());
+
+        PlanNode filterNode = new FilterNode(idAllocator.getNextId(), source, equalCallExpression);
+
+        Assignments assignments = new Assignments((Collections.singletonMap(candySymbol, new VariableReferenceExpression("candy", VarcharType.VARCHAR))));
+        PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
+
+        PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
+        assertOptimizedQuery(optimize, "(first_name = 'Lisa')");
+    }
+
+    private static void assertOptimizedQuery(PlanNode optimize, String expectedOp)
+    {
+        ProjectNode optimizedProjectNode = (ProjectNode) optimize;
+        FilterNode projectNodeSource = (FilterNode) optimizedProjectNode.getSource();
+        TableScanNode newTableScanNode = (TableScanNode) projectNodeSource.getSource();
+        TableHandle newTableScanNodeTable = newTableScanNode.getTable();
+        ElasticsearchTableHandle newTableScanNodeTableConnectorHandle = (ElasticsearchTableHandle) newTableScanNodeTable.getConnectorHandle();
+        Optional<String> query = newTableScanNodeTableConnectorHandle.getQuery();
+        Assert.assertEquals(expectedOp, query.get());
     }
 }
