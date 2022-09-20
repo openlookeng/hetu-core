@@ -2,7 +2,6 @@ package io.prestosql.elasticsearch.optimization;
 
 import com.google.common.collect.ImmutableMap;
 import io.airlift.bootstrap.LifeCycleManager;
-import io.airlift.slice.Slice;
 import io.airlift.units.Duration;
 import io.prestosql.elasticsearch.ElasticsearchClient;
 import io.prestosql.elasticsearch.ElasticsearchColumnHandle;
@@ -42,19 +41,17 @@ import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.BooleanType;
-import io.prestosql.spi.type.ParameterKind;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.type.VarcharType;
-import io.prestosql.spi.type.testing.TestingTypeManager;
 import io.prestosql.sql.relational.FunctionResolution;
 import io.prestosql.sql.tree.StringLiteral;
 import io.prestosql.type.InternalTypeManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import org.testng.asserts.Assertion;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -83,6 +80,10 @@ public class ElasticSearchPlanOptimizerTest
 
     static FunctionMetadataManager functionMetadataManager;
 
+    static CatalogName catalogName = new CatalogName("elasticsearch");
+
+    static ConnectorTableHandle favouriteCandyConnectorTableHandle = new ElasticsearchTableHandle("default", "favourite_candy", Optional.empty());
+
     static StandardFunctionResolution standardFunctionResolution;
 
     static ElasticSearchPlanOptimizer elasticSearchPlanOptimizer;
@@ -100,6 +101,14 @@ public class ElasticSearchPlanOptimizerTest
     static ElasticsearchSplitManager elasticsearchSplitManager;
 
     static ElasticsearchPageSourceProvider elasticsearchPageSourceProvider;
+
+    static PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+
+    static ConnectorTransactionHandle elasticsearchTransactionHandle = ElasticsearchTransactionHandle.INSTANCE;
+
+    static TableHandle favouriteCandyTableHandle = new TableHandle(catalogName, favouriteCandyConnectorTableHandle, elasticsearchTransactionHandle, Optional.empty());
+    static TypeSignature returnTypeBoolean = new TypeSignature("boolean");
+
 
     static {
         // elastic search config for test
@@ -204,13 +213,7 @@ public class ElasticSearchPlanOptimizerTest
     @Test
     public void testPlanVisitorOptimizePushDownEnableForEquals(){
         // Note: query => select candy from elasticsearch.default.favorite_candy where first_name='Lisa';
-
-        PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
         PlanNodeId planNodeId = idAllocator.getNextId();
-        CatalogName catalogName = new CatalogName("elasticsearch");
-        ConnectorTableHandle connectorTableHandle = new ElasticsearchTableHandle("default", "favourite_candy", Optional.empty());
-        ConnectorTransactionHandle elasticsearchTransactionHandle = ElasticsearchTransactionHandle.INSTANCE;
-        TableHandle tablehandle = new TableHandle(catalogName, connectorTableHandle, elasticsearchTransactionHandle, Optional.empty());
 
         Symbol candySymbol = new Symbol("candy");
         Symbol first_nameSymbol = new Symbol("first_name");
@@ -218,9 +221,8 @@ public class ElasticSearchPlanOptimizerTest
         assignments1.put(candySymbol, new ElasticsearchColumnHandle("candy", VarcharType.VARCHAR));
         assignments1.put(first_nameSymbol, new ElasticsearchColumnHandle("first_name", VarcharType.VARCHAR));
 
-        PlanNode source = new TableScanNode(planNodeId, tablehandle, new ArrayList<>(assignments1.keySet()), assignments1, TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0),0, false);
+        PlanNode source = new TableScanNode(planNodeId, favouriteCandyTableHandle, new ArrayList<>(assignments1.keySet()), assignments1, TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0),0, false);
 
-        TypeSignature returnType = new TypeSignature("boolean");
         ArrayList<TypeSignatureParameter> typeSignatureParameters = new ArrayList<>();
         typeSignatureParameters.add(TypeSignatureParameter.of(2147483647));
         TypeSignature typeSignature = new TypeSignature("varchar", typeSignatureParameters);
@@ -228,14 +230,13 @@ public class ElasticSearchPlanOptimizerTest
         List<TypeSignature> typeSignatures = new ArrayList<>();
         typeSignatures.add(typeSignature1);
         typeSignatures.add(typeSignature);
-        Signature equalFunctionSignature = new Signature(new QualifiedObjectName("presto", "default", "$operator$equal"), FunctionKind.SCALAR, returnType, typeSignatures);
+        Signature equalFunctionSignature = new Signature(new QualifiedObjectName("presto", "default", "$operator$equal"), FunctionKind.SCALAR, returnTypeBoolean, typeSignatures);
         FunctionHandle functionHandle = new BuiltInFunctionHandle(equalFunctionSignature);
         List<RowExpression> arguments = new ArrayList<>();
         arguments.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
         arguments.add(new ConstantExpression(new StringLiteral("Lisa").getSlice(), VarcharType.VARCHAR));
 
         RowExpression equalCallExpression = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments,Optional.empty());
-
         PlanNode filterNode = new FilterNode(idAllocator.getNextId(), source, equalCallExpression);
 
         Assignments assignments = new Assignments((Collections.singletonMap(candySymbol, new VariableReferenceExpression("candy", VarcharType.VARCHAR))));
@@ -243,6 +244,52 @@ public class ElasticSearchPlanOptimizerTest
 
         PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
         assertOptimizedQuery(optimize, "(first_name = 'Lisa')");
+    }
+
+    @Test
+    public void testPlanVisitorOptimizePushDownEnableForOR(){
+        // Note: query => select candy from elasticsearch.default.favorite_candy where first_name='Lisa' OR first_name!='Lis' ;
+        PlanNodeId planNodeId = idAllocator.getNextId();
+
+        Symbol candySymbol = new Symbol("candy");
+        Symbol first_nameSymbol = new Symbol("first_name");
+        Map<Symbol, ColumnHandle> assignments1 = new HashMap<>(2);
+        assignments1.put(candySymbol, new ElasticsearchColumnHandle("candy", VarcharType.VARCHAR));
+        assignments1.put(first_nameSymbol, new ElasticsearchColumnHandle("first_name", VarcharType.VARCHAR));
+
+        PlanNode source = new TableScanNode(planNodeId, favouriteCandyTableHandle, new ArrayList<>(assignments1.keySet()), assignments1, TupleDomain.all(), Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, new UUID(0, 0),0, false);
+
+        //first_name = 'Lisa'
+        ArrayList<TypeSignatureParameter> typeSignatureParameters = new ArrayList<>();
+        typeSignatureParameters.add(TypeSignatureParameter.of(2147483647));
+        TypeSignature typeSignature = new TypeSignature("varchar", typeSignatureParameters);
+        TypeSignature typeSignature1 = new TypeSignature("varchar", typeSignatureParameters);
+        List<TypeSignature> typeSignatures = new ArrayList<>();
+        typeSignatures.add(typeSignature1);
+        typeSignatures.add(typeSignature);
+        Signature equalFunctionSignature = new Signature(new QualifiedObjectName("presto", "default", "$operator$equal"), FunctionKind.SCALAR, returnTypeBoolean, typeSignatures);
+        FunctionHandle functionHandle = new BuiltInFunctionHandle(equalFunctionSignature);
+        List<RowExpression> arguments = new ArrayList<>();
+        arguments.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
+        arguments.add(new ConstantExpression(new StringLiteral("Lisa").getSlice(), VarcharType.VARCHAR));
+        RowExpression equalCallExpression = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments,Optional.empty());
+        List<RowExpression> arguments1 = new ArrayList<>();
+
+        //first='Lis'
+        arguments1.add(new VariableReferenceExpression("first_name", VarcharType.VARCHAR));
+        arguments1.add(new ConstantExpression(new StringLiteral("Lis").getSlice(), VarcharType.VARCHAR));
+        RowExpression equalCallExpression1 = new CallExpression("EQUAL", functionHandle, BooleanType.BOOLEAN, arguments1,Optional.empty());
+
+        //first_name = 'Lisa' OR first='Lis'
+        RowExpression specialForm = new SpecialForm(SpecialForm.Form.OR, BooleanType.BOOLEAN, equalCallExpression, equalCallExpression1);
+
+        PlanNode filterNode = new FilterNode(idAllocator.getNextId(), source, specialForm);
+
+        Assignments assignments = new Assignments((Collections.singletonMap(candySymbol, new VariableReferenceExpression("candy", VarcharType.VARCHAR))));
+        PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
+
+        PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
+        assertOptimizedQuery(optimize, "(first_name = 'Lisa') OR (first_name = 'Lis')");
     }
 
     private static void assertOptimizedQuery(PlanNode optimize, String expectedOp)
@@ -253,6 +300,7 @@ public class ElasticSearchPlanOptimizerTest
         TableHandle newTableScanNodeTable = newTableScanNode.getTable();
         ElasticsearchTableHandle newTableScanNodeTableConnectorHandle = (ElasticsearchTableHandle) newTableScanNodeTable.getConnectorHandle();
         Optional<String> query = newTableScanNodeTableConnectorHandle.getQuery();
+        Assert.assertTrue(query.isPresent());
         Assert.assertEquals(expectedOp, query.get());
     }
 }
