@@ -680,7 +680,9 @@ public class ExchangeClient
             // Snapshot: Client may have been removed as a result of rescheduling, then don't queue it.
             // Use object identity, instead of .equals, for comparison.
             if (!recoveryEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
-                queuedClients.add(client);
+                if (!completedClients.contains(client)) {
+                    queuedClients.add(client);
+                }
             }
         }
         scheduleRequestIfNecessary();
@@ -697,6 +699,7 @@ public class ExchangeClient
                     buffer.taskFinished(client.getRemoteTaskId());
                 }
             }
+            queuedClients.remove(client);
         }
         scheduleRequestIfNecessary();
     }
@@ -710,6 +713,7 @@ public class ExchangeClient
                 buffer.taskFailed(client.getRemoteTaskId(), cause);
                 closeQuietly(client);
             }
+            queuedClients.remove(client);
             scheduleRequestIfNecessary();
         }
         else {
