@@ -422,7 +422,7 @@ public class ExchangeOperator
         {
             ExchangeDataSource dataSource = delegate.get();
             if (dataSource == null) {
-                return null;
+                return Pair.of(null, null);
             }
             return dataSource.pollPage(target);
         }
@@ -737,7 +737,7 @@ public class ExchangeOperator
         {
             ExchangeSource spoolExchangeSource = this.exchangeSource;
             if (spoolExchangeSource == null) {
-                return null;
+                return Pair.of(null, null);
             }
 
             Slice slice = spoolExchangeSource.read();
