@@ -404,7 +404,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Default value:** `default`
 >
 > This property defines the failure detection profile used to determine if failure has happened for a http client. The value `<profile-name>` set for this property has to correspond to `<profile-name>.properties` file in `etc/failure-retry-policy/`. In case no such profile is available, and this property is not set, "default" profile is used.
-> For example, `failure.recovery.retry.profile="test"` requires `test.properties` file to be present in `etc/failure-retry-policy`.
+> For example, `failure.recovery.retry.profile=test` requires `test.properties` file to be present in `etc/failure-retry-policy`.
 > The file `test.properties` must contain `failure.recovery.retry.type` specified.
 
 

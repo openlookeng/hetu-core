@@ -371,7 +371,7 @@
  > -   **默认值：** `default`
  >
  > 此属性定义用于确定HTTP客户端上是否发生故障的故障检测配置文件。此属性的值`<profile-name>`必须对应`etc/failure-retry-policy/`路径中的`<profile-name>.properties`文件。如果没有此类配置文件可用，并且未设置此属性，则使用“default”配置文件。
- > 例如，`failure.recovery.retry.profile="test"`要求`test.properties`文件存在于`etc/failure-retry-policy`路径中。
+ > 例如，`failure.recovery.retry.profile=test`要求`test.properties`文件存在于`etc/failure-retry-policy`路径中。
  > `test.properties`文件必须包含指定的`failure.recovery.retry.type`。
  
  
