@@ -14,7 +14,7 @@ BloomIndex仅支持相等表达式，例如`name='monkey'`。
 **注意：当前，启发式索引仅支持ORC存储格式的Hive数据源。**
 
 1. BloomIndex用于调度时的分片过滤，被coordinator节点使用。
-2. BloomIndex也用于worker节点上，用于在读取ORC文件是过滤stripes。
+2. BloomIndex也用于worker节点上，用于在读取ORC文件时过滤stripes。
 
 ## 选择适用的列
 
