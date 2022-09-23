@@ -204,10 +204,7 @@ public class ExchangeOperator
     @Override
     public void noMoreSplits()
     {
-        if (exchangeDataSource instanceof LazyExchangeDataSource) {
-            LazyExchangeDataSource lazyExchangeDataSource = (LazyExchangeDataSource) exchangeDataSource;
-            lazyExchangeDataSource.noMoreLocations();
-        }
+        exchangeDataSource.noMoreSplits();
         blockedOnSplits.set(null);
     }
 
@@ -573,15 +570,6 @@ public class ExchangeOperator
             }
         }
 
-        public void noMoreLocations()
-        {
-            ExchangeDataSource dataSource = delegate.get();
-            if (dataSource instanceof DirectExchangeDataSource) {
-                DirectExchangeDataSource directExchangeDataSource = (DirectExchangeDataSource) dataSource;
-                directExchangeDataSource.noMoreLocations();
-            }
-        }
-
         public void noMoreTargets()
         {
             ExchangeDataSource dataSource = delegate.get();
@@ -696,11 +684,6 @@ public class ExchangeOperator
         {
             this.snapshotState = snapshotState;
             this.inputChannels = inputChannels;
-        }
-
-        public void noMoreLocations()
-        {
-            exchangeClient.noMoreLocations();
         }
 
         public void noMoreTargets()
