@@ -283,6 +283,16 @@ public class TestMySqlIntegrationSmokeTest
         assertUpdate("DROP TABLE test_insert_not_null");
     }
 
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "This connector does not support query retries")
+    public void testTaskRetryInsert()
+    {
+        Session session = Session.builder(getSession())
+                .setSystemProperty("retry_policy", "TASK")
+                .build();
+        assertUpdate("CREATE TABLE test (a int, b int)");
+        assertUpdate(session, "INSERT INTO test values (1,10)");
+    }
+
     private void execute(String sql)
             throws SQLException
     {

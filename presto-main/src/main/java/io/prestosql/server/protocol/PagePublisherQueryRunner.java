@@ -24,6 +24,7 @@ import io.prestosql.client.DataCenterQueryResults;
 import io.prestosql.client.StatementStats;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.ExchangeClient;
@@ -31,7 +32,6 @@ import io.prestosql.operator.ExchangeClientSupplier;
 import io.prestosql.server.SessionContext;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.BlockEncodingSerde;
-import io.prestosql.spi.exchange.ExchangeId;
 import io.prestosql.spi.statestore.StateCollection;
 import io.prestosql.statestore.StateStoreProvider;
 

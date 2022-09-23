@@ -14,9 +14,8 @@
 package io.prestosql.exchange;
 
 import io.airlift.log.Logger;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.server.testing.TestingPrestoServer;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
-import io.prestosql.spi.exchange.ExchangeManager;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -28,7 +27,8 @@ import static org.testng.Assert.assertNotNull;
 
 public class ExchangeManagerRegistryTest
 {
-    private static final Logger LOG = Logger.get(ExchangeManagerRegistryTest.class);
+    private static final Logger log = Logger.get(ExchangeManagerRegistryTest.class);
+
     private static final File CONFIG_FILE = new File("etc/exchange-manager.properties");
 
     @Test
@@ -37,12 +37,12 @@ public class ExchangeManagerRegistryTest
         Map<String, String> properties = loadPropertiesFrom(CONFIG_FILE.getPath());
         try (TestingPrestoServer server = new TestingPrestoServer(properties)) {
             ExchangeManagerRegistry exchangeManagerRegistry = new ExchangeManagerRegistry(new ExchangeHandleResolver());
-            exchangeManagerRegistry.loadExchangeManager();
+            exchangeManagerRegistry.loadExchangeManager(new FileSystemClientManager());
             ExchangeManager exchangeManager = exchangeManagerRegistry.getExchangeManager();
             assertNotNull(exchangeManager);
         }
         catch (Exception e) {
-            LOG.info(e.getMessage());
+            log.error(e.getMessage());
         }
     }
 }

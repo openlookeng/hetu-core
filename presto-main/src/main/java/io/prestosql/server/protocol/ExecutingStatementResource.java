@@ -24,6 +24,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.client.QueryResults;
 import io.prestosql.client.QueryStatusInfo;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.ExchangeClient;
@@ -32,7 +33,6 @@ import io.prestosql.server.ForStatementResource;
 import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.BlockEncodingSerde;
-import io.prestosql.spi.exchange.ExchangeId;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;

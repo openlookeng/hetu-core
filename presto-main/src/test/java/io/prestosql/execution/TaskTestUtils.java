@@ -22,6 +22,7 @@ import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeHandleResolver;
 import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
 import io.prestosql.execution.buffer.OutputBuffers;
@@ -40,7 +41,6 @@ import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.seedstore.SeedStoreManager;
 import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
@@ -187,7 +187,7 @@ public final class TaskTestUtils
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)
     {
-        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty(), Optional.empty(), null);
+        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty(), Optional.empty(), null, 1);
     }
 
     public static SplitMonitor createTestSplitMonitor()

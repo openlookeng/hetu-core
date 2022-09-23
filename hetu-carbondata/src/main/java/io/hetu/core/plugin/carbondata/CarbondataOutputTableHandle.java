@@ -49,7 +49,7 @@ public class CarbondataOutputTableHandle
                                        @JsonProperty("additionalConf") Map<String, String> additionalConf)
     {
         super(schemaName, tableName, inputColumns, pageSinkMetadata, locationHandle, tableStorageFormat,
-                partitionStorageFormat, partitionedBy, bucketProperty, tableOwner, additionalTableParameters);
+                partitionStorageFormat, partitionedBy, bucketProperty, tableOwner, additionalTableParameters, false);
         this.additionalConf = ImmutableMap.copyOf(requireNonNull(additionalConf, "additional conf map is null"));
     }
 

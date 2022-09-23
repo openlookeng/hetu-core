@@ -27,13 +27,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -156,6 +159,28 @@ public final class SortedRangeSet
     }
 
     @Override
+    public boolean isDiscreteSet()
+    {
+        for (Range range : lowIndexedRanges.values()) {
+            if (!range.isSingleValue()) {
+                return false;
+            }
+        }
+        return !isNone();
+    }
+
+    @Override
+    public List<Object> getDiscreteSet()
+    {
+        if (!isDiscreteSet()) {
+            throw new IllegalStateException("SortedRangeSet is not a discrete set");
+        }
+        return unmodifiableList(lowIndexedRanges.values().stream()
+                .map(Range::getSingleValue)
+                .collect(Collectors.toList()));
+    }
+
+    @Override
     public boolean containsValue(Object value)
     {
         return includesMarker(Marker.exactly(type, value));
@@ -260,6 +285,41 @@ public final class SortedRangeSet
     }
 
     @Override
+    public boolean overlaps(ValueSet other)
+    {
+        SortedRangeSet otherRangeSet = checkCompatibility(other);
+
+        Iterator<Range> iterator1 = lowIndexedRanges.values().iterator();
+        Iterator<Range> iterator2 = otherRangeSet.lowIndexedRanges.values().iterator();
+
+        if (iterator1.hasNext() && iterator2.hasNext()) {
+            Range range1 = iterator1.next();
+            Range range2 = iterator2.next();
+
+            while (true) {
+                if (range1.overlaps(range2)) {
+                    return true;
+                }
+
+                if (range1.getHigh().compareTo(range2.getHigh()) <= 0) {
+                    if (!iterator1.hasNext()) {
+                        break;
+                    }
+                    range1 = iterator1.next();
+                }
+                else {
+                    if (!iterator2.hasNext()) {
+                        break;
+                    }
+                    range2 = iterator2.next();
+                }
+            }
+        }
+
+        return false;
+    }
+
+    @Override
     public SortedRangeSet union(ValueSet other)
     {
         SortedRangeSet otherRangeSet = checkCompatibility(other);
@@ -331,6 +391,48 @@ public final class SortedRangeSet
         if (!getType().equals(marker.getType())) {
             throw new IllegalStateException(format("Marker of %s does not match SortedRangeSet of %s", marker.getType(), getType()));
         }
+    }
+
+    @Override
+    public Optional<Collection<Object>> tryExpandRanges(int valuesLimit)
+    {
+        List<Range> ranges = getRanges().getOrderedRanges();
+        Type typeRangeSet = getType();
+
+        Range typeRange = typeRangeSet.getRange().map(range -> Range.range(typeRangeSet, range.getMin(), true, range.getMax(), true)).orElse(Range.all(typeRangeSet));
+
+        List<Object> result = new ArrayList<>();
+        for (Range range : ranges) {
+            if (range.isLowUnbounded() || range.isHighUnbounded()) {
+                // Try to restrict the current unbounded range with the type min-max values.
+                range = range.intersect(typeRange);
+                if (range.isLowUnbounded() || range.isHighUnbounded()) {
+                    return Optional.empty();
+                }
+            }
+            Optional<Stream<?>> discreteValues = typeRangeSet.getDiscreteValues(new Type.Range(range.getLowBoundedValue(), range.getHighBoundedValue()));
+            if (!discreteValues.isPresent()) {
+                return Optional.empty();
+            }
+            Iterator<?> iterator = discreteValues.get().iterator();
+            if (!iterator.hasNext()) {
+                throw new IllegalStateException("discreteValues iterator is empty");
+            }
+            if (!range.isLowInclusive()) {
+                iterator.next();
+            }
+            while (iterator.hasNext()) {
+                Object current = iterator.next();
+                // Don't add the highest value in the range (if it's not included).
+                if (range.isHighInclusive() || iterator.hasNext()) {
+                    if (result.size() >= valuesLimit) {
+                        return Optional.empty();
+                    }
+                    result.add(current);
+                }
+            }
+        }
+        return Optional.of(unmodifiableList(result));
     }
 
     @Override

@@ -22,11 +22,13 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.airlift.http.client.HttpStatus;
 import io.airlift.log.Logger;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.dynamicfilter.DynamicFilterService;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeSinkHandle;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
@@ -39,9 +41,6 @@ import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeSinkHandle;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -362,6 +361,17 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::resume);
     }
 
+    public synchronized void setPriority(int priority)
+    {
+        stateMachine.setPriority(priority);
+        getAllTasks().forEach(remoteTask -> remoteTask.setPriority(priority));
+    }
+
+    public synchronized void spillRevocableMem()
+    {
+        getAllTasks().forEach(RemoteTask::spillRevocableMemory);
+    }
+
     public void OnSnapshotXCompleted(boolean capture, long snapshotId)
     {
         log.debug("OnSnapshotXCompleted() is called!, capture: %b, snapshotId: %d", capture, snapshotId);
@@ -437,8 +447,7 @@ public final class SqlStageExecution
             OutputBuffers outputBuffers,
             Multimap<PlanNodeId, Split> splits,
             Multimap<PlanNodeId, Lifespan> noMoreSplitsForLifespan,
-            Set<PlanNodeId> noMoreSplits,
-            Optional<DataSize> estimatedMemory)
+            Set<PlanNodeId> noMoreSplits)
     {
         if (stateMachine.getState().isDone()) {
             return Optional.empty();
@@ -448,7 +457,6 @@ public final class SqlStageExecution
 
         stateMachine.transitionToScheduling();
 
-        //TODO(SURYA): total partitions is being passed as empty here. Need to see what to add to substitute it. And removed estimatedMemory. estimtedMemory is required in updating TaskInfo
         RemoteTask task = remoteTaskFactory.createRemoteTask(
                 stateMachine.getSession(),
                 taskId,
@@ -461,7 +469,7 @@ public final class SqlStageExecution
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 Optional.ofNullable(parentId),
-                snapshotManager);
+                snapshotManager, OptionalInt.empty());
 
         noMoreSplitsForLifespan.forEach(task::noMoreSplits);
         noMoreSplits.forEach(task::noMoreSplits);
@@ -630,7 +638,7 @@ public final class SqlStageExecution
 
         if (sinkExchange.isPresent()) {
             ExchangeSinkHandle sinkHandle = sinkExchange.get().addSink(taskId.getId());
-            ExchangeSinkInstanceHandle exchangeSinkInstanceHandle = sinkExchange.get().instantiateSink(sinkHandle, taskId.getAttemptId()); //TODO(Surya): get the attemptid
+            ExchangeSinkInstanceHandle exchangeSinkInstanceHandle = sinkExchange.get().instantiateSink(sinkHandle, taskId.getAttemptId());
             localOutputBuffers.setExchangeSinkInstanceHandle(exchangeSinkInstanceHandle);
         }
 
@@ -646,7 +654,7 @@ public final class SqlStageExecution
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 Optional.ofNullable(parentId),
-                snapshotManager);
+                snapshotManager, OptionalInt.empty());
 
         completeSources.forEach(task::noMoreSplits);
 

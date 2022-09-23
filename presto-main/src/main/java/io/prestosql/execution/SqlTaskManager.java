@@ -188,7 +188,6 @@ public class SqlTaskManager
         this.metadata = metadata;
         // currentTaskInstanceIds and seenInstanceIds are already initialized
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
-        //TODO(SURYA) check this instanceId , for now passing random UUID
         this.tasks = CacheBuilder.newBuilder().weakValues().build(CacheLoader.from(
                 taskId -> createSqlTask(taskId, UUID.randomUUID().toString(),
                         locationFactory.createLocalTaskLocation(taskId),
@@ -454,7 +453,7 @@ public class SqlTaskManager
     }
 
     @Override
-    public TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer, String expectedTaskInstanceId)
+    public TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer, String expectedTaskInstanceId, OptionalInt taskPriority)
     {
         requireNonNull(session, "session is null");
         requireNonNull(taskId, "taskId is null");
@@ -472,7 +471,7 @@ public class SqlTaskManager
             queryContexts.getUnchecked(taskId.getQueryId()).setResourceOvercommit();
         }
         sqlTask.recordHeartbeat();
-        return sqlTask.updateTask(session, fragment, sources, outputBuffers, totalPartitions, consumer, cteCtx);
+        return sqlTask.updateTask(session, fragment, sources, outputBuffers, totalPartitions, consumer, cteCtx, taskPriority.orElse(1));
     }
 
     @Override
@@ -553,6 +552,42 @@ public class SqlTaskManager
         TaskInfo result = sqlTask.resume(targetState);
 
         log.debug("Resuming task %s (instanceId %s). Old state: %s; new state: %s", taskId, expectedTaskInstanceId, oldState, targetState);
+        return result;
+    }
+
+    @Override
+    public TaskInfo setPriority(TaskId taskId, TaskState targetState, String taskInstanceId, Integer taskPriority)
+    {
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(taskPriority, "taskPriority is null");
+
+        SqlTask sqlTask = getTaskOrCreate(taskInstanceId, taskId);
+        if (sqlTask == null) {
+            return null;
+        }
+
+        TaskState oldState = sqlTask.getTaskStatus().getState();
+        TaskInfo result = sqlTask.setPriority(taskPriority);
+
+        log.debug("setPriority task %s (instanceId %s). Old state: %s; new state: %s", taskId, taskInstanceId, oldState, targetState);
+        return result;
+    }
+
+    @Override
+    public TaskInfo spillTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId)
+    {
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(targetState, "targetState is null");
+
+        SqlTask sqlTask = getTaskOrCreate(expectedTaskInstanceId, taskId);
+        if (sqlTask == null) {
+            return null;
+        }
+
+        TaskState oldState = sqlTask.getTaskStatus().getState();
+        TaskInfo result = sqlTask.spill(targetState);
+
+        log.debug("Spilling task %s (instanceId %s). Old state: %s; new state: %s", taskId, expectedTaskInstanceId, oldState, targetState);
         return result;
     }
 
@@ -674,7 +709,6 @@ public class SqlTaskManager
     /**
      * Add a listener that notifies about failures of any source tasks for a given task
      */
-    //TODO(SURYA): check this implementation.
     public void addSourceTaskFailureListener(TaskId taskId, TaskFailureListener listener)
     {
         tasks.getUnchecked(taskId).addSourceTaskFailureListener(listener);

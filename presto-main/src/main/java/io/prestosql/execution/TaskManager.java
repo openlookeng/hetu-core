@@ -82,13 +82,15 @@ public interface TaskManager
 
     /**
      * Updates the task plan, sources and output buffers.  If the task does not
-     * already exist, is is created and then updated.
+     * already exist, is created and then updated.
      */
-    TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer, String expectedTaskInstanceId);
+    TaskInfo updateTask(Session session, TaskId taskId, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer, String expectedTaskInstanceId, OptionalInt taskPriority);
 
     TaskInfo suspendTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
 
     TaskInfo resumeTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
+
+    TaskInfo spillTask(TaskId taskId, TaskState targetState, String expectedTaskInstanceId);
 
     /**
      * Cancels a task.  If the task does not already exist, is is created and then
@@ -132,4 +134,6 @@ public interface TaskManager
      * possible notifications are observed out of order due to the asynchronous execution.
      */
     void addStateChangeListener(String instanceId, StateChangeListener<TaskState> stateChangeListener);
+
+    TaskInfo setPriority(TaskId taskId, TaskState targetState, String taskInstanceId, Integer priority);
 }

@@ -13,6 +13,8 @@
  */
 package io.prestosql.operator.aggregation;
 
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.prestosql.operator.aggregation.state.LongDecimalWithOverflowState;
 import io.prestosql.operator.aggregation.state.LongDecimalWithOverflowStateFactory;
 import io.prestosql.spi.block.BlockBuilder;
@@ -48,12 +50,12 @@ public class TestDecimalSumAggregation
         addToState(state, TWO.pow(126));
 
         assertEquals(state.getOverflow(), 0);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(126)));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(126)));
 
         addToState(state, TWO.pow(126));
 
         assertEquals(state.getOverflow(), 1);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(0));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(0));
     }
 
     @Test
@@ -62,12 +64,12 @@ public class TestDecimalSumAggregation
         addToState(state, TWO.pow(126).negate());
 
         assertEquals(state.getOverflow(), 0);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(126).negate()));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(126).negate()));
 
         addToState(state, TWO.pow(126).negate());
 
         assertEquals(state.getOverflow(), -1);
-        assertEquals(UnscaledDecimal128Arithmetic.compare(state.getLongDecimal(), unscaledDecimal(0)), 0);
+        assertEquals(UnscaledDecimal128Arithmetic.compare(getDecimalSlice(state), unscaledDecimal(0)), 0);
     }
 
     @Test
@@ -78,14 +80,14 @@ public class TestDecimalSumAggregation
         addToState(state, TWO.pow(125));
 
         assertEquals(state.getOverflow(), 1);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(125)));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(125)));
 
         addToState(state, TWO.pow(126).negate());
         addToState(state, TWO.pow(126).negate());
         addToState(state, TWO.pow(126).negate());
 
         assertEquals(state.getOverflow(), 0);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(125).negate()));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(125).negate()));
     }
 
     @Test
@@ -101,7 +103,7 @@ public class TestDecimalSumAggregation
 
         DecimalSumAggregation.combine(state, otherState);
         assertEquals(state.getOverflow(), 1);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(126)));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(126)));
     }
 
     @Test
@@ -117,7 +119,7 @@ public class TestDecimalSumAggregation
 
         DecimalSumAggregation.combine(state, otherState);
         assertEquals(state.getOverflow(), -1);
-        assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(126).negate()));
+        assertEquals(getDecimalSlice(state), unscaledDecimal(TWO.pow(126).negate()));
     }
 
     @Test(expectedExceptions = ArithmeticException.class)
@@ -127,7 +129,7 @@ public class TestDecimalSumAggregation
         addToState(state, TWO.pow(126));
 
         assertEquals(state.getOverflow(), 1);
-        DecimalSumAggregation.outputLongDecimal(TYPE, state, new VariableWidthBlockBuilder(null, 10, 100));
+        DecimalSumAggregation.outputLongDecimal(state, new VariableWidthBlockBuilder(null, 10, 100));
     }
 
     private static void addToState(LongDecimalWithOverflowState state, BigInteger value)
@@ -135,6 +137,19 @@ public class TestDecimalSumAggregation
         BlockBuilder blockBuilder = TYPE.createFixedSizeBlockBuilder(1);
         TYPE.writeSlice(blockBuilder, unscaledDecimal(value));
 
-        DecimalSumAggregation.inputLongDecimal(TYPE, state, blockBuilder.build(), 0);
+        if (TYPE.isShort()) {
+            DecimalSumAggregation.inputShortDecimal(state, blockBuilder.build(), 0);
+        }
+        else {
+            DecimalSumAggregation.inputLongDecimal(state, blockBuilder.build(), 0);
+        }
+    }
+
+    private Slice getDecimalSlice(LongDecimalWithOverflowState state)
+    {
+        long[] decimal = state.getDecimalArray();
+        int offset = state.getDecimalArrayOffset();
+
+        return Slices.wrappedLongArray(decimal[offset], decimal[offset + 1]);
     }
 }

@@ -92,15 +92,19 @@ public class InternalResourceGroup
     @GuardedBy("root")
     private final CounterStat timeBetweenStartsSec = new CounterStat();
 
-    public InternalResourceGroup(Optional<BaseResourceGroup> parent, String name, BiConsumer<BaseResourceGroup, Boolean> jmxExportListener, Executor executor)
+    private final int noResourceRetryCount;
+
+    public InternalResourceGroup(Optional<BaseResourceGroup> parent, String name, BiConsumer<BaseResourceGroup, Boolean> jmxExportListener, Executor executor, int noResourceRetryCount)
     {
-        super(parent, name, jmxExportListener, executor);
+        super(parent, name, jmxExportListener, executor, noResourceRetryCount);
         if (parent.isPresent()) {
             parentGroup = Optional.of((InternalResourceGroup) parent.get());
         }
         else {
             parentGroup = Optional.empty();
         }
+
+        this.noResourceRetryCount = noResourceRetryCount;
     }
 
     @Override
@@ -338,7 +342,7 @@ public class InternalResourceGroup
             if (subGroups.containsKey(name)) {
                 return (InternalResourceGroup) subGroups.get(name);
             }
-            InternalResourceGroup subGroup = new InternalResourceGroup(Optional.of(this), name, jmxExportListener, executor);
+            InternalResourceGroup subGroup = new InternalResourceGroup(Optional.of(this), name, jmxExportListener, executor, noResourceRetryCount);
             // Sub group must use query priority to ensure ordering
             if (schedulingPolicy == QUERY_PRIORITY) {
                 subGroup.setSchedulingPolicy(QUERY_PRIORITY);

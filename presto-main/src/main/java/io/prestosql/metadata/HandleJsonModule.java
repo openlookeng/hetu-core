@@ -17,6 +17,9 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.ProvidesIntoSet;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorIndexHandle;
@@ -29,9 +32,6 @@ import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
 
 public class HandleJsonModule
         implements Module

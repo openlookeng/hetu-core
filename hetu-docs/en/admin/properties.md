@@ -387,6 +387,13 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Output buffer size for task data that is waiting to be pulled by upstream tasks. If the task output is hash partitioned, then the buffer will be shared across all of the partitioned consumers. Increasing this value may improve network throughput for data transferred between stages if the network has high latency or if there are many nodes in the cluster.
 
+### `query-resource-tracking`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Disable query level resource tracking and mitigation actions.
+
 ## Failure Recovery handling Properties
 
 ### Failure Retry Policies
@@ -1042,3 +1049,193 @@ helps with cache affinity scheduling.
 > -    **Default value:** `false`
 >
 > Case-insensitive matching between database and collection names. The default is case sensitive.
+
+## Fault Tolerant Execution
+
+### `exchange.base-directories`
+>
+> -  **Type:** `URI`
+>
+> Comma-separated list of URI locations that the exchange manager uses to store spooling data.
+
+### `exchange.encryption-enabled`
+>
+> -  **Type:** `boolean`
+> -  **Default value:** `false`
+>
+> Enable encrypting of spooling data.
+
+### `exchange.max-page-storage-size`
+>
+> -  **Type:** `data size`
+> -  **Default value:** `16MB`
+>
+> Max storage size of a page written to a sink, including the page itself and its size represented by an int
+
+### `exchange.sink-buffer-pool-min-size`
+>
+> -  **Type:** `int`
+> -  **Default value:** `10`
+>
+> The minimum buffer pool size for an exchange sink. The larger the buffer pool size, the larger the write parallelism and memory usage.
+
+### `exchange.sink-buffers-per-partition`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `2`
+> -  **Default value:** `2`
+>
+> The number of buffers per partition in the buffer pool. The larger the buffer pool size, the larger the write parallelism and memory usage.
+
+### `exchange.sink-max-file-size`
+>
+> -  **Type:** `data size`
+> -  **Default value:** `1GB`
+>
+> Max size of files written by exchange sinks.
+
+### `exchange.source-concurrent-readers`
+>
+> -  **Type:** `int`
+> -  **Default value:** `4`
+>
+> Number of concurrent readers to read from spooling storage. The larger the number of concurrent readers, the larger the read parallelism and memory usage.
+
+### `exchange.max-output-partition-count`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `50`
+> 
+> Max number of distinct partitions to be created by the exchange.
+
+### `exchange.file-listing-parallelism`
+>
+> -  **Type:** `int`
+> -  **Default value:** `50`
+>
+> Max parallelism of file listing calls when enumerating spooling files
+
+### `retry-policy`
+>
+> -  **Type:** `string`
+> -  **Allowed values:** `NONE`, `TASK`
+> -  **Default value:** `NONE`
+>
+> Configures what is retried in the event of failure, TASK to retry tasks individually if they fail.
+
+### `task-retry-attempts-overall`
+>
+> -  **Type:** `int`
+> -  **Default value:** `null(no limit)`
+>
+> Maximum number retries across all tasks within a given query before declaring the query as failed.
+
+### `task-retry-attempts-per-task`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `0`
+> -  **Default value:** `4`
+>
+> Maximum number of times Presto may attempt to retry a single task before declaring the query as failed.
+
+### `retry-initial-delay`
+>
+> -  **Type:** `duration`
+> -  **Default value:** `10s`
+>
+> Minimum time that a failed task must wait before it is retried. May be overridden with the retry_initial_delay session property.
+
+### `retry-max-delay`
+>
+> -  **Type:** `duration`
+> -  **Default value:** `1m`
+>
+> Maximum time that a failed task must wait before it is retried. Wait time is increased on each subsequent failure. May be overridden with the retry_max_delay session property.
+
+### `retry-delay-scale-factor`
+>
+> -  **Type:** `double`
+> -  **Default value:** `2.0`
+>
+> Factor by which retry delay is increased on each task failure. May be overridden with the retry_delay_scale_factor session property.
+
+### `max-tasks-waiting-for-node-per-stage`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `5`
+>
+> Allow for up to configured number of tasks to wait for node allocation per stage, before pausing scheduling for other tasks from this stage.
+
+### `fault-tolerant-execution-target-task-input-size`
+>
+> -  **Type:** `data size`
+> -  **Default value:** `4GB`
+>
+> Target size in bytes of all task inputs for a single fault-tolerant task. Applies to tasks that read input from spooled data written by other tasks. 
+> May be overridden for the current session with the fault_tolerant_execution_target_task_input_size session property.
+
+### `fault-tolerant-execution-target-task-split-count`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `64`
+>
+> Target number of standard splits processed by a single task that reads data from source tables. Value is interpreted with split weight taken into account. If the weight of splits produced by a catalog denotes that they are lighter or heavier than “standard” split, then the number of splits processed by single task is adjusted accordingly. 
+> May be overridden for the current session with the fault_tolerant_execution_target_task_split_count session property.
+
+### `fault-tolerant-execution-preserve-input-partitions-in-write-stage`
+>
+> -  **Type:** `boolean`
+> -  **Default value:** `true`
+>
+> Ensure single task reads single hash partitioned input partition for stages which write table data
+
+### `fault-tolerant-execution-min-task-split-count`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `16`
+>
+> Minimum number of splits processed by a single task. This value is not split weight-adjusted and serves as protection against situations where catalogs report an incorrect split weight. 
+> May be overridden for the current session with the fault_tolerant_execution_min_task_split_count session property.
+
+### `fault-tolerant-execution-max-task-split-count`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `256`
+>
+> Maximum number of splits processed by a single task. This value is not split weight-adjusted and serves as protection against situations where catalogs report an incorrect split weight. 
+> May be overridden for the current session with the fault_tolerant_execution_max_task_split_count session property.
+
+### `fault-tolerant-execution-partition-count`
+>
+> -  **Type:** `int`
+> -  **Minimum value:** `1`
+> -  **Default value:** `50`
+>
+> Number of partitions to use for distributed joins and aggregations. May be overridden for the current session with the fault_tolerant_execution_partition_count session property.
+
+### `fault-tolerant-execution-task-descriptor-storage-max-memory`
+>
+> -  **Type:** `data size`
+> -  **Default value:** `(JVM heap size * 0.15)`
+>
+> Maximum amount of memory to be used to store task descriptors for fault tolerant queries on coordinator. Extra memory is needed to be able to reschedule tasks in case of a failure.
+
+### `node-scheduler.allowed-no-matching-node-period`
+>
+> -  **Type:** `duration`
+> -  **Default value:** `2m`
+>
+> Wait time for scheduler before failing a query for which hard task requirements cannot be satisfied.
+
+### `node-scheduler.allocator-type`
+>
+> -  **Type:** `string`
+> -  **Allowed values:** `BIN_PACKING`, `FIXED_COUNT`
+> -  **Default value:** `BIN_PACKING`
+>
+> Configures node allocator type.

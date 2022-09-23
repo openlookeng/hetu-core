@@ -27,6 +27,8 @@ import java.util.OptionalInt;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class HiveSplitWrapper
@@ -150,10 +152,11 @@ public class HiveSplitWrapper
         return splits.size();
     }
 
-    //TODO(SURYA): need to check if any others need to be added.
     @Override
     public long getRetainedSizeInBytes()
     {
-        return INSTANCE_SIZE;
+        return INSTANCE_SIZE
+                + estimatedSizeOf(splits, HiveSplit::getRetainedSizeInBytes)
+                + sizeOf(bucketNumber);
     }
 }

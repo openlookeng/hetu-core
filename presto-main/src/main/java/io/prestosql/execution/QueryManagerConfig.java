@@ -20,7 +20,7 @@ import io.airlift.configuration.LegacyConfig;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDuration;
-import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.exchange.RetryPolicy;
 
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
@@ -75,7 +75,6 @@ public class QueryManagerConfig
 
     private RetryPolicy retryPolicy = RetryPolicy.NONE;
 
-    private int queryRetryAttempts = 4;
     private int taskRetryAttemptsPerTask = 4;
     private int taskRetryAttemptsOverall = Integer.MAX_VALUE;
     private Duration retryInitialDelay = new Duration(10, SECONDS);
@@ -91,6 +90,12 @@ public class QueryManagerConfig
     private int faultTolerantExecutionPartitionCount = 50;
 
     private DataSize faultTolerantExecutionTaskDescriptorStorageMaxMemory = new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE);
+
+    private String exchangeFilesystemType = "local";
+
+    private String exchangeFilesystemBaseDirectory = "/tmp/hetu-exchange-manager";
+
+    private boolean queryResourceTracking;
 
     @Min(1)
     public int getScheduleSplitBatchSize()
@@ -391,20 +396,6 @@ public class QueryManagerConfig
     }
 
     @Min(0)
-    public int getQueryRetryAttempts()
-    {
-        return queryRetryAttempts;
-    }
-
-    @Config("query-retry-attempts")
-    @LegacyConfig("retry-attempts")
-    public QueryManagerConfig setQueryRetryAttempts(int queryRetryAttempts)
-    {
-        this.queryRetryAttempts = queryRetryAttempts;
-        return this;
-    }
-
-    @Min(0)
     public int getTaskRetryAttemptsOverall()
     {
         return taskRetryAttemptsOverall;
@@ -581,6 +572,44 @@ public class QueryManagerConfig
     public QueryManagerConfig setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(DataSize faultTolerantExecutionTaskDescriptorStorageMaxMemory)
     {
         this.faultTolerantExecutionTaskDescriptorStorageMaxMemory = faultTolerantExecutionTaskDescriptorStorageMaxMemory;
+        return this;
+    }
+
+    @NotNull
+    public String getExchangeFilesystemType()
+    {
+        return exchangeFilesystemType;
+    }
+
+    @Config("exchange-filesystem-type")
+    public QueryManagerConfig setExchangeFilesystemType(String exchangeFilesystemType)
+    {
+        this.exchangeFilesystemType = exchangeFilesystemType;
+        return this;
+    }
+
+    @NotNull
+    public String getExchangeFilesystemBaseDirectory()
+    {
+        return exchangeFilesystemBaseDirectory;
+    }
+
+    @Config("exchange-filesystem-base-directory")
+    public QueryManagerConfig setExchangeFilesystemBaseDirectory(String exchangeFilesystemBaseDirectory)
+    {
+        this.exchangeFilesystemBaseDirectory = exchangeFilesystemBaseDirectory;
+        return this;
+    }
+
+    public boolean isQueryResourceTracking()
+    {
+        return queryResourceTracking;
+    }
+
+    @Config("query-resource-tracking")
+    public QueryManagerConfig setQueryResourceTracking(Boolean queryResourceTracking)
+    {
+        this.queryResourceTracking = queryResourceTracking;
         return this;
     }
 }

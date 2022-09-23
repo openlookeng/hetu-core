@@ -25,6 +25,7 @@ import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PageCodecMarker;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
@@ -34,7 +35,6 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.snapshot.MultiInputSnapshotState;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -680,7 +680,9 @@ public class ExchangeClient
             // Snapshot: Client may have been removed as a result of rescheduling, then don't queue it.
             // Use object identity, instead of .equals, for comparison.
             if (!recoveryEnabled || allClients.values().stream().anyMatch(c -> c == client)) {
-                queuedClients.add(client);
+                if (!completedClients.contains(client)) {
+                    queuedClients.add(client);
+                }
             }
         }
         scheduleRequestIfNecessary();
@@ -697,6 +699,7 @@ public class ExchangeClient
                     buffer.taskFinished(client.getRemoteTaskId());
                 }
             }
+            queuedClients.remove(client);
         }
         scheduleRequestIfNecessary();
     }
@@ -710,6 +713,7 @@ public class ExchangeClient
                 buffer.taskFailed(client.getRemoteTaskId(), cause);
                 closeQuietly(client);
             }
+            queuedClients.remove(client);
             scheduleRequestIfNecessary();
         }
         else {

@@ -17,12 +17,12 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.memory.MemoryManagerConfig;
 import io.prestosql.snapshot.RecoveryConfig;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.session.PropertyMetadata;
 import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -185,7 +185,6 @@ public final class SystemSessionProperties
     public static final String SKIP_NON_APPLICABLE_RULES_ENABLED = "skip_non_applicable_rules_enabled";
     public static final String ELIMINATE_DUPLICATE_SPILL_FILES = "eliminate_duplicate_spill_files";
     // Task Level Retry
-    public static final String QUERY_RETRY_ATTEMPTS = "query_retry_attempts";
     public static final String TASK_RETRY_ATTEMPTS_OVERALL = "task_retry_attempts_overall";
     public static final String TASK_RETRY_ATTEMPTS_PER_TASK = "task_retry_attempts_per_task";
     public static final String MAX_TASKS_WAITING_FOR_NODE_PER_STAGE = "max_tasks_waiting_for_node_per_stage";
@@ -203,6 +202,10 @@ public final class SystemSessionProperties
     public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE = "fault_tolerant_execution_task_memory_estimation_quantile";
 
     public static final String RETRY_POLICY = "retry_policy";
+
+    public static final String EXCHANGE_FILESYSTEM_BASE_DIRECTORY = "exchange_filesystem_base_directory";
+
+    public static final String QUERY_RESOURCE_TRACKING = "query_resource_tracking_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -896,11 +899,6 @@ public final class SystemSessionProperties
                         queryManagerConfig.getRetryPolicy(),
                         true),
                 integerProperty(
-                        QUERY_RETRY_ATTEMPTS,
-                        "Maximum number of query retry attempts",
-                        queryManagerConfig.getQueryRetryAttempts(),
-                        false),
-                integerProperty(
                         TASK_RETRY_ATTEMPTS_OVERALL,
                         "Maximum number of task retry attempts overall",
                         queryManagerConfig.getTaskRetryAttemptsOverall(),
@@ -990,7 +988,17 @@ public final class SystemSessionProperties
                         memoryManagerConfig.getFaultTolerantExecutionTaskMemoryEstimationQuantile(),
                         false,
                         value -> validateDoubleRange(value, FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, 0.0, 1.0),
-                        value -> value));
+                        value -> value),
+                stringProperty(
+                        EXCHANGE_FILESYSTEM_BASE_DIRECTORY,
+                        "Name of the exchange filesystem base directory",
+                        queryManagerConfig.getExchangeFilesystemBaseDirectory(),
+                        false),
+                booleanProperty(
+                        QUERY_RESOURCE_TRACKING,
+                        "Query tracking feature enabled for current session",
+                        queryManagerConfig.isQueryResourceTracking(),
+                        false));
     }
 
     private static double validateDoubleRange(Object value, String property, double lowerBoundIncluded, double upperBoundIncluded)
@@ -1659,11 +1667,6 @@ public final class SystemSessionProperties
         return retryPolicy;
     }
 
-    public static int getQueryRetryAttempts(Session session)
-    {
-        return session.getSystemProperty(QUERY_RETRY_ATTEMPTS, Integer.class);
-    }
-
     public static int getTaskRetryAttemptsOverall(Session session)
     {
         return session.getSystemProperty(TASK_RETRY_ATTEMPTS_OVERALL, Integer.class);
@@ -1737,5 +1740,15 @@ public final class SystemSessionProperties
     public static double getFaultTolerantExecutionTaskMemoryEstimationQuantile(Session session)
     {
         return session.getSystemProperty(FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE, Double.class);
+    }
+
+    public static String getExchangeFilesystemBaseDirectory(Session session)
+    {
+        return session.getSystemProperty(EXCHANGE_FILESYSTEM_BASE_DIRECTORY, String.class);
+    }
+
+    public static boolean isQueryResourceTrackingEnabled(Session session)
+    {
+        return session.getSystemProperty(QUERY_RESOURCE_TRACKING, Boolean.class);
     }
 }

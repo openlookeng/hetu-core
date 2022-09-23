@@ -15,7 +15,6 @@ package io.prestosql.execution.scheduler;
 
 import io.prestosql.Session;
 
-//TODO(SURYA): need to implement this interface
 public interface NodeAllocatorService
 {
     NodeAllocator getNodeAllocator(Session session);

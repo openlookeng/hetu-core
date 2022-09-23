@@ -22,6 +22,7 @@ import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
+import io.prestosql.exchange.ExchangeHandleResolver;
 import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.BufferState;
@@ -31,7 +32,6 @@ import io.prestosql.execution.executor.TaskExecutor;
 import io.prestosql.memory.MemoryPool;
 import io.prestosql.memory.QueryContext;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spiller.SpillSpaceTracker;
 import io.prestosql.sql.planner.LocalExecutionPlanner;
@@ -123,7 +123,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -136,7 +136,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -155,7 +155,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -172,7 +172,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         for (boolean moreResults = true; moreResults; moreResults = !results.isBufferComplete()) {
             results = sqlTask.getTaskResults(OUT, results.getToken() + results.getSerializedPages().size(), new DataSize(1, MEGABYTE)).get();
         }
@@ -202,7 +202,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
         assertNull(taskInfo.getStats().getEndTime());
 
@@ -231,7 +231,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -243,7 +243,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
 
         sqlTask.abortTaskResults(OUT);
 
@@ -265,7 +265,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -291,7 +291,7 @@ public class TestSqlTask
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
 
         for (boolean moreResults = true; moreResults; moreResults = !results.isBufferComplete()) {
             results = sqlTask.getTaskResults(OUT, results.getToken() + results.getSerializedPages().size(), new DataSize(1, MEGABYTE)).get();

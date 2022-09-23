@@ -916,7 +916,7 @@
 
 ### `hetu.experimental.snapshot.profile`
 
-> - **类型：**`string`
+> -   **类型：** `string`
 >
 > 此属性定义用于存储快照的[文件系统](../develop/filesystem.md)配置文件。对应的配置文件必须存在于`etc/filesystem`中。例如，如果将该属性设置为`hetu.experimental.snapshot.profile=snapshot-hdfs1`，则必须在`etc/filesystem`中创建描述此文件系统的配置文件`snapshot-hdfs1.properties`，其中包含的必要信息包括身份验证类型、配置和密钥表（如适用）。具体细节请参考[文件系统](../develop/filesystem.md)相关章节。
 >

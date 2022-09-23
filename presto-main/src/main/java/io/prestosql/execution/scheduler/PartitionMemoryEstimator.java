@@ -23,7 +23,6 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
-//TODO(SURYA) need to implement this interface.
 public interface PartitionMemoryEstimator
 {
     MemoryRequirements getInitialMemoryRequirements(Session session, DataSize defaultMemoryLimit);

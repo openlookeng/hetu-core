@@ -21,6 +21,7 @@ import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
+import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.TaskId;
@@ -31,6 +32,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import org.joda.time.DateTime;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
@@ -84,6 +86,8 @@ public class DriverContext
     private final int driverId;
 
     private PagesSerde serde;
+    private PagesSerde kryoSerde;
+    private PagesSerde javaSerde;
 
     public DriverContext(
             PipelineContext pipelineContext,
@@ -345,6 +349,8 @@ public class DriverContext
         long processedInputPositions;
         DataSize outputDataSize;
         long outputPositions;
+        Duration inputBlockedTime;
+        Duration outputBlockedTime;
         if (inputOperator != null) {
             physicalInputDataSize = inputOperator.getPhysicalInputDataSize();
             physicalInputPositions = inputOperator.getPhysicalInputPositions();
@@ -364,6 +370,9 @@ public class DriverContext
             OperatorStats outputOperator = requireNonNull(getLast(operators, null));
             outputDataSize = outputOperator.getOutputDataSize();
             outputPositions = outputOperator.getOutputPositions();
+
+            inputBlockedTime = inputOperator.getBlockedWall();
+            outputBlockedTime = outputOperator.getBlockedWall();
         }
         else {
             physicalInputDataSize = new DataSize(0, BYTE);
@@ -383,6 +392,8 @@ public class DriverContext
 
             outputDataSize = new DataSize(0, BYTE);
             outputPositions = 0;
+            inputBlockedTime = new Duration(0, MILLISECONDS);
+            outputBlockedTime = new Duration(0, MILLISECONDS);
         }
 
         long physicalWrittenDataSize = operators.stream()
@@ -442,7 +453,9 @@ public class DriverContext
                 outputDataSize.convertToMostSuccinctDataSize(),
                 outputPositions,
                 succinctBytes(physicalWrittenDataSize),
-                operators);
+                operators,
+                inputBlockedTime,
+                outputBlockedTime);
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
@@ -511,5 +524,23 @@ public class DriverContext
             serde = pipelineContext.getTaskContext().getSerdeFactory().createPagesSerde();
         }
         return serde;
+    }
+
+    public PagesSerde getJavaSerde()
+    {
+        if (javaSerde == null) {
+            PagesSerdeFactory serdeFactory = pipelineContext.getTaskContext().getSerdeFactory();
+            javaSerde = serdeFactory.createDirectPagesSerde(Optional.empty(), true, false);
+        }
+        return javaSerde;
+    }
+
+    public PagesSerde getKryoSerde()
+    {
+        if (kryoSerde == null) {
+            PagesSerdeFactory serdeFactory = pipelineContext.getTaskContext().getKryoSerdeFactory();
+            kryoSerde = serdeFactory.createDirectPagesSerde(Optional.empty(), true, true);
+        }
+        return kryoSerde;
     }
 }

@@ -94,6 +94,11 @@ public final class BooleanBigArray
         grow(length);
     }
 
+    public long getCapacity()
+    {
+        return capacity;
+    }
+
     private void grow(long length)
     {
         // how many segments are required to get to the length?

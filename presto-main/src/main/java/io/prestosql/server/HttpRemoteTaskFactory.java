@@ -140,17 +140,18 @@ public class HttpRemoteTaskFactory
 
     @Override
     public RemoteTask createRemoteTask(Session session,
-            TaskId taskId,
-            String instanceId,
-            InternalNode node,
-            PlanFragment fragment,
-            Multimap<PlanNodeId, Split> initialSplits,
-            OptionalInt totalPartitions,
-            OutputBuffers outputBuffers,
-            PartitionedSplitCountTracker partitionedSplitCountTracker,
-            boolean summarizeTaskInfo,
-            Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager)
+                                       TaskId taskId,
+                                       String instanceId,
+                                       InternalNode node,
+                                       PlanFragment fragment,
+                                       Multimap<PlanNodeId, Split> initialSplits,
+                                       OptionalInt totalPartitions,
+                                       OutputBuffers outputBuffers,
+                                       PartitionedSplitCountTracker partitionedSplitCountTracker,
+                                       boolean summarizeTaskInfo,
+                                       Optional<PlanNodeId> parent,
+                                       QuerySnapshotManager snapshotManager,
+                                       OptionalInt taskPriority)
     {
         return new HttpRemoteTask(session,
                 taskId,
@@ -177,6 +178,7 @@ public class HttpRemoteTaskFactory
                 isBinaryEncoding,
                 parent,
                 snapshotManager,
-                failTaskRequestCodec);
+                failTaskRequestCodec,
+                taskPriority);
     }
 }

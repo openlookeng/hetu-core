@@ -19,7 +19,6 @@ import io.prestosql.metadata.InternalNode;
 
 import java.io.Closeable;
 
-//TODO(SURYA): need to implement this interface
 public interface NodeAllocator
         extends Closeable
 {

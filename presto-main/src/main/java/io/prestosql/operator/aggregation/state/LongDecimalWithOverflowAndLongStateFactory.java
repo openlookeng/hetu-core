@@ -13,16 +13,12 @@
  */
 package io.prestosql.operator.aggregation.state;
 
-import io.airlift.slice.Slice;
 import io.prestosql.array.LongBigArray;
 import io.prestosql.spi.function.AccumulatorStateFactory;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
-
-import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
-import static io.prestosql.spi.type.UnscaledDecimal128Arithmetic.UNSCALED_DECIMAL_128_SLICE_LENGTH;
 
 public class LongDecimalWithOverflowAndLongStateFactory
         implements AccumulatorStateFactory<LongDecimalWithOverflowAndLongState>
@@ -78,9 +74,15 @@ public class LongDecimalWithOverflowAndLongStateFactory
         }
 
         @Override
+        public void addLong(long value)
+        {
+            longs.add(getGroupId(), value);
+        }
+
+        @Override
         public long getEstimatedSize()
         {
-            return INSTANCE_SIZE + unscaledDecimals.sizeOf() + overflows.sizeOf() + numberOfElements * SingleLongDecimalWithOverflowAndLongState.SIZE;
+            return INSTANCE_SIZE + isNotNull.sizeOf() + unscaledDecimals.sizeOf() + (overflows == null ? 0 : overflows.sizeOf());
         }
 
         @Override
@@ -112,7 +114,7 @@ public class LongDecimalWithOverflowAndLongStateFactory
             extends LongDecimalWithOverflowStateFactory.SingleLongDecimalWithOverflowState
             implements LongDecimalWithOverflowAndLongState
     {
-        public static final int SIZE = ClassLayout.parseClass(Slice.class).instanceSize() + UNSCALED_DECIMAL_128_SLICE_LENGTH + SIZE_OF_LONG * 2;
+        private static final int INSTANCE_SIZE = ClassLayout.parseClass(SingleLongDecimalWithOverflowAndLongState.class).instanceSize();
 
         protected long longValue;
 
@@ -129,12 +131,15 @@ public class LongDecimalWithOverflowAndLongStateFactory
         }
 
         @Override
+        public void addLong(long value)
+        {
+            longValue += value;
+        }
+
+        @Override
         public long getEstimatedSize()
         {
-            if (getLongDecimal() == null) {
-                return SIZE_OF_LONG;
-            }
-            return SIZE;
+            return INSTANCE_SIZE + SIZE;
         }
 
         @Override

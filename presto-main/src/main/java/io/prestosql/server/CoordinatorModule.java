@@ -99,7 +99,9 @@ import io.prestosql.execution.resourcegroups.LegacyResourceGroupConfigurationMan
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.scheduler.AllAtOnceExecutionPolicy;
 import io.prestosql.execution.scheduler.BinPackingNodeAllocatorService;
+import io.prestosql.execution.scheduler.ConstantPartitionMemoryEstimator;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
+import io.prestosql.execution.scheduler.FixedCountNodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
@@ -123,6 +125,8 @@ import io.prestosql.metadata.CatalogManager;
 import io.prestosql.operator.ForScheduler;
 import io.prestosql.queryeditorui.QueryEditorUIModule;
 import io.prestosql.queryhistory.QueryHistoryModule;
+import io.prestosql.resourcemanager.ForResourceMonitor;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -199,6 +203,7 @@ import static io.prestosql.execution.DataDefinitionExecution.DataDefinitionExecu
 import static io.prestosql.execution.QueryExecution.QueryExecutionFactory;
 import static io.prestosql.execution.SqlQueryExecution.SqlQueryExecutionFactory;
 import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NodeAllocatorType.BIN_PACKING;
+import static io.prestosql.execution.scheduler.NodeSchedulerConfig.NodeAllocatorType.FIXED_COUNT;
 import static io.prestosql.util.StatementUtils.getAllQueryTypes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -327,6 +332,10 @@ public class CoordinatorModule
             binder.bind(NodeAllocatorService.class).to(BinPackingNodeAllocatorService.class);
             binder.bind(PartitionMemoryEstimatorFactory.class).to(BinPackingNodeAllocatorService.class);
         }
+        else if (nodeSchedulerConfig.getNodeAllocatorType() == FIXED_COUNT) {
+            binder.bind(NodeAllocatorService.class).to(FixedCountNodeAllocatorService.class).in(Scopes.SINGLETON);
+            binder.bind(PartitionMemoryEstimatorFactory.class).toInstance(ConstantPartitionMemoryEstimator::new);
+        }
 
         // node monitor
         binder.bind(ClusterSizeMonitor.class).in(Scopes.SINGLETON);
@@ -446,6 +455,10 @@ public class CoordinatorModule
         binder.bind(TaskExecutionStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(TaskExecutionStats.class).withGeneratedName();
         binder.bind(SplitSourceFactory.class).in(Scopes.SINGLETON);
+
+        binder.bind(ExecutorService.class).annotatedWith(ForResourceMonitor.class)
+                .toInstance(newCachedThreadPool(threadsNamed("query-resource-service-%s")));
+        binder.bind(QueryResourceManagerService.class).in(Scopes.SINGLETON);
 
         // cleanup
         binder.bind(ExecutorCleanup.class).in(Scopes.SINGLETON);

@@ -58,9 +58,11 @@ public class TaskHandle
 
     private final AtomicInteger nextSplitId = new AtomicInteger();
 
-    protected final AtomicReference<Priority> priority = new AtomicReference<>(new Priority(0, 0));
+    protected final AtomicReference<Priority> priority = new AtomicReference<>(new Priority(0, 0, 1));
     private final MultilevelSplitQueue splitQueue;
     private final OptionalInt maxDriversPerTask;
+
+    private int queryPriorityTag;
 
     public TaskHandle(
             TaskId taskId,
@@ -68,7 +70,8 @@ public class TaskHandle
             DoubleSupplier utilizationSupplier,
             int initialSplitConcurrency,
             Duration splitConcurrencyAdjustFrequency,
-            OptionalInt maxDriversPerTask)
+            OptionalInt maxDriversPerTask,
+            int queryPriorityTag)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
         this.splitQueue = requireNonNull(splitQueue, "splitQueue is null");
@@ -77,6 +80,7 @@ public class TaskHandle
         this.concurrencyController = new SplitConcurrencyController(
                 initialSplitConcurrency,
                 requireNonNull(splitConcurrencyAdjustFrequency, "splitConcurrencyAdjustFrequency is null"));
+        this.queryPriorityTag = queryPriorityTag;
     }
 
     public synchronized Priority addScheduledNanos(long durationNanos)
@@ -94,7 +98,7 @@ public class TaskHandle
     {
         long levelMinPriority = splitQueue.getLevelMinPriority(priority.get().getLevel(), scheduledNanos);
         if (priority.get().getLevelPriority() < levelMinPriority) {
-            Priority newPriority = new Priority(priority.get().getLevel(), levelMinPriority);
+            Priority newPriority = new Priority(priority.get().getLevel(), levelMinPriority, queryPriorityTag);
             priority.set(newPriority);
             return newPriority;
         }
@@ -228,6 +232,16 @@ public class TaskHandle
         ImmutableList.Builder<PrioritizedSplitRunner> builder = ImmutableList.builder();
         builder.addAll(runningIntermediateSplits);
         return builder.build();
+    }
+
+    public int getQueryPriorityTag()
+    {
+        return queryPriorityTag;
+    }
+
+    public void setQueryPriorityTag(int queryPriorityTag)
+    {
+        this.queryPriorityTag = queryPriorityTag;
     }
 
     @Override

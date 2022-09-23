@@ -30,7 +30,12 @@ import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.dynamicfilter.DynamicFilterService;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeContext;
+import io.prestosql.exchange.ExchangeId;
+import io.prestosql.exchange.ExchangeManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.BasicStageStats;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.LocationFactory;
@@ -58,6 +63,8 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.metadata.TableProperties;
 import io.prestosql.operator.TaskLocation;
+import io.prestosql.resourcemanager.QueryExecutionModifier;
+import io.prestosql.resourcemanager.QueryResourceManager;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.snapshot.QueryRecoveryManager;
 import io.prestosql.snapshot.QuerySnapshotManager;
@@ -66,11 +73,6 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeContext;
-import io.prestosql.spi.exchange.ExchangeId;
-import io.prestosql.spi.exchange.ExchangeManager;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.TableScanNode;
@@ -133,7 +135,6 @@ import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.prestosql.SystemSessionProperties.getConcurrentLifespansPerNode;
 import static io.prestosql.SystemSessionProperties.getFaultTolerantExecutionPartitionCount;
 import static io.prestosql.SystemSessionProperties.getMaxTasksWaitingForNodePerStage;
-import static io.prestosql.SystemSessionProperties.getQueryRetryAttempts;
 import static io.prestosql.SystemSessionProperties.getRetryDelayScaleFactor;
 import static io.prestosql.SystemSessionProperties.getRetryInitialDelay;
 import static io.prestosql.SystemSessionProperties.getRetryMaxDelay;
@@ -141,7 +142,9 @@ import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.SystemSessionProperties.getTaskRetryAttemptsOverall;
 import static io.prestosql.SystemSessionProperties.getTaskRetryAttemptsPerTask;
 import static io.prestosql.SystemSessionProperties.getWriterMinSize;
+import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
 import static io.prestosql.SystemSessionProperties.isReuseTableScanEnabled;
+import static io.prestosql.exchange.RetryPolicy.TASK;
 import static io.prestosql.execution.BasicStageStats.aggregateBasicStageStats;
 import static io.prestosql.execution.QueryState.FINISHING;
 import static io.prestosql.execution.QueryState.RECOVERING;
@@ -159,13 +162,13 @@ import static io.prestosql.snapshot.RecoveryConfig.calculateTaskCount;
 import static io.prestosql.spi.ErrorType.EXTERNAL;
 import static io.prestosql.spi.ErrorType.INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.CLUSTER_OUT_OF_MEMORY;
+import static io.prestosql.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_FAILED;
 import static io.prestosql.spi.connector.CatalogName.isInternalSystemConnector;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
-import static io.prestosql.spi.exchange.RetryPolicy.TASK;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_BROADCAST_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SCALED_WRITER_DISTRIBUTION;
@@ -228,7 +231,6 @@ public class SqlQueryScheduler
     private final CoordinatorStagesScheduler coordinatorStagesScheduler;
 
     private final RetryPolicy retryPolicy;
-    private final int maxQueryRetryAttempts;
     private final int maxTaskRetryAttemptsOverall;
     private final int maxTaskRetryAttemptsPerTask;
     private final int maxTasksWaitingForNodePerStage;
@@ -243,6 +245,7 @@ public class SqlQueryScheduler
     private final NodeAllocatorService nodeAllocatorService;
     private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
     private final TaskExecutionStats taskExecutionStats;
+    private final QueryResourceManager queryResourceManager;
 
     @GuardedBy("this")
     private final AtomicReference<DistributedStagesScheduler> distributedStagesScheduler = new AtomicReference<>();
@@ -280,7 +283,8 @@ public class SqlQueryScheduler
             TaskDescriptorStorage taskDescriptorStorage,
             NodeAllocatorService nodeAllocatorService,
             PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
-            TaskExecutionStats taskExecutionStats)
+            TaskExecutionStats taskExecutionStats,
+            QueryResourceManager queryResourceManager)
     {
         SqlQueryScheduler sqlQueryScheduler = new SqlQueryScheduler(
                 queryStateMachine,
@@ -312,7 +316,8 @@ public class SqlQueryScheduler
                 taskDescriptorStorage,
                 nodeAllocatorService,
                 partitionMemoryEstimatorFactory,
-                taskExecutionStats);
+                taskExecutionStats,
+                queryResourceManager);
         if (!(getRetryPolicy(queryStateMachine.getSession()) == TASK)) {
             sqlQueryScheduler.initialize();
         }
@@ -349,7 +354,8 @@ public class SqlQueryScheduler
             TaskDescriptorStorage taskDescriptorStorage,
             NodeAllocatorService nodeAllocatorService,
             PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
-            TaskExecutionStats taskExecutionStats)
+            TaskExecutionStats taskExecutionStats,
+            QueryResourceManager queryResourceManager)
     {
         this.queryStateMachine = requireNonNull(queryStateMachine, "queryStateMachine is null");
         this.executionPolicy = requireNonNull(executionPolicy, "schedulerPolicyFactory is null");
@@ -360,6 +366,7 @@ public class SqlQueryScheduler
 
         this.snapshotManager = snapshotManager;
         this.queryRecoveryManager = queryRecoveryManager;
+        this.queryResourceManager = queryResourceManager;
         if (SystemSessionProperties.isRecoveryEnabled(session)) {
             queryRecoveryManager.setCancelToResumeCb(this::cancelToResume);
         }
@@ -474,7 +481,6 @@ public class SqlQueryScheduler
         this.stageSchedulers = stageSchedulerBuilder.build();
         this.stageLinkages = stageLinkageBuilder.build();
 
-        maxQueryRetryAttempts = getQueryRetryAttempts(queryStateMachine.getSession());
         maxTaskRetryAttemptsOverall = getTaskRetryAttemptsOverall(queryStateMachine.getSession());
         maxTaskRetryAttemptsPerTask = getTaskRetryAttemptsPerTask(queryStateMachine.getSession());
         maxTasksWaitingForNodePerStage = getMaxTasksWaitingForNodePerStage(queryStateMachine.getSession());
@@ -844,6 +850,11 @@ public class SqlQueryScheduler
         return aggregateBasicStageStats(stageStats);
     }
 
+    private ImmutableList<StageInfo> getStagesInfo()
+    {
+        return stages.values().stream().map(SqlStageExecution::getStageInfo).collect(toImmutableList());
+    }
+
     public StageInfo getStageInfo()
     {
         Map<StageId, StageInfo> stageInfos = stages.values().stream()
@@ -962,18 +973,6 @@ public class SqlQueryScheduler
         }
     }
 
-    private boolean canScheduleMoreSplits()
-    {
-        long cachedMemoryUsage = queryStateMachine.getResourceGroupManager().getCachedMemoryUsage(queryStateMachine.getResourceGroup());
-        long softReservedMemory = queryStateMachine.getResourceGroupManager().getSoftReservedMemory(queryStateMachine.getResourceGroup());
-        if (cachedMemoryUsage < softReservedMemory) {
-            return true;
-        }
-
-        log.debug("Splits scheduling throttled....!!! Used memory " + cachedMemoryUsage + " configured " + softReservedMemory);
-        return false;
-    }
-
     private int getOptimalSmallSplitGroupSize()
     {
         ResourceGroupInfo resourceGroupInfo = queryStateMachine.getResourceGroupManager().getResourceGroupInfo(queryStateMachine.getResourceGroup());
@@ -985,6 +984,34 @@ public class SqlQueryScheduler
             }
         }
         return SPLIT_GROUP_GRADATION[result];
+    }
+
+    private void updateQueryResourceStats()
+    {
+        QueryExecutionModifier modifier = queryResourceManager.updateStats(getStagesInfo());
+
+        switch (modifier) {
+            case SPILL_REVOCABLE:
+                spillRevocableMem();
+                break;
+
+            case SUSPEND_QUERY:
+                suspend();
+                break;
+
+            case RESUME_QUERY:
+                resume();
+                break;
+
+            case NO_OP:
+            case THROTTLE_SPLITS:
+                /* Throttling handled directly in scheduling */
+                break;
+
+            case KILL_QUERY:
+                queryStateMachine.transitionToFailed(new PrestoException(EXCEEDED_TIME_LIMIT, "Query exceeded resource limit"));
+                break;
+        }
     }
 
     private void schedule()
@@ -1005,7 +1032,7 @@ public class SqlQueryScheduler
                     // configured limit. If yes throttle further split scheduling.
                     // Throttle Logic: Wait for x seconds (Wait time will increase till max as per THROTTLE_SLEEP_TIMER)
                     // and then let it schedule 10% of splits.
-                    if (queryStateMachine.isThrottlingEnabled() && !canScheduleMoreSplits()) {
+                    if (queryStateMachine.isThrottlingEnabled() && !queryResourceManager.canScheduleMore()) {
                         try {
                             SECONDS.sleep(THROTTLE_SLEEP_TIMER[currentTimerLevel]);
                         }
@@ -1018,6 +1045,10 @@ public class SqlQueryScheduler
                     else {
                         stage.setThrottledSchedule(false);
                         currentTimerLevel = 0;
+                    }
+
+                    if (isQueryResourceTrackingEnabled(session)) {
+                        updateQueryResourceStats();
                     }
 
                     // perform some scheduling work
@@ -1063,6 +1094,10 @@ public class SqlQueryScheduler
                                 .processScheduleResults(stage.getState(), ImmutableSet.of());
                         completedStages.add(stage.getStageId());
                     }
+                }
+
+                if (isQueryResourceTrackingEnabled(session)) {
+                    updateQueryResourceStats();
                 }
 
                 // wait for a state change and then schedule again
@@ -1150,6 +1185,14 @@ public class SqlQueryScheduler
         }
     }
 
+    public synchronized void spillRevocableMem()
+    {
+        log.info("Resuming suspended query tasks: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(SqlStageExecution::spillRevocableMem);
+        }
+    }
+
     private static ListenableFuture<?> whenAllStages(Collection<SqlStageExecution> stages, Predicate<StageState> predicate)
     {
         checkArgument(!stages.isEmpty(), "stages is empty");
@@ -1175,6 +1218,14 @@ public class SqlQueryScheduler
             stageExecution.setResuming(restoringSnapshotId);
         }
         snapshotManager.setRestoringSnapshotId(restoringSnapshotId);
+    }
+
+    public void setStagePriority()
+    {
+        log.info("set query task priority: %s", queryStateMachine.getQueryId());
+        try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
+            stages.values().forEach(stage -> stage.setPriority(queryStateMachine.getPriority()));
+        }
     }
 
     private interface ExchangeLocationsConsumer
@@ -1286,7 +1337,6 @@ public class SqlQueryScheduler
             return Optional.empty();
         }
 
-        //TODO(SURYA): this function is not implemented in olk, need to see if it is required.
         DistributedStagesScheduler stagesScheduler;
         switch (retryPolicy) {
             case TASK:
@@ -1624,7 +1674,6 @@ public class SqlQueryScheduler
             if (childStages.isEmpty()) {
                 return parent;
             }
-            //Todo(SURYA): add a flag to indicate coordinator only. Introduced as part of adding failure injection tests
             return new StageInfo(
                     parent.getStageId(),
                     parent.getState(),
@@ -1899,7 +1948,6 @@ public class SqlQueryScheduler
             queryStateMachine.addOutputTaskFailureListener(failureReporter);
 
             String catalogName = queryStateMachine.getSession().getCatalog().orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog is not present"));
-            //TODO(SURYA): passing keepConsumerOnFeederNodes as false and feederScheduledNOdes as emptyMap.
             InternalNode coordinator = nodeScheduler.createNodeSelector(new CatalogName(catalogName), false, ImmutableMap.of()).selectCurrentNode();
             for (StageExecution stageExecution : stageExecutions) {
                 Optional<RemoteTask> remoteTask = stageExecution.scheduleTask(
@@ -1908,7 +1956,6 @@ public class SqlQueryScheduler
                         ImmutableMultimap.of(),
                         ImmutableMultimap.of());
                 stageExecution.schedulingComplete();
-                //TODO(SURYA): addSourceTaskFailureListener -> sqlTaskManager needs to have many changes to be done.
                 remoteTask.ifPresent(task -> coordinatorTaskManager.addSourceTaskFailureListener(task.getTaskId(), failureReporter));
             }
         }
@@ -1965,7 +2012,6 @@ public class SqlQueryScheduler
         }
     }
 
-    //TODO(SURYA): This is used in pipelinedDistributedStagesScheduler
     private static class TaskLifecycleListenerBridge
             implements TaskLifecycleListener
     {
@@ -2455,7 +2501,6 @@ public class SqlQueryScheduler
                     boolean allFinished = true;
                     for (FaultTolerantStageScheduler scheduler : schedulers) {
                         if (scheduler.isFinished()) {
-                            log.info("[SURYA] scheduler finished: " + scheduler.getStageId());
                             continue;
                         }
                         allFinished = false;

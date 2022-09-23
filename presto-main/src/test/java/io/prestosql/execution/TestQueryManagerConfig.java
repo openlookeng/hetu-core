@@ -17,7 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.configuration.testing.ConfigAssertions;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.exchange.RetryPolicy;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -56,7 +56,6 @@ public class TestQueryManagerConfig
                 .setRequiredWorkers(1)
                 .setRequiredWorkersMaxWait(new Duration(5, TimeUnit.MINUTES))
                 .setRetryPolicy(RetryPolicy.NONE)
-                .setQueryRetryAttempts(4)
                 .setTaskRetryAttemptsPerTask(4)
                 .setTaskRetryAttemptsOverall(Integer.MAX_VALUE)
                 .setRetryInitialDelay(new Duration(10, SECONDS))
@@ -69,7 +68,10 @@ public class TestQueryManagerConfig
                 .setFaultTolerantExecutionMinTaskSplitCount(16)
                 .setFaultTolerantExecutionMaxTaskSplitCount(256)
                 .setFaultTolerantExecutionPartitionCount(50)
-                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE)));
+                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(Math.round(AVAILABLE_HEAP_MEMORY * 0.15), DataSize.Unit.BYTE))
+                .setExchangeFilesystemBaseDirectory("/tmp/hetu-exchange-manager")
+                .setExchangeFilesystemType("local")
+                .setQueryResourceTracking(false));
     }
 
     @Test
@@ -98,7 +100,6 @@ public class TestQueryManagerConfig
                 .put("query-manager.required-workers", "333")
                 .put("query-manager.required-workers-max-wait", "33m")
                 .put("retry-policy", "TASK")
-                .put("query-retry-attempts", "5")
                 .put("task-retry-attempts-overall", "20")
                 .put("task-retry-attempts-per-task", "5")
                 .put("retry-initial-delay", "11s")
@@ -112,6 +113,9 @@ public class TestQueryManagerConfig
                 .put("fault-tolerant-execution-max-task-split-count", "257")
                 .put("fault-tolerant-execution-partition-count", "51")
                 .put("fault-tolerant-execution-task-descriptor-storage-max-memory", "1GB")
+                .put("exchange-filesystem-base-directory", "/opt/hetu-1.8.0/exchange-base-dir")
+                .put("exchange-filesystem-type", "hdfs")
+                .put("query-resource-tracking", "true")
                 .build();
 
         QueryManagerConfig expected = new QueryManagerConfig()
@@ -137,7 +141,6 @@ public class TestQueryManagerConfig
                 .setRequiredWorkers(333)
                 .setRequiredWorkersMaxWait(new Duration(33, TimeUnit.MINUTES))
                 .setRetryPolicy(RetryPolicy.TASK)
-                .setQueryRetryAttempts(5)
                 .setTaskRetryAttemptsPerTask(5)
                 .setTaskRetryAttemptsOverall(20)
                 .setRetryInitialDelay(new Duration(11, SECONDS))
@@ -150,7 +153,10 @@ public class TestQueryManagerConfig
                 .setFaultTolerantExecutionMinTaskSplitCount(17)
                 .setFaultTolerantExecutionMaxTaskSplitCount(257)
                 .setFaultTolerantExecutionPartitionCount(51)
-                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(1, DataSize.Unit.GIGABYTE));
+                .setFaultTolerantExecutionTaskDescriptorStorageMaxMemory(new DataSize(1, DataSize.Unit.GIGABYTE))
+                .setExchangeFilesystemBaseDirectory("/opt/hetu-1.8.0/exchange-base-dir")
+                .setExchangeFilesystemType("hdfs")
+                .setQueryResourceTracking(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

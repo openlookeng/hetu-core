@@ -143,7 +143,6 @@ public class SqlQueryManager
 
             try {
                 enforceCpuLimits();
-                // Todo(Nitin K): patch to suspend query in case cpu limits increase...
             }
             catch (Throwable e) {
                 log.error(e, "Error enforcing query CPU time limits");
@@ -260,38 +259,40 @@ public class SqlQueryManager
     {
         requireNonNull(queryExecution, "queryExecution is null");
 
-        if (!queryTracker.addQuery(queryExecution)) {
-            throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Query %s already registered", queryExecution.getQueryId()));
-        }
+        if (queryExecution.getTryCount() == 0) {
+            if (!queryTracker.addQuery(queryExecution)) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, format("Query %s already registered", queryExecution.getQueryId()));
+            }
 
-        // CreateIndex operations could not register cleanup operations like connectors
-        // Therefore a listener is added here to clean up index records on failure
-        if (isIndexCreationQuery(queryExecution.getQueryInfo())) {
-            queryExecution.addStateChangeListener(state -> {
+            // CreateIndex operations could not register cleanup operations like connectors
+            // Therefore a listener is added here to clean up index records on failure
+            if (isIndexCreationQuery(queryExecution.getQueryInfo())) {
+                queryExecution.addStateChangeListener(state -> {
+                    try {
+                        queryMonitor.indexCreationStateChangeEvent(state, queryExecution.getQueryInfo());
+                    }
+                    finally {
+                        // execution MUST be added to the expiration queue or there will be a leak
+                        queryTracker.expireQuery(queryExecution.getQueryId());
+                    }
+                });
+            }
+
+            queryExecution.addFinalQueryInfoListener(finalQueryInfo -> {
                 try {
-                    queryMonitor.indexCreationStateChangeEvent(state, queryExecution.getQueryInfo());
+                    queryMonitor.queryCompletedEvent(finalQueryInfo);
+                    if (!(finalQueryInfo.getSession().getSource().map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source)).orElse(false))) {
+                        queryHistoryService.insert(finalQueryInfo);
+                    }
                 }
                 finally {
                     // execution MUST be added to the expiration queue or there will be a leak
                     queryTracker.expireQuery(queryExecution.getQueryId());
                 }
             });
+
+            stats.trackQueryStats(queryExecution);
         }
-
-        queryExecution.addFinalQueryInfoListener(finalQueryInfo -> {
-            try {
-                queryMonitor.queryCompletedEvent(finalQueryInfo);
-                if (!(finalQueryInfo.getSession().getSource().map(source -> QueryEditorUIModule.UI_QUERY_SOURCE.equals(source)).orElse(false))) {
-                    queryHistoryService.insert(finalQueryInfo);
-                }
-            }
-            finally {
-                // execution MUST be added to the expiration queue or there will be a leak
-                queryTracker.expireQuery(queryExecution.getQueryId());
-            }
-        });
-
-        stats.trackQueryStats(queryExecution);
 
         embedVersion.embedVersion(queryExecution::start).run();
     }
@@ -343,6 +344,16 @@ public class SqlQueryManager
 
         queryTracker.tryGetQuery(queryId)
                 .ifPresent(QueryExecution::resumeQuery);
+    }
+
+    @Override
+    public void spillQueryRevocableMemory(QueryId queryId)
+    {
+        requireNonNull(queryId, "queryId is null");
+        log.debug("Spill any revocable memory in query %s", queryId);
+
+        queryTracker.tryGetQuery(queryId)
+                .ifPresent(QueryExecution::spillQueryRevocableMemory);
     }
 
     @Override

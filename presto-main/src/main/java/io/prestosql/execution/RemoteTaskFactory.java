@@ -39,5 +39,6 @@ public interface RemoteTaskFactory
             PartitionedSplitCountTracker partitionedSplitCountTracker,
             boolean summarizeTaskInfo,
             Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager);
+            QuerySnapshotManager snapshotManager,
+            OptionalInt taskPriority);
 }

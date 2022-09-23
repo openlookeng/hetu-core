@@ -161,7 +161,7 @@
 
 1. openLooKeng的SQL是否是大小写敏感的？如果数据源是大小写敏感的，openLooKeng如何处理？
 
-   > openLooKeng对大小写不敏感，对于sql中的大写，openLooKeng都会转换成小写处理。如果数据源本身是大小写敏感的，那么就可能查询失败。比如ES是大小写敏感的，所以如果ES中的列名使用大写，那么openLooKeng查询该列就会出错。
+   > openLooKeng对大小写不敏感，对于sql中的大写，openLooKeng都会转换成小写处理。如果数据源本身是大小写敏感的，那么就可能查询失败。比如ES是大小写敏感的，所以如果ES中的列名使用大写，那么openLooKeng查询该列就会出错。其中，jdbc数据源匹配数据库和集合名称时，通过在对应数据源配置文件中增加配置项“case-insensitive-name-matching”控制是否对大小写敏感，详情参考: https://docs.openlookeng.io/zh/docs/docs/admin/properties.html。
 
 2. 对接hive使用update失败，报错：cannot change stats state for a transactional table，是什么原因？
 

@@ -80,6 +80,7 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.ConnectorUpdateTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableHandle;
 import io.prestosql.spi.connector.ConnectorVacuumTableInfo;
+import io.prestosql.spi.connector.RetryMode;
 import io.prestosql.spi.connector.SchemaNotFoundException;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.TableAlreadyExistsException;
@@ -197,6 +198,7 @@ import static io.prestosql.plugin.hive.HiveUtil.hiveColumnHandles;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.connector.RetryMode.NO_RETRIES;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -346,6 +348,24 @@ public class CarbondataMetadata
     }
 
     @Override
+    public CarbondataInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector does not support insert with query retries enabled");
+        }
+        return beginInsert(session, tableHandle);
+    }
+
+    @Override
+    public CarbondataInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector does not support insert with query retries enabled");
+        }
+        return beginInsert(session, tableHandle, isOverwrite);
+    }
+
+    @Override
     public CarbondataInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite)
     {
         return beginInsertUpdateInternal(session, tableHandle, isOverwrite);
@@ -411,6 +431,15 @@ public class CarbondataMetadata
     }
 
     @Override
+    public CarbondataUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector does not support update with query retries enabled");
+        }
+        return beginUpdateAsInsert(session, tableHandle);
+    }
+
+    @Override
     public CarbondataUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         currentState = State.UPDATE;
@@ -461,6 +490,15 @@ public class CarbondataMetadata
                 parent.getTableStorageFormat(),
                 parent.getPartitionStorageFormat(),
                 additionalConf);
+    }
+
+    @Override
+    public CarbonDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector does not support delete with query retries enabled");
+        }
+        return beginDeletesAsInsert(session, tableHandle);
     }
 
     @Override
@@ -549,7 +587,7 @@ public class CarbondataMetadata
                 updateTableHandle.getSchemaName(), updateTableHandle.getTableName(),
                 updateTableHandle.getInputColumns(), updateTableHandle.getPageSinkMetadata(),
                 updateTableHandle.getLocationHandle(), updateTableHandle.getBucketProperty(),
-                updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false);
+                updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false, updateTableHandle.isRetriesEnabled());
 
         autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
         return finishUpdateAndDelete(session, insertTableHandle, fragments, computedStatistics);
@@ -563,7 +601,7 @@ public class CarbondataMetadata
                 deleteTableHandle.getSchemaName(), deleteTableHandle.getTableName(),
                 deleteTableHandle.getInputColumns(), deleteTableHandle.getPageSinkMetadata(),
                 deleteTableHandle.getLocationHandle(), deleteTableHandle.getBucketProperty(),
-                deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false);
+                deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false, deleteTableHandle.isRetriesEnabled());
 
         autoCleanerTasks.add(new CarbondataAutoCleaner(table.get(), initialConfiguration, carbondataTableReader, metastore, hdfsEnvironment, user));
         return finishUpdateAndDelete(session, insertTableHandle, fragments, computedStatistics);
@@ -1191,6 +1229,15 @@ public class CarbondataMetadata
     }
 
     @Override
+    public CarbondataOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Carbondata connector does not support create table with query retries enabled");
+        }
+        return beginCreateTable(session, tableMetadata, layout);
+    }
+
+    @Override
     public CarbondataOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
         // get the root directory for the database
@@ -1416,7 +1463,8 @@ public class CarbondataMetadata
                 partitionUpdate.getWritePath(),
                 partitionUpdate.getFileNames(),
                 partitionStatistics,
-                HiveACIDWriteType.INSERT_OVERWRITE);
+                HiveACIDWriteType.INSERT_OVERWRITE,
+                false);
         markSegmentsForDelete(session, table);
     }
 
@@ -1439,7 +1487,8 @@ public class CarbondataMetadata
                     partitionUpdate.getWritePath(),
                     partitionUpdate.getFileNames(),
                     partitionStatistics,
-                    acidWriteType);
+                    acidWriteType,
+                    false);
         }
         else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.APPEND) {
             Partition partition = buildPartitionObject(session, table, partitionUpdate);
@@ -1452,7 +1501,7 @@ public class CarbondataMetadata
                     partitionUpdate.getStatistics(),
                     columnTypes,
                     getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-            metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType);
+            metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType, Optional.empty(), false);
         }
     }
 

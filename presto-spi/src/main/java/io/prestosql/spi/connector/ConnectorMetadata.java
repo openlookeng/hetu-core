@@ -400,6 +400,24 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Begin the atomic creation of a table with data.
+     *
+     * <p/>
+     * If connector does not support execution with retries, the method should throw:
+     * <pre>
+     *     new PrestoException(NOT_SUPPORTED, "This connector does not support query retries")
+     * </pre>
+     * unless {@code retryMode} is set to {@code NO_RETRIES}.
+     */
+    default ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginCreateTable(session, tableMetadata, layout);
+    }
+
+    /**
      * Finish a table creation with data after the data is written.
      */
     default Optional<ConnectorOutputMetadata> finishCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
@@ -427,11 +445,33 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Begin insert query.
+     */
+    default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginInsert(session, tableHandle);
+    }
+
+    /**
      * Begin insert query
      */
     default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support inserts overwrite");
+    }
+
+    /**
+     * Begin insert query.
+     */
+    default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginInsert(session, tableHandle, isOverwrite);
     }
 
     /**
@@ -471,6 +511,17 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Begin delete query.
+     */
+    default ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginDelete(session, tableHandle);
+    }
+
+    /**
      * Finish delete query
      *
      * @param fragments all fragments returned by {@link io.prestosql.spi.connector.UpdatablePageSource#finish()}
@@ -488,9 +539,28 @@ public interface ConnectorMetadata
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
     }
 
+    /**
+     * Begin update query
+     */
+    default ConnectorUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginUpdateAsInsert(session, tableHandle);
+    }
+
     default ConnectorDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support delete as insert");
+    }
+
+    default ConnectorDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginDeletesAsInsert(session, tableHandle);
     }
 
     /**
@@ -514,6 +584,25 @@ public interface ConnectorMetadata
     default ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnTypes)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support updates");
+    }
+
+    /**
+     * Do whatever is necessary to start an UPDATE query, returning the {@link ConnectorTableHandle}
+     * instance that will be passed to split generation, and to the {@link #finishUpdate} method.
+     *
+     * @param session The session in which to start the update operation.
+     * @param tableHandle A ConnectorTableHandle for the table to be updated.
+     * @param updatedColumnsTypes A list of the ColumnHandles of columns that will be updated by this UPDATE
+     * operation, in table column order.
+     * @return a ConnectorTableHandle that will be passed to split generation, and to the
+     * {@link #finishUpdate} method.
+     */
+    default ConnectorTableHandle beginUpdate(ConnectorSession session, ConnectorTableHandle tableHandle, List<Type> updatedColumnsTypes, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginUpdate(session, tableHandle, updatedColumnsTypes);
     }
 
     /**

@@ -18,10 +18,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.execution.TaskId;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.net.URI;
@@ -34,7 +34,6 @@ import static java.util.Objects.requireNonNull;
 public class RemoteSplit
         implements ConnectorSplit
 {
-    //TODO(SURYA): replace old constructor with new one and check how to get estimatedSizeOf information.
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RemoteSplit.class).instanceSize();
 
     private final URI location;

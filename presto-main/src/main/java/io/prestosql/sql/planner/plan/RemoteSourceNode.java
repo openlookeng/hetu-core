@@ -16,7 +16,7 @@ package io.prestosql.sql.planner.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
-import io.prestosql.spi.exchange.RetryPolicy;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;

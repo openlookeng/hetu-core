@@ -26,6 +26,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.exchange.ExchangeHandleResolver;
 import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.NodeTaskMap.PartitionedSplitCountTracker;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
@@ -39,7 +40,6 @@ import io.prestosql.metadata.Split;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskStats;
 import io.prestosql.snapshot.QuerySnapshotManager;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
 import io.prestosql.spi.memory.MemoryPoolId;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.PlanNode;
@@ -138,7 +138,7 @@ public class MockRemoteTaskFactory
             initialSplits.put(sourceId, sourceSplit);
         }
         return createRemoteTask(TEST_SESSION, taskId, instanceId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST),
-                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION));
+                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION), OptionalInt.empty());
     }
 
     @Override
@@ -154,7 +154,7 @@ public class MockRemoteTaskFactory
             PartitionedSplitCountTracker partitionedSplitCountTracker,
             boolean summarizeTaskInfo,
             Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager, OptionalInt taskPriority)
     {
         return new MockRemoteTask(taskId, instanceId, fragment, node.getNodeIdentifier(), executor, scheduledExecutor, initialSplits, totalPartitions, partitionedSplitCountTracker);
     }
@@ -186,6 +186,8 @@ public class MockRemoteTaskFactory
         private SettableFuture<?> whenSplitQueueHasSpace = SettableFuture.create();
 
         private final PartitionedSplitCountTracker partitionedSplitCountTracker;
+
+        private final AtomicBoolean taskSpillCalled = new AtomicBoolean();
 
         public MockRemoteTask(TaskId taskId,
                 String instanceId,
@@ -457,6 +459,12 @@ public class MockRemoteTaskFactory
         }
 
         @Override
+        public void setPriority(int priority)
+        {
+            taskStateMachine.setPriority(priority);
+        }
+
+        @Override
         public void abort()
         {
             taskStateMachine.cancel(TaskState.ABORTED);
@@ -473,6 +481,11 @@ public class MockRemoteTaskFactory
         public void failRemotely(Throwable cause)
         {
             //do nothing
+        }
+
+        public void spillRevocableMemory()
+        {
+            taskSpillCalled.set(true);
         }
 
         @Override

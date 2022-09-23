@@ -15,8 +15,8 @@ package io.prestosql.execution.scheduler;
 
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ListMultimap;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.metadata.Split;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
 import io.prestosql.spi.plan.PlanNodeId;
 import org.openjdk.jol.info.ClassLayout;
 

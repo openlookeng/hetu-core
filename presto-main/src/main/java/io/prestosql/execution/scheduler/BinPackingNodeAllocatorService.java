@@ -188,7 +188,6 @@ public class BinPackingNodeAllocatorService
             if (!entry.getValue().isPresent()) {
                 continue;
             }
-            //TODO(SURYA): passed GENERAL_POOL, but difference between GENERAL_POOL or RESERVED_POOL
             MemoryPoolInfo poolInfo = entry.getValue().get().getPools().get(GENERAL_POOL);
             newNodePoolMemoryInfos.put(entry.getKey(), poolInfo);
             maxNodePoolSizeBytes = Math.max(poolInfo.getMaxBytes(), maxNodePoolSizeBytes);
@@ -456,7 +455,6 @@ public class BinPackingNodeAllocatorService
                     realtimeTasksMemoryPerNode.put(node.getNodeIdentifier(), ImmutableMap.of());
                     continue;
                 }
-                //TODO(SURYA) passing empty map for getTaskMemoryReservations
                 realtimeTasksMemoryPerNode.put(node.getNodeIdentifier(), ImmutableMap.of());
             }
 

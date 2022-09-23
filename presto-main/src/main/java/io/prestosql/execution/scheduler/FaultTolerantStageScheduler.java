@@ -30,6 +30,10 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.concurrent.MoreFutures;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeSinkHandle;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.execution.ExecutionFailureInfo;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
@@ -44,10 +48,6 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.ErrorCode;
 import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeSinkHandle;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
@@ -128,7 +128,6 @@ public class FaultTolerantStageScheduler
 
     private final DelayedFutureCompletor futureCompletor;
 
-    //TODO(SURYA) immediateVoidFuture() is replced here with immediateFuture(null).
     @GuardedBy("this")
     private ListenableFuture<Void> blocked = immediateFuture(null);
 
@@ -414,8 +413,7 @@ public class FaultTolerantStageScheduler
                 taskSplits,
                 allSourcePlanNodeIds.stream()
                         .collect(toImmutableListMultimap(Function.identity(), planNodeId -> Lifespan.taskWide())),
-                allSourcePlanNodeIds,
-                Optional.of(memoryRequirements.getRequiredMemory())).orElseThrow(() -> new VerifyException("stage execution is expected to be active"));
+                allSourcePlanNodeIds).orElseThrow(() -> new VerifyException("stage execution is expected to be active"));
 
         nodeLease.attachTaskId(task.getTaskId());
         partitionToRemoteTaskMap.put(partition, task);

@@ -34,6 +34,10 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeSourceHandle;
+import io.prestosql.exchange.ExchangeSourceSplitter;
+import io.prestosql.exchange.ExchangeSourceStatistics;
 import io.prestosql.execution.ForQueryExecution;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.QueryManagerConfig;
@@ -44,10 +48,6 @@ import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.SplitWeight;
 import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
-import io.prestosql.spi.exchange.ExchangeSourceSplitter;
-import io.prestosql.spi.exchange.ExchangeSourceStatistics;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.PlanVisitor;
@@ -795,7 +795,6 @@ public class StageTaskSourceFactory
                     currentSplitBatchFuture,
                     splitBatch -> {
                         synchronized (this) {
-                            log.info("[SURYA] number of splits in batch: " + splitBatch.getSplits().size());
                             for (Split split : splitBatch.getSplits()) {
                                 if (split.isRemotelyAccessible()) {
                                     remotelyAccessibleSplitBuffer.add(split);
@@ -811,7 +810,6 @@ public class StageTaskSourceFactory
 
                             ImmutableList.Builder<TaskDescriptor> readyTasksBuilder = ImmutableList.builder();
                             boolean isLastBatch = splitBatch.isLastBatch();
-                            log.info("[SURYA] isLastBatch: " + splitBatch.isLastBatch());
                             readyTasksBuilder.addAll(getReadyTasks(
                                     remotelyAccessibleSplitBuffer,
                                     ImmutableList.of(),
@@ -908,7 +906,6 @@ public class StageTaskSourceFactory
         @Override
         public synchronized boolean isFinished()
         {
-            log.info("[SURYA] taskSource is Finished");
             return finished;
         }
 

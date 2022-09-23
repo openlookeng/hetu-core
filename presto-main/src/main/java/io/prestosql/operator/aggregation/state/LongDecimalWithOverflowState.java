@@ -13,7 +13,6 @@
  */
 package io.prestosql.operator.aggregation.state;
 
-import io.airlift.slice.Slice;
 import io.prestosql.spi.function.AccumulatorState;
 import io.prestosql.spi.function.AccumulatorStateMetadata;
 
@@ -21,11 +20,17 @@ import io.prestosql.spi.function.AccumulatorStateMetadata;
 public interface LongDecimalWithOverflowState
         extends AccumulatorState
 {
-    Slice getLongDecimal();
+    boolean isNotNull();
 
-    void setLongDecimal(Slice unscaledDecimal);
+    void setNotNull();
+
+    long[] getDecimalArray();
+
+    int getDecimalArrayOffset();
 
     long getOverflow();
 
     void setOverflow(long overflow);
+
+    void addOverflow(long overflow);
 }

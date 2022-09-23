@@ -95,10 +95,11 @@ public class TaskExecutionStats
 
         public void update(TaskStats stats)
         {
-            //TODO(SURYA) see the usage of these commented variables and add them accordingly
             elapsedTime.add(stats.getElapsedTime());
             scheduledTime.add(stats.getTotalScheduledTime());
             cpuTime.add(stats.getTotalCpuTime());
+            inputBlockedTime.add(stats.getInputBlockedTime());
+            outputBlockedTime.add(stats.getOutputBlockedTime());
             peakMemoryReservationInBytes.add(stats.getPeakUserMemoryReservation().toBytes());
         }
 

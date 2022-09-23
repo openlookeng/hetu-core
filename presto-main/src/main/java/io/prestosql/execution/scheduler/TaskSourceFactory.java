@@ -15,8 +15,8 @@ package io.prestosql.execution.scheduler;
 
 import com.google.common.collect.Multimap;
 import io.prestosql.Session;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeSourceHandle;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
 

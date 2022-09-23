@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.plugin.hive.HiveBucketing.BucketingVersion;
 import io.prestosql.spi.HostAddress;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.Map;
@@ -29,10 +30,16 @@ import java.util.Properties;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.util.SizeOf.INTEGER_INSTANCE_SIZE;
+import static io.prestosql.spi.util.SizeOf.LONG_INSTANCE_SIZE;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class HiveSplit
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveSplit.class).instanceSize();
+
     private final String path;
     private final long start;
     private final long length;
@@ -284,8 +291,28 @@ public class HiveSplit
         return startRowOffsetOfFile;
     }
 
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + estimatedSizeOf(path)
+                + estimatedSizeOf(schema, key -> estimatedSizeOf((String) key), value -> estimatedSizeOf((String) value))
+                + estimatedSizeOf(partitionKeys, HivePartitionKey::getEstimatedSizeInBytes)
+                + estimatedSizeOf(addresses, HostAddress::getRetainedSizeInBytes)
+                + estimatedSizeOf(database)
+                + estimatedSizeOf(table)
+                + estimatedSizeOf(partitionName)
+                + sizeOf(bucketNumber)
+                + sizeOf(bucketConversion, BucketConversion::getRetainedSizeInBytes)
+                + estimatedSizeOf(columnCoercions, (Integer key) -> INTEGER_INSTANCE_SIZE, HiveType::getRetainedSizeInBytes)
+                + sizeOf(startRowOffsetOfFile, value -> LONG_INSTANCE_SIZE)
+                + sizeOf(deleteDeltaLocations, DeleteDeltaLocations::getRetainedSizeInBytes)
+                + estimatedSizeOf(customSplitInfo, key -> estimatedSizeOf(key), value -> estimatedSizeOf(value));
+    }
+
     public static class BucketConversion
     {
+        private static final int INSTANCE_SIZE = ClassLayout.parseClass(BucketConversion.class).instanceSize();
+
         private final BucketingVersion bucketingVersion;
         private final int tableBucketCount;
         private final int partitionBucketCount;
@@ -342,6 +369,12 @@ public class HiveSplit
             return tableBucketCount == that.tableBucketCount &&
                     partitionBucketCount == that.partitionBucketCount &&
                     Objects.equals(bucketColumnNames, that.bucketColumnNames);
+        }
+
+        public long getRetainedSizeInBytes()
+        {
+            return INSTANCE_SIZE
+                    + estimatedSizeOf(bucketColumnNames, HiveColumnHandle::getRetainedSizeInBytes);
         }
 
         @Override

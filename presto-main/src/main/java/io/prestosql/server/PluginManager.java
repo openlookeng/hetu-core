@@ -41,7 +41,6 @@ import io.prestosql.spi.classloader.ThreadContextClassLoader;
 import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.cube.CubeProvider;
 import io.prestosql.spi.eventlistener.EventListenerFactory;
-import io.prestosql.spi.exchange.ExchangeManagerFactory;
 import io.prestosql.spi.failuredetector.FailureRetryFactory;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 import io.prestosql.spi.function.FunctionNamespaceManagerFactory;
@@ -381,11 +380,6 @@ public class PluginManager
         for (FailureRetryFactory failureRetryFactory : fplugin.getFailureRetryFactory()) {
             log.info("Registering failure retry policy provider %s", failureRetryFactory.getName());
             FailureDetectorManager.addFailureRetryFactory(failureRetryFactory);
-        }
-
-        for (ExchangeManagerFactory exchangeManagerFactory : plugin.getExchangeManagerFactories()) {
-            log.info("Registering exchange manager %s", exchangeManagerFactory.getName());
-            exchangeManagerRegistry.addExchangeManagerFactory(exchangeManagerFactory);
         }
 
         installFunctionsPlugin(plugin);

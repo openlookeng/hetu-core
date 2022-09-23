@@ -21,7 +21,10 @@ import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.BufferState;
 import io.prestosql.execution.buffer.OutputBuffers;
@@ -34,9 +37,6 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.ExchangeClientSupplier;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.ExchangeHandleResolver;
-import io.prestosql.spi.exchange.ExchangeId;
-import io.prestosql.spi.exchange.RetryPolicy;
 import io.prestosql.spiller.LocalSpillManager;
 import io.prestosql.spiller.NodeSpillConfig;
 import org.testng.annotations.AfterClass;
@@ -301,7 +301,8 @@ public class TestSqlTaskManager
                 outputBuffers,
                 OptionalInt.empty(),
                 Optional.empty(),
-                "0-test_instance_id");
+                "0-test_instance_id",
+                OptionalInt.of(1));
     }
 
     private TaskInfo createTask(SqlTaskManager sqlTaskManager, TaskId taskId, OutputBuffers outputBuffers)
@@ -321,7 +322,8 @@ public class TestSqlTaskManager
                 outputBuffers,
                 OptionalInt.empty(),
                 Optional.empty(),
-                "0-test_instance_id");
+                "0-test_instance_id",
+                OptionalInt.empty());
     }
 
     public static class MockExchangeClientSupplier

@@ -145,7 +145,8 @@ public class TaskResource
                 taskUpdateRequest.getOutputIds(),
                 taskUpdateRequest.getTotalPartitions(),
                 taskUpdateRequest.getConsumerId(),
-                taskUpdateRequest.getTaskInstanceId());
+                taskUpdateRequest.getTaskInstanceId(),
+                taskUpdateRequest.getTaskPriority());
         if (taskInfo == null) {
             return Response.ok().entity(createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath())).build();
         }
@@ -295,6 +296,55 @@ public class TaskResource
 
         TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
         TaskInfo taskInfo = taskManager.resumeTask(taskId, targetState, taskInstanceId);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+        }
+
+        if (shouldSummarize(uriInfo)) {
+            taskInfo = taskInfo.summarize();
+        }
+        return taskInfo;
+    }
+
+    @DELETE
+    @Path("{taskId}/priority")
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    public TaskInfo setPriority(
+            @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
+            @QueryParam("targetState") String targetStateStr,
+            @QueryParam("taskPriority") Integer taskPriority,
+            @Context UriInfo uriInfo)
+    {
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+
+        TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
+        TaskInfo taskInfo = taskManager.setPriority(taskId, targetState, taskInstanceId, taskPriority);
+
+        if (taskInfo == null) {
+            taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());
+        }
+
+        if (shouldSummarize(uriInfo)) {
+            taskInfo = taskInfo.summarize();
+        }
+        return taskInfo;
+    }
+
+    @DELETE
+    @Path("{taskId}/spill")
+    @Produces({MediaType.APPLICATION_JSON, APPLICATION_JACKSON_SMILE})
+    public TaskInfo spillRevocableMemory(
+            @PathParam("taskId") TaskId taskId,
+            @HeaderParam(PRESTO_TASK_INSTANCE_ID) String taskInstanceId,
+            @QueryParam("targetState") String targetStateStr,
+             @Context UriInfo uriInfo)
+    {
+        SecurityRequireNonNull.requireNonNull(taskId, "taskId is null");
+
+        TaskState targetState = targetStateStr == null ? TaskState.ABORTED : TaskState.valueOf(targetStateStr);
+        TaskInfo taskInfo = taskManager.spillTask(taskId, targetState, taskInstanceId);
 
         if (taskInfo == null) {
             taskInfo = createAbortedTaskInfo(taskId, uriInfo.getAbsolutePath());

@@ -29,20 +29,21 @@ import io.airlift.slice.SliceOutput;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeUtil;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.Exchange;
+import io.prestosql.exchange.ExchangeContext;
+import io.prestosql.exchange.ExchangeId;
+import io.prestosql.exchange.ExchangeManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.ExchangeSink;
+import io.prestosql.exchange.ExchangeSinkHandle;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.ExchangeSource;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TaskId;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
-import io.prestosql.spi.exchange.Exchange;
-import io.prestosql.spi.exchange.ExchangeContext;
-import io.prestosql.spi.exchange.ExchangeId;
-import io.prestosql.spi.exchange.ExchangeManager;
-import io.prestosql.spi.exchange.ExchangeSink;
-import io.prestosql.spi.exchange.ExchangeSinkHandle;
-import io.prestosql.spi.exchange.ExchangeSinkInstanceHandle;
-import io.prestosql.spi.exchange.ExchangeSource;
-import io.prestosql.spi.exchange.RetryPolicy;
 
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -75,7 +76,6 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_TASK_FAILED;
 import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
-import static io.prestosql.spi.exchange.RetryPolicy.NONE;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 
@@ -124,7 +124,7 @@ public class DeduplicatingDirectExchangeBuffer
     {
         this.executor = requireNonNull(executor, "executor is null");
         requireNonNull(retryPolicy, "retryPolicy is null");
-        checkArgument(retryPolicy != NONE, "retries should be enabled");
+        checkArgument(retryPolicy != RetryPolicy.NONE, "retries should be enabled");
         this.retryPolicy = retryPolicy;
         this.pageBuffer = new PageBuffer(
                 exchangeManagerRegistry,
@@ -517,7 +517,7 @@ public class DeduplicatingDirectExchangeBuffer
                 ExchangeSinkHandle sinkHandle = exchange.addSink(0);
                 sinkInstanceHandle = exchange.instantiateSink(sinkHandle, 0);
                 exchange.noMoreSinks();
-                exchangeSink = exchangeManager.createSink(sinkInstanceHandle, true);
+                exchangeSink = exchangeManager.createSink(sinkInstanceHandle, DirectSerialisationType.OFF, true);
 
                 writeBuffer = new DynamicSliceOutput(DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
             }

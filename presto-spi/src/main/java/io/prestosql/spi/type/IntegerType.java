@@ -19,6 +19,8 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
 
 import java.util.Optional;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
@@ -61,6 +63,12 @@ public final class IntegerType
     public Optional<Range> getRange()
     {
         return Optional.of(new Range((long) Integer.MIN_VALUE, (long) Integer.MAX_VALUE));
+    }
+
+    @Override
+    public Optional<Stream<?>> getDiscreteValues(Range range)
+    {
+        return Optional.of(LongStream.rangeClosed((long) range.getMin(), (long) range.getMax()).boxed());
     }
 
     @Override

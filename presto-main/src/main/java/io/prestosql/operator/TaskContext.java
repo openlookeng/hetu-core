@@ -114,6 +114,7 @@ public class TaskContext
     private final PlanNodeId consumerId;
 
     private final PagesSerdeFactory serdeFactory;
+    private final PagesSerdeFactory kryoSerdeFactory;
     private final TaskSnapshotManager snapshotManager;
     private final QueryRecoveryManager queryRecoveryManager;
 
@@ -132,10 +133,11 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager, queryRecoveryManager);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, kryoSerdeFactory, snapshotManager, queryRecoveryManager);
         taskContext.initialize();
         return taskContext;
     }
@@ -152,6 +154,7 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
@@ -169,6 +172,7 @@ public class TaskContext
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
         this.consumerId = consumerId;
         this.serdeFactory = serdeFactory;
+        this.kryoSerdeFactory = kryoSerdeFactory;
         this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
         this.queryRecoveryManager = queryRecoveryManager;
     }
@@ -464,6 +468,8 @@ public class TaskContext
         long outputPositions = 0;
 
         long physicalWrittenDataSize = 0;
+        long inputBlockedTime = 0;
+        long outputBlockedTime = 0;
 
         for (PipelineStats pipeline : pipelineStats) {
             if (pipeline.getLastEndTime() != null) {
@@ -494,11 +500,14 @@ public class TaskContext
 
                 processedInputDataSize += pipeline.getProcessedInputDataSize().toBytes();
                 processedInputPositions += pipeline.getProcessedInputPositions();
+                inputBlockedTime += pipeline.getInputBlockedTime().roundTo(NANOSECONDS);
             }
 
             if (pipeline.isOutputPipeline()) {
                 outputDataSize += pipeline.getOutputDataSize().toBytes();
                 outputPositions += pipeline.getOutputPositions();
+
+                outputBlockedTime += pipeline.getOutputBlockedTime().roundTo(NANOSECONDS);
             }
 
             physicalWrittenDataSize += pipeline.getPhysicalWrittenDataSize().toBytes();
@@ -581,7 +590,9 @@ public class TaskContext
                 succinctBytes(physicalWrittenDataSize),
                 fullGcCount,
                 fullGcTime,
-                pipelineStats);
+                pipelineStats,
+                new Duration(inputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(outputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit());
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
@@ -626,6 +637,11 @@ public class TaskContext
     public PagesSerdeFactory getSerdeFactory()
     {
         return serdeFactory;
+    }
+
+    public PagesSerdeFactory getKryoSerdeFactory()
+    {
+        return kryoSerdeFactory;
     }
 
     public QueryRecoveryManager getRecoveryManager()

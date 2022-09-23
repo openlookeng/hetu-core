@@ -57,6 +57,7 @@ import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
+import io.prestosql.sql.planner.plan.TopNRankingNumberNode;
 import io.prestosql.sql.planner.plan.UnnestNode;
 import io.prestosql.sql.planner.plan.UpdateNode;
 
@@ -77,17 +78,13 @@ public class SplitSourceFactory
 
     private final SplitManager splitManager;
 
-    //TODO(SURYA) commenting plannerContext for now as we are not using this now. Will uncomment once this is required.
-//    private final PlannerContext plannerContext;
     private final DynamicFilterService dynamicFilterService;
     private final TypeAnalyzer typeAnalyzer;
 
     @Inject
-//    public SplitSourceFactory(SplitManager splitManager, PlannerContext plannerContext, DynamicFilterService dynamicFilterService, TypeAnalyzer typeAnalyzer)
     public SplitSourceFactory(SplitManager splitManager, DynamicFilterService dynamicFilterService, TypeAnalyzer typeAnalyzer)
     {
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
-//        this.plannerContext = requireNonNull(plannerContext, "metadata is null");
         this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
         this.typeAnalyzer = requireNonNull(typeAnalyzer, "typeAnalyzer is null");
     }
@@ -159,7 +156,6 @@ public class SplitSourceFactory
                     .orElse(ImmutableList.of());
 
             // get dataSource for table
-            //TODO(SURYA): not passing dynamic filter supplier instead using overloaded constructor which passes default values.
             SplitSource splitSource = splitManager.getSplits(
                     session,
                     node.getTable(),
@@ -363,6 +359,12 @@ public class SplitSourceFactory
 
         @Override
         public Map<PlanNodeId, SplitSource> visitUpdate(UpdateNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitTopNRankingNumber(TopNRankingNumberNode node, Void context)
         {
             return node.getSource().accept(this, context);
         }

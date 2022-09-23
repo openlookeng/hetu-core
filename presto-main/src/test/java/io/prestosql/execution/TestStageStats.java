@@ -38,6 +38,7 @@ public class TestStageStats
             4,
             5,
             6,
+            7,
 
             7,
             8,
@@ -46,6 +47,7 @@ public class TestStageStats
             11,
 
             12.0,
+            13.0,
             new DataSize(13, BYTE),
             new DataSize(14, BYTE),
             new DataSize(15, BYTE),
@@ -53,27 +55,40 @@ public class TestStageStats
             new DataSize(17, BYTE),
 
             new Duration(15, NANOSECONDS),
+            new Duration(15, NANOSECONDS),
+            new Duration(16, NANOSECONDS),
             new Duration(16, NANOSECONDS),
             new Duration(18, NANOSECONDS),
             false,
             ImmutableSet.of(),
 
             new DataSize(191, BYTE),
+            new DataSize(191, BYTE),
+            201,
             201,
 
             new DataSize(192, BYTE),
+            new DataSize(192, BYTE),
+            202,
             202,
 
             new DataSize(19, BYTE),
+            new DataSize(19, BYTE),
+            20,
             20,
 
             new DataSize(21, BYTE),
+            new DataSize(21, BYTE),
+            22,
             22,
 
             new DataSize(23, BYTE),
             new DataSize(24, BYTE),
+            new DataSize(24, BYTE),
+            25,
             25,
 
+            new DataSize(26, BYTE),
             new DataSize(26, BYTE),
 
             new StageGcStatistics(
@@ -85,7 +100,11 @@ public class TestStageStats
                     106,
                     107),
 
-            ImmutableList.of());
+            ImmutableList.of(),
+            new Duration(15, NANOSECONDS),
+            new Duration(15, NANOSECONDS),
+            new Duration(16, NANOSECONDS),
+            new Duration(16, NANOSECONDS));
 
     @Test
     public void testJson()
