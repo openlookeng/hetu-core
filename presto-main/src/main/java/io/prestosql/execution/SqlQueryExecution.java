@@ -545,6 +545,8 @@ public class SqlQueryExecution
 
     private boolean setResourceLimitsFromEstimates(PlanNodeId rootId)
     {
+        boolean result = true;
+
         /* Get Stage level plan and which plan to get the resource availability decision */
         Map<Integer, PlanCostEstimate> stageLevelCosts = getResourceLimitFromPlan();
         PlanCostEstimate estimate = stageLevelCosts.getOrDefault(-1, null);
@@ -559,13 +561,18 @@ public class SqlQueryExecution
             double ioCost = estimate.getNetworkCost();
             ioCost = Double.isInfinite(ioCost) || Double.isNaN(ioCost) ? 0.0 : ioCost;
 
+            log.debug("Plan Estimates: CpuCost: %f, MemCost: %f, IOCost: %f", cpuCost, memCost, ioCost);
+
             /* Todo(Future Feature): Re-divide the available resources amongst queries again when new query comes in.. */
-            return queryResourceManager.setResourceLimit(new DataSize(memCost, BYTE),
+            result = queryResourceManager.setResourceLimit(new DataSize(memCost, BYTE),
                     new Duration(cpuCost, TimeUnit.MILLISECONDS),
                     new DataSize(ioCost, BYTE));
+            if (!result) {
+                log.warn("Plan estimate indicate less available resources to run query");
+            }
         }
 
-        return true;
+        return result;
     }
 
     private void updateQueryResourceStats()
@@ -815,7 +822,7 @@ public class SqlQueryExecution
             WarningCollector warningCollector)
     {
         LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
-        return logicalPlanner.plan(analysis, true);
+        return logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(session));
     }
 
     private void checkTaskRetrySupport(Session session)

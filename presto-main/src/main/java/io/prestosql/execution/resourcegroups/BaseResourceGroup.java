@@ -14,6 +14,7 @@
 package io.prestosql.execution.resourcegroups;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -57,6 +58,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public abstract class BaseResourceGroup
         implements ResourceGroup
 {
+    static final Logger log = Logger.get(BaseResourceGroup.class);
     public static final int DEFAULT_WEIGHT = 1;
     public static final int RETRY_COUNT = 5;
 
@@ -482,6 +484,7 @@ public abstract class BaseResourceGroup
                         }
                     }
                     else {
+                        log.warn("Query failed after %d retries in resourceGroup: %s", query.getRetryCount(), id);
                         query.fail(new QueryQueueFullException(id));
                     }
                 }
