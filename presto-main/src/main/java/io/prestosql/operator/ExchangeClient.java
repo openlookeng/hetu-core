@@ -533,6 +533,12 @@ public class ExchangeClient
     {
         boolean isFinished = (buffer != null) ? buffer.isFinished() : (isFinished() || isFailed());
         if (isFinished) {
+            if (buffer != null && !queuedClients.isEmpty()) {
+                log.debug("Removing client from queue after buffer is finished: " + queuedClients);
+                queuedClients.forEach(ExchangeClient::closeQuietly);
+                completedClients.addAll(queuedClients);
+                queuedClients.clear();
+            }
             return;
         }
 
