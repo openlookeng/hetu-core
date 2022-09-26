@@ -1017,8 +1017,6 @@ helps with cache affinity scheduling.
 >
 > Enables elimination of duplicate spill files storage as part of snapshot capture.
 
-
-
 ## HTTP Client Configurations
 
 ### `http.client.idle-timeout`
@@ -1052,18 +1050,30 @@ helps with cache affinity scheduling.
 
 ## Fault Tolerant Execution
 
+### `exchange-manager.name`
+
+> -   **Type:** `string`
+> -   **Default value:** `filesystem`
+>
+> The name of task snapshot manager.
+
+### `exchange-filesystem-type`
+> -   **Type:** `string`
+> -   **Default value:** `exchange`
+>
+> The file system client name used by the task snapshot. If `exchange-filesystem-type=exchange`, the client named `exchange` will be used to store the Task snapshot during query execution. The configuration file path for file system clients is `etc/filesystem/exchange.properties` (the properties file name needs to be consistent with exchange-filesystem-type), see [Exchange File System Client](<./properties.md#exchange-file-system-client>).
+
 ### `exchange.base-directories`
 >
 > -  **Type:** `URI`
 >
 > Comma-separated list of URI locations that the exchange manager uses to store spooling data.
 
-### `exchange.encryption-enabled`
+### `exchange.compression-enabled`
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
 >
-> -  **Type:** `boolean`
-> -  **Default value:** `false`
->
-> Enable encrypting of spooling data.
+> The property enables the compression feature of task snapshot.
 
 ### `exchange.max-page-storage-size`
 >
@@ -1137,7 +1147,7 @@ helps with cache affinity scheduling.
 > -  **Minimum value:** `0`
 > -  **Default value:** `4`
 >
-> Maximum number of times Presto may attempt to retry a single task before declaring the query as failed.
+> Maximum number of times openLooKeng may attempt to retry a single task before declaring the query as failed.
 
 ### `retry-initial-delay`
 >
@@ -1239,3 +1249,28 @@ helps with cache affinity scheduling.
 > -  **Default value:** `BIN_PACKING`
 >
 > Configures node allocator type.
+
+## Exchange File System Client
+
+### `fs.client.type`
+> - **Type:** `string`
+> - **Allowed values:** `local`, `hdfs`
+> - **Default value:** `local`
+>
+> The type of file system client is configured by the property. if `fs.client.type=local`, recover framework uses local file system client, else if `fs.client.type=hdfs` recover framework uses hdfs file system client.
+
+### `hdfs.config.resources`
+> -   **Type:** `string`
+> -   **Default value:** `etc/filesystem/core-site.xml,etc/filesystem/hdfs-site.xml`
+>
+> The URI of resource configuration file that the hdfs file system depends on.
+>
+> (Note that this is a configuration property required by the hdfs file system, and when there is more than one resource configuration file, it is separated by ','.)
+
+### `hdfs.authenticcation.type`
+> -   **Type:** `string`
+> -   **Default value:** `NONE`
+>
+> The property specifies the authentication type for the hdfs file system.
+>
+> (Note that this is a configuration property required by the hdfs file system.)

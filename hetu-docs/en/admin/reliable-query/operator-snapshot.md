@@ -1,19 +1,15 @@
 
-# Reliable Query Execution
+# Operator Snapshot
 
 ## Overview
 
-When a node in a cluster fails as result of network, hardware, or software issues, all queries with tasks running on the failing node will be lost. This can significantly impact cluster productivity and waste precious resources, especially for long running queries.
-
-One way to overcome this is to automatically rerun those impacted queries. This reduces the need for human intervention and increases fault tolerance, but as a result, the total execution time can be much longer.
-
-To achieve better performance while maintaining execution reliability, the *distributed snapshot* mechanism in openLooKeng takes periodic snapshots of the complete state of the query execution. When an error occurs, the query can resume execution from the last successful snapshot. The implementation is based on the standard [Chandy-Lamport algorithm](https://en.wikipedia.org/wiki/Chandy%E2%80%93Lamport_algorithm).
+The Operator Snapshot in openLooKeng takes periodic snapshots of the complete state of the query execution. When an error occurs, the query can resume execution from the last successful snapshot. The implementation is based on the standard [Chandy-Lamport algorithm](https://en.wikipedia.org/wiki/Chandy%E2%80%93Lamport_algorithm).
 
 As of release 1.2.0, openLooKeng supports recovery of tasks and worker node failures.
 
 ## Enable Recovery framework
 
-Recovery framework is most useful for long running queries. It is disabled by default, and must be enabled and disabled via a session property [`recovery_enabled`](properties.md#recovery_enabled). It is recommended that the feature is only enabled for complex queries that require high reliability.
+Recovery framework is most useful for long running queries. It is disabled by default, and must be enabled or disabled via a session property [`recovery_enabled`](../properties.md#recovery_enabled). It is recommended that the feature is only enabled for complex queries that require high reliability.
 
 ## Requirements
 
@@ -37,7 +33,7 @@ When a query that does not meet the above requirements is submitted with distrib
 
 ## Detection
 
-Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`Failure Recovery handling Properties`](properties.md#Failure Recovery handling Properties) configuration.
+Error recovery is triggered when communication between the coordinator and a remote task fails for an extended period of time, as controlled by the [`Failure Recovery handling Properties`](<../properties.md#failure-recovery-handling-properties>) configuration.
 
 ## Storage Considerations
 
@@ -67,8 +63,8 @@ Snapshot restore statistics covers number of times restored from snapshots durin
 
 Additionally, while query is in progress number of capturing snapshots and id of the restoring snapshot will be displayed. Refer below picture for more details 
 
-![](../images/snapshot_statistics.png)
+![](../../images/snapshot_statistics.png)
 
 ## Configurations
 
-Configurations related to recovery framework feature can be found in [Properties Reference](properties.md#Query Recovery).
+Configurations related to recovery framework feature can be found in [Properties Reference](<../properties.md#query-recovery>).
