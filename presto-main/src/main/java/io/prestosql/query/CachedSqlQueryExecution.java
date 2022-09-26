@@ -111,6 +111,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.isExecutionPlanCacheEnabled;
+import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
 
 public class CachedSqlQueryExecution
         extends SqlQueryExecution
@@ -287,7 +288,7 @@ public class CachedSqlQueryExecution
             Map<String, Object> systemSessionProperties)
     {
         // build a new plan
-        Plan plan = logicalPlanner.plan(analysis, true);
+        Plan plan = logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(getSession()));
         // Cache the plan
         CachedSqlQueryExecutionPlan newCachedPlan = new CachedSqlQueryExecutionPlan(statement, tableNames, tableStatistics, planOptimizers, plan,
                 analysis.getParameters(), columnTypes, getSession().getTimeZoneKey(), getSession().getIdentity(), systemSessionProperties);
