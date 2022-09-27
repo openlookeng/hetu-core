@@ -339,4 +339,10 @@
             <unpack />
         </artifact>
     </artifactSet>
+
+    <artifactSet to="plugin/hetu-singledata">
+        <artifact id="${project.groupId}:hetu-singledata:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>

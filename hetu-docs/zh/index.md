@@ -93,6 +93,7 @@ headless: true
     - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
     - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
     - [PostgreSQL]({{< relref "./docs/connector/postgresql.md" >}})
+    - [SingleData]({{< relref "./docs/connector/singledata.md" >}})
     - [SQL Server]({{< relref "./docs/connector/sqlserver.md" >}})
     - [系统]({{< relref "./docs/connector/system.md" >}})
     - [Thrift]({{< relref "./docs/connector/thrift.md" >}})
