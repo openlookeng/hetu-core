@@ -394,6 +394,14 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Disable query level resource tracking and mitigation actions.
 
+### `query-no-resource-retry-count`
+
+> -   **Type:** `integer`
+> -   **Default value:** `5`
+>
+> Query shall retry the given number of times when resources availability is not enough. This gets enabled only when `query-resource-tracking` is set to `true`.
+> In case the value specified is less than 5, it will automatically revert to default value of 5.
+
 ## Failure Recovery handling Properties
 
 ### Failure Retry Policies
