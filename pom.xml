@@ -159,6 +159,7 @@
         <module>hetu-kylin</module>
         <module>hetu-mpp</module>
         <module>hetu-mariadb</module>
+        <module>hetu-singledata</module>
     </modules>
 
     <dependencyManagement>
@@ -387,6 +388,18 @@
             <dependency>
                 <groupId>io.hetu.core</groupId>
                 <artifactId>presto-mysql</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>presto-postgresql</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.hetu.core</groupId>
+                <artifactId>hetu-opengauss</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
