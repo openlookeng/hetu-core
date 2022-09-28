@@ -57,6 +57,18 @@ The valid values are:
 - `true` (default) - enable dynamic filter creation
 - `false` - disable dynamic filter creation
 
+Non-estimable Predicate approximation
+----------------------------------------
+
+Enables approximation of the output row count of filters whose costs cannot be accurately estimated even with complete statistics. This allows the optimizer to
+produce more efficient plans in the presence of filters which were previously not estimated.
+
+This is governed by `non_estimatable_predicate_approximation_enabled` session property, with `optimizer.non-estimatable-predicate-approximation.enabled` configuration property providing the default value.
+
+The valid values are:
+- `true` (default) - enable non-estimatable predicate approximation
+- `false` - disable non-estimatable predicate approximation
+
 Connector Implementations
 -------------------------
 

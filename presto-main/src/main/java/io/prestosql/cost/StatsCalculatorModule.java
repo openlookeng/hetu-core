@@ -44,6 +44,7 @@ public class StatsCalculatorModule
         rules.add(new OutputStatsRule());
         rules.add(new TableScanStatsRule(metadata, normalizer, filterStatsCalculator));
         rules.add(new SimpleFilterProjectSemiJoinStatsRule(normalizer, filterStatsCalculator, metadata)); // this must be before FilterStatsRule
+        rules.add(new FilterProjectAggregationStatsRule(normalizer, filterStatsCalculator)); // this must be before FilterStatsRule
         rules.add(new FilterStatsRule(normalizer, filterStatsCalculator));
         rules.add(new ValuesStatsRule(metadata));
         rules.add(new LimitStatsRule(normalizer));

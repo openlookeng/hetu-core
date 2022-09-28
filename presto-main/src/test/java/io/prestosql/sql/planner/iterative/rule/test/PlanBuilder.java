@@ -376,9 +376,17 @@ public class PlanBuilder
         private Optional<Symbol> groupIdSymbol = Optional.empty();
         private Session session = testSessionBuilder().build();
 
+        private Optional<PlanNodeId> nodeId = Optional.empty();
+
         public AggregationBuilder source(PlanNode source)
         {
             this.source = source;
+            return this;
+        }
+
+        public AggregationBuilder nodeId(PlanNodeId nodeId)
+        {
+            this.nodeId = Optional.of(nodeId);
             return this;
         }
 
@@ -487,7 +495,7 @@ public class PlanBuilder
         {
             checkState(groupingSets != null, "No grouping sets defined; use globalGrouping/groupingKeys method");
             return new AggregationNode(
-                    idAllocator.getNextId(),
+                    nodeId.orElse(idAllocator.getNextId()),
                     source,
                     assignments,
                     groupingSets,

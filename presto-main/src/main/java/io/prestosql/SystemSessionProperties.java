@@ -130,11 +130,12 @@ public final class SystemSessionProperties
     public static final String OPTIMIZE_TOP_N_RANKING_NUMBER = "optimize_top_n_ranking_number";
     public static final String MAX_GROUPING_SETS = "max_grouping_sets";
     public static final String STATISTICS_CPU_TIMER_ENABLED = "statistics_cpu_timer_enabled";
-    public static final String ENABLE_STATS_CALCULATOR = "enable_stats_calculator";
+    public static final String ENABLE_STATS_CALCULATOR = "enable_stats_calculator"; // check this
     public static final String IGNORE_STATS_CALCULATOR_FAILURES = "ignore_stats_calculator_failures";
     public static final String MAX_DRIVERS_PER_TASK = "max_drivers_per_task";
     public static final String DEFAULT_FILTER_FACTOR_ENABLED = "default_filter_factor_enabled";
     public static final String UNWRAP_CASTS = "unwrap_casts";
+    public static final String NON_ESTIMATABLE_PREDICATE_APPROXIMATION_ENABLED = "non_estimatable_predicate_approximation_enabled";
     public static final String SKIP_REDUNDANT_SORT = "skip_redundant_sort";
     public static final String PREDICATE_PUSHDOWN_USE_TABLE_PROPERTIES = "predicate_pushdown_use_table_properties";
     public static final String WORK_PROCESSOR_PIPELINES = "work_processor_pipelines";
@@ -681,6 +682,11 @@ public final class SystemSessionProperties
                         UNWRAP_CASTS,
                         "Enable optimization to unwrap CAST expression",
                         featuresConfig.isUnwrapCasts(),
+                        false),
+                booleanProperty(
+                        NON_ESTIMATABLE_PREDICATE_APPROXIMATION_ENABLED,
+                        "Approximate the cost of filters which cannot be accurately estimated even with complete statistics",
+                        featuresConfig.isNonEstimatablePredicateApproximationEnabled(),
                         false),
                 booleanProperty(
                         SKIP_REDUNDANT_SORT,
@@ -1452,6 +1458,11 @@ public final class SystemSessionProperties
     public static boolean isUnwrapCasts(Session session)
     {
         return session.getSystemProperty(UNWRAP_CASTS, Boolean.class);
+    }
+
+    public static boolean isNonEstimatablePredicateApproximationEnabled(Session session)
+    {
+        return session.getSystemProperty(NON_ESTIMATABLE_PREDICATE_APPROXIMATION_ENABLED, Boolean.class);
     }
 
     public static boolean isSkipRedundantSort(Session session)

@@ -185,6 +185,8 @@ public class FeaturesConfig
     private boolean prioritizeLargerSpiltsMemoryRevoke = true;
     private DataSize revocableMemorySelectionThreshold = new DataSize(512, MEGABYTE);
 
+    private boolean nonEstimatablePredicateApproximationEnabled = true; //non-estimatable-predicate-approximation
+
     public enum JoinReorderingStrategy
     {
         NONE,
@@ -1269,6 +1271,19 @@ public class FeaturesConfig
     public FeaturesConfig setWorkProcessorPipelines(boolean workProcessorPipelines)
     {
         this.workProcessorPipelines = workProcessorPipelines;
+        return this;
+    }
+
+    public boolean isNonEstimatablePredicateApproximationEnabled()
+    {
+        return nonEstimatablePredicateApproximationEnabled;
+    }
+
+    @Config("optimizer.non-estimatable-predicate-approximation.enabled")
+    @ConfigDescription("Approximate the cost of filters which cannot be accurately estimated even with complete statistics")
+    public FeaturesConfig setNonEstimatablePredicateApproximationEnabled(boolean nonEstimatablePredicateApproximationEnabled)
+    {
+        this.nonEstimatablePredicateApproximationEnabled = nonEstimatablePredicateApproximationEnabled;
         return this;
     }
 
