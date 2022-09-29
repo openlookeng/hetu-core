@@ -45,7 +45,6 @@ import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -468,18 +467,12 @@ public class FileSystemExchangeSink
         private void flushIfNeeded(boolean finished)
         {
             SliceOutput buffer = currentBuffer;
-            AtomicBoolean isBufferReleased = new AtomicBoolean(false);
             if (buffer != null && (!buffer.isWritable() || finished)) {
                 if (!buffer.isWritable()) {
                     currentBuffer = null;
-                    isBufferReleased.set(true);
                 }
                 ListenableFuture<Void> writeFuture = currentWriter.write(buffer.slice());
-                writeFuture.addListener(() -> {
-                    if (isBufferReleased.get()) {
-                        bufferPool.offer(buffer);
-                    }
-                }, directExecutor());
+                writeFuture.addListener(() -> bufferPool.offer(buffer), directExecutor());
                 addExceptionCallback(writeFuture, throwable -> failure.compareAndSet(null, throwable));
             }
         }
