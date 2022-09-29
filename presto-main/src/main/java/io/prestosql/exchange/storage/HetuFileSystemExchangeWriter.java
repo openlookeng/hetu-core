@@ -73,7 +73,7 @@ public class HetuFileSystemExchangeWriter
                 this.outputStream = new CipherOutputStream(fileSystemClient.newOutputStream(path), cipher);
             }
             else if (exchangeCompressionEnabled) {
-                this.outputStream = new SnappyFramedOutputStream(fileSystemClient.newOutputStream(path));
+                this.outputStream = new SnappyFramedOutputStream(new OutputStreamSliceOutput(fileSystemClient.newOutputStream(path), directSerialisationBufferSize));
             }
             else {
                 if (directSerialisationType == DirectSerialisationType.KRYO) {
