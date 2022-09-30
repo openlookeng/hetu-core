@@ -1893,4 +1893,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.8</tag>
+  </scm>
 </project>
