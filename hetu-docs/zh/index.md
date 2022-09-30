@@ -44,7 +44,7 @@ headless: true
     - [状态存储]({{< relref "./docs/admin/state-store.md" >}})
     - [元数据存储]({{< relref "./docs/admin/meta-store.md" >}})
     - [审计日志]({{< relref "./docs/admin/audit-log.md" >}})
-    - [可靠查询执行]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [可靠查询执行]({{< relref "./docs/admin/reliable-query/_index.md" >}})
     - [JDBC数据源多分片管理]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [扩展物理执行计划]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 

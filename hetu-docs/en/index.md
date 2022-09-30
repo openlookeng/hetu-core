@@ -44,7 +44,7 @@ headless: true
     - [State store]({{< relref "./docs/admin/state-store.md" >}})
     - [Meta Store]({{< relref "./docs/admin/meta-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
-    - [Reliable Execution]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [Reliable Execution]({{< relref "./docs/admin/reliable-query/_index.md" >}})
     - [JDBC Data Source Multi-Split Management]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [Extension Physical Execution Planner]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
