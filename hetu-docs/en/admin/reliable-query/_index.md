@@ -7,7 +7,7 @@ One way to overcome this is to automatically rerun those impacted queries. This 
 
 To achieve better performance while maintaining execution reliability, there are two mechanisms in openLooKeng provided:
 
-- [Operator Snapshot](./operator-snapshot.md)
-- [Task Snapshot](./task-snapshot.md)
+- [Operator Snapshot](./reliable-query/operator-snapshot.md)
+- [Task Snapshot](./reliable-query/task-snapshot.md)
 
 
