@@ -7,7 +7,7 @@
 
 为了保持执行可靠性同时实现更好的性能，openLooKeng提供了以下两种机制:
 
-- [算子级别快照](./operator-snapshot.md)
-- [Task级别快照](./task-snapshot.md)
+- [算子级别快照](./reliable-query/operator-snapshot.md)
+- [Task级别快照](./reliable-query/task-snapshot.md)
 
 
