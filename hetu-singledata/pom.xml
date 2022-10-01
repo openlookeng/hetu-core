@@ -17,7 +17,7 @@
         <dep.shardingsphere.version>5.2.0</dep.shardingsphere.version>
         <dep.curator.version>5.1.0</dep.curator.version>
         <dep.zookeeper.verison>3.6.0</dep.zookeeper.verison>
-        <dep.calcite.version>1.27.0</dep.calcite.version>
+        <dep.calcite.version>1.32.0</dep.calcite.version>
         <dep.antlr4.version>4.9.2</dep.antlr4.version>
         <dep.zaxxer.version>3.4.2</dep.zaxxer.version>
         <dep.testng.version>6.10</dep.testng.version>
