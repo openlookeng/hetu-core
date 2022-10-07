@@ -516,7 +516,7 @@ public class BinPackingNodeAllocatorService
                         if (requirements.getAddresses().contains(node.getHostAndPort())) {
                             return true;
                         }
-                        if (requirements.getAddresses().isEmpty()) {
+                        if (requirements.getAddresses().isEmpty() || !(requirements.getAddresses().contains(node.getHostAndPort()))) {
                             return scheduleOnCoordinator || !node.isCoordinator();
                         }
                         return false;

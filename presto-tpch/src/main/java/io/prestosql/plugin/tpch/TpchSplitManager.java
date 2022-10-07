@@ -25,6 +25,7 @@ import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.FixedSplitSource;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -53,11 +54,12 @@ public class TpchSplitManager
         int partNumber = 0;
 
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
-        if (session.isRecoveryEnabled()) {
+        if (session.isRecoveryEnabled() || session.isRetryModeTask()) {
             // Snapshot: Modify splits as needed to all them to be scheduled on any node.
             // This allows them to be processed by a different worker after resume.
             List<HostAddress> addresses = nodes.stream().map(Node::getHostAndPort).collect(Collectors.toList());
             for (int i = 0; i < totalParts; i++) {
+                Collections.rotate(addresses, 1);
                 splits.add(new TpchSplit(partNumber, totalParts, addresses));
                 partNumber++;
             }
