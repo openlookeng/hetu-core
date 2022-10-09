@@ -399,8 +399,8 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 > -   **Type:** `integer`
 > -   **Default value:** `5`
 >
-> Query shall retry the given number of times when resources availability is not enough. This gets enabled only when `query-resource-tracking` is set to `true`.
-> In case the value specified is less than 5, it will automatically revert to default value of 5.
+> Query shall be retried at the given number of times when resources available is not enough. This is enabled only when `query-resource-tracking` is set to be `true`.
+> In case the value specified is less than 5, it will automatically be reverted to default value 5.
 
 ## Failure Recovery handling Properties
 
@@ -1075,7 +1075,7 @@ helps with cache affinity scheduling.
 >
 > -  **Type:** `URI`
 >
-> Comma-separated list of URI locations that the exchange manager uses to store spooling data.
+> The initial file directory which is utilized to store the snapshots of tasks. If there is more than one root directory, commas are used to separate them.
 
 ### `exchange.compression-enabled`
 > -   **Type:** `boolean`

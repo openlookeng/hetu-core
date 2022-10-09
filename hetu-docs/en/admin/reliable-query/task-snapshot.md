@@ -32,8 +32,8 @@ To ensure that query execution can be automatically resumed through a previously
 - **Supported Statements**: only `SELECT`, `INSERT` and `CREATE TABLE AS SELECT(CTAS)` types of statements are supported
    - This does *not* include statements like `INSERT INTO CUBE`
 - **Source tables**: can only read from tables in `Hive` catalog
-- **Target table**: can only write to tables in `Hive` catalogs, with `ORC` format
-- **Interaction with other features**: Task Snapshot feature and Operator Snapshot feature do not support the same time
+- **Target table**: can only write into tables in `Hive` catalog, with `ORC` format
+- **Interaction with other features**: Task Snapshot feature and Operator Snapshot feature are not supported at the same time
 
 ## Detection
 
