@@ -34,103 +34,120 @@ public class SizeOfUtilTest<T>
     @Test
     public void testSizeOf1()
     {
-        SizeOfUtil.sizeOf(new boolean[]{false});
+        long l = SizeOfUtil.sizeOf(new boolean[]{false});
+        assertEquals(l, 17);
     }
 
     @Test
     public void testSizeOf2()
     {
-        SizeOfUtil.sizeOf("content".getBytes(StandardCharsets.UTF_8));
+        long l = SizeOfUtil.sizeOf("content".getBytes(StandardCharsets.UTF_8));
+        assertEquals(l, 23);
     }
 
     @Test
     public void testSizeOf3()
     {
-        SizeOfUtil.sizeOf(new short[]{(short) 0});
+        long l = SizeOfUtil.sizeOf(new short[]{(short) 0});
+        assertEquals(l, 18);
     }
 
     @Test
     public void testSizeOf4()
     {
-        SizeOfUtil.sizeOf(new char[]{'a'});
+        long l = SizeOfUtil.sizeOf(new char[]{'a'});
+        assertEquals(l, 18);
     }
 
     @Test
     public void testSizeOf5()
     {
-        SizeOfUtil.sizeOf(new int[]{0});
+        long l = SizeOfUtil.sizeOf(new int[]{0});
+        assertEquals(l, 20);
     }
 
     @Test
     public void testSizeOf6()
     {
-        SizeOfUtil.sizeOf(new long[]{0L});
+        long l = SizeOfUtil.sizeOf(new long[]{0L});
+        assertEquals(l, 24);
     }
 
     @Test
     public void testSizeOf7()
     {
-        SizeOfUtil.sizeOf(new float[]{0.0f});
+        long l = SizeOfUtil.sizeOf(new float[]{0.0f});
+        assertEquals(l, 20);
     }
 
     @Test
     public void testSizeOf8()
     {
-        SizeOfUtil.sizeOf(new double[]{0.0});
+        long l = SizeOfUtil.sizeOf(new double[]{0.0});
+        assertEquals(l, 24);
     }
 
     @Test
     public void testSizeOf9()
     {
-        SizeOfUtil.sizeOf(new Object[]{"array"});
+        long l = SizeOfUtil.sizeOf(new Object[]{"array"});
+        assertEquals(l, 20);
     }
 
     @Test
     public void testSizeOf10()
     {
-        SizeOfUtil.sizeOf(false);
+        long l = SizeOfUtil.sizeOf(false);
+        assertEquals(l, 16);
     }
 
     @Test
     public void testSizeOf11()
     {
-        SizeOfUtil.sizeOf((byte) 0b0);
+        long l = SizeOfUtil.sizeOf((byte) 0b0);
+        assertEquals(l, 16);
     }
 
     @Test
     public void testSizeOf12()
     {
-        SizeOfUtil.sizeOf((short) 0);
+        long l = SizeOfUtil.sizeOf((short) 0);
+        assertEquals(l, 16);
     }
 
     @Test
     public void testSizeOf13()
     {
-        SizeOfUtil.sizeOf('a');
+        long a = SizeOfUtil.sizeOf('a');
+        assertEquals(a, 16);
     }
 
     @Test
     public void testSizeOf14()
     {
-        SizeOfUtil.sizeOf(0);
+        long l = SizeOfUtil.sizeOf(0);
+        assertEquals(l, 16);
     }
 
     @Test
     public void testSizeOf15()
     {
-        SizeOfUtil.sizeOf(0L);
+        long l = SizeOfUtil.sizeOf(0L);
+        assertEquals(l, 24);
     }
 
     @Test
     public void testSizeOf16()
     {
-        SizeOfUtil.sizeOf(0.0f);
+        long l = SizeOfUtil.sizeOf(0.0f);
+        assertEquals(l, 16);
     }
 
     @Test
     public void testSizeOf17()
     {
-        SizeOfUtil.sizeOf(0.0);
+        long l = SizeOfUtil.sizeOf(0.0);
+        assertEquals(l, 24);
     }
 
     @Test
@@ -157,6 +174,7 @@ public class SizeOfUtilTest<T>
 
         // Run the test
         final long result = SizeOfUtil.sizeOf(optional);
+        assertEquals(24, result);
     }
 
     @Test
@@ -167,6 +185,7 @@ public class SizeOfUtilTest<T>
 
         // Run the test
         final long result = SizeOfUtil.sizeOf(optional);
+        assertEquals(24, result);
     }
 
     @Test
@@ -177,12 +196,14 @@ public class SizeOfUtilTest<T>
 
         // Run the test
         final long result = SizeOfUtil.sizeOf(optional);
+        assertEquals(24, result);
     }
 
     @Test
     public void testEstimatedSizeOf1()
     {
-        SizeOfUtil.estimatedSizeOf("string");
+        long string = SizeOfUtil.estimatedSizeOf("string");
+        assertEquals(36, string);
     }
 
     @Test
@@ -195,7 +216,8 @@ public class SizeOfUtilTest<T>
         };
 
         // Run the test
-        SizeOfUtil.estimatedSizeOf(list, valueSize);
+        long l = SizeOfUtil.estimatedSizeOf(list, valueSize);
+        assertEquals(16, l);
     }
 
     @Test
@@ -208,60 +230,70 @@ public class SizeOfUtilTest<T>
         };
 
         // Run the test
-        SizeOfUtil.estimatedSizeOf(set, valueSize);
+        long l = SizeOfUtil.estimatedSizeOf(set, valueSize);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfBooleanArray()
     {
-        SizeOfUtil.sizeOfBooleanArray(0);
+        long l = SizeOfUtil.sizeOfBooleanArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfByteArray()
     {
-        SizeOfUtil.sizeOfByteArray(0);
+        long l = SizeOfUtil.sizeOfByteArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfShortArray()
     {
-        SizeOfUtil.sizeOfShortArray(0);
+        long l = SizeOfUtil.sizeOfShortArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfCharArray()
     {
-        SizeOfUtil.sizeOfCharArray(0);
+        long l = SizeOfUtil.sizeOfCharArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfIntArray()
     {
-        SizeOfUtil.sizeOfIntArray(0);
+        long l = SizeOfUtil.sizeOfIntArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfLongArray()
     {
-        SizeOfUtil.sizeOfLongArray(0);
+        long l = SizeOfUtil.sizeOfLongArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfFloatArray()
     {
-        SizeOfUtil.sizeOfFloatArray(0);
+        long l = SizeOfUtil.sizeOfFloatArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfDoubleArray()
     {
-        SizeOfUtil.sizeOfDoubleArray(0);
+        long l = SizeOfUtil.sizeOfDoubleArray(0);
+        assertEquals(16, l);
     }
 
     @Test
     public void testSizeOfObjectArray()
     {
-        SizeOfUtil.sizeOfObjectArray(0);
+        long l = SizeOfUtil.sizeOfObjectArray(0);
+        assertEquals(16, l);
     }
 }

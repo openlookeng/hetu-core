@@ -3,16 +3,16 @@
 
 ## 概述
 
-openLookeng Iceberg 是一种用于大型分析数据集的开放表式。Iceberg 连接器允许查询存储在以 Iceberg 格式编写的文件中的数据。
+openLooKeng Iceberg 是一种用于大型分析数据集的开放表式。Iceberg 连接器允许查询存储在以 Iceberg 格式编写的文件中的数据。
 Iceberg 数据文件可以存储为 Parquet、ORC 格式，由format表定义中的属性决定。该表format默认为ORC。
 
 ## 要求
 
 要使用 Iceberg，您需要：
 
-- 从OpenLookeng 协调节点和工作节点到分布式对象存储的网络访问。
+- 从openLooKeng 协调节点和工作节点到分布式对象存储的网络访问。
 - 访问 Hive 元存储服务 (HMS) 。
-- 从 OpenLookeng 协调器到 HMS 的网络访问。使用 Thrift 协议的 Hive Metastore 访问默认使用端口 9083。
+- 从 openLooKeng 协调器到 HMS 的网络访问。使用 Thrift 协议的 Hive Metastore 访问默认使用端口 9083。
 
 ## Hive元存储目录
 

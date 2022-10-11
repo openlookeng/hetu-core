@@ -3,16 +3,16 @@
 
 ## Overview
 
-openLookeng Iceberg is an open table format for huge analytic datasets. The Iceberg connector allows querying data stored in files written in Iceberg format.
+openLooKeng Iceberg is an open table format for huge analytic datasets. The Iceberg connector allows querying data stored in files written in Iceberg format.
 Iceberg data files can be stored in either Parquet, ORC format, as determined by the format property in the table definition. The table format defaults to ORC.
 
 ## Requirements
 
 To use Iceberg, you need:
 
-- Network access from the Trino coordinator and workers to the distributed object storage.
+- Network access from the openLooKeng coordinator and workers to the distributed object storage.
 - Access to a Hive metastore service (HMS) .
-- Network access from the Trino coordinator to the HMS. Hive metastore access with the Thrift protocol defaults to using port 9083.
+- Network access from the openLooKeng coordinator to the HMS. Hive metastore access with the Thrift protocol defaults to using port 9083.
 
 ## Hive metastore catalog
 
