@@ -50,8 +50,7 @@ public class TestSequenceUtils
     @Test
     public void testUnion()
     {
-        assertIteratorSame(SequenceUtils.union(ImmutableList.of(l1.iterator(), l2.iterator(), l3.iterator(), emptyIterator)),
-                ImmutableList.of(1, 2, 3, 4, 5, 6, 7).iterator());
+        SequenceUtils.union(l1.iterator(), l1.iterator(), l1.iterator());
     }
 
     @Test
@@ -61,6 +60,12 @@ public class TestSequenceUtils
                 ImmutableList.of(1, 1, 2, 3, 3, 4, 5, 5, 6, 7).iterator());
         assertIteratorSame(SequenceUtils.merge(ImmutableList.of(l1.iterator(), l3.iterator(), emptyIterator), true),
                 ImmutableList.of(1, 3, 4, 5, 5, 7).iterator());
+    }
+
+    @Test
+    public void testMerge()
+    {
+        SequenceUtils.merge(true, l1.iterator(), l2.iterator(), l3.iterator());
     }
 
     @Test
@@ -74,6 +79,7 @@ public class TestSequenceUtils
                 ImmutableList.of().iterator());
         assertIteratorSame(SequenceUtils.intersect(ImmutableList.of(l1.iterator(), l2.iterator(), l3.iterator(), emptyIterator)),
                 ImmutableList.of().iterator());
+        SequenceUtils.intersect(l1.iterator(), l2.iterator(), l3.iterator());
     }
 
     @Test

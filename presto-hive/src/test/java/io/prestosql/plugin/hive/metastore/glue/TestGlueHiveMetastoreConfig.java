@@ -14,6 +14,7 @@
 package io.prestosql.plugin.hive.metastore.glue;
 
 import com.google.common.collect.ImmutableMap;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -24,6 +25,14 @@ import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 
 public class TestGlueHiveMetastoreConfig
 {
+    private GlueHiveMetastoreConfig glueHiveMetastoreConfigtest;
+
+    @BeforeMethod
+    public void setup()
+    {
+        glueHiveMetastoreConfigtest = new GlueHiveMetastoreConfig();
+    }
+
     @Test
     public void testDefaults()
     {
@@ -35,6 +44,7 @@ public class TestGlueHiveMetastoreConfig
                 .setIamRole(null)
                 .setAwsAccessKey(null)
                 .setAwsSecretKey(null)
+                .setGlueEndpointUrl(null)
                 .setCatalogId(null));
     }
 
@@ -50,6 +60,7 @@ public class TestGlueHiveMetastoreConfig
                 .put("hive.metastore.glue.aws-access-key", "ABC")
                 .put("hive.metastore.glue.aws-secret-key", "DEF")
                 .put("hive.metastore.glue.catalogid", "0123456789")
+                .put("hive.metastore.glue.endpoint-url", "/location")
                 .build();
 
         GlueHiveMetastoreConfig expected = new GlueHiveMetastoreConfig()
@@ -60,8 +71,18 @@ public class TestGlueHiveMetastoreConfig
                 .setIamRole("role")
                 .setAwsAccessKey("ABC")
                 .setAwsSecretKey("DEF")
+                .setGlueEndpointUrl("/location")
                 .setCatalogId("0123456789");
 
         assertFullMapping(properties, expected);
+    }
+
+    @Test
+    public void testGetExternalId()
+    {
+        glueHiveMetastoreConfigtest.getExternalId();
+        glueHiveMetastoreConfigtest.getAwsCredentialsProvider();
+        glueHiveMetastoreConfigtest.getGlueEndpointUrl();
+        glueHiveMetastoreConfigtest.setGlueEndpointUrl("glueEndpointUrl");
     }
 }

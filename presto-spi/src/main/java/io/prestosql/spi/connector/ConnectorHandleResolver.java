@@ -45,6 +45,11 @@ public interface ConnectorHandleResolver
         throw new UnsupportedOperationException();
     }
 
+    default Class<? extends ConnectorTableExecuteHandle> getTableExecuteHandleClass()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     default Class<? extends ConnectorInsertTableHandle> getInsertTableHandleClass()
     {
         throw new UnsupportedOperationException();

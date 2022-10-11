@@ -190,6 +190,10 @@ public final class HiveUtil
 
     private static final String DEFAULT_PARTITION_VALUE = "\\N";
 
+    public static final String ICEBERG_TABLE_TYPE_VALUE = "iceberg";
+
+    public static final String ICEBERG_TABLE_TYPE_NAME = "table_type";
+
     private static final Iterable<Pattern> BUCKET_PATTERNS = ImmutableList.of(
             // Hive naming pattern per `org.apache.hadoop.hive.ql.exec.Utilities#getBucketIdFromFile()`
             Pattern.compile("(0\\d+)_\\d+.*"),
@@ -1215,5 +1219,30 @@ public final class HiveUtil
         }
         throw new PrestoException(GENERIC_INTERNAL_ERROR,
                 "Unhandled type for " + javaType.getSimpleName() + ":" + type.getTypeSignature());
+    }
+
+    public static boolean isIcebergTable(Table table)
+    {
+        return isIcebergTable(table.getParameters());
+    }
+
+    public static boolean isIcebergTable(Map<String, String> tableParameters)
+    {
+        return ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableParameters.get(ICEBERG_TABLE_TYPE_NAME));
+    }
+
+    public static boolean isHiveSystemSchema(String schemaName)
+    {
+        if ("information_schema".equals(schemaName)) {
+            // For things like listing columns in information_schema.columns table, we need to explicitly filter out Hive's own information_schema.
+            // TODO https://github.com/trinodb/trino/issues/1559 this should be filtered out in engine.
+            return true;
+        }
+        if ("sys".equals(schemaName)) {
+            // Hive 3's `sys` schema contains no objects we can handle, so there is no point in exposing it.
+            // Also, exposing it may require proper handling in access control.
+            return true;
+        }
+        return false;
     }
 }

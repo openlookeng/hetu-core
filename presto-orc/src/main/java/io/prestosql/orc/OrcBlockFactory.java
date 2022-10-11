@@ -46,6 +46,11 @@ public class OrcBlockFactory
         return new LazyBlock(positionCount, new OrcBlockLoader(reader, onBlockLoaded));
     }
 
+    public Block createBlock(int positionCount, OrcBlockReader reader, boolean nested)
+    {
+        return new LazyBlock(positionCount, new OrcBlockLoader(reader, nested && !nestedLazy));
+    }
+
     public NestedBlockFactory createNestedBlockFactory(Consumer<Block> onBlockLoaded)
     {
         return new NestedBlockFactory(nestedLazy, onBlockLoaded);
@@ -92,11 +97,20 @@ public class OrcBlockFactory
         private final OrcBlockReader blockReader;
         private final Consumer<Block> onBlockLoaded;
         private boolean loaded;
+        private final boolean loadFully;
 
         public OrcBlockLoader(OrcBlockReader blockReader, Consumer<Block> onBlockLoaded)
         {
             this.blockReader = requireNonNull(blockReader, "blockReader is null");
             this.onBlockLoaded = requireNonNull(onBlockLoaded, "onBlockLoaded is null");
+            this.loadFully = false;
+        }
+
+        public OrcBlockLoader(OrcBlockReader blockReader, boolean loadFully)
+        {
+            this.blockReader = requireNonNull(blockReader, "blockReader is null");
+            this.loadFully = loadFully;
+            this.onBlockLoaded = null;
         }
 
         @Override
@@ -115,6 +129,12 @@ public class OrcBlockFactory
             }
 
             loaded = true;
+        }
+
+        @Override
+        public Block load()
+        {
+            return null;
         }
     }
 }

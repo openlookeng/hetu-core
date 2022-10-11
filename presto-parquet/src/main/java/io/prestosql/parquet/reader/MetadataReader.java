@@ -13,6 +13,9 @@
  */
 package io.prestosql.parquet.reader;
 
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
+import io.prestosql.parquet.ParquetDataSource;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,6 +37,7 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnPath;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.internal.hadoop.metadata.IndexReference;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
@@ -45,6 +49,7 @@ import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,6 +63,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static io.prestosql.parquet.ParquetValidationUtils.validateParquet;
+import static java.lang.Math.min;
+import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static org.apache.parquet.format.Util.readFileMetaData;
 
@@ -66,8 +73,119 @@ public final class MetadataReader
     private static final int PARQUET_METADATA_LENGTH = 4;
     private static final byte[] MAGIC = "PAR1".getBytes(US_ASCII);
     private static final ParquetMetadataConverter PARQUET_METADATA_CONVERTER = new ParquetMetadataConverter();
+    private static final int POST_SCRIPT_SIZE = Integer.BYTES + MAGIC.length;
+    private static final int EXPECTED_FOOTER_SIZE = 16 * 1024;
 
     private MetadataReader() {}
+
+    public static ParquetMetadata readFooter(ParquetDataSource dataSource)
+            throws IOException
+    {
+        // Parquet File Layout:
+        //
+        // MAGIC
+        // variable: Data
+        // variable: Metadata
+        // 4 bytes: MetadataLength
+        // MAGIC
+
+        validateParquet(dataSource.getEstimatedSize() >= MAGIC.length + POST_SCRIPT_SIZE, "%s is not a valid Parquet File", dataSource.getId());
+
+        // Read the tail of the file
+        long estimatedFileSize = dataSource.getEstimatedSize();
+        long expectedReadSize = min(estimatedFileSize, EXPECTED_FOOTER_SIZE);
+        Slice buffer = dataSource.readTail(toIntExact(expectedReadSize));
+
+        Slice magic = buffer.slice(buffer.length() - MAGIC.length, MAGIC.length);
+        validateParquet(Slices.utf8Slice("PAR1").equals(magic), "Not valid Parquet file: %s expected magic number: %s got: %s", dataSource.getId(), new String(MAGIC, StandardCharsets.UTF_8), magic.toStringUtf8());
+
+        int metadataLength = buffer.getInt(buffer.length() - POST_SCRIPT_SIZE);
+        long metadataIndex = estimatedFileSize - POST_SCRIPT_SIZE - metadataLength;
+        validateParquet(
+                metadataIndex >= MAGIC.length && metadataIndex < estimatedFileSize - POST_SCRIPT_SIZE,
+                "Corrupted Parquet file: %s metadata index: %s out of range",
+                dataSource.getId(),
+                metadataIndex);
+
+        int completeFooterSize = metadataLength + POST_SCRIPT_SIZE;
+        if (completeFooterSize > buffer.length()) {
+            // initial read was not large enough, so just read again with the correct size
+            buffer = dataSource.readTail(completeFooterSize);
+        }
+        InputStream metadataStream = buffer.slice(buffer.length() - completeFooterSize, metadataLength).getInput();
+
+        FileMetaData fileMetaData = readFileMetaData(metadataStream);
+        List<SchemaElement> schema = fileMetaData.getSchema();
+        validateParquet(!schema.isEmpty(), "Empty Parquet schema in file: %s", dataSource.getId());
+
+        MessageType messageType = readParquetSchema(schema);
+        List<BlockMetaData> blocks = new ArrayList<>();
+        List<RowGroup> rowGroups = fileMetaData.getRow_groups();
+        if (rowGroups != null) {
+            for (RowGroup rowGroup : rowGroups) {
+                BlockMetaData blockMetaData = new BlockMetaData();
+                blockMetaData.setRowCount(rowGroup.getNum_rows());
+                blockMetaData.setTotalByteSize(rowGroup.getTotal_byte_size());
+                List<ColumnChunk> columns = rowGroup.getColumns();
+                validateParquet(!columns.isEmpty(), "No columns in row group: %s", rowGroup);
+                String filePath = columns.get(0).getFile_path();
+                for (ColumnChunk columnChunk : columns) {
+                    validateParquet(
+                            (filePath == null && columnChunk.getFile_path() == null)
+                                    || (filePath != null && filePath.equals(columnChunk.getFile_path())),
+                            "all column chunks of the same row group must be in the same file");
+                    ColumnMetaData metaData = columnChunk.meta_data;
+                    String[] path = metaData.path_in_schema.stream()
+                            .map(value -> value.toLowerCase(Locale.ENGLISH))
+                            .toArray(String[]::new);
+                    ColumnPath columnPath = ColumnPath.get(path);
+                    PrimitiveType primitiveType = messageType.getType(columnPath.toArray()).asPrimitiveType();
+                    ColumnChunkMetaData column = ColumnChunkMetaData.get(
+                            columnPath,
+                            primitiveType,
+                            CompressionCodecName.fromParquet(metaData.codec),
+                            PARQUET_METADATA_CONVERTER.convertEncodingStats(metaData.encoding_stats),
+                            readEncodings(metaData.encodings),
+                            readStats(Optional.ofNullable(fileMetaData.getCreated_by()), Optional.ofNullable(metaData.statistics), primitiveType),
+                            metaData.data_page_offset,
+                            metaData.dictionary_page_offset,
+                            metaData.num_values,
+                            metaData.total_compressed_size,
+                            metaData.total_uncompressed_size);
+                    column.setColumnIndexReference(toColumnIndexReference(columnChunk));
+                    column.setOffsetIndexReference(toOffsetIndexReference(columnChunk));
+                    blockMetaData.addColumn(column);
+                }
+                blockMetaData.setPath(filePath);
+                blocks.add(blockMetaData);
+            }
+        }
+
+        Map<String, String> keyValueMetaData = new HashMap<>();
+        List<KeyValue> keyValueList = fileMetaData.getKey_value_metadata();
+        if (keyValueList != null) {
+            for (KeyValue keyValue : keyValueList) {
+                keyValueMetaData.put(keyValue.key, keyValue.value);
+            }
+        }
+        return new ParquetMetadata(new org.apache.parquet.hadoop.metadata.FileMetaData(messageType, keyValueMetaData, fileMetaData.getCreated_by()), blocks);
+    }
+
+    private static IndexReference toOffsetIndexReference(ColumnChunk columnChunk)
+    {
+        if (columnChunk.isSetOffset_index_offset() && columnChunk.isSetOffset_index_length()) {
+            return new IndexReference(columnChunk.getOffset_index_offset(), columnChunk.getOffset_index_length());
+        }
+        return null;
+    }
+
+    private static IndexReference toColumnIndexReference(ColumnChunk columnChunk)
+    {
+        if (columnChunk.isSetColumn_index_offset() && columnChunk.isSetColumn_index_length()) {
+            return new IndexReference(columnChunk.getColumn_index_offset(), columnChunk.getColumn_index_length());
+        }
+        return null;
+    }
 
     public static ParquetMetadata readFooter(FileSystem fileSystem, Path file, long fileSize)
             throws IOException

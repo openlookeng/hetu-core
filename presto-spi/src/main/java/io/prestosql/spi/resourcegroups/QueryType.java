@@ -23,5 +23,6 @@ public enum QueryType
     INSERT,
     SELECT,
     UPDATE,
-    VACUUM
+    VACUUM,
+    ALTER_TABLE_EXECUTE,
 }

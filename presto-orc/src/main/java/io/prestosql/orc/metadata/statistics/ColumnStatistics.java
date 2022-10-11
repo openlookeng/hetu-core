@@ -14,6 +14,7 @@
 package io.prestosql.orc.metadata.statistics;
 
 import io.prestosql.orc.metadata.statistics.StatisticsHasher.Hashable;
+import io.prestosql.spi.util.BloomFilter;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
@@ -45,6 +46,10 @@ public class ColumnStatistics
     private final BinaryStatistics binaryStatistics;
     private final HashableBloomFilter bloomFilter;
 
+    private final long numberOfNanValues;
+    private final BloomFilter loomFilter;
+    private final TimestampStatistics timestampStatistics;
+
     public ColumnStatistics(
             Long numberOfValues,
             long minAverageValueSizeInBytes,
@@ -57,6 +62,9 @@ public class ColumnStatistics
             BinaryStatistics binaryStatistics,
             HashableBloomFilter bloomFilter)
     {
+        this.numberOfNanValues = 0L;
+        this.loomFilter = null;
+        this.timestampStatistics = null;
         this.hasNumberOfValues = numberOfValues != null;
         this.numberOfValues = hasNumberOfValues ? numberOfValues : 0;
         this.minAverageValueSizeInBytes = minAverageValueSizeInBytes;
@@ -68,6 +76,41 @@ public class ColumnStatistics
         this.decimalStatistics = decimalStatistics;
         this.binaryStatistics = binaryStatistics;
         this.bloomFilter = bloomFilter;
+    }
+
+    public ColumnStatistics(
+            Long numberOfValues,
+            long minAverageValueSizeInBytes,
+            BooleanStatistics booleanStatistics,
+            IntegerStatistics integerStatistics,
+            DoubleStatistics doubleStatistics,
+            Long numberOfNanValues,
+            StringStatistics stringStatistics,
+            DateStatistics dateStatistics,
+            TimestampStatistics timestampStatistics,
+            DecimalStatistics decimalStatistics,
+            BinaryStatistics binaryStatistics,
+            BloomFilter loomFilter)
+    {
+        this.hasNumberOfValues = numberOfValues != null;
+        this.numberOfValues = hasNumberOfValues ? numberOfValues : 0;
+        this.minAverageValueSizeInBytes = minAverageValueSizeInBytes;
+        this.booleanStatistics = booleanStatistics;
+        this.integerStatistics = integerStatistics;
+        this.doubleStatistics = doubleStatistics;
+        this.numberOfNanValues = numberOfNanValues != null ? numberOfNanValues : 0;
+        this.stringStatistics = stringStatistics;
+        this.dateStatistics = dateStatistics;
+        this.timestampStatistics = timestampStatistics;
+        this.decimalStatistics = decimalStatistics;
+        this.binaryStatistics = binaryStatistics;
+        this.loomFilter = loomFilter;
+        this.bloomFilter = null;
+    }
+
+    public TimestampStatistics getTimestampStatistics()
+    {
+        return timestampStatistics;
     }
 
     public boolean hasNumberOfValues()
@@ -274,5 +317,10 @@ public class ColumnStatistics
                 mergeDecimalStatistics(stats).orElse(null),
                 mergeBinaryStatistics(stats).orElse(null),
                 null);
+    }
+
+    public long getNumberOfNanValues()
+    {
+        return numberOfNanValues;
     }
 }

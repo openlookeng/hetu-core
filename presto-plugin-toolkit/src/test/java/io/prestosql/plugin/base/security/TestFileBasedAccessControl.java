@@ -25,8 +25,6 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.util.Set;
 
-import static io.prestosql.spi.testing.InterfaceTestUtils.assertAllMethodsOverridden;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.testng.Assert.assertThrows;
 
 public class TestFileBasedAccessControl
@@ -88,14 +86,14 @@ public class TestFileBasedAccessControl
     @Test
     public void testInvalidRules()
     {
-        assertThatThrownBy(() -> createAccessControl("invalid.json"))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> createAccessControl("invalid.json"))
                 .hasMessageContaining("Invalid JSON");
     }
 
     @Test
     public void testEverythingImplemented()
     {
-        assertAllMethodsOverridden(ConnectorAccessControl.class, FileBasedAccessControl.class);
+        io.prestosql.spi.testing.InterfaceTestUtils.assertAllMethodsOverridden(ConnectorAccessControl.class, FileBasedAccessControl.class);
     }
 
     private static ConnectorIdentity user(String name, Set<String> groups)

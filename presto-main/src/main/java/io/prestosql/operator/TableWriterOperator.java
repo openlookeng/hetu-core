@@ -101,8 +101,12 @@ public class TableWriterOperator
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.columnChannels = requireNonNull(columnChannels, "columnChannels is null");
             this.pageSinkManager = requireNonNull(pageSinkManager, "pageSinkManager is null");
-            checkArgument(writerTarget instanceof CreateTarget || writerTarget instanceof InsertTarget || writerTarget instanceof UpdateAsInsertTarget
-                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget, "writerTarget must be CreateTarget or InsertTarget or UpdateAsInsertTarget or DeleteAsInsertTarget");
+            checkArgument(writerTarget instanceof CreateTarget
+                    || writerTarget instanceof InsertTarget
+                    || writerTarget instanceof UpdateAsInsertTarget
+                    || writerTarget instanceof TableWriterNode.DeleteAsInsertTarget
+                    || writerTarget instanceof TableWriterNode.TableExecuteTarget,
+                    "writerTarget must be CreateTarget or InsertTarget or UpdateAsInsertTarget or DeleteAsInsertTarget");
             this.target = requireNonNull(writerTarget, "writerTarget is null");
             this.session = session;
             this.taskId = taskId;
@@ -134,6 +138,9 @@ public class TableWriterOperator
             }
             if (target instanceof DeleteAsInsertTarget) {
                 return pageSinkManager.createPageSink(session, driverTaskId, ((DeleteAsInsertTarget) target).getHandle());
+            }
+            if (target instanceof TableWriterNode.TableExecuteTarget) {
+                return pageSinkManager.createPageSink(session, ((TableWriterNode.TableExecuteTarget) target).getExecuteHandle());
             }
             throw new UnsupportedOperationException("Unhandled target type: " + target.getClass().getName());
         }

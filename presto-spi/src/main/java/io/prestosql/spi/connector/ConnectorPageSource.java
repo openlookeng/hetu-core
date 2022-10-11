@@ -14,6 +14,7 @@
 package io.prestosql.spi.connector;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.metrics.Metrics;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -24,6 +25,16 @@ public interface ConnectorPageSource
         extends Closeable
 {
     CompletableFuture<?> NOT_BLOCKED = CompletableFuture.completedFuture(null);
+
+    default OptionalLong getCompletedPositions()
+    {
+        return OptionalLong.empty();
+    }
+
+    default long getMemoryUsage()
+    {
+        return getSystemMemoryUsage();
+    }
 
     /**
      * Gets the number of input bytes processed by this page source so far.
@@ -85,5 +96,10 @@ public interface ConnectorPageSource
     default OptionalLong getCompletedPositionCount()
     {
         return OptionalLong.empty();
+    }
+
+    default Metrics getMetrics()
+    {
+        return Metrics.EMPTY;
     }
 }

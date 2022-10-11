@@ -13,6 +13,8 @@
  */
 package io.prestosql.sql.analyzer;
 
+import io.prestosql.spi.ErrorCodeSupplier;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeLocation;
 
@@ -52,5 +54,10 @@ public class SemanticException
             return format("line %s:%s: %s", nodeLocation.getLineNumber(), nodeLocation.getColumnNumber(), format(formatString, args));
         }
         return format(formatString, args);
+    }
+
+    public static PrestoException semanticException(ErrorCodeSupplier code, Node node, String format, Object... args)
+    {
+        return semanticException(code, node, null, format, args);
     }
 }

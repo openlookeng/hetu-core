@@ -339,7 +339,11 @@
             <unpack />
         </artifact>
     </artifactSet>
-
+    <artifactSet to="plugin/iceberg">
+        <artifact id="${project.groupId}:hetu-iceberg:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
     <artifactSet to="plugin/hetu-singledata">
         <artifact id="${project.groupId}:hetu-singledata:zip:${project.version}">
             <unpack />

@@ -16,6 +16,7 @@ package io.prestosql.metadata;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.prestosql.Session;
+import io.prestosql.security.AccessControl;
 import io.prestosql.spi.ErrorCodeSupplier;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
@@ -26,15 +27,21 @@ import io.prestosql.sql.analyzer.SemanticException;
 import io.prestosql.sql.planner.ParameterRewriter;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.ExpressionTreeRewriter;
+import io.prestosql.sql.tree.NodeRef;
+import io.prestosql.sql.tree.Parameter;
+import io.prestosql.sql.tree.Property;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.type.TypeUtils.writeNativeValue;
+import static io.prestosql.sql.analyzer.PropertyUtil.evaluateProperties;
 import static io.prestosql.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
@@ -55,6 +62,9 @@ abstract class AbstractPropertyManager
 
     public final void addProperties(CatalogName catalogName, List<PropertyMetadata<?>> properties)
     {
+        if (catalogName.getCatalogName().equalsIgnoreCase("iceberg")) {
+            System.out.println();
+        }
         requireNonNull(catalogName, "catalogName is null");
         requireNonNull(properties, "properties is null");
 
@@ -162,5 +172,32 @@ abstract class AbstractPropertyManager
             throw new PrestoException(propertyError, format("Invalid null value for %s property", propertyType));
         }
         return objectValue;
+    }
+
+    public Map<String, Optional<Object>> getNullableProperties(
+            CatalogName catalog,
+            Iterable<Property> properties,
+            Session session,
+            Metadata metadata,
+            AccessControl accessControl,
+            Map<NodeRef<Parameter>, Expression> parameters,
+            boolean includeAllProperties)
+    {
+        List<Expression> expressions = parameters.values().stream().collect(Collectors.toList());
+        Map<String, PropertyMetadata<?>> propertyMetadata = connectorProperties.get(catalog);
+        if (propertyMetadata == null) {
+            throw new PrestoException(NOT_FOUND, format("Catalog '%s' %s property not found", catalog, propertyType));
+        }
+
+        return evaluateProperties(
+                metadata,
+                properties,
+                session,
+                accessControl,
+                expressions,
+                includeAllProperties,
+                propertyMetadata,
+                propertyError,
+                format("catalog '%s' %s property", catalog, propertyType));
     }
 }

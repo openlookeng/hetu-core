@@ -31,7 +31,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"operatorContext"})
+@RestorableConfig(uncapturedFields = "operatorContext")
 public class NestedLoopJoinPagesBuilder
         implements Restorable
 {

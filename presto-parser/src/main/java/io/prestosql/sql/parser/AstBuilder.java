@@ -152,6 +152,7 @@ import io.prestosql.sql.tree.SearchedCaseExpression;
 import io.prestosql.sql.tree.Select;
 import io.prestosql.sql.tree.SelectItem;
 import io.prestosql.sql.tree.SetPath;
+import io.prestosql.sql.tree.SetProperties;
 import io.prestosql.sql.tree.SetRole;
 import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.ShowCache;
@@ -182,6 +183,7 @@ import io.prestosql.sql.tree.SubqueryExpression;
 import io.prestosql.sql.tree.SubscriptExpression;
 import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.TableElement;
+import io.prestosql.sql.tree.TableExecute;
 import io.prestosql.sql.tree.TableSubquery;
 import io.prestosql.sql.tree.TimeLiteral;
 import io.prestosql.sql.tree.TimestampLiteral;
@@ -233,6 +235,17 @@ class AstBuilder
     AstBuilder(ParsingOptions parsingOptions)
     {
         this.parsingOptions = requireNonNull(parsingOptions, "parsingOptions is null");
+    }
+
+    @Override
+    public Node visitSetTableProperties(SqlBaseParser.SetTablePropertiesContext context)
+    {
+        List<Property> properties = ImmutableList.of();
+        if (context.propertyAssignments() != null) {
+            properties = visit(context.propertyAssignments().property(), Property.class);
+        }
+
+        return new SetProperties(getLocation(context), SetProperties.Type.TABLE, getQualifiedName(context.qualifiedName()), properties);
     }
 
     @Override
@@ -2239,6 +2252,21 @@ class AstBuilder
                         .map(AstBuilder::unquote),
                 getTextIfPresent(context.escape)
                         .map(AstBuilder::unquote));
+    }
+
+    @Override
+    public Node visitTableExecute(SqlBaseParser.TableExecuteContext context)
+    {
+        List<CallArgument> arguments = ImmutableList.of();
+        if (context.callArgument() != null) {
+            arguments = this.visit(context.callArgument(), CallArgument.class);
+        }
+
+        return new TableExecute(
+                new Table(getLocation(context), getQualifiedName(context.tableName)),
+                (Identifier) visit(context.procedureName),
+                arguments,
+                visitIfPresent(context.booleanExpression(), Expression.class));
     }
 
     // ***************** helpers *****************

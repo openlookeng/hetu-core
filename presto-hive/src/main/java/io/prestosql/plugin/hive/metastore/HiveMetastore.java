@@ -16,8 +16,11 @@ package io.prestosql.plugin.hive.metastore;
 import io.prestosql.plugin.hive.HivePartition;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionStatistics;
+import io.prestosql.plugin.hive.acid.AcidOperation;
+import io.prestosql.plugin.hive.acid.AcidTransaction;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
 import io.prestosql.spi.type.Type;
@@ -25,11 +28,15 @@ import org.apache.hadoop.hive.metastore.api.DataOperationType;
 import org.apache.hadoop.hive.metastore.api.ShowLocksRequest;
 import org.apache.hadoop.hive.metastore.api.ShowLocksResponse;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
 
 public interface HiveMetastore
 {
@@ -196,5 +203,127 @@ public interface HiveMetastore
 
     default void refreshMetastoreCache()
     {
+    }
+
+    default List<String> getTablesWithParameter(String databaseName, String parameterKey, String parameterValue)
+    {
+        return emptyList();
+    }
+
+    default void dropDatabase(String databaseName, boolean deleteData)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void setDatabaseOwner(String databaseName, HivePrincipal principal)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void createTable(Table table, PrincipalPrivileges principalPrivileges)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void replaceTable(String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void commentColumn(String databaseName, String tableName, String columnName, Optional<String> comment)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void updateTableStatistics(String databaseName, String tableName, AcidTransaction transaction, Function<PartitionStatistics, PartitionStatistics> update)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void updatePartitionStatistics(Table table, Map<String, Function<PartitionStatistics, PartitionStatistics>> updates)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void setTableOwner(String databaseName, String tableName, HivePrincipal principal)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Optional<List<String>> getPartitionNamesByFilter(String databaseName, String tableName, List<String> columnNames, TupleDomain<String> partitionKeysFilter)
+    {
+        return Optional.empty();
+    }
+
+    default Set<RoleGrant> listGrantedPrincipals(String role)
+    {
+        return Collections.emptySet();
+    }
+
+    default void grantTablePrivileges(String databaseName, String tableName, String tableOwner, HivePrincipal grantee, HivePrincipal grantor, Set<HivePrivilegeInfo.HivePrivilege> privileges, boolean grantOption)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void revokeTablePrivileges(String databaseName, String tableName, String tableOwner, HivePrincipal grantee, HivePrincipal grantor, Set<HivePrivilegeInfo.HivePrivilege> privileges, boolean grantOption)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, Optional<String> tableOwner, Optional<HivePrincipal> principal)
+    {
+        return Collections.emptySet();
+    }
+
+    default long openTransaction(AcidTransactionOwner transactionOwner)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default String getValidWriteIds(List<SchemaTableName> tables, long currentTransactionId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default long allocateWriteId(String dbName, String tableName, long transactionId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void acquireTableWriteLock(
+            AcidTransactionOwner transactionOwner,
+            String queryId,
+            long transactionId,
+            String dbName,
+            String tableName,
+            DataOperationType operation,
+            boolean isDynamicPartitionWrite)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void updateTableWriteId(String dbName, String tableName, long transactionId, long writeId, OptionalLong rowCountChange)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void alterPartitions(String dbName, String tableName, List<Partition> partitions, long writeId)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void addDynamicPartitions(String dbName, String tableName, List<String> partitionNames, long transactionId, long writeId, AcidOperation operation)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default void alterTransactionalTable(Table table, long transactionId, long writeId, PrincipalPrivileges principalPrivileges)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    default Optional<Table> getTable(String databaseName, String tableName)
+    {
+        return Optional.empty();
     }
 }

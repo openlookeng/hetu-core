@@ -201,8 +201,10 @@ public class SqlQueryExecution
     private PlanRoot plan;
 
     private AtomicInteger tryCount = new AtomicInteger(0);
+    private final TableExecuteContextManager tableExecuteContextManager;
 
     public SqlQueryExecution(
+            TableExecuteContextManager tableExecuteContextManager,
             PreparedQuery preparedQuery,
             QueryStateMachine stateMachine,
             String slug,
@@ -274,10 +276,12 @@ public class SqlQueryExecution
             this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
             this.queryResourceManager = requireNonNull(queryResourceManager, "queryResourceManager is null").createQueryResourceManager(stateMachine.getQueryId(), stateMachine.getSession(), stateMachine.getResourceGroup(), stateMachine.getResourceGroupManager());
 
+            this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
             // clear dynamic filter tasks and data created for this query
             stateMachine.addStateChangeListener(state -> {
                 if (isEnableDynamicFiltering(stateMachine.getSession()) && state.isDone()) {
                     dynamicFilterService.clearDynamicFiltersForQuery(stateMachine.getQueryId().getId());
+                    tableExecuteContextManager.unregisterTableExecuteContextForQuery(stateMachine.getQueryId());
                 }
             });
 
@@ -631,6 +635,7 @@ public class SqlQueryExecution
                 // if query is not finished, start the scheduler, otherwise cancel it
                 SqlQueryScheduler scheduler = queryScheduler.get();
 
+                tableExecuteContextManager.registerTableExecuteContextForQuery(getQueryId());
                 if (!stateMachine.isDone()) {
                     scheduler.start();
                 }
@@ -713,7 +718,8 @@ public class SqlQueryExecution
                 nodeAllocatorService,
                 partitionMemoryEstimatorFactory,
                 taskExecutionStats,
-                queryResourceManager);
+                queryResourceManager,
+                tableExecuteContextManager);
         if (snapshotId.isPresent() && snapshotId.getAsLong() != 0) {
             // Restore going to happen first, mark the restore state for all stages
             scheduler.setResuming(snapshotId.getAsLong());
@@ -1011,7 +1017,8 @@ public class SqlQueryExecution
                 nodeAllocatorService,
                 partitionMemoryEstimatorFactory,
                 taskExecutionStats,
-                queryResourceManager);
+                queryResourceManager,
+                tableExecuteContextManager);
 
         queryScheduler.set(scheduler);
 
@@ -1294,6 +1301,7 @@ public class SqlQueryExecution
         private final NodeAllocatorService nodeAllocatorService;
         private final PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory;
         private final TaskExecutionStats taskExecutionStats;
+        private final TableExecuteContextManager tableExecuteContextManager;
 
         private final QueryResourceManagerService queryResourceManagerService;
 
@@ -1331,7 +1339,8 @@ public class SqlQueryExecution
                 NodeAllocatorService nodeAllocatorService,
                 PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
                 TaskExecutionStats taskExecutionStats,
-                QueryResourceManagerService queryResourceManagerService)
+                QueryResourceManagerService queryResourceManagerService,
+                TableExecuteContextManager tableExecuteContextManager)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1360,6 +1369,7 @@ public class SqlQueryExecution
             this.stateStoreProvider = requireNonNull(stateStoreProvider, "stateStoreProvider is null");
             this.recoveryUtils = requireNonNull(recoveryUtils, "recoveryUtils is null");
             this.queryResourceManagerService = requireNonNull(queryResourceManagerService, "queryResourceManagerService is null");
+            this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
             this.loadConfigToService(hetuConfig);
             if (hetuConfig.isExecutionPlanCacheEnabled()) {
                 this.cache = Optional.of(CacheBuilder.newBuilder()
@@ -1435,7 +1445,8 @@ public class SqlQueryExecution
                     nodeAllocatorService,
                     partitionMemoryEstimatorFactory,
                     taskExecutionStats,
-                    queryResourceManagerService);
+                    queryResourceManagerService,
+                    tableExecuteContextManager);
         }
     }
 }

@@ -24,6 +24,9 @@ import static java.util.stream.Collectors.toMap;
 
 public enum OperatorType
 {
+    COMPARISON_UNORDERED_FIRST("COMPARISON_UNORDERED_FIRST", false),
+    COMPARISON_UNORDERED_LAST("COMPARISON_UNORDERED_LAST", false),
+
     ADD("+", false),
     SUBTRACT("-", false),
     MULTIPLY("*", false),

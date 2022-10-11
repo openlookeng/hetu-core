@@ -51,7 +51,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.operator.GroupBySort.createGroupBySort;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"updateMemory"})
+@RestorableConfig(uncapturedFields = "updateMemory")
 public abstract class InMemoryAggregationBuilder
         implements AggregationBuilder, Restorable
 {

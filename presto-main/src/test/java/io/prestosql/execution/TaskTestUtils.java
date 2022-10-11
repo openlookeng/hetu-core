@@ -148,6 +148,7 @@ public final class TaskTestUtils
         SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
+        TableExecuteContextManager tableExecuteContextManager = new TableExecuteContextManager();
 
         return new LocalExecutionPlanner(
                 metadata,
@@ -182,7 +183,8 @@ public final class TaskTestUtils
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
                 cubeManager,
-                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()),
+                tableExecuteContextManager);
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)

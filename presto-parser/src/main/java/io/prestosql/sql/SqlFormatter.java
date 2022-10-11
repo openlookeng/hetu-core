@@ -100,6 +100,7 @@ import io.prestosql.sql.tree.SampledRelation;
 import io.prestosql.sql.tree.Select;
 import io.prestosql.sql.tree.SelectItem;
 import io.prestosql.sql.tree.SetPath;
+import io.prestosql.sql.tree.SetProperties;
 import io.prestosql.sql.tree.SetRole;
 import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.ShowCache;
@@ -173,6 +174,36 @@ public final class SqlFormatter
         {
             this.builder = builder;
             this.parameters = parameters;
+        }
+
+        @Override
+        protected Void visitSetProperties(SetProperties node, Integer context)
+        {
+            SetProperties.Type type = node.getType();
+            builder.append("ALTER ");
+            switch (type) {
+                case TABLE:
+                    builder.append("TABLE ");
+                    break;
+                case MATERIALIZED_VIEW:
+                    builder.append("MATERIALIZED VIEW ");
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unsupported SetProperties.Type: " + type);
+            }
+            builder.append(formatName(node.getName()))
+                    .append(" SET PROPERTIES ")
+                    .append(joinProperties(node.getProperties()));
+
+            return null;
+        }
+
+        private String joinProperties(List<Property> properties)
+        {
+            return properties.stream()
+                    .map(element -> formatExpression(element.getName(), Optional.empty()) + " = " +
+                            (element.isSetToDefault() ? "DEFAULT" : formatExpression(element.getNonDefaultValue(), Optional.empty())))
+                    .collect(joining(", "));
         }
 
         @Override

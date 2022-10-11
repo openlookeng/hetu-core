@@ -30,7 +30,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"snapshotState"})
+@RestorableConfig(uncapturedFields = "snapshotState")
 public class EnforceSingleRowOperator
         implements Operator
 {

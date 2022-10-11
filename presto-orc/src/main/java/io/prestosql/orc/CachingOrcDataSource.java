@@ -45,6 +45,12 @@ public class CachingOrcDataSource
     }
 
     @Override
+    public long getEstimatedSize()
+    {
+        return getSize();
+    }
+
+    @Override
     public OrcDataSourceId getId()
     {
         return dataSource.getId();
@@ -72,6 +78,12 @@ public class CachingOrcDataSource
     public long getSize()
     {
         return dataSource.getSize();
+    }
+
+    @Override
+    public Slice readTail(int length) throws IOException
+    {
+        return dataSource.readTail(length);
     }
 
     @VisibleForTesting
@@ -121,6 +133,12 @@ public class CachingOrcDataSource
             throws IOException
     {
         dataSource.close();
+    }
+
+    @Override
+    public long getRetainedSize()
+    {
+        return 0;
     }
 
     @Override

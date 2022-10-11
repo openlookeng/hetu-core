@@ -142,4 +142,16 @@ final class ReaderUtils
             currentLength = nextLength;
         }
     }
+
+    public static OrcCorruptionException invalidStreamType(OrcColumn column, Type type)
+            throws OrcCorruptionException
+    {
+        throw new OrcCorruptionException(
+                column.getOrcDataSourceId(),
+                "Cannot read SQL type '%s' from ORC stream '%s' of type %s with attributes %s",
+                type,
+                column.getPath(),
+                column.getColumnType(),
+                column.getAttributes());
+    }
 }

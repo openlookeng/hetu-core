@@ -16,13 +16,11 @@ package io.prestosql.plugin.base.security;
 import io.prestosql.spi.security.SystemAccessControl;
 import org.testng.annotations.Test;
 
-import static io.prestosql.spi.testing.InterfaceTestUtils.assertAllMethodsOverridden;
-
 public class TestForwardingSystemAccessControl
 {
     @Test
     public void testEverythingDelegated()
     {
-        assertAllMethodsOverridden(SystemAccessControl.class, ForwardingSystemAccessControl.class);
+        io.prestosql.spi.testing.InterfaceTestUtils.assertAllMethodsOverridden(SystemAccessControl.class, ForwardingSystemAccessControl.class);
     }
 }

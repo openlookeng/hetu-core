@@ -596,7 +596,7 @@ public class WindowOperator
         int pendingInputPosition;
     }
 
-    @RestorableConfig(uncapturedFields = {"this$0"})
+    @RestorableConfig(uncapturedFields = "this$0")
     private class PagesIndexToWindowPartitions
             implements WorkProcessor.RestorableFunction<PagesIndexWithHashStrategies, WorkProcessor<WindowPartition>>
     {
@@ -697,7 +697,7 @@ public class WindowOperator
         }
     }
 
-    @RestorableConfig(uncapturedFields = {"this$0"})
+    @RestorableConfig(uncapturedFields = "this$0")
     private class WindowPartitionsToOutputPages
             implements Transformation<WindowPartition, Page>
     {

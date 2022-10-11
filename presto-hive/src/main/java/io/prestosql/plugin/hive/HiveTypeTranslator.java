@@ -18,6 +18,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.NamedTypeSignature;
+import io.prestosql.spi.type.TimestampType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import io.prestosql.spi.type.VarcharType;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.prestosql.plugin.hive.HiveType.HIVE_BINARY;
 import static io.prestosql.plugin.hive.HiveType.HIVE_BOOLEAN;
 import static io.prestosql.plugin.hive.HiveType.HIVE_BYTE;
@@ -48,10 +50,12 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimeType.TIME;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getCharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo;
@@ -111,7 +115,7 @@ public class HiveTypeTranslator
         if (DATE.equals(type)) {
             return HIVE_DATE.getTypeInfo();
         }
-        if (TIMESTAMP.equals(type)) {
+        if (TIMESTAMP.equals(type) || TIME.equals(type)) {
             return HIVE_TIMESTAMP.getTypeInfo();
         }
         if (type instanceof DecimalType) {
@@ -144,6 +148,92 @@ public class HiveTypeTranslator
                     type.getTypeParameters().stream()
                             .map(this::translate)
                             .collect(toList()));
+        }
+        throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type: %s", type));
+    }
+
+    public static TypeInfo toTypeInfo(Type type)
+    {
+        requireNonNull(type, "type is null");
+        if (BOOLEAN.equals(type)) {
+            return HIVE_BOOLEAN.getTypeInfo();
+        }
+        if (BIGINT.equals(type)) {
+            return HIVE_LONG.getTypeInfo();
+        }
+        if (INTEGER.equals(type)) {
+            return HIVE_INT.getTypeInfo();
+        }
+        if (SMALLINT.equals(type)) {
+            return HIVE_SHORT.getTypeInfo();
+        }
+        if (TINYINT.equals(type)) {
+            return HIVE_BYTE.getTypeInfo();
+        }
+        if (REAL.equals(type)) {
+            return HIVE_FLOAT.getTypeInfo();
+        }
+        if (DOUBLE.equals(type)) {
+            return HIVE_DOUBLE.getTypeInfo();
+        }
+        if (type instanceof VarcharType) {
+            VarcharType varcharType = (VarcharType) type;
+            if (varcharType.isUnbounded()) {
+                return HIVE_STRING.getTypeInfo();
+            }
+            if (varcharType.getBoundedLength() <= HiveVarchar.MAX_VARCHAR_LENGTH) {
+                return getVarcharTypeInfo(varcharType.getBoundedLength());
+            }
+            throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type: %s. Supported VARCHAR types: VARCHAR(<=%d), VARCHAR.", type, HiveVarchar.MAX_VARCHAR_LENGTH));
+        }
+        if (type instanceof CharType) {
+            CharType charType = (CharType) type;
+            int charLength = charType.getLength();
+            if (charLength <= HiveChar.MAX_CHAR_LENGTH) {
+                return getCharTypeInfo(charLength);
+            }
+            throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type: %s. Supported CHAR types: CHAR(<=%d).",
+                    type, HiveChar.MAX_CHAR_LENGTH));
+        }
+        if (VARBINARY.equals(type)) {
+            return HIVE_BINARY.getTypeInfo();
+        }
+        if (DATE.equals(type)) {
+            return HIVE_DATE.getTypeInfo();
+        }
+        if (type instanceof TimestampType) {
+            return HIVE_TIMESTAMP.getTypeInfo();
+        }
+        if (type instanceof DecimalType) {
+            DecimalType decimalType = (DecimalType) type;
+            return new DecimalTypeInfo(decimalType.getPrecision(), decimalType.getScale());
+        }
+        if (isArrayType(type)) {
+            TypeInfo elementType = toTypeInfo(type.getTypeParameters().get(0));
+            return getListTypeInfo(elementType);
+        }
+        if (isMapType(type)) {
+            TypeInfo keyType = toTypeInfo(type.getTypeParameters().get(0));
+            TypeInfo valueType = toTypeInfo(type.getTypeParameters().get(1));
+            return getMapTypeInfo(keyType, valueType);
+        }
+        if (isRowType(type)) {
+            ImmutableList.Builder<String> fieldNames = ImmutableList.builder();
+            for (TypeSignatureParameter parameter : type.getTypeSignature().getParameters()) {
+                if (!parameter.isNamedTypeSignature()) {
+                    throw new IllegalArgumentException(format("Expected all parameters to be named type, but got %s", parameter));
+                }
+                NamedTypeSignature namedTypeSignature = parameter.getNamedTypeSignature();
+                if (!namedTypeSignature.getName().isPresent()) {
+                    throw new PrestoException(NOT_SUPPORTED, format("Anonymous row type is not supported in Hive. Please give each field a name: %s", type));
+                }
+                fieldNames.add(namedTypeSignature.getName().get());
+            }
+            return getStructTypeInfo(
+                    fieldNames.build(),
+                    type.getTypeParameters().stream()
+                            .map(HiveTypeTranslator::toTypeInfo)
+                            .collect(toImmutableList()));
         }
         throw new PrestoException(NOT_SUPPORTED, format("Unsupported Hive type: %s", type));
     }

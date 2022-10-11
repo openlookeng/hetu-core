@@ -17,6 +17,7 @@ import io.airlift.slice.Slice;
 import io.prestosql.Session;
 import io.prestosql.spi.PartialAndFinalAggregationType;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.BeginTableExecuteResult;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -46,6 +47,7 @@ import io.prestosql.spi.statistics.TableStatisticsMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.sql.planner.PartitioningHandle;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 
 import java.util.Collection;
 import java.util.List;
@@ -59,6 +61,58 @@ import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 
 public interface Metadata
 {
+    default void setMaterializedViewProperties(Session session, QualifiedObjectName viewName, Map<String, Optional<Object>> properties)
+    {
+    }
+
+    default void setTableProperties(Session session, TableHandle tableHandle, Map<String, Optional<Object>> properties)
+    {
+    }
+
+    default boolean supportsReportingWrittenBytes(Session session, QualifiedObjectName tableName, Map<String, Object> tableProperties)
+    {
+        return false;
+    }
+
+    default boolean supportsReportingWrittenBytes(Session session, TableHandle tableHandle)
+    {
+        return false;
+    }
+
+    default Optional<TableExecuteHandle> getTableHandleForExecute(
+            Session session,
+            TableHandle tableHandle,
+            String procedureName,
+            Map<String, Object> executeProperties)
+    {
+        return Optional.empty();
+    }
+
+    default RedirectionAwareTableHandle getRedirectionAwareTableHandle(Session session, QualifiedObjectName tableName)
+    {
+        return null;
+    }
+
+    default RedirectionAwareTableHandle getRedirectionAwareTableHandle(Session session, QualifiedObjectName tableName, Optional<TableVersion> startVersion, Optional<TableVersion> endVersion)
+    {
+        return null;
+    }
+
+    default boolean isView(Session session, QualifiedObjectName viewName)
+    {
+        return getView(session, viewName).isPresent();
+    }
+
+    default boolean isMaterializedView(Session session, QualifiedObjectName viewName)
+    {
+        return getMaterializedView(session, viewName).isPresent();
+    }
+
+    default Optional<MaterializedViewDefinition> getMaterializedView(Session session, QualifiedObjectName viewName)
+    {
+        return Optional.empty();
+    }
+
     Set<ConnectorCapabilities> getConnectorCapabilities(Session session, CatalogName catalogName);
 
     boolean catalogExists(Session session, String catalogName);
@@ -573,4 +627,13 @@ public interface Metadata
     PartialAndFinalAggregationType validateAndGetSortAggregationType(Session session, TableHandle tableHandle, List<String> keyNames);
 
     void refreshMetadataCache(Session session, Optional<String> catalogName);
+
+    default BeginTableExecuteResult<TableExecuteHandle, TableHandle> beginTableExecute(Session session, TableExecuteHandle handle, TableHandle updatedSourceTableHandle)
+    {
+        return null;
+    }
+
+    default void finishTableExecute(Session session, TableExecuteHandle handle, Collection<Slice> fragments, List<Object> tableExecuteState)
+    {
+    }
 }

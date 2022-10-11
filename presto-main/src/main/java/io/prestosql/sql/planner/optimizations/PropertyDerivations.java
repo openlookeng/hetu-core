@@ -189,6 +189,21 @@ public class PropertyDerivations
         }
 
         @Override
+        public ActualProperties visitTableExecute(PlanNode node, List<ActualProperties> inputProperties)
+        {
+            ActualProperties properties = Iterables.getOnlyElement(inputProperties);
+
+            if (properties.isCoordinatorOnly()) {
+                return ActualProperties.builder()
+                        .global(coordinatorSingleStreamPartition())
+                        .build();
+            }
+            return ActualProperties.builder()
+                    .global(properties.isSingleNode() ? singleStreamPartition() : arbitraryPartition())
+                    .build();
+        }
+
+        @Override
         public ActualProperties visitOutput(OutputNode node, List<ActualProperties> inputProperties)
         {
             return Iterables.getOnlyElement(inputProperties)

@@ -202,4 +202,10 @@ public class ThriftPageSource
             future.cancel(true);
         }
     }
+
+    @Override
+    public long getMemoryUsage()
+    {
+        return 0;
+    }
 }

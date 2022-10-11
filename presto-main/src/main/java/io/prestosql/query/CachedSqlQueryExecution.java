@@ -32,6 +32,7 @@ import io.prestosql.execution.QueryStateMachine;
 import io.prestosql.execution.RemoteTaskFactory;
 import io.prestosql.execution.SqlQueryExecution;
 import io.prestosql.execution.SqlTaskManager;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
 import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeScheduler;
@@ -132,9 +133,10 @@ public class CachedSqlQueryExecution
                                    ExchangeManagerRegistry exchangeManagerRegistry, SqlTaskManager coordinatorTaskManager, TaskSourceFactory taskSourceFactory,
                                    TaskDescriptorStorage taskDescriptorStorage, NodeAllocatorService nodeAllocatorService,
                                    PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats,
-                                   QueryResourceManagerService queryResourceManager)
+                                   QueryResourceManagerService queryResourceManager,
+                                   TableExecuteContextManager tableExecuteContextManager)
     {
-        super(preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
+        super(tableExecuteContextManager, preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService,

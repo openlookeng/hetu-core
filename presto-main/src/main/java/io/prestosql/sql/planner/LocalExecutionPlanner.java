@@ -36,6 +36,7 @@ import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.buffer.OutputBuffer;
@@ -211,6 +212,8 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -377,6 +380,7 @@ public class LocalExecutionPlanner
     protected final LogicalRowExpressions logicalRowExpressions;
     protected final TaskManagerConfig taskManagerConfig;
     private final ExchangeManagerRegistry exchangeManagerRegistry;
+    protected final TableExecuteContextManager tableExecuteContextManager;
 
     public Metadata getMetadata()
     {
@@ -556,7 +560,8 @@ public class LocalExecutionPlanner
             DynamicFilterCacheManager dynamicFilterCacheManager,
             HeuristicIndexerManager heuristicIndexerManager,
             CubeManager cubeManager,
-            ExchangeManagerRegistry exchangeManagerRegistry)
+            ExchangeManagerRegistry exchangeManagerRegistry,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -591,6 +596,7 @@ public class LocalExecutionPlanner
         this.functionResolution = new FunctionResolution(metadata.getFunctionAndTypeManager());
         this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
+        this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
     }
 
     public LocalExecutionPlan plan(
@@ -3081,6 +3087,7 @@ public class LocalExecutionPlanner
                     createTableFinisher(session, node, metadata),
                     statisticsAggregation,
                     descriptor,
+                    tableExecuteContextManager,
                     session);
             Map<Symbol, Integer> layout = ImmutableMap.of(node.getOutputSymbols().get(0), 0);
 
@@ -3181,6 +3188,36 @@ public class LocalExecutionPlanner
                     sourceLayout, node.getFilter(), node.getAssignments(), context.getTypes());
 
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, source, UNGROUPED_EXECUTION);
+        }
+
+        @Override
+        public PhysicalOperation visitTableExecute(PlanNode planNode, LocalExecutionPlanContext context)
+        {
+            TableExecuteNode node = (TableExecuteNode) planNode;
+            // Set table writer count
+            context.setDriverInstanceCount(getTaskWriterCount(session));
+
+            PhysicalOperation source = node.getSource().accept(this, context);
+
+            ImmutableMap.Builder<Symbol, Integer> outputMapping = ImmutableMap.builder();
+            outputMapping.put(node.getOutputSymbols().get(0), ROW_COUNT_CHANNEL);
+            outputMapping.put(node.getOutputSymbols().get(1), FRAGMENT_CHANNEL);
+
+            List<Integer> inputChannels = node.getColumns().stream()
+                    .map(source::symbolToChannel)
+                    .collect(toImmutableList());
+
+            OperatorFactory operatorFactory = new TableWriterOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    pageSinkManager,
+                    node.getTarget(),
+                    inputChannels,
+                    session,
+                    new DevNullOperatorFactory(context.getNextOperatorId(), node.getId()), // statistics are not calculated
+                    getSymbolTypes(node.getOutputSymbols(), context.getTypes()), Optional.empty());
+
+            return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
         }
 
         @Override
@@ -3701,7 +3738,7 @@ public class LocalExecutionPlanner
     private static TableFinisher createTableFinisher(Session session, TableFinishNode node, Metadata metadata)
     {
         WriterTarget target = node.getTarget();
-        return (fragments, statistics) -> {
+        return (fragments, statistics, tableExecuteContext) -> {
             if (target instanceof CreateTarget) {
                 return metadata.finishCreateTable(session, ((CreateTarget) target).getHandle(), fragments, statistics);
             }
@@ -3724,6 +3761,11 @@ public class LocalExecutionPlanner
             }
             else if (target instanceof DeleteAsInsertTarget) {
                 metadata.finishDeleteAsInsert(session, ((DeleteAsInsertTarget) target).getHandle(), fragments, statistics);
+                return Optional.empty();
+            }
+            else if (target instanceof TableWriterNode.TableExecuteTarget) {
+                TableExecuteHandle tableExecuteHandle = ((TableWriterNode.TableExecuteTarget) target).getExecuteHandle();
+                metadata.finishTableExecute(session, tableExecuteHandle, fragments, tableExecuteContext.getSplitsInfo());
                 return Optional.empty();
             }
             else {

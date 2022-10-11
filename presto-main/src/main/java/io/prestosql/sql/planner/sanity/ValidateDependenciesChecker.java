@@ -65,6 +65,7 @@ import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -607,6 +608,15 @@ public final class ValidateDependenciesChecker
         @Override
         public Void visitTableUpdate(TableUpdateNode node, Set<Symbol> boundSymbols)
         {
+            return null;
+        }
+
+        @Override
+        public Void visitTableExecute(PlanNode node, Set<Symbol> context)
+        {
+            TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
+            PlanNode source = tableExecuteNode.getSource();
+            source.accept(this, context); // visit child
             return null;
         }
 

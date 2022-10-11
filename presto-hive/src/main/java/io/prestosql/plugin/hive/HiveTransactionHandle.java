@@ -26,16 +26,29 @@ public class HiveTransactionHandle
         implements ConnectorTransactionHandle
 {
     private final UUID uuid;
+    private final boolean autoCommit;
+
+    public HiveTransactionHandle(boolean autoCommit)
+    {
+        this(autoCommit, UUID.randomUUID());
+    }
 
     public HiveTransactionHandle()
     {
-        this(UUID.randomUUID());
+        this(false, UUID.randomUUID());
     }
 
     @JsonCreator
-    public HiveTransactionHandle(@JsonProperty("uuid") UUID uuid)
+    public HiveTransactionHandle(@JsonProperty("autoCommit") boolean autoCommit, @JsonProperty("uuid") UUID uuid)
     {
+        this.autoCommit = autoCommit;
         this.uuid = requireNonNull(uuid, "uuid is null");
+    }
+
+    @JsonProperty
+    public boolean isAutoCommit()
+    {
+        return autoCommit;
     }
 
     @JsonProperty

@@ -14,7 +14,10 @@
 package io.prestosql.spi.procedure;
 
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+
+import javax.annotation.Nullable;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -92,17 +95,45 @@ public class Procedure
     public static class Argument
     {
         private final String name;
-        private final TypeSignature type;
+        private final TypeSignature typeSignature;
+
+        private final Type type;
+        private final boolean required;
+        private final Object defaultValue;
 
         public Argument(String name, String type)
         {
             this(name, parseTypeSignature(type));
         }
 
+        public Argument(String name, Type type, boolean required, @Nullable Object defaultValue)
+        {
+            this(name, false, type, required, defaultValue);
+        }
+
+        @Deprecated
+        public Argument(String name, boolean allowNonUppercaseName, Type type, boolean required, @Nullable Object defaultValue)
+        {
+            this.name = checkNotNullOrEmpty(name, "name");
+            if (!allowNonUppercaseName && !name.equals(name.toUpperCase(ENGLISH))) {
+                throw new IllegalArgumentException("Argument name not uppercase. Previously argument names were matched incorrectly. " +
+                        "This is now fixed and for backwards compatibility of CALL statements, the argument must be declared in uppercase. " +
+                        "You can pass allowNonUppercaseName boolean flag if you want to register non-uppercase argument name.");
+            }
+            this.type = requireNonNull(type, "type is null");
+            this.required = required;
+            this.defaultValue = defaultValue;
+            this.typeSignature = null;
+        }
+
         public Argument(String name, TypeSignature type)
         {
             this.name = checkNotNullOrEmpty(name, "name");
-            this.type = requireNonNull(type, "type is null");
+            this.typeSignature = requireNonNull(type, "type is null");
+
+            this.type = null;
+            this.required = false;
+            this.defaultValue = null;
         }
 
         public String getName()
@@ -112,7 +143,7 @@ public class Procedure
 
         public TypeSignature getType()
         {
-            return type;
+            return typeSignature;
         }
 
         @Override

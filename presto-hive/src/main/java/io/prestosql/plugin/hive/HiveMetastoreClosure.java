@@ -55,6 +55,11 @@ public class HiveMetastoreClosure
         return delegate.getTable(identity, databaseName, tableName);
     }
 
+    public Optional<Table> getTable(String databaseName, String tableName)
+    {
+        return delegate.getTable(databaseName, tableName);
+    }
+
     public PartitionStatistics getTableStatistics(HiveIdentity identity, String databaseName, String tableName)
     {
         return delegate.getTableStatistics(identity, getExistingTable(identity, databaseName, tableName));

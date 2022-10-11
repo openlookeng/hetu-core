@@ -21,6 +21,7 @@ import io.prestosql.spi.connector.ConnectorSplitSource;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
+import io.prestosql.spi.connector.Constraint;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.resourcegroups.QueryType;
@@ -67,5 +68,17 @@ public final class ClassLoaderSafeConnectorSplitManager
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             return delegate.getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilterSupplier, queryType, queryInfo, userDefinedCachePredicates, partOfReuse);
         }
+    }
+
+    @Override
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, DynamicFilter dynamicFilter, Constraint constraint)
+    {
+        return delegate.getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilter, constraint);
+    }
+
+    @Override
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, DynamicFilter dynamicFilter)
+    {
+        return delegate.getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilter);
     }
 }

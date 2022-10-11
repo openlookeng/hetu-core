@@ -25,6 +25,7 @@ import io.prestosql.client.FailureInfo;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.scalar.ArraySubscriptOperator;
+import io.prestosql.security.AccessControl;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
@@ -136,6 +137,7 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.sql.analyzer.ConstantExpressionVerifier.verifyExpressionIsConstant;
 import static io.prestosql.sql.analyzer.ExpressionAnalyzer.createConstantAnalyzer;
+import static io.prestosql.sql.analyzer.ExpressionAnalyzer.createConstantAnalyzers;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.gen.VarArgsToMapAdapterGenerator.generateVarArgsToMapAdapter;
 import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
@@ -180,6 +182,27 @@ public class ExpressionInterpreter
         requireNonNull(session, "session is null");
 
         return new ExpressionInterpreter(expression, metadata, session, expressionTypes, true);
+    }
+
+    public static Object evaluateConstantExpression(
+            Metadata metadata,
+            Expression expression,
+            Type expectedType,
+            Session session,
+            AccessControl accessControl,
+            List<Expression> parameters)
+    {
+        ExpressionAnalyzer analyzer = createConstantAnalyzers(metadata, accessControl, session, parameters, WarningCollector.NOOP);
+        analyzer.analyze(expression, Scope.create());
+
+        Type actualType = analyzer.getExpressionTypes().get(NodeRef.of(expression));
+
+        Map<NodeRef<Expression>, Type> coercions = ImmutableMap.<NodeRef<Expression>, Type>builder()
+                .putAll(analyzer.getExpressionCoercions())
+                .put(NodeRef.of(expression), expectedType)
+                .build();
+
+        return evaluateConstantExpression(expression, coercions, analyzer.getTypeOnlyCoercions(), metadata, session, ImmutableSet.of(), parameters);
     }
 
     public static Object evaluateConstantExpression(Expression expression, Type expectedType, Metadata metadata, Session session, List<Expression> parameters)

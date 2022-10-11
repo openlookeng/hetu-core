@@ -226,7 +226,7 @@ public class GenericAccumulatorFactory
         }
     }
 
-    @RestorableConfig(uncapturedFields = {"maskChannel"})
+    @RestorableConfig(uncapturedFields = "maskChannel")
     private static class DistinctingAccumulator
             implements Accumulator
     {
@@ -349,7 +349,7 @@ public class GenericAccumulatorFactory
         return page.getPositions(ids, 0, next);
     }
 
-    @RestorableConfig(uncapturedFields = {"maskChannel"})
+    @RestorableConfig(uncapturedFields = "maskChannel")
     private static class DistinctingGroupedAccumulator
             implements GroupedAccumulator
     {

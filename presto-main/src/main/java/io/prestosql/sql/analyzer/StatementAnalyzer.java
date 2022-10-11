@@ -34,7 +34,9 @@ import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.OperatorNotFoundException;
+import io.prestosql.metadata.RedirectionAwareTableHandle;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.metadata.TableProceduresRegistry;
 import io.prestosql.security.AccessControl;
 import io.prestosql.security.AllowAllAccessControl;
 import io.prestosql.security.ViewAccessControl;
@@ -49,6 +51,7 @@ import io.prestosql.spi.connector.ConnectorViewDefinition;
 import io.prestosql.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.prestosql.spi.connector.CreateIndexMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.connector.TableProcedureMetadata;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.heuristicindex.IndexClient;
@@ -74,6 +77,7 @@ import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.ExpressionInterpreter;
 import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 import io.prestosql.sql.tree.AddColumn;
 import io.prestosql.sql.tree.AliasedRelation;
 import io.prestosql.sql.tree.AllColumns;
@@ -81,6 +85,7 @@ import io.prestosql.sql.tree.Analyze;
 import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AssignmentItem;
 import io.prestosql.sql.tree.Call;
+import io.prestosql.sql.tree.CallArgument;
 import io.prestosql.sql.tree.Comment;
 import io.prestosql.sql.tree.Commit;
 import io.prestosql.sql.tree.ComparisonExpression;
@@ -153,6 +158,7 @@ import io.prestosql.sql.tree.SampledRelation;
 import io.prestosql.sql.tree.Select;
 import io.prestosql.sql.tree.SelectItem;
 import io.prestosql.sql.tree.SetOperation;
+import io.prestosql.sql.tree.SetProperties;
 import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.SimpleGroupBy;
 import io.prestosql.sql.tree.SingleColumn;
@@ -160,6 +166,7 @@ import io.prestosql.sql.tree.SortItem;
 import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.Table;
+import io.prestosql.sql.tree.TableExecute;
 import io.prestosql.sql.tree.TableSubquery;
 import io.prestosql.sql.tree.Unnest;
 import io.prestosql.sql.tree.Update;
@@ -191,6 +198,7 @@ import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.LongSupplier;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -205,10 +213,12 @@ import static io.prestosql.SystemSessionProperties.getMaxGroupingSets;
 import static io.prestosql.SystemSessionProperties.isEnableStarTreeIndex;
 import static io.prestosql.cube.CubeManager.STAR_TREE;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
+import static io.prestosql.metadata.MetadataUtil.getRequiredCatalogHandle;
 import static io.prestosql.spi.StandardErrorCode.INVALID_COLUMN_MASK;
 import static io.prestosql.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static io.prestosql.spi.StandardErrorCode.INVALID_ROW_FILTER;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
+import static io.prestosql.spi.StandardErrorCode.TABLE_NOT_FOUND;
 import static io.prestosql.spi.connector.CreateIndexMetadata.Level.UNDEFINED;
 import static io.prestosql.spi.connector.StandardWarningCode.CUBE_NOT_FOUND;
 import static io.prestosql.spi.connector.StandardWarningCode.REDUNDANT_ORDER_BY;
@@ -278,6 +288,7 @@ import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_IS_RECURSIVE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_IS_STALE;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.VIEW_PARSE_ERROR;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.WILDCARD_WITHOUT_FROM;
+import static io.prestosql.sql.analyzer.SemanticException.semanticException;
 import static io.prestosql.sql.planner.ExpressionDeterminismEvaluator.isDeterministic;
 import static io.prestosql.sql.planner.ExpressionInterpreter.expressionOptimizer;
 import static io.prestosql.sql.tree.ExplainType.Type.DISTRIBUTED;
@@ -291,6 +302,7 @@ import static java.util.stream.Collectors.joining;
 
 class StatementAnalyzer
 {
+    private final TableProceduresRegistry tableProceduresRegistry;
     private final Analysis analysis;
     private final Metadata metadata;
     private final TypeCoercion typeCoercion;
@@ -316,6 +328,7 @@ class StatementAnalyzer
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.session = requireNonNull(session, "session is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.tableProceduresRegistry = TableProceduresRegistry.getInstance();
     }
 
     public StatementAnalyzer(
@@ -373,6 +386,12 @@ class StatementAnalyzer
             this.outerQueryScope = requireNonNull(outerQueryScope, "outerQueryScope is null");
             this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
             this.updateKind = requireNonNull(updateKind, "updateKind is null");
+        }
+
+        @Override
+        protected Scope visitSetProperties(SetProperties node, Optional<Scope> context)
+        {
+            return createAndAssignScope(node, context);
         }
 
         @Override
@@ -674,9 +693,19 @@ class StatementAnalyzer
                     warningCollector);
 
             Scope tableScope = analyzer.analyzeForUpdate(table, scope, UpdateKind.UPDATE);
+
+            Map<String, ColumnHandle> columnMap = metadata.getColumnHandles(session, targetTableHandle.get());
             // validate the columns and set values
             if (node.getAssignmentItems().size() > 0) {
                 Set<String> updateColumnNames = new HashSet<>();
+                List<String> names = node.getAssignmentItems().stream().map(item -> item.getName().toString()).distinct().collect(Collectors.toList());
+                names.forEach(item -> {
+                    Type type = tableColumnsTypeMap.get(item);
+                    Set<ColumnHandle> updateColumnHandle = type.getUpdateColumnHandle();
+                    if (!updateColumnHandle.isEmpty()) {
+                        type.clear();
+                    }
+                });
                 for (AssignmentItem assignmentItem : node.getAssignmentItems()) {
                     String updateColumnName = assignmentItem.getName().toString();
                     if (!tableColumns.contains(updateColumnName)) {
@@ -689,11 +718,15 @@ class StatementAnalyzer
                     if (immutableColumns.contains(updateColumnName)) {
                         throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES, node, "Update of the column %s is not supported. ", updateColumnName);
                     }
-
                     Expression setValue = assignmentItem.getValue();
                     ExpressionAnalysis expressionAnalysis = analyzeExpression(setValue, tableScope);
                     Type tableColumnType = tableColumnsTypeMap.get(updateColumnName);
                     Type setValueType = expressionAnalysis.getExpressionTypes().get(NodeRef.of(setValue));
+
+                    ColumnHandle columnHandle = columnMap.get(updateColumnName);
+                    if (null != columnHandle) {
+                        tableColumnType.setUpdateColumnHandle(columnHandle);
+                    }
                     if (targetTableHandle.get().getConnectorHandle().isUpdateAsInsertSupported()
                             && !typeCoercion.canCoerce(setValueType, tableColumnType)) {
                         throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES, node, "Update column value %s has mismatched column type: %s ", setValue, tableColumnType);
@@ -1004,6 +1037,15 @@ class StatementAnalyzer
         }
 
         @Override
+        protected Scope visitCallArgument(CallArgument node, Optional<Scope> scope)
+        {
+            // CallArgument value expressions must be constant
+            createConstantAnalyzer(metadata, session, analysis.getParameters(), WarningCollector.NOOP, analysis.isDescribe())
+                    .analyze(node.getValue(), createScope(scope));
+            return createAndAssignScope(node, scope);
+        }
+
+        @Override
         protected Scope visitCreateIndex(CreateIndex node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
@@ -1127,6 +1169,120 @@ class StatementAnalyzer
         protected Scope visitCall(Call node, Optional<Scope> scope)
         {
             return createAndAssignScope(node, scope);
+        }
+
+        @Override
+        protected Scope visitTableExecute(TableExecute node, Optional<Scope> scope)
+        {
+            Table table = node.getTable();
+            QualifiedObjectName originalName = createQualifiedObjectName(session, table, table.getName());
+            String procedureName = node.getProcedureName().getCanonicalValue();
+
+            if (metadata.isMaterializedView(session, originalName)) {
+                throw semanticException(StandardErrorCode.NOT_SUPPORTED, node, "ALTER TABLE EXECUTE is not supported for materialized views");
+            }
+
+            if (metadata.isView(session, originalName)) {
+                throw semanticException(StandardErrorCode.NOT_SUPPORTED, node, "ALTER TABLE EXECUTE is not supported for views");
+            }
+
+            RedirectionAwareTableHandle redirection = metadata.getRedirectionAwareTableHandle(session, originalName);
+            QualifiedObjectName tableName = redirection.getRedirectedTableName().orElse(originalName);
+            TableHandle tableHandle = redirection.getTableHandle()
+                    .orElseThrow(() -> semanticException(TABLE_NOT_FOUND, table, "Table '%s' does not exist", tableName));
+
+            accessControl.checkCanExecuteTableProcedure(
+                    session.toSecurityContext(),
+                    tableName,
+                    procedureName);
+
+            if (!accessControl.getRowFilters(session.toSecurityContext().getTransactionId(), session.toSecurityContext().getIdentity(), tableName).isEmpty()) {
+                throw semanticException(StandardErrorCode.NOT_SUPPORTED, node, "ALTER TABLE EXECUTE is not supported for table with row filter");
+            }
+
+            TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle);
+            for (ColumnMetadata tableColumn : tableMetadata.getColumns()) {
+                if (!accessControl.getColumnMasks(session.toSecurityContext().getTransactionId(), session.toSecurityContext().getIdentity(), tableName, tableColumn.getName(), tableColumn.getType()).isEmpty()) {
+                    throw semanticException(StandardErrorCode.NOT_SUPPORTED, node, "ALTER TABLE EXECUTE is not supported for table with column masks");
+                }
+            }
+
+            Scope tableScope = analyze(table, scope);
+
+            CatalogName catalogName = getRequiredCatalogHandle(metadata, session, node, tableName.getCatalogName());
+            TableProcedureMetadata procedureMetadata = tableProceduresRegistry.resolve(catalogName, procedureName);
+
+            // analyze WHERE
+            if (!procedureMetadata.getExecutionMode().supportsFilter() && node.getWhere().isPresent()) {
+                throw semanticException(StandardErrorCode.NOT_SUPPORTED, node, "WHERE not supported for procedure " + procedureName);
+            }
+            node.getWhere().ifPresent(where -> analyzeWhere(node, tableScope, where));
+
+            // analyze arguments
+
+            Map<String, Expression> propertiesMap = processTableExecuteArguments(node, procedureMetadata, scope);
+            Map<String, Object> tableProperties = TableProceduresPropertyManager.getInstance().getProperties(
+                    metadata,
+                    catalogName,
+                    procedureName,
+                    propertiesMap,
+                    session,
+                    accessControl,
+                    analysis.getParameters());
+            TableExecuteHandle executeHandle =
+                    metadata.getTableHandleForExecute(
+                                    session,
+                                    tableHandle,
+                                    procedureName,
+                                    tableProperties)
+                            .orElseThrow(() -> semanticException(StandardErrorCode.NOT_SUPPORTED, node, "Procedure '%s' cannot be executed on table '%s'", procedureName, tableName));
+
+            analysis.setTableExecuteReadsData(procedureMetadata.getExecutionMode().isReadsData());
+            analysis.setTableExecuteHandle(executeHandle);
+
+            analysis.setUpdateType("ALTER TABLE EXECUTE");
+            analysis.setUpdateTarget(tableName, Optional.of(table), Optional.empty());
+
+            return createAndAssignScope(node, scope, Field.newUnqualified("rows", BIGINT));
+        }
+
+        private Map<String, Expression> processTableExecuteArguments(TableExecute node, TableProcedureMetadata procedureMetadata, Optional<Scope> scope)
+        {
+            List<CallArgument> arguments = node.getArguments();
+            Predicate<CallArgument> hasName = argument -> argument.getName().isPresent();
+            boolean anyNamed = arguments.stream().anyMatch(hasName);
+            boolean allNamed = arguments.stream().allMatch(hasName);
+            if (anyNamed && !allNamed) {
+                throw semanticException(StandardErrorCode.INVALID_ARGUMENTS, node, "Named and positional arguments cannot be mixed");
+            }
+
+            if (!anyNamed && arguments.size() > procedureMetadata.getProperties().size()) {
+                throw semanticException(StandardErrorCode.INVALID_ARGUMENTS, node, "Too many positional arguments");
+            }
+
+            for (CallArgument argument : arguments) {
+                process(argument, scope);
+            }
+
+            Map<String, Expression> argumentsMap = new HashMap<>();
+
+            if (anyNamed) {
+                // all properties named
+                for (CallArgument argument : arguments) {
+                    if (argumentsMap.put(argument.getName().get(), argument.getValue()) != null) {
+                        throw semanticException(StandardErrorCode.DUPLICATE_PROPERTY, argument, "Duplicate named argument: %s", argument.getName());
+                    }
+                }
+            }
+            else {
+                // all properties unnamed
+                int pos = 0;
+                for (CallArgument argument : arguments) {
+                    argumentsMap.put(procedureMetadata.getProperties().get(pos).getName(), argument.getValue());
+                    pos++;
+                }
+            }
+            return ImmutableMap.copyOf(argumentsMap);
         }
 
         private void validateProperties(List<Property> properties, Optional<Scope> scope)
@@ -1521,14 +1677,14 @@ class StatementAnalyzer
             }
 
             Map<NodeRef<Expression>, Type> expressionTypes = ExpressionAnalyzer.analyzeExpressions(
-                    session,
-                    metadata,
-                    sqlParser,
-                    TypeProvider.empty(),
-                    ImmutableList.of(relation.getSamplePercentage()),
-                    analysis.getParameters(),
-                    WarningCollector.NOOP,
-                    analysis.isDescribe())
+                            session,
+                            metadata,
+                            sqlParser,
+                            TypeProvider.empty(),
+                            ImmutableList.of(relation.getSamplePercentage()),
+                            analysis.getParameters(),
+                            WarningCollector.NOOP,
+                            analysis.isDescribe())
                     .getExpressionTypes();
 
             ExpressionInterpreter samplePercentageEval = expressionOptimizer(relation.getSamplePercentage(), metadata, session, expressionTypes);

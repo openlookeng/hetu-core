@@ -24,6 +24,7 @@ import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorPageSink;
 import io.prestosql.spi.connector.ConnectorPageSinkProvider;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -87,6 +88,14 @@ public class PageSinkManager
     {
         // assumes connectorId and catalog are the same
         ConnectorSession connectorSession = session.toPerTaskConnectorSession(tableHandle.getCatalogName(), taskId);
+        return providerFor(tableHandle.getCatalogName()).createPageSink(tableHandle.getTransactionHandle(), connectorSession, tableHandle.getConnectorHandle());
+    }
+
+    @Override
+    public ConnectorPageSink createPageSink(Session session, TableExecuteHandle tableHandle)
+    {
+        // assumes connectorId and catalog are the same
+        ConnectorSession connectorSession = session.toConnectorSession(tableHandle.getCatalogName());
         return providerFor(tableHandle.getCatalogName()).createPageSink(tableHandle.getTransactionHandle(), connectorSession, tableHandle.getConnectorHandle());
     }
 

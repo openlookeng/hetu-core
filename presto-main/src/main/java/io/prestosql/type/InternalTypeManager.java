@@ -15,13 +15,16 @@ package io.prestosql.type;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.metadata.TypeRegistry;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
+import io.prestosql.spi.type.TypeOperators;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 
 import javax.inject.Inject;
 
@@ -38,12 +41,23 @@ public final class InternalTypeManager
 {
     private final FunctionAndTypeManager metadata;
     private final TypeCoercion typeCoercion;
+    public static final TypeManager TESTING_TYPE_MANAGER = new InternalTypeManager(new TypeRegistry(new TypeOperators(), new FeaturesConfig()));
+    private final TypeRegistry typeRegistry;
 
     @Inject
     public InternalTypeManager(FunctionAndTypeManager metadata)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.typeCoercion = new TypeCoercion(this::getType);
+        this.typeRegistry = null;
+    }
+
+    @Inject
+    public InternalTypeManager(TypeRegistry typeRegistry)
+    {
+        this.typeRegistry = typeRegistry;
+        this.metadata = null;
+        this.typeCoercion = null;
     }
 
     @Override
@@ -99,5 +113,11 @@ public final class InternalTypeManager
     public Optional<Type> coerceTypeBase(Type sourceType, String resultTypeBase)
     {
         return typeCoercion.coerceTypeBase(sourceType, resultTypeBase);
+    }
+
+    @Override
+    public TypeOperators getTypeOperators()
+    {
+        return new TypeOperators();
     }
 }

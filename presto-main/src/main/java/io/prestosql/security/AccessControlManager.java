@@ -20,11 +20,13 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorAccessControl;
+import io.prestosql.spi.connector.ConnectorSecurityContext;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -52,6 +54,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -86,6 +90,7 @@ public class AccessControlManager
     public AccessControlManager(TransactionManager transactionManager)
     {
         this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
+        addSystemAccessControlFactory(new DefaultSystemAccessControl.Factory());
         addSystemAccessControlFactory(new AllowAllSystemAccessControl.Factory());
         addSystemAccessControlFactory(new ReadOnlySystemAccessControl.Factory());
         addSystemAccessControlFactory(new FileBasedSystemAccessControl.Factory());
@@ -147,6 +152,72 @@ public class AccessControlManager
         this.systemAccessControl.set(tmpSystemAccessControl);
 
         log.info("-- Loaded system access control %s --", name);
+    }
+
+    @Override
+    public void checkCanSetTableProperties(SecurityContext securityContext, QualifiedObjectName tableName, Map<String, Optional<Object>> properties)
+    {
+        requireNonNull(securityContext, "securityContext is null");
+        requireNonNull(tableName, "tableName is null");
+        requireNonNull(properties, "nonNullProperties is null");
+
+        checkCanAccessCatalog(securityContext, tableName.getCatalogName());
+
+        systemAuthorizationCheck(control -> control.checkCanSetTableProperties(securityContext.toSystemSecurityContext().getIdentity(), tableName.asCatalogSchemaTableName(), properties));
+
+        catalogAuthorizationCheck(tableName.getCatalogName(), securityContext, (control, context) -> control.checkCanSetTableProperties(context, tableName.asSchemaTableName(), properties));
+    }
+
+    private void systemAuthorizationCheck(Consumer<SystemAccessControl> check)
+    {
+        try {
+            for (SystemAccessControl systemAccessControl : getSystemAccessControls()) {
+                check.accept(systemAccessControl);
+            }
+            authorizationSuccess.update(1);
+        }
+        catch (PrestoException e) {
+            authorizationFail.update(1);
+            throw e;
+        }
+    }
+
+    private void catalogAuthorizationCheck(String catalogName, SecurityContext securityContext, BiConsumer<ConnectorAccessControl, ConnectorSecurityContext> check)
+    {
+        CatalogAccessControlEntry entry = getConnectorAccessControl(securityContext.getTransactionId(), catalogName);
+        if (entry == null) {
+            return;
+        }
+
+        try {
+            check.accept(entry.getAccessControl(), entry.toConnectorSecurityContext(securityContext));
+            authorizationSuccess.update(1);
+        }
+        catch (PrestoException e) {
+            authorizationFail.update(1);
+            throw e;
+        }
+    }
+
+    private void checkCanAccessCatalog(SecurityContext securityContext, String catalogName)
+    {
+        try {
+            List<SystemAccessControl> systemAccessControls = getSystemAccessControls();
+            for (SystemAccessControl systemAccessControl : systemAccessControls) {
+                systemAccessControl.checkCanAccessCatalog(securityContext.toSystemSecurityContext().getIdentity(), catalogName);
+            }
+            authorizationSuccess.update(1);
+        }
+        catch (PrestoException e) {
+            authorizationFail.update(1);
+            throw e;
+        }
+    }
+
+    private List<SystemAccessControl> getSystemAccessControls()
+    {
+        return Optional.ofNullable(ImmutableList.of(systemAccessControl.get()))
+                .orElse(ImmutableList.of(new InitializingSystemAccessControl()));
     }
 
     @Override
@@ -1005,6 +1076,19 @@ public class AccessControlManager
         {
             this.catalogName = requireNonNull(catalogName, "catalogName is null");
             this.accessControl = requireNonNull(accessControl, "accessControl is null");
+        }
+
+        public ConnectorSecurityContext toConnectorSecurityContext(SecurityContext securityContext)
+        {
+            return toConnectorSecurityContext(securityContext.getTransactionId(), securityContext.getIdentity(), securityContext.getQueryId());
+        }
+
+        public ConnectorSecurityContext toConnectorSecurityContext(TransactionId requiredTransactionId, Identity identity, QueryId queryId)
+        {
+            return new ConnectorSecurityContext(
+                    transactionManager.getConnectorTransaction(requiredTransactionId, catalogName),
+                    identity.toConnectorIdentity(catalogName.getCatalogName()),
+                    queryId);
         }
 
         public CatalogName getCatalogName()

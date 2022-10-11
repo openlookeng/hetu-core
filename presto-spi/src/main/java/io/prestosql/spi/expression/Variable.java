@@ -15,6 +15,9 @@ package io.prestosql.spi.expression;
 
 import io.prestosql.spi.type.Type;
 
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class Variable
@@ -41,5 +44,11 @@ public class Variable
     public String toString()
     {
         return name + "::" + getType();
+    }
+
+    @Override
+    public List<? extends ConnectorExpression> getChildren()
+    {
+        return emptyList();
     }
 }

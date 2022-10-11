@@ -15,8 +15,10 @@
 package io.prestosql.spi.dynamicfilter;
 
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * DynamicFilter contains dynamic filter information and
@@ -26,6 +28,51 @@ import java.util.Objects;
  */
 public abstract class DynamicFilter
 {
+    public static DynamicFilter empty = new DynamicFilter()
+    {
+        @Override
+        public CompletableFuture<?> isBlocked()
+        {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public boolean contains(Object value)
+        {
+            return false;
+        }
+
+        @Override
+        public long getSize()
+        {
+            return 0;
+        }
+
+        @Override
+        public DynamicFilter clone()
+        {
+            return null;
+        }
+
+        @Override
+        public boolean isEmpty()
+        {
+            return false;
+        }
+
+        @Override
+        public boolean isAwaitable()
+        {
+            return false;
+        }
+
+        @Override
+        public TupleDomain<ColumnHandle> getCurrentPredicate()
+        {
+            return TupleDomain.all();  // no filtering
+        }
+    };
+
     public enum Type
     {
         LOCAL,
@@ -163,4 +210,10 @@ public abstract class DynamicFilter
         return other.getColumnHandle().equals(this.columnHandle) &&
                 other.getFilterId().equals(this.filterId);
     }
+
+    public abstract boolean isAwaitable();
+
+    public abstract CompletableFuture<?> isBlocked();
+
+    public abstract TupleDomain<ColumnHandle> getCurrentPredicate();
 }

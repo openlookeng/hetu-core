@@ -27,6 +27,7 @@ import io.prestosql.plugin.hive.HiveViewNotSupportedException;
 import io.prestosql.plugin.hive.PartitionNotFoundException;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.metastore.AcidTransactionOwner;
 import io.prestosql.plugin.hive.metastore.Column;
 import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
 import io.prestosql.plugin.hive.metastore.HivePrincipal;
@@ -56,9 +57,11 @@ import org.apache.hadoop.hive.metastore.api.InvalidInputException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
 import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.LockComponent;
+import org.apache.hadoop.hive.metastore.api.LockLevel;
 import org.apache.hadoop.hive.metastore.api.LockRequest;
 import org.apache.hadoop.hive.metastore.api.LockResponse;
 import org.apache.hadoop.hive.metastore.api.LockState;
+import org.apache.hadoop.hive.metastore.api.LockType;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchLockException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -104,7 +107,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Sets.difference;
+import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
+import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_TABLE_LOCK_NOT_ACQUIRED;
 import static io.prestosql.plugin.hive.HiveUtil.PRESTO_VIEW_FLAG;
+import static io.prestosql.plugin.hive.HiveUtil.log;
 import static io.prestosql.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.security.PrincipalType.USER;
@@ -1893,5 +1899,93 @@ public class ThriftHiveMetastore
     {
         T callOn(ThriftMetastoreClient client)
                 throws TException;
+    }
+
+    @Override
+    public long acquireTableExclusiveLock(HiveIdentity identity, AcidTransactionOwner transactionOwner, String queryId, String dbName, String tableName)
+    {
+        requireNonNull(transactionOwner, "transactionOwner is null");
+        LockComponent lockComponent = new LockComponent(LockType.EXCLUSIVE, LockLevel.TABLE, dbName);
+        lockComponent.setTablename(tableName);
+        LockRequest lockRequest = new LockRequestBuilder(queryId)
+                .addLockComponent(lockComponent)
+                .setUser(transactionOwner.toString())
+                .build();
+        return acquireLock(identity, format("query %s", queryId), lockRequest);
+    }
+
+    private long acquireLock(HiveIdentity identity, String context, LockRequest lockRequest)
+    {
+        try {
+            LockResponse response = retry()
+                    .stopOn(NoSuchTxnException.class, TxnAbortedException.class, MetaException.class)
+                    .run("acquireLock", stats.getAcquireLock().wrap(() -> {
+                        try (ThriftMetastoreClient metastoreClient = createMetastoreClient(identity)) {
+                            return metastoreClient.acquireLock(lockRequest);
+                        }
+                    }));
+
+            long lockId = response.getLockid();
+            long waitStart = nanoTime();
+            while (response.getState() == LockState.WAITING) {
+                if (Duration.nanosSince(waitStart).compareTo(maxWaitForLock) > 0) {
+                    // timed out
+                    throw unlockSuppressing(identity, lockId, new PrestoException(HIVE_TABLE_LOCK_NOT_ACQUIRED, format("Timed out waiting for lock %d for %s", lockId, context)));
+                }
+
+                log.debug("Waiting for lock %d for %s", lockId, context);
+
+                response = retry()
+                        .stopOn(NoSuchTxnException.class, NoSuchLockException.class, TxnAbortedException.class, MetaException.class)
+                        .run("checkLock", stats.getCheckLock().wrap(() -> {
+                            try (ThriftMetastoreClient metastoreClient = createMetastoreClient(identity)) {
+                                return metastoreClient.checkLock(lockId);
+                            }
+                        }));
+            }
+
+            if (response.getState() != LockState.ACQUIRED) {
+                throw unlockSuppressing(identity, lockId, new PrestoException(HIVE_TABLE_LOCK_NOT_ACQUIRED, "Could not acquire lock. Lock in state " + response.getState()));
+            }
+            return response.getLockid();
+        }
+        catch (TException e) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
+    }
+
+    private <T extends Exception> T unlockSuppressing(HiveIdentity identity, long lockId, T exception)
+    {
+        try {
+            releaseTableLock(identity, lockId);
+        }
+        catch (RuntimeException e) {
+            exception.addSuppressed(e);
+        }
+        return exception;
+    }
+
+    @Override
+    public void releaseTableLock(HiveIdentity identity, long lockId)
+    {
+        try {
+            retry()
+                    .stopOn(NoSuchTxnException.class, NoSuchLockException.class, TxnAbortedException.class, MetaException.class)
+                    .run("unlock", stats.getUnlock().wrap(() -> {
+                        try (ThriftMetastoreClient metastoreClient = createMetastoreClient(identity)) {
+                            metastoreClient.unlock(lockId);
+                        }
+                        return null;
+                    }));
+        }
+        catch (TException e) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, e);
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
     }
 }

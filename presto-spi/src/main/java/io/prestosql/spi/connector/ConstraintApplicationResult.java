@@ -13,7 +13,10 @@
  */
 package io.prestosql.spi.connector;
 
+import io.prestosql.spi.expression.ConnectorExpression;
 import io.prestosql.spi.predicate.TupleDomain;
+
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -22,10 +25,28 @@ public class ConstraintApplicationResult<T>
     private final T handle;
     private final TupleDomain<ColumnHandle> remainingFilter;
 
+    private final Optional<ConnectorExpression> remainingExpression;
+    private final boolean precalculateStatistics;
+
     public ConstraintApplicationResult(T handle, TupleDomain<ColumnHandle> remainingFilter)
     {
         this.handle = requireNonNull(handle, "handle is null");
         this.remainingFilter = requireNonNull(remainingFilter, "remainingFilter is null");
+        this.remainingExpression = Optional.empty();
+        this.precalculateStatistics = false;
+    }
+
+    public ConstraintApplicationResult(T handle, TupleDomain<ColumnHandle> remainingFilter, boolean precalculateStatistics)
+    {
+        this(handle, remainingFilter, Optional.empty(), precalculateStatistics);
+    }
+
+    private ConstraintApplicationResult(T handle, TupleDomain<ColumnHandle> remainingFilter, Optional<ConnectorExpression> remainingExpression, boolean precalculateStatistics)
+    {
+        this.handle = requireNonNull(handle, "handle is null");
+        this.remainingFilter = requireNonNull(remainingFilter, "remainingFilter is null");
+        this.remainingExpression = requireNonNull(remainingExpression, "remainingExpression is null");
+        this.precalculateStatistics = precalculateStatistics;
     }
 
     public T getHandle()

@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner.plan;
 
 import io.prestosql.spi.plan.CTEScanNode;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanVisitor;
 
 public abstract class InternalPlanVisitor<R, C>
@@ -114,6 +115,11 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitTableExecute(TableExecuteNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitTableFinish(TableFinishNode node, C context)
     {
         return visitPlan(node, context);
@@ -171,6 +177,12 @@ public abstract class InternalPlanVisitor<R, C>
 
     @Override
     public R visitCTEScan(CTEScanNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
+    @Override
+    public R visitTableExecute(PlanNode node, C context)
     {
         return visitPlan(node, context);
     }

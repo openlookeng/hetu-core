@@ -446,6 +446,12 @@ public class PruneUnreferencedOutputs
         }
 
         @Override
+        public PlanNode visitTableExecute(PlanNode node, RewriteContext<Set<Symbol>> context)
+        {
+            return node;
+        }
+
+        @Override
         public PlanNode visitTableScan(TableScanNode node, RewriteContext<Set<Symbol>> context)
         {
             List<Symbol> newOutputs = node.getOutputSymbols().stream()

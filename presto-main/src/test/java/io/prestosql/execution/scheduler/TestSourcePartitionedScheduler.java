@@ -32,6 +32,7 @@ import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageId;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.TableInfo;
 import io.prestosql.execution.TestSqlTaskManager.MockLocationFactory;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
@@ -338,7 +339,7 @@ public class TestSourcePartitionedScheduler
                     Iterables.getOnlyElement(plan.getSplitSources().keySet()),
                     Iterables.getOnlyElement(plan.getSplitSources().values()),
                     new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null), stage::getAllTasks),
-                    2, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()));
+                    2, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager());
             scheduler.schedule();
         }).hasErrorCode(NO_NODES_AVAILABLE);
     }
@@ -476,7 +477,7 @@ public class TestSourcePartitionedScheduler
         SplitSource splitSource = Iterables.getOnlyElement(plan.getSplitSources().values());
         SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(splitSource.getCatalogName(), false, null), stage::getAllTasks);
         return newSourcePartitionedSchedulerAsStageScheduler(stage, sourceNode, splitSource,
-                placementPolicy, splitBatchSize, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()));
+                placementPolicy, splitBatchSize, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager());
     }
 
     private static StageExecutionPlan createPlan(ConnectorSplitSource splitSource)

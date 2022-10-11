@@ -32,6 +32,7 @@ public final class Constants
     public static final String PARTITIONED_BY = "partitioned_by";
     public static final String SORTED_BY = "sorted_by";
     public static final String FORMAT = "format";
+
     public static final String LOCATION = "location";
     public static final String TRANSACTIONAL = "transactional";
 

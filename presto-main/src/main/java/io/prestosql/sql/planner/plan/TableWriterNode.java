@@ -19,14 +19,17 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import io.prestosql.Session;
 import io.prestosql.metadata.DeletesAsInsertTableHandle;
 import io.prestosql.metadata.InsertTableHandle;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.NewTableLayout;
 import io.prestosql.metadata.OutputTableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
+import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
@@ -40,6 +43,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -98,6 +102,69 @@ public class TableWriterNode
             outputBuilder.addAll(aggregation.getAggregations().keySet());
         });
         this.outputs = outputBuilder.build();
+    }
+
+    public static class TableExecuteTarget
+            extends WriterTarget
+    {
+        private final TableExecuteHandle executeHandle;
+        private final Optional<TableHandle> sourceHandle;
+        private final SchemaTableName schemaTableName;
+        private final boolean reportingWrittenBytesSupported;
+
+        @JsonCreator
+        public TableExecuteTarget(
+                @JsonProperty("executeHandle") TableExecuteHandle executeHandle,
+                @JsonProperty("sourceHandle") Optional<TableHandle> sourceHandle,
+                @JsonProperty("schemaTableName") SchemaTableName schemaTableName,
+                @JsonProperty("reportingWrittenBytesSupported") boolean reportingWrittenBytesSupported)
+        {
+            this.executeHandle = requireNonNull(executeHandle, "handle is null");
+            this.sourceHandle = requireNonNull(sourceHandle, "sourceHandle is null");
+            this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
+            this.reportingWrittenBytesSupported = reportingWrittenBytesSupported;
+        }
+
+        @JsonProperty
+        public TableExecuteHandle getExecuteHandle()
+        {
+            return executeHandle;
+        }
+
+        @JsonProperty
+        public Optional<TableHandle> getSourceHandle()
+        {
+            return sourceHandle;
+        }
+
+        public TableHandle getMandatorySourceHandle()
+        {
+            return sourceHandle.orElseThrow(() -> new NoSuchElementException("No value present"));
+        }
+
+        @JsonProperty
+        public SchemaTableName getSchemaTableName()
+        {
+            return schemaTableName;
+        }
+
+        @JsonProperty
+        public boolean isReportingWrittenBytesSupported()
+        {
+            return reportingWrittenBytesSupported;
+        }
+
+        @Override
+        public String toString()
+        {
+            return executeHandle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            return sourceHandle.map(tableHandle -> metadata.supportsReportingWrittenBytes(session, tableHandle)).orElse(reportingWrittenBytesSupported);
+        }
     }
 
     @JsonProperty
@@ -186,12 +253,15 @@ public class TableWriterNode
             @JsonSubTypes.Type(value = UpdateTarget.class, name = "UpdateTarget"),
             @JsonSubTypes.Type(value = DeleteTarget.class, name = "DeleteTarget"),
             @JsonSubTypes.Type(value = DeleteAsInsertTarget.class, name = "DeleteAsInsertTarget"),
+            @JsonSubTypes.Type(value = TableExecuteTarget.class, name = "TableExecuteTarget"),
             @JsonSubTypes.Type(value = VacuumTarget.class, name = "VacuumTarget")})
     @SuppressWarnings({"EmptyClass", "ClassMayBeInterface"})
     public abstract static class WriterTarget
     {
         @Override
         public abstract String toString();
+
+        public abstract boolean supportsReportingWrittenBytes(Metadata metadata, Session session);
     }
 
     // only used during planning -- will not be serialized
@@ -229,6 +299,16 @@ public class TableWriterNode
         {
             return catalog + "." + tableMetadata.getTable();
         }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            QualifiedObjectName fullTableName = new QualifiedObjectName(
+                    catalog,
+                    tableMetadata.getTableSchema().getTable().getSchemaName(),
+                    tableMetadata.getTableSchema().getTable().getTableName());
+            return metadata.supportsReportingWrittenBytes(session, fullTableName, tableMetadata.getProperties());
+        }
     }
 
     public static class CreateTarget
@@ -236,6 +316,7 @@ public class TableWriterNode
     {
         private final OutputTableHandle handle;
         private final SchemaTableName schemaTableName;
+        private final boolean reportingWrittenBytesSupported;
 
         @JsonCreator
         public CreateTarget(
@@ -244,6 +325,7 @@ public class TableWriterNode
         {
             this.handle = requireNonNull(handle, "handle is null");
             this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
+            this.reportingWrittenBytesSupported = false;
         }
 
         @JsonProperty
@@ -262,6 +344,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            return reportingWrittenBytesSupported;
         }
     }
 
@@ -292,6 +380,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            return metadata.supportsReportingWrittenBytes(session, handle);
         }
     }
 
@@ -336,6 +430,12 @@ public class TableWriterNode
         {
             return handle.toString();
         }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            return isOverwrite;
+        }
     }
 
     public static class DeleteTarget
@@ -369,6 +469,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -421,6 +527,12 @@ public class TableWriterNode
         {
             super(handle, constraint, columnAssignments);
         }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
     public static class UpdateAsInsertTarget
@@ -454,6 +566,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -508,6 +626,12 @@ public class TableWriterNode
         {
             return handle.toString();
         }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
     // only used during planning -- will not be serialized
@@ -517,6 +641,12 @@ public class TableWriterNode
         public DeleteAsInsertReference(TableHandle handle, Optional<Expression> constraint, Map<Symbol, ColumnHandle> columnAssignments)
         {
             super(handle, constraint, columnAssignments);
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -551,6 +681,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -596,6 +732,12 @@ public class TableWriterNode
         {
             return handle.toString();
         }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
+        }
     }
 
     public static class VacuumTarget
@@ -629,6 +771,12 @@ public class TableWriterNode
         public String toString()
         {
             return handle.toString();
+        }
+
+        @Override
+        public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+        {
+            throw new UnsupportedOperationException();
         }
     }
 }

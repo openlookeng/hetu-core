@@ -26,6 +26,5 @@ import static java.lang.annotation.ElementType.TYPE;
  * static analysis tools flag as unused.
  */
 @Target({TYPE, FIELD, METHOD, CONSTRUCTOR})
-public @interface UsedByGeneratedCode
-{
+public @interface UsedByGeneratedCode {
 }

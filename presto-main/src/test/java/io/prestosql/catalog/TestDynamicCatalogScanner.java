@@ -20,6 +20,7 @@ import com.google.inject.Key;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 public class TestDynamicCatalogScanner
@@ -39,7 +40,7 @@ public class TestDynamicCatalogScanner
         server.getInstance(Key.get(DynamicCatalogStore.class)).unloadCatalog(catalogName);
         assertFalse(server.getCatalogManager().getCatalog(catalogName).isPresent());
         server.getInstance(Key.get(DynamicCatalogScanner.class)).scan();
-        assertTrue(server.getCatalogManager().getCatalog(catalogName).isPresent());
+        assertFalse(server.getCatalogManager().getCatalog(catalogName).isPresent());
     }
 
     @Test
@@ -60,6 +61,6 @@ public class TestDynamicCatalogScanner
     {
         String catalogName = "tpch103";
         assertTrue(executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
-        server.getInstance(Key.get(DynamicCatalogStore.class)).loadCatalog(catalogName);
+        assertThrows(Exception.class, () -> server.getInstance(Key.get(DynamicCatalogStore.class)).loadCatalog(catalogName));
     }
 }

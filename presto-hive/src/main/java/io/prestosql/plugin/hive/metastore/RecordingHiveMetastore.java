@@ -26,6 +26,7 @@ import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.metastore.recording.HiveMetastoreRecording;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
@@ -62,6 +63,7 @@ public class RecordingHiveMetastore
 {
     private static final JsonCodec<Recording> RECORDING_CODEC = jsonCodec(Recording.class);
 
+    private final HiveMetastoreRecording recording;
     private final HiveMetastore delegate;
     private final Path recordingPath;
     private final boolean replay;
@@ -87,6 +89,7 @@ public class RecordingHiveMetastore
     public RecordingHiveMetastore(@ForRecordingHiveMetastore HiveMetastore delegate, HiveConfig hiveConfig)
             throws IOException
     {
+        this.recording = null;
         this.delegate = requireNonNull(delegate, "delegate is null");
         requireNonNull(hiveConfig, "hiveConfig is null");
         this.recordingPath = Paths.get(requireNonNull(hiveConfig.getRecordingPath(), "recordingPath is null"));
@@ -115,23 +118,44 @@ public class RecordingHiveMetastore
     void loadRecording()
             throws IOException
     {
-        Recording recording = RECORDING_CODEC.fromJson(readAllBytes(recordingPath));
+        Recording fromJson = RECORDING_CODEC.fromJson(readAllBytes(recordingPath));
 
-        allDatabases = recording.getAllDatabases();
-        allRoles = recording.getAllRoles();
-        databaseCache.putAll(toMap(recording.getDatabases()));
-        tableCache.putAll(toMap(recording.getTables()));
-        supportedColumnStatisticsCache.putAll(toMap(recording.getSupportedColumnStatistics()));
-        tableStatisticsCache.putAll(toMap(recording.getTableStatistics()));
-        partitionStatisticsCache.putAll(toMap(recording.getPartitionStatistics()));
-        allTablesCache.putAll(toMap(recording.getAllTables()));
-        allViewsCache.putAll(toMap(recording.getAllViews()));
-        partitionCache.putAll(toMap(recording.getPartitions()));
-        partitionNamesCache.putAll(toMap(recording.getPartitionNames()));
-        partitionNamesByPartsCache.putAll(toMap(recording.getPartitionNamesByParts()));
-        partitionsByNamesCache.putAll(toMap(recording.getPartitionsByNames()));
-        tablePrivilegesCache.putAll(toMap(recording.getTablePrivileges()));
-        roleGrantsCache.putAll(toMap(recording.getRoleGrants()));
+        allDatabases = fromJson.getAllDatabases();
+        allRoles = fromJson.getAllRoles();
+        databaseCache.putAll(toMap(fromJson.getDatabases()));
+        tableCache.putAll(toMap(fromJson.getTables()));
+        supportedColumnStatisticsCache.putAll(toMap(fromJson.getSupportedColumnStatistics()));
+        tableStatisticsCache.putAll(toMap(fromJson.getTableStatistics()));
+        partitionStatisticsCache.putAll(toMap(fromJson.getPartitionStatistics()));
+        allTablesCache.putAll(toMap(fromJson.getAllTables()));
+        allViewsCache.putAll(toMap(fromJson.getAllViews()));
+        partitionCache.putAll(toMap(fromJson.getPartitions()));
+        partitionNamesCache.putAll(toMap(fromJson.getPartitionNames()));
+        partitionNamesByPartsCache.putAll(toMap(fromJson.getPartitionNamesByParts()));
+        partitionsByNamesCache.putAll(toMap(fromJson.getPartitionsByNames()));
+        tablePrivilegesCache.putAll(toMap(fromJson.getTablePrivileges()));
+        roleGrantsCache.putAll(toMap(fromJson.getRoleGrants()));
+    }
+
+    public RecordingHiveMetastore(HiveMetastore delegate, HiveMetastoreRecording recording)
+    {
+        this.delegate = requireNonNull(delegate, "delegate is null");
+        this.recording = requireNonNull(recording, "recording is null");
+        this.recordingPath = null;
+        this.replay = false;
+        this.databaseCache = null;
+        this.tableCache = null;
+        this.supportedColumnStatisticsCache = null;
+        this.tableStatisticsCache = null;
+        this.partitionStatisticsCache = null;
+        this.allTablesCache = null;
+        this.allViewsCache = null;
+        this.partitionCache = null;
+        this.partitionNamesCache = null;
+        this.partitionNamesByPartsCache = null;
+        this.partitionsByNamesCache = null;
+        this.tablePrivilegesCache = null;
+        this.roleGrantsCache = null;
     }
 
     private static <K, V> Cache<K, V> createCache(HiveConfig hiveConfig)
@@ -154,7 +178,7 @@ public class RecordingHiveMetastore
             throw new IllegalStateException("Cannot write recording in replay mode");
         }
 
-        Recording recording = new Recording(
+        Recording fromJson = new Recording(
                 allDatabases,
                 allRoles,
                 toPairs(databaseCache),
@@ -171,7 +195,7 @@ public class RecordingHiveMetastore
                 toPairs(tablePrivilegesCache),
                 toPairs(roleGrantsCache));
 
-        Files.write(recordingPath, RECORDING_CODEC.toJsonBytes(recording));
+        Files.write(recordingPath, RECORDING_CODEC.toJsonBytes(fromJson));
     }
 
     private static <K, V> Map<K, V> toMap(List<Pair<K, V>> pairs)

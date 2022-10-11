@@ -29,6 +29,8 @@ public class IntegerStatisticsBuilder
     private long sum;
     private boolean overflow;
 
+    private final BloomFilterBuilder bloomFilterBuilder;
+
     @Override
     public void addValue(long value)
     {
@@ -112,5 +114,15 @@ public class IntegerStatisticsBuilder
             }
         }
         return integerStatisticsBuilder.buildIntegerStatistics();
+    }
+
+    public IntegerStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
+    {
+        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder is null");
+    }
+
+    public IntegerStatisticsBuilder()
+    {
+        this.bloomFilterBuilder = null;
     }
 }

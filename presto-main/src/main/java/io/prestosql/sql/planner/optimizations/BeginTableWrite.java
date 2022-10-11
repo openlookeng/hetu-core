@@ -17,7 +17,9 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.connector.BeginTableExecuteResult;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.operator.ReuseExchangeOperator;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -32,6 +34,8 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
@@ -49,10 +53,15 @@ import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.planner.plan.ChildReplacer.replaceChildren;
 import static java.util.stream.Collectors.toSet;
@@ -153,6 +162,26 @@ public class BeginTableWrite
         }
 
         @Override
+        public PlanNode visitTableExecute(PlanNode planNode, RewriteContext<Context> context)
+        {
+            if (context == null) {
+                throw new IllegalStateException("WriterTarget not present");
+            }
+            TableExecuteNode node = (TableExecuteNode) planNode;
+            TableWriterNode.TableExecuteTarget tableExecuteTarget = (TableWriterNode.TableExecuteTarget) context.get().materializedHandle.get();
+            return new TableExecuteNode(
+                    node.getId(),
+                    rewriteModifyTableScan(node.getSource(), tableExecuteTarget.getSourceHandle().orElseThrow(() -> new NoSuchElementException("No value present"))),
+                    tableExecuteTarget,
+                    node.getRowCountSymbol(),
+                    node.getFragmentSymbol(),
+                    node.getColumns(),
+                    node.getColumnNames(),
+                    node.getPartitioningScheme(),
+                    node.getPreferredPartitioningScheme());
+        }
+
+        @Override
         public PlanNode visitStatisticsWriterNode(StatisticsWriterNode node, RewriteContext<Context> context)
         {
             PlanNode child = node.getSource();
@@ -220,7 +249,27 @@ public class BeginTableWrite
                         .collect(toSet());
                 return getOnlyElement(writerTargets);
             }
+            if (node instanceof TableExecuteNode) {
+                TableWriterNode.TableExecuteTarget target = ((TableExecuteNode) node).getTarget();
+                return new TableWriterNode.TableExecuteTarget(
+                        target.getExecuteHandle(),
+                        findTableScanHandleForTableExecute(((TableExecuteNode) node).getSource()),
+                        target.getSchemaTableName(),
+                        target.isReportingWrittenBytesSupported());
+            }
             throw new IllegalArgumentException("Invalid child for TableCommitNode: " + node.getClass().getSimpleName());
+        }
+
+        private Optional<TableHandle> findTableScanHandleForTableExecute(PlanNode startNode)
+        {
+            List<PlanNode> tableScanNodes = PlanNodeSearcher.searchFrom(startNode)
+                    .where(node -> node instanceof TableScanNode)
+                    .findAll();
+
+            if (tableScanNodes.size() == 1) {
+                return Optional.of(((TableScanNode) tableScanNodes.get(0)).getTable());
+            }
+            throw new IllegalArgumentException("Expected to find exactly one update target TableScanNode in plan but found: " + tableScanNodes);
         }
 
         private WriterTarget createWriterTarget(WriterTarget target)
@@ -260,6 +309,11 @@ public class BeginTableWrite
                 return new VacuumTarget(metadata.beginVacuum(session, vacuum.getHandle(), vacuum.isFull(), vacuum.isUnify(), vacuum.getPartition()),
                         metadata.getTableMetadata(session, vacuum.getHandle()).getTable());
             }
+            if (target instanceof TableWriterNode.TableExecuteTarget) {
+                TableWriterNode.TableExecuteTarget tableExecute = (TableWriterNode.TableExecuteTarget) target;
+                BeginTableExecuteResult<TableExecuteHandle, TableHandle> result = metadata.beginTableExecute(session, tableExecute.getExecuteHandle(), tableExecute.getMandatorySourceHandle());
+                return new TableWriterNode.TableExecuteTarget(result.getTableExecuteHandle(), Optional.of(result.getSourceHandle()), tableExecute.getSchemaTableName(), tableExecute.isReportingWrittenBytesSupported());
+            }
             throw new IllegalArgumentException("Unhandled target type: " + target.getClass().getSimpleName());
         }
 
@@ -288,6 +342,35 @@ public class BeginTableWrite
 
         private PlanNode rewriteModifyTableScan(PlanNode node, TableHandle handle)
         {
+            if (node instanceof ExchangeNode) {
+                AtomicInteger modifyCount = new AtomicInteger(0);
+                PlanNode rewrittenNode = SimplePlanRewriter.rewriteWith(
+                        new SimplePlanRewriter<Void>()
+                        {
+                            @Override
+                            public PlanNode visitTableScan(TableScanNode scan, RewriteContext<Void> context)
+                            {
+                                modifyCount.incrementAndGet();
+                                return new TableScanNode(
+                                        scan.getId(),
+                                        handle,
+                                        scan.getOutputSymbols(),
+                                        scan.getAssignments(),
+                                        scan.getEnforcedConstraint(),
+                                        Optional.empty(),
+                                        ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
+                                        // partitioning should not change with write table handle
+                                        UUID.randomUUID(),
+                                        1,
+                                        false);
+                            }
+                        },
+                        node,
+                        null);
+                verify(modifyCount.get() == 1, "Expected to find exactly one update target TableScanNode but found %s", modifyCount);
+                return rewrittenNode;
+            }
+
             if (node instanceof TableScanNode) {
                 TableScanNode scan = (TableScanNode) node;
                 return new TableScanNode(
@@ -339,6 +422,11 @@ public class BeginTableWrite
         {
             checkState(this.handle.get().equals(handle), "can't find materialized handle for WriterTarget");
             return materializedHandle;
+        }
+
+        private static WriterTarget getContextTarget(SimplePlanRewriter.RewriteContext<Optional<WriterTarget>> context)
+        {
+            return context.get().orElseThrow(() -> new IllegalStateException("WriterTarget not present"));
         }
     }
 }

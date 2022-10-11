@@ -301,6 +301,11 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
     }
 
+    public AggregatedMemoryContext getCurrentStripeSystemMemoryContext()
+    {
+        return this.currentStripeSystemMemoryContext;
+    }
+
     private boolean filterStripeUsingIndex(StripeInformation stripe, Map<Long, List<IndexMetadata>> stripeOffsetToIndex,
             Map<String, Domain> and, Map<String, List<Domain>> or)
     {
@@ -531,7 +536,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                 }
             }
         }
-
         if (writeChecksumBuilder.isPresent()) {
             OrcWriteValidation.WriteChecksum actualChecksum = writeChecksumBuilder.get().build();
             validateWrite(validation -> validation.getChecksum().getTotalRowCount() == actualChecksum.getTotalRowCount(), "Invalid row count");

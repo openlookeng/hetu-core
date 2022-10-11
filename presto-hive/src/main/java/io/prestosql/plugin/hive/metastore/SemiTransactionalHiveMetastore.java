@@ -251,6 +251,29 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    public synchronized Optional<Table> getTable(String databaseName, String tableName)
+    {
+        checkReadable();
+        Action<TableAndMore> tableAction = tableActions.get(new SchemaTableName(databaseName, tableName));
+        if (tableAction == null) {
+            return closure.getTable(databaseName, tableName);
+        }
+        switch (tableAction.getType()) {
+            case ADD:
+            case ALTER:
+            case INSERT_EXISTING:
+            case DELETE_ROWS:
+            case UPDATE:
+                return Optional.of(tableAction.getData().getTable());
+            case DROP:
+                return Optional.empty();
+            case DROP_PRESERVE_DATA:
+                // TODO
+                break;
+        }
+        throw new IllegalStateException("Unknown action type");
+    }
+
     public synchronized Set<ColumnStatisticType> getSupportedColumnStatistics(Type type)
     {
         return delegate.getSupportedColumnStatistics(type);
@@ -2678,7 +2701,10 @@ public class SemiTransactionalHiveMetastore
         DROP,
         ADD,
         ALTER,
-        INSERT_EXISTING
+        INSERT_EXISTING,
+        DELETE_ROWS,
+        UPDATE,
+        DROP_PRESERVE_DATA
     }
 
     private enum TableSource

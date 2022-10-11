@@ -36,7 +36,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Group input data and produce a single block for each sequence of identical values.
  */
-@RestorableConfig(uncapturedFields = {"snapshotState"})
+@RestorableConfig(uncapturedFields = "snapshotState")
 public class AggregationOperator
         implements Operator
 {

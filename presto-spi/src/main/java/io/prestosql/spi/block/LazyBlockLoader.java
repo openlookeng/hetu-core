@@ -16,4 +16,9 @@ package io.prestosql.spi.block;
 public interface LazyBlockLoader<T>
 {
     void load(LazyBlock<T> block);
+
+    default Block load()
+    {
+        return null;
+    }
 }

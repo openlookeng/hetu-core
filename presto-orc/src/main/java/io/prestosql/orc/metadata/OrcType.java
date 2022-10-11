@@ -14,6 +14,7 @@
 package io.prestosql.orc.metadata;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
@@ -23,6 +24,7 @@ import io.prestosql.spi.type.VarcharType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -67,6 +69,7 @@ public class OrcType
 
         DATE,
         TIMESTAMP,
+        TIMESTAMP_INSTANT,
 
         LIST,
         MAP,
@@ -80,6 +83,8 @@ public class OrcType
     private final Optional<Integer> length;
     private final Optional<Integer> precision;
     private final Optional<Integer> scale;
+
+    private final Map<String, String> attributes;
 
     private OrcType(OrcTypeKind orcTypeKind)
     {
@@ -115,6 +120,24 @@ public class OrcType
         this.length = requireNonNull(length, "length is null");
         this.precision = requireNonNull(precision, "precision is null");
         this.scale = requireNonNull(scale, "scale can not be null");
+        this.attributes = null;
+    }
+
+    public OrcType(OrcTypeKind orcTypeKind, List<OrcColumnId> fieldTypeIndexes, List<String> fieldNames, Optional<Integer> length, Optional<Integer> precision, Optional<Integer> scale, Map<String, String> attributes)
+    {
+        this.orcTypeKind = requireNonNull(orcTypeKind, "orcTypeKind is null");
+        this.fieldTypeIndexes = ImmutableList.copyOf(requireNonNull(fieldTypeIndexes, "fieldTypeIndexes is null"));
+        if (fieldNames == null || (fieldNames.isEmpty() && !fieldTypeIndexes.isEmpty())) {
+            this.fieldNames = null;
+        }
+        else {
+            this.fieldNames = ImmutableList.copyOf(requireNonNull(fieldNames, "fieldNames is null"));
+            checkArgument(fieldNames.size() == fieldTypeIndexes.size(), "fieldNames and fieldTypeIndexes have different sizes");
+        }
+        this.length = requireNonNull(length, "length is null");
+        this.precision = requireNonNull(precision, "precision is null");
+        this.scale = requireNonNull(scale, "scale cannot be null");
+        this.attributes = ImmutableMap.copyOf(requireNonNull(attributes, "attributes is null"));
     }
 
     public OrcTypeKind getOrcTypeKind()
@@ -292,5 +315,10 @@ public class OrcType
         fieldTypesList.forEach(orcTypes::addAll);
 
         return orcTypes.build();
+    }
+
+    public Map<String, String> getAttributes()
+    {
+        return attributes;
     }
 }

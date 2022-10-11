@@ -849,7 +849,7 @@ public abstract class AbstractTestHive
         public HiveTransaction(HiveTransactionManager transactionManager, HiveMetadata hiveMetadata)
         {
             this.transactionManager = requireNonNull(transactionManager, "transactionManager is null");
-            this.transactionHandle = new HiveTransactionHandle();
+            this.transactionHandle = new HiveTransactionHandle(false);
             transactionManager.put(transactionHandle, hiveMetadata);
             getMetastore().testOnlyThrowOnCleanupFailures();
         }

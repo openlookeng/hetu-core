@@ -208,6 +208,16 @@ class QueryPlanner
                 computeOutputs(builder, analysis.getOutputExpressions(query)));
     }
 
+    public static List<Symbol> visibleFields(RelationPlan subPlan)
+    {
+        RelationType descriptor = subPlan.getDescriptor();
+        return descriptor.getAllFields().stream()
+                .filter(field -> !field.isHidden())
+                .map(descriptor::indexOf)
+                .map(subPlan.getFieldMappings()::get)
+                .collect(toImmutableList());
+    }
+
     public RelationPlan plan(QuerySpecification node)
     {
         PlanBuilder builder = planFrom(node);
@@ -1507,8 +1517,8 @@ class QueryPlanner
         private final Optional<RowExpression> predicate;
 
         UpdateDeleteRelationPlan(RelationPlan plan, List<String> columNames,
-                Map<Symbol, ColumnHandle> columnAssignments,
-                Optional<RowExpression> predicate)
+                                 Map<Symbol, ColumnHandle> columnAssignments,
+                                 Optional<RowExpression> predicate)
         {
             this.plan = plan;
             this.columNames = columNames;
