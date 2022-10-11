@@ -14,6 +14,7 @@
 package io.hetu.core.plugin.iceberg;
 
 import io.airlift.slice.Slice;
+import io.prestosql.plugin.hive.ReaderProjectionsAdapterTest;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
@@ -196,7 +197,8 @@ public class IcebergBucketFunctionTest
     public void testGetBucket()
     {
         // Setup
-        final Page page = new Page(0, new Properties(), null);
+        ReaderProjectionsAdapterTest.Block block = new ReaderProjectionsAdapterTest.Block();
+        final Page page = new Page(0, (Block) new Properties(), (Block) Arrays.asList(block));
 
         // Run the test
         final int result = icebergBucketFunctionUnderTest.getBucket(page, 0);

@@ -24,6 +24,7 @@ import io.prestosql.orc.OrcWriteValidation;
 import io.prestosql.plugin.hive.HiveCompressionCodec;
 import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -35,6 +36,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,6 +66,8 @@ import static org.apache.iceberg.types.Types.NestedField.optional;
 
 public class IcebergTestUtil
 {
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
+
     private IcebergTestUtil()
     {
     }
@@ -152,6 +157,7 @@ public class IcebergTestUtil
                 columnMetadata.add(col);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
         List<Types.NestedField> icebergColumns = new ArrayList<>();
@@ -164,6 +170,7 @@ public class IcebergTestUtil
                     icebergColumns.add(field);
                 }
                 catch (Exception e) {
+                    LOG.error(e.getMessage());
                 }
             }
         }

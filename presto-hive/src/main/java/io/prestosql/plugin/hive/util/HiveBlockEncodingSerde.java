@@ -101,17 +101,18 @@ public final class HiveBlockEncodingSerde
     @Override
     public void writeBlock(SliceOutput output, Block block)
     {
+        Block block1 = block;
         while (true) {
             // get the encoding name
-            String encodingName = block.getEncodingName();
+            String encodingName = block1.getEncodingName();
 
             // look up the encoding factory
             BlockEncoding blockEncoding = blockEncodings.get(encodingName);
 
             // see if a replacement block should be written instead
-            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(block);
+            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(block1);
             if (replacementBlock.isPresent()) {
-                block = replacementBlock.get();
+                block1 = replacementBlock.get();
                 continue;
             }
 
@@ -119,7 +120,7 @@ public final class HiveBlockEncodingSerde
             writeLengthPrefixedString(output, encodingName);
 
             // write the block to the output
-            blockEncoding.writeBlock(this, output, block);
+            blockEncoding.writeBlock(this, output, block1);
 
             break;
         }

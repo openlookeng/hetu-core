@@ -22,6 +22,8 @@ import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.mockito.Mockito.verify;
 import static org.mockito.MockitoAnnotations.initMocks;
 
@@ -50,6 +52,6 @@ public class UuidValueWriterTest
         uuidValueWriterUnderTest.write(block);
 
         // Verify the results
-        verify(mockValuesWriter).writeBytes(Binary.fromReusedByteArray("content".getBytes()));
+        verify(mockValuesWriter).writeBytes(Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8)));
     }
 }

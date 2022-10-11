@@ -59,19 +59,6 @@ public class TableScanNodeTest
         // Verify the results
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final PlanVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        tableScanNodeUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testToString() throws Exception
     {
@@ -134,54 +121,6 @@ public class TableScanNodeTest
         // Verify the results
         assertTrue(result);
     }
-
-//    @Test
-//    public void testNewInstance() throws Exception
-//    {
-//        // Setup
-//        final PlanNodeId id = new PlanNodeId("id");
-//        final TableHandle table = new TableHandle(new CatalogName("catalogName"), null, null, Optional.empty());
-//        final List<Symbol> outputs = Arrays.asList(new Symbol("name"));
-//        final Map<Symbol, ColumnHandle> assignments = new HashMap<>();
-//
-//        // Run the test
-//        final TableScanNode result = TableScanNode.newInstance(id, table, outputs, assignments,
-//                ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-//                UUID.fromString("a4fdc7af-2635-4dfb-a1b4-37c5a18bd87b"), 0, false);
-//        assertEquals(null, result.getFilterExpr());
-//        assertEquals(new TableHandle(new CatalogName("catalogName"), null, null, Optional.empty()), result.getTable());
-//        assertTrue(result.isForDelete());
-//        assertEquals(Arrays.asList(new Symbol("name")), result.getOutputSymbols());
-//        assertEquals(new HashMap<>(), result.getAssignments());
-//        assertEquals(ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT, result.getStrategy());
-//        assertEquals(UUID.fromString("67c76a11-1cd1-46a5-bceb-2ed8eeb0b333"), result.getReuseTableScanMappingId());
-//        assertEquals(0, result.getConsumerTableScanNodeCount());
-//        assertEquals(TupleDomain.withColumnDomains(new HashMap<>()), result.getEnforcedConstraint());
-//        assertEquals(Optional.empty(), result.getPredicate());
-//        assertEquals(Arrays.asList(), result.getSources());
-//        final PlanVisitor<R, C> visitor = null;
-//        final C context = null;
-//        assertEquals(null, result.accept(visitor, context));
-//        assertEquals("result", result.toString());
-//        final List<PlanNode> newChildren = Arrays.asList();
-//        assertEquals(null, result.replaceChildren(newChildren));
-//        final List<PlanNode> n1 = Arrays.asList();
-//        final List<PlanNode> n2 = Arrays.asList();
-//        assertTrue(result.isSourcesEqual(n1, n2));
-//        final List<Symbol> s1 = Arrays.asList(new Symbol("name"));
-//        final List<Symbol> s2 = Arrays.asList(new Symbol("name"));
-//        assertTrue(result.isSymbolsEqual(s1, s2));
-//        final TableScanNode curr = new TableScanNode(new PlanNodeId("id"),
-//                new TableHandle(new CatalogName("catalogName"), null, null, Optional.empty()),
-//                Arrays.asList(new Symbol("name")), new HashMap<>(), TupleDomain.withColumnDomains(new HashMap<>()),
-//                Optional.empty(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-//                UUID.fromString("67c76a11-1cd1-46a5-bceb-2ed8eeb0b333"), 0, false);
-//        assertTrue(result.isPredicateSame(curr));
-//        assertEquals(new PlanNodeId("id"), result.getId());
-//        assertEquals(Arrays.asList(new Symbol("name")), result.getInputSymbols());
-//        assertEquals(Arrays.asList(new Symbol("name")), result.getAllSymbols());
-//        assertEquals(PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES, result.getSkipOptRuleLevel());
-//    }
 
     @Test
     public void testGetActualColName() throws Exception

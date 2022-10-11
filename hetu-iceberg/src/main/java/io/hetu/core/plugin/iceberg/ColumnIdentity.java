@@ -58,14 +58,14 @@ public class ColumnIdentity
                 children.isEmpty() == (typeCategory == PRIMITIVE),
                 "Children should be empty if and only if column type is primitive");
         ImmutableMap.Builder<Integer, ColumnIdentity> childrenBuilder = ImmutableMap.builder();
-        ImmutableMap.Builder<Integer, Integer> childFieldIdToIndex = ImmutableMap.builder();
+        ImmutableMap.Builder<Integer, Integer> fieldIdToIndex = ImmutableMap.builder();
         for (int i = 0; i < children.size(); i++) {
             ColumnIdentity child = children.get(i);
             childrenBuilder.put(child.getId(), child);
-            childFieldIdToIndex.put(child.getId(), i);
+            fieldIdToIndex.put(child.getId(), i);
         }
         this.children = childrenBuilder.build();
-        this.childFieldIdToIndex = childFieldIdToIndex.build();
+        this.childFieldIdToIndex = fieldIdToIndex.build();
     }
 
     @JsonProperty
@@ -149,24 +149,24 @@ public class ColumnIdentity
 
     public static ColumnIdentity createColumnIdentity(Types.NestedField column)
     {
-        int id = column.fieldId();
-        String name = column.name();
+        int colId = column.fieldId();
+        String cliName = column.name();
         org.apache.iceberg.types.Type fieldType = column.type();
 
         if (!fieldType.isNestedType()) {
-            return new ColumnIdentity(id, name, PRIMITIVE, ImmutableList.of());
+            return new ColumnIdentity(colId, cliName, PRIMITIVE, ImmutableList.of());
         }
 
         if (fieldType.isListType()) {
             ColumnIdentity elementColumn = createColumnIdentity(getOnlyElement(fieldType.asListType().fields()));
-            return new ColumnIdentity(id, name, ARRAY, ImmutableList.of(elementColumn));
+            return new ColumnIdentity(colId, cliName, ARRAY, ImmutableList.of(elementColumn));
         }
 
         if (fieldType.isStructType()) {
             List<ColumnIdentity> fieldColumns = fieldType.asStructType().fields().stream()
                     .map(ColumnIdentity::createColumnIdentity)
                     .collect(toImmutableList());
-            return new ColumnIdentity(id, name, STRUCT, fieldColumns);
+            return new ColumnIdentity(colId, cliName, STRUCT, fieldColumns);
         }
 
         if (fieldType.isMapType()) {
@@ -174,7 +174,7 @@ public class ColumnIdentity
                     .map(ColumnIdentity::createColumnIdentity)
                     .collect(toImmutableList());
             checkArgument(keyValueColumns.size() == 2, "Expected map type to have two fields");
-            return new ColumnIdentity(id, name, MAP, keyValueColumns);
+            return new ColumnIdentity(colId, cliName, MAP, keyValueColumns);
         }
 
         throw new UnsupportedOperationException(format("Iceberg column type %s is not supported", fieldType.typeId()));

@@ -55,9 +55,9 @@ public class Int128
             throw new IllegalArgumentException("Expected long[2]");
         }
 
-        long high = value[0];
-        long low = value[1];
-        return valueOf(high, low);
+        long highValue = value[0];
+        long lowValue = value[1];
+        return valueOf(highValue, lowValue);
     }
 
     public static Int128 valueOf(long high, long low)
@@ -72,16 +72,16 @@ public class Int128
 
     public static Int128 valueOf(BigInteger value)
     {
-        long low = value.longValue();
-        long high;
+        long lowValue = value.longValue();
+        long highValue;
         try {
-            high = value.shiftRight(64).longValueExact();
+            highValue = value.shiftRight(64).longValueExact();
         }
         catch (ArithmeticException e) {
             throw new ArithmeticException("BigInteger out of Int128 range");
         }
 
-        return new Int128(high, low);
+        return new Int128(highValue, lowValue);
     }
 
     public static Int128 valueOf(long value)

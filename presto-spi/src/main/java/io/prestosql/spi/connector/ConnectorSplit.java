@@ -21,11 +21,6 @@ import java.util.List;
 
 public interface ConnectorSplit
 {
-    default SplitWeight getSplitWeight()
-    {
-        return SplitWeight.standard();
-    }
-
     default boolean isSplitEmpty()
     {
         return false;
@@ -67,6 +62,11 @@ public interface ConnectorSplit
         return 1;
     }
 
+    default SplitWeight getSplitWeight()
+    {
+        return SplitWeight.standard();
+    }
+
     default List<ConnectorSplit> getUnwrappedSplits()
     {
         throw new NotImplementedException();
@@ -74,6 +74,6 @@ public interface ConnectorSplit
 
     default long getRetainedSizeInBytes()
     {
-        throw new UnsupportedOperationException("This connector does not provide memory accounting capabilities for ConnectorSplit");
+        return 0;
     }
 }

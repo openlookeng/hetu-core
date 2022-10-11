@@ -35,7 +35,7 @@ public class ConstantPopulatingPageSourceTest
     public void testBuilder()
     {
         ConstantPopulatingPageSource.Builder builder = ConstantPopulatingPageSource.builder();
-        ConnectorPageSource connectorPageSource = new ConnectorPageSource()
+        ConnectorPageSource pageSourcew = new ConnectorPageSource()
         {
             @Override
             public long getCompletedBytes()
@@ -73,8 +73,8 @@ public class ConstantPopulatingPageSourceTest
             }
         };
         ConstantPopulatingPageSource.Builder builde = builder.addDelegateColumn(10);
-        this.constantPopulatingPageSourceUnderTest = (ConstantPopulatingPageSource) builde.build(connectorPageSource);
-        ConnectorPageSource build = builder.build(connectorPageSource);
+        this.constantPopulatingPageSourceUnderTest = (ConstantPopulatingPageSource) builde.build(pageSourcew);
+        ConnectorPageSource build = builder.build(pageSourcew);
     }
 
     @Test

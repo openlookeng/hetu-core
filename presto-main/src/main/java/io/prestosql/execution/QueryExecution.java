@@ -14,10 +14,11 @@
 package io.prestosql.execution;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
+import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.QueryTracker.TrackedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -30,7 +31,7 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Plan;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
@@ -94,9 +95,39 @@ public interface QueryExecution
         // no-op
     }
 
+    default int getPriority()
+    {
+        return 1;
+    }
+
+    default void setPriority(int priority)
+    {
+        // no-op
+    }
+
+    default void spillQueryRevocableMemory()
+    {
+        // no-op
+    }
+
     interface QueryExecutionFactory<T extends QueryExecution>
     {
         T createQueryExecution(PreparedQuery preparedQuery, QueryStateMachine stateMachine, String slug, WarningCollector warningCollector);
+    }
+
+    default PlanCostEstimate getEstimates()
+    {
+        return PlanCostEstimate.unknown();
+    }
+
+    default int getTryCount()
+    {
+        return 0;
+    }
+
+    default void setTryCount(int tryCount)
+    {
+        // NO_OP
     }
 
     /**
@@ -109,14 +140,14 @@ public interface QueryExecution
     {
         private final List<String> columnNames;
         private final List<Type> columnTypes;
-        private final Set<TaskLocation> bufferLocations;
+        private final Map<TaskId, TaskLocation> bufferLocations;
         private final boolean noMoreBufferLocations;
 
-        public QueryOutputInfo(List<String> columnNames, List<Type> columnTypes, Set<TaskLocation> bufferLocations, boolean noMoreBufferLocations)
+        public QueryOutputInfo(List<String> columnNames, List<Type> columnTypes, Map<TaskId, TaskLocation> bufferLocations, boolean noMoreBufferLocations)
         {
             this.columnNames = ImmutableList.copyOf(requireNonNull(columnNames, "columnNames is null"));
             this.columnTypes = ImmutableList.copyOf(requireNonNull(columnTypes, "columnTypes is null"));
-            this.bufferLocations = ImmutableSet.copyOf(requireNonNull(bufferLocations, "bufferLocations is null"));
+            this.bufferLocations = ImmutableMap.copyOf(requireNonNull(bufferLocations, "bufferLocations is null"));
             this.noMoreBufferLocations = noMoreBufferLocations;
         }
 
@@ -130,7 +161,7 @@ public interface QueryExecution
             return columnTypes;
         }
 
-        public Set<TaskLocation> getBufferLocations()
+        public Map<TaskId, TaskLocation> getBufferLocations()
         {
             return bufferLocations;
         }

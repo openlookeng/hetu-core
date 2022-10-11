@@ -15,14 +15,18 @@ package io.prestosql.execution.buffer;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.Page;
 
 import javax.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OutputBuffer
 {
@@ -100,6 +104,18 @@ public interface OutputBuffer
     void abort(OutputBufferId bufferId);
 
     /**
+     * Abort the buffer, discarding all pages, but blocking readers. Its is expected
+     * readers will be unblocked when the failed query is cleaned up.
+     */
+    void abort();
+
+    /**
+     *
+     * @return non-empty failure cause if the buffer is in state {@link BufferState#FAILED}
+     */
+    Optional<Throwable> getFailureCause();
+
+    /**
      * Get a future that will be completed when the buffer is not full.
      */
     ListenableFuture<?> isFull();
@@ -123,6 +139,11 @@ public interface OutputBuffer
     void setNoMorePages();
 
     /**
+     * Get buffer state
+     */
+    BufferState getState();
+
+    /**
      * Destroys the buffer, discarding all pages.
      */
     void destroy();
@@ -137,4 +158,22 @@ public interface OutputBuffer
      * @return the peak memory usage of this output buffer.
      */
     long getPeakMemoryUsage();
+
+    /**
+     * @return true in case of spooling output buffer.
+     */
+    default boolean isSpoolingOutputBuffer()
+    {
+        return false;
+    }
+
+    default DirectSerialisationType getExchangeDirectSerialisationType()
+    {
+        return DirectSerialisationType.OFF;
+    }
+
+    default void enqueuePages(int partition, List<Page> pages, String id, PagesSerde directSerde)
+    {
+        return;
+    }
 }

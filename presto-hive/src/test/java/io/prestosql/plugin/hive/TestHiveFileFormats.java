@@ -90,8 +90,8 @@ import static org.testng.Assert.fail;
 public class TestHiveFileFormats
         extends AbstractTestHiveFileFormats
 {
-    private static final Logger LOG = Logger.get(TestHiveFileFormats.class);
     private static final FileFormatDataSourceStats STATS = new FileFormatDataSourceStats();
+    private static final Logger log = Logger.get(HiveConnector.class);
     private static TestingConnectorSession parquetPageSourceSession = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
     private static TestingConnectorSession parquetPageSourceSessionUseName = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(true), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
 
@@ -835,7 +835,7 @@ public class TestHiveFileFormats
             File file = File.createTempFile("presto_test", formatName + compressionSuffix);
 
             if (!file.delete()) {
-                LOG.error("File deletion failed");
+                log.error("File deletion failed");
             }
 
             try {

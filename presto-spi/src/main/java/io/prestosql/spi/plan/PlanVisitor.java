@@ -17,7 +17,7 @@ public abstract class PlanVisitor<R, C>
 {
     public R visitTableExecute(PlanNode node, C context)
     {
-        return visitPlan(node, context); //todo xjp
+        return visitPlan(node, context);
     }
 
     public abstract R visitPlan(PlanNode node, C context);

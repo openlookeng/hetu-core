@@ -28,6 +28,8 @@ import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.RetryPolicy;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.FailureRetryConfig;
@@ -190,7 +192,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                failureDetectorManager, null);
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -277,7 +279,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                failureDetectorManager, null);
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -324,7 +326,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                failureDetectorManager, null);
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -358,7 +360,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                failureDetectorManager, null);
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -429,7 +431,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                failureDetectorManager, null);
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -487,7 +489,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                ticker, failureDetectorManager2, null);
+                ticker, failureDetectorManager2, null, new TaskId("taskid"));
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -559,7 +561,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                ticker, failureDetectorManager3, null);
+                ticker, failureDetectorManager3, null, new TaskId("taskid"));
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
         for (int i = 0; i < 11; i++) {
@@ -607,7 +609,7 @@ public class TestHttpPageBufferClient
                 scheduler,
                 pageBufferClientCallbackExecutor,
                 false,
-                ticker, failureDetectorManager1, null);
+                ticker, failureDetectorManager1, null, new TaskId("taskid"));
 
         assertStatus(client, location, "queued", 0, 0, 0, 0, "not scheduled");
 
@@ -699,7 +701,7 @@ public class TestHttpPageBufferClient
         }
     }
 
-    private static class TestingClientCallback
+    static class TestingClientCallback
             implements ClientCallback
     {
         private final CyclicBarrier done;

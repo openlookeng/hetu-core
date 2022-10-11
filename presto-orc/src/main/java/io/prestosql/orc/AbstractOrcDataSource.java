@@ -64,7 +64,6 @@ public abstract class AbstractOrcDataSource
         this.lazyReadSmallRanges = lazyReadSmallRanges;
         this.lastModifiedTime = lastModifiedTime;
 
-        //xjp
         this.estimatedSize = 0L;
         this.options = null;
     }

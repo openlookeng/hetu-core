@@ -42,6 +42,7 @@ import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -367,7 +368,7 @@ public class HiveMetastoreRecordingTest
     {
         // Setup
         when(mockRecordingCodec.toJsonBytes(any(HiveMetastoreRecording.Recording.class)))
-                .thenReturn("content".getBytes());
+                .thenReturn("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         hiveMetastoreRecordingUnderTest.writeRecording();

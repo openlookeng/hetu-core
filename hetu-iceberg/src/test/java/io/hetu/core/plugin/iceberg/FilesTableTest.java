@@ -13,8 +13,8 @@
  */
 package io.hetu.core.plugin.iceberg;
 
-import io.hetu.core.plugin.iceberg.catalog.TrinoCatalog;
 import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.plugin.hive.HiveTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.type.TypeManager;
@@ -38,13 +38,6 @@ public class FilesTableTest
     private Table mockIcebergTable;
 
     private FilesTable filesTableUnderTest;
-    private final TrinoCatalog catalog;
-
-    public FilesTableTest(TypeManager mockTypeManager, TrinoCatalog catalog)
-    {
-        this.mockTypeManager = mockTypeManager;
-        this.catalog = catalog;
-    }
 
     @BeforeMethod
     public void setUp() throws Exception
@@ -67,7 +60,7 @@ public class FilesTableTest
         final TupleDomain<Integer> constraint = TupleDomain.withColumnDomains(new HashMap<>());
 
         // Run the test
-        filesTableUnderTest.pageSource(null, null, constraint);
+        filesTableUnderTest.pageSource(new HiveTransactionHandle(), new HdfsFileIoProviderTest.ConnectorSession(), constraint);
 
         // Verify the results
     }

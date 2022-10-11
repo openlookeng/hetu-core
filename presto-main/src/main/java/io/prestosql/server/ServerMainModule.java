@@ -58,6 +58,7 @@ import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.SqlTaskManager;
 import io.prestosql.execution.StageInfo;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskManagementExecutor;
 import io.prestosql.execution.TaskManager;

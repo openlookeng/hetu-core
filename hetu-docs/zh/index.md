@@ -44,7 +44,7 @@ headless: true
     - [状态存储]({{< relref "./docs/admin/state-store.md" >}})
     - [元数据存储]({{< relref "./docs/admin/meta-store.md" >}})
     - [审计日志]({{< relref "./docs/admin/audit-log.md" >}})
-    - [可靠查询执行]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [可靠查询执行]({{< relref "./docs/admin/reliable-query/_index.md" >}})
     - [JDBC数据源多分片管理]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [扩展物理执行计划]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
@@ -93,6 +93,7 @@ headless: true
     - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
     - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
     - [PostgreSQL]({{< relref "./docs/connector/postgresql.md" >}})
+    - [SingleData]({{< relref "./docs/connector/singledata.md" >}})
     - [SQL Server]({{< relref "./docs/connector/sqlserver.md" >}})
     - [系统]({{< relref "./docs/connector/system.md" >}})
     - [Thrift]({{< relref "./docs/connector/thrift.md" >}})
@@ -220,6 +221,7 @@ headless: true
     - [任务资源]({{< relref "./docs/rest/task.md" >}})
 
 - [发行说明]("#")
+    - [1.8.0 (2022年9月30日)]({{< relref "./docs/releasenotes/releasenotes-1.8.0.md" >}})
     - [1.7.0 (2022年6月30日)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})
     - [1.6.1 (2022年4月27日)]({{< relref "./docs/releasenotes/releasenotes-1.6.1.md" >}})
     - [1.6.0 (2022年3月30日)]({{< relref "./docs/releasenotes/releasenotes-1.6.0.md" >}})

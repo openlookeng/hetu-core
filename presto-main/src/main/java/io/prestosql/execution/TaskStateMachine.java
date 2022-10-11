@@ -13,19 +13,28 @@
  */
 package io.prestosql.execution;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import org.joda.time.DateTime;
 
+import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static io.prestosql.execution.TaskState.FLUSHING;
 import static io.prestosql.execution.TaskState.RUNNING;
 import static io.prestosql.execution.TaskState.SUSPENDED;
 import static io.prestosql.execution.TaskState.TERMINAL_TASK_STATES;
@@ -41,11 +50,19 @@ public class TaskStateMachine
     private final TaskId taskId;
     private final StateMachine<TaskState> taskState;
     private final LinkedBlockingQueue<Throwable> failureCauses = new LinkedBlockingQueue<>();
+    private final Executor executor;
+
+    @GuardedBy("this")
+    private final Map<TaskId, Throwable> sourceTaskFailures = new HashMap<>();
+    @GuardedBy("this")
+    private final List<TaskFailureListener> sourceTaskFailureListeners = new ArrayList<>();
+    private AtomicInteger priority = new AtomicInteger(1);
 
     public TaskStateMachine(TaskId taskId, Executor executor)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
-        taskState = new StateMachine<>("task " + taskId, executor, TaskState.RUNNING, TERMINAL_TASK_STATES);
+        taskState = new StateMachine<>("task " + taskId, executor, RUNNING, TERMINAL_TASK_STATES);
+        this.executor = executor;
         taskState.addStateChangeListener(new StateChangeListener<TaskState>()
         {
             @Override
@@ -87,6 +104,11 @@ public class TaskStateMachine
     public LinkedBlockingQueue<Throwable> getFailureCauses()
     {
         return failureCauses;
+    }
+
+    public void transitionToFlushing()
+    {
+        taskState.setIf(FLUSHING, currentState -> currentState == RUNNING);
     }
 
     public void finished()
@@ -142,6 +164,32 @@ public class TaskStateMachine
         taskState.addStateChangeListenerToTail(stateChangeListener);
     }
 
+    public void sourceTaskFailed(TaskId taskId, Throwable failure)
+    {
+        List<TaskFailureListener> listeners;
+        synchronized (this) {
+            sourceTaskFailures.putIfAbsent(taskId, failure);
+            listeners = ImmutableList.copyOf(sourceTaskFailureListeners);
+        }
+        executor.execute(() -> {
+            for (TaskFailureListener listener : listeners) {
+                listener.onTaskFailed(taskId, failure);
+            }
+        });
+    }
+
+    public void addSourceTaskFailureListener(TaskFailureListener listener)
+    {
+        Map<TaskId, Throwable> failures;
+        synchronized (this) {
+            sourceTaskFailureListeners.add(listener);
+            failures = ImmutableMap.copyOf(sourceTaskFailures);
+        }
+        executor.execute(() -> {
+            failures.forEach(listener::onTaskFailed);
+        });
+    }
+
     @Override
     public String toString()
     {
@@ -150,5 +198,15 @@ public class TaskStateMachine
                 .add("taskState", taskState)
                 .add("failureCauses", failureCauses)
                 .toString();
+    }
+
+    public void setPriority(int priority)
+    {
+        this.priority.set(priority);
+    }
+
+    public int getPriority()
+    {
+        return priority.get();
     }
 }

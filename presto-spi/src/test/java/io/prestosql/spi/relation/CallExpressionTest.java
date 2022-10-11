@@ -13,7 +13,6 @@
  */
 package io.prestosql.spi.relation;
 
-//import io.prestosql.spi.block.TestMethodHandleUtil;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.type.Type;
 import org.mockito.Mock;
@@ -71,19 +70,6 @@ public class CallExpressionTest
     {
         assertEquals(0, callExpressionUnderTest.hashCode());
     }
-
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        callExpressionUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
 
     @Test
     public void testAbsEquals() throws Exception

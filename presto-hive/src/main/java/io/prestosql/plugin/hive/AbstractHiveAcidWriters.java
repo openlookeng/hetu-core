@@ -113,7 +113,6 @@ public abstract class AbstractHiveAcidWriters
         }
     }
 
-    // todo xjp
     protected void lazyInitializeDeleteFileWriter()
     {
         if (!deleteFileWriter.isPresent()) {

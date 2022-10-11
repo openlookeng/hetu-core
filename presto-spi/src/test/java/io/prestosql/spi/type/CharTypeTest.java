@@ -18,7 +18,6 @@ import io.prestosql.spi.block.BlockBuilderStatus;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
-//import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -60,14 +59,5 @@ public class CharTypeTest
         assertTrue(result.getBoolean(null, 0));
         assertEquals(0L, result.getLong(null, 0));
         assertEquals(0.0, result.getDouble(null, 0), 0.0001);
-//        final Block<T> block3 = null;
-//        assertEquals(null, result.get(block3, 0));
-//        assertEquals(Optional.of(new Type.Range("min", "max")), result.getRange());
-//        assertEquals(null, result.read(null));
-//        final TypeOperators typeOperators = new TypeOperators((val1, val2) -> {
-//            return "value";
-//        });
-//        assertEquals(TypeOperatorDeclaration.extractOperatorDeclaration(Object.class, null, Object.class),
-//                result.getTypeOperatorDeclaration(typeOperators));
     }
 }

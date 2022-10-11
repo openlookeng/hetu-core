@@ -47,19 +47,6 @@ public class ValuesNodeTest
         // Verify the results
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final PlanVisitor<R,C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = valuesNodeUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testReplaceChildren() throws Exception
     {

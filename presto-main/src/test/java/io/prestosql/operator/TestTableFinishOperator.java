@@ -18,9 +18,12 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.prestosql.Session;
+import io.prestosql.execution.TableExecuteContext;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.operator.TableFinishOperator.TableFinishOperatorFactory;
 import io.prestosql.operator.TableFinishOperator.TableFinisher;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
@@ -32,7 +35,6 @@ import io.prestosql.spi.snapshot.SnapshotTestUtil;
 import io.prestosql.spi.statistics.ColumnStatisticMetadata;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.TableExecuteContext;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -101,6 +103,8 @@ public class TestTableFinishOperator
         Session session = testSessionBuilder()
                 .setSystemProperty("statistics_cpu_timer_enabled", "true")
                 .build();
+        TableExecuteContextManager tableExecuteContextManager = new TableExecuteContextManager();
+        tableExecuteContextManager.registerTableExecuteContextForQuery(QueryId.valueOf("test_query"));
         TableFinishOperatorFactory operatorFactory = new TableFinishOperatorFactory(
                 0,
                 new PlanNodeId("node"),
@@ -112,7 +116,7 @@ public class TestTableFinishOperator
                         ImmutableList.of(LONG_MAX.bind(ImmutableList.of(2), Optional.empty())),
                         true),
                 descriptor,
-                null,
+                tableExecuteContextManager,
                 session);
         DriverContext driverContext = createTaskContext(scheduledExecutor, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)
@@ -177,6 +181,8 @@ public class TestTableFinishOperator
         Session session = testSessionBuilder()
                 .setSystemProperty("statistics_cpu_timer_enabled", "true")
                 .build();
+        TableExecuteContextManager tableExecuteContextManager = new TableExecuteContextManager();
+        tableExecuteContextManager.registerTableExecuteContextForQuery(QueryId.valueOf("test_query"));
         TableFinishOperatorFactory operatorFactory = new TableFinishOperatorFactory(
                 0,
                 new PlanNodeId("node"),
@@ -188,7 +194,7 @@ public class TestTableFinishOperator
                         ImmutableList.of(LONG_MAX.bind(ImmutableList.of(2), Optional.empty())),
                         true),
                 descriptor,
-                null,
+                tableExecuteContextManager,
                 session);
         DriverContext driverContext = createTaskContext(scheduledExecutor, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)

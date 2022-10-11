@@ -108,7 +108,6 @@ public final class OrcWriter
     private final int rowGroupMaxRowCount;
     private final int maxCompressionBufferSize;
     private final Map<String, String> userMetadata = new HashMap<>();
-//    private final Map<String, String> userMetadata;xjp
     private final CompressedMetadataWriter metadataWriter;
 
     private final List<ClosedStripe> closedStripes = new ArrayList<>();
@@ -166,7 +165,6 @@ public final class OrcWriter
         recordValidation(validation -> validation.setRowGroupMaxRowCount(rowGroupMaxRowCount));
         this.maxCompressionBufferSize = toIntExact(options.getMaxCompressionBufferSize().toBytes());
 
-//        this.userMetadata = buildUserMetadata(userMetadata);xjp
         this.userMetadata.putAll(buildUserMetadata(userMetadata));
         this.metadataWriter = new CompressedMetadataWriter(new OrcMetadataWriter(writeLegacyVersion), compression, maxCompressionBufferSize);
         this.stats = requireNonNull(stats, "stats is null");
@@ -262,7 +260,7 @@ public final class OrcWriter
         // create column writers
         OrcType rootType = orcTypes.get(ROOT_COLUMN);
         checkArgument(rootType.getFieldCount() == types.size());
-        ImmutableList.Builder<ColumnWriter> columnWriters = ImmutableList.builder();
+        ImmutableList.Builder<ColumnWriter> columnWriterBuilder = ImmutableList.builder();
         ImmutableSet.Builder<SliceDictionaryColumnWriter> sliceColumnWriters = ImmutableSet.builder();
         for (int fieldId = 0; fieldId < types.size(); fieldId++) {
             OrcColumnId fieldColumnIndex = rootType.getFieldTypeIndex(fieldId);
@@ -276,7 +274,7 @@ public final class OrcWriter
                     options.getMaxStringStatisticsLimit(),
                     getBloomFilterBuilder(options, columnNames.get(fieldId)),
                     options.isShouldCompactMinMax());
-            columnWriters.add(columnWriter);
+            columnWriterBuilder.add(columnWriter);
 
             if (columnWriter instanceof SliceDictionaryColumnWriter) {
                 sliceColumnWriters.add((SliceDictionaryColumnWriter) columnWriter);
@@ -289,7 +287,7 @@ public final class OrcWriter
                 }
             }
         }
-        this.columnWriters = columnWriters.build();
+        this.columnWriters = columnWriterBuilder.build();
         this.dictionaryCompressionOptimizer = new DictionaryCompressionOptimizer(
                 sliceColumnWriters.build(),
                 stripeMinBytes,
@@ -642,11 +640,11 @@ public final class OrcWriter
                 .mapToLong(stripe -> stripe.getStripeInformation().getNumberOfRows())
                 .sum();
 
-        Optional<ColumnMetadata<ColumnStatistics>> fileStats = toFileStats(closedStripes.stream()
+        Optional<ColumnMetadata<ColumnStatistics>> toFileStats = toFileStats(closedStripes.stream()
                 .map(ClosedStripe::getStatistics)
                 .map(StripeStatistics::getColumnStatistics)
                 .collect(toList()));
-        recordValidation(validation -> validation.setFileStatistics(fileStats));
+        recordValidation(validation -> validation.setFileStatistics(toFileStats));
 
         Map<String, Slice> localUserMetadata = this.userMetadata.entrySet().stream()
                 .collect(Collectors.toMap(Entry::getKey, entry -> utf8Slice(entry.getValue())));
@@ -658,7 +656,7 @@ public final class OrcWriter
                         .map(ClosedStripe::getStripeInformation)
                         .collect(toImmutableList()),
                 orcTypes,
-                fileStats,
+                toFileStats,
                 localUserMetadata);
 
         closedStripes.clear();
@@ -706,14 +704,14 @@ public final class OrcWriter
         int columnCount = stripes.get(0).size();
         checkArgument(stripes.stream().allMatch(stripe -> columnCount == stripe.size()));
 
-        ImmutableList.Builder<ColumnStatistics> fileStats = ImmutableList.builder();
+        ImmutableList.Builder<ColumnStatistics> columnStatisticsBuilder = ImmutableList.builder();
         for (int i = 0; i < columnCount; i++) {
             OrcColumnId columnId = new OrcColumnId(i);
-            fileStats.add(ColumnStatistics.mergeColumnStatistics(stripes.stream()
+            columnStatisticsBuilder.add(ColumnStatistics.mergeColumnStatistics(stripes.stream()
                     .map(stripe -> stripe.get(columnId))
                     .collect(toList())));
         }
-        return Optional.of(new ColumnMetadata<>(fileStats.build()));
+        return Optional.of(new ColumnMetadata<>(columnStatisticsBuilder.build()));
     }
 
     public void addUserMetadata(String key, String value)

@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -46,7 +47,7 @@ public class IcebergSplitTest
                 Arrays.asList(new HostAddress("host", 0)),
                 "partitionSpecJson",
                 "partitionDataJson",
-                Arrays.asList(new TrinoDeleteFile(0L, 0, FileContent.DATA, "path", FileFormat.ORC, 0L, 0L, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), "content".getBytes(), Arrays.asList(0), 0, Arrays.asList(0L))),
+                Arrays.asList(new TrinoDeleteFile(0L, 0, FileContent.DATA, "path", FileFormat.ORC, 0L, 0L, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), "content".getBytes(StandardCharsets.UTF_8), Arrays.asList(0), 0, Arrays.asList(0L))),
                 SplitWeight.standard());
     }
 

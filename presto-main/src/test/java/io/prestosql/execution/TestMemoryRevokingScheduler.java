@@ -23,6 +23,8 @@ import io.airlift.stats.CounterStat;
 import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.executor.TaskExecutor;
 import io.prestosql.memory.MemoryPool;
 import io.prestosql.memory.QueryContext;
@@ -123,7 +125,7 @@ public class TestMemoryRevokingScheduler
         SqlTask sqlTask1 = newSqlTask();
         SqlTask sqlTask2 = newSqlTask();
 
-        TaskContext taskContext1 = sqlTask1.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q1", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
+        TaskContext taskContext1 = sqlTask1.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q1", 1, 1, 0), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext11 = taskContext1.addPipelineContext(0, false, false, false);
         DriverContext driverContext111 = pipelineContext11.addDriverContext();
         OperatorContext operatorContext1 = driverContext111.addOperatorContext(1, new PlanNodeId("na"), "na");
@@ -131,7 +133,7 @@ public class TestMemoryRevokingScheduler
         DriverContext driverContext112 = pipelineContext11.addDriverContext();
         OperatorContext operatorContext3 = driverContext112.addOperatorContext(3, new PlanNodeId("na"), "na");
 
-        TaskContext taskContext2 = sqlTask2.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q2", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
+        TaskContext taskContext2 = sqlTask2.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q2", 1, 1, 0), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext21 = taskContext2.addPipelineContext(1, false, false, false);
         DriverContext driverContext211 = pipelineContext21.addDriverContext();
         OperatorContext operatorContext4 = driverContext211.addOperatorContext(4, new PlanNodeId("na"), "na");
@@ -253,7 +255,7 @@ public class TestMemoryRevokingScheduler
 
     private OperatorContext createContexts(SqlTask sqlTask)
     {
-        TaskContext taskContext = sqlTask.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q", 1, 1), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
+        TaskContext taskContext = sqlTask.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q", 1, 1, 0), executor), session, false, false, OptionalInt.empty(), Optional.empty(), TESTING_SERDE_FACTORY);
         PipelineContext pipelineContext = taskContext.addPipelineContext(0, false, false, false);
         DriverContext driverContext = pipelineContext.addDriverContext();
         OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("na"), "na");
@@ -291,7 +293,7 @@ public class TestMemoryRevokingScheduler
 
     private SqlTask newSqlTask()
     {
-        TaskId taskId = new TaskId("query", 0, idGeneator.incrementAndGet());
+        TaskId taskId = new TaskId("query", 0, idGeneator.incrementAndGet(), 0);
         String instanceId = "Testing instance id";
         URI location = URI.create("fake://task/" + taskId);
 
@@ -315,6 +317,7 @@ public class TestMemoryRevokingScheduler
                 Functions.identity(),
                 new DataSize(32, MEGABYTE),
                 new CounterStat(),
-                createTestMetadataManager());
+                createTestMetadataManager(),
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
     }
 }

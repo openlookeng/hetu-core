@@ -31,14 +31,14 @@ class FilteredOffsetIndex
      */
     public static FilteredOffsetIndex filterOffsetIndex(OffsetIndex offsetIndex, RowRanges rowRanges, long totalRowCount)
     {
-        IntList indexMap = new IntArrayList();
+        IntList intList = new IntArrayList();
         for (int i = 0, n = offsetIndex.getPageCount(); i < n; ++i) {
             long from = offsetIndex.getFirstRowIndex(i);
             if (rowRanges.isOverlapping(from, offsetIndex.getLastRowIndex(i, totalRowCount))) {
-                indexMap.add(i);
+                intList.add(i);
             }
         }
-        return new FilteredOffsetIndex(offsetIndex, indexMap.toIntArray());
+        return new FilteredOffsetIndex(offsetIndex, intList.toIntArray());
     }
 
     private final OffsetIndex offsetIndex;

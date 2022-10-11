@@ -164,16 +164,16 @@ public abstract class AbstractIcebergTableOperations
     public String metadataFileLocation(String filename)
     {
         TableMetadata metadata = current();
-        String location;
+        String local;
         if (metadata != null) {
             String writeLocation = metadata.properties().get(WRITE_METADATA_LOCATION);
             if (writeLocation != null) {
                 return format("%s/%s", writeLocation, filename);
             }
-            location = metadata.location();
+            local = metadata.location();
         }
         else {
-            location = this.location.orElseThrow(() -> new IllegalStateException("Location not set"));
+            local = this.location.orElseThrow(() -> new IllegalStateException("Location not set"));
         }
         return format("%s/%s/%s", location, METADATA_FOLDER_NAME, filename);
     }
@@ -237,9 +237,9 @@ public abstract class AbstractIcebergTableOperations
 
     protected static String metadataFileLocation(TableMetadata metadata, String filename)
     {
-        String location = metadata.properties().get(WRITE_METADATA_LOCATION);
-        if (location != null) {
-            return format("%s/%s", location, filename);
+        String place = metadata.properties().get(WRITE_METADATA_LOCATION);
+        if (place != null) {
+            return format("%s/%s", place, filename);
         }
         return format("%s/%s/%s", metadata.location(), METADATA_FOLDER_NAME, filename);
     }

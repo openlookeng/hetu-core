@@ -15,17 +15,4 @@ package io.prestosql.spi.connector;
 
 public class BeginTableExecuteResultTest
 {
-//    private BeginTableExecuteResult<E, T> beginTableExecuteResultUnderTest;
-
-//    @BeforeMethod
-//    public void setUp() throws Exception
-//    {
-//        beginTableExecuteResultUnderTest = new BeginTableExecuteResult<E, T>(null, null);
-//    }
-//
-//    @Test
-//    public void testToString() throws Exception
-//    {
-//        assertEquals("result", beginTableExecuteResultUnderTest.toString());
-//    }
 }

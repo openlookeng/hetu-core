@@ -20,17 +20,21 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.ConnectorSplit;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class HiveSplitWrapper
         implements ConnectorSplit
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveSplitWrapper.class).instanceSize();
     private final List<HiveSplit> splits;
     private final OptionalInt bucketNumber;
 
@@ -146,5 +150,13 @@ public class HiveSplitWrapper
     public int getSplitCount()
     {
         return splits.size();
+    }
+
+    @Override
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + estimatedSizeOf(splits, HiveSplit::getRetainedSizeInBytes)
+                + sizeOf(bucketNumber);
     }
 }

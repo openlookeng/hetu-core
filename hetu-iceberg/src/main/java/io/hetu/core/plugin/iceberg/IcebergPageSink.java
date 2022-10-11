@@ -211,13 +211,14 @@ public class IcebergPageSink
 
     private void doAppend(Page page)
     {
-        while (page.getPositionCount() > MAX_PAGE_POSITIONS) {
-            Page chunk = page.getRegion(0, MAX_PAGE_POSITIONS);
-            page = page.getRegion(MAX_PAGE_POSITIONS, page.getPositionCount() - MAX_PAGE_POSITIONS);
+        Page page1 = page;
+        while (page1.getPositionCount() > MAX_PAGE_POSITIONS) {
+            Page chunk = page1.getRegion(0, MAX_PAGE_POSITIONS);
+            page1 = page1.getRegion(MAX_PAGE_POSITIONS, page1.getPositionCount() - MAX_PAGE_POSITIONS);
             writePage(chunk);
         }
 
-        writePage(page);
+        writePage(page1);
     }
 
     private void writePage(Page page)

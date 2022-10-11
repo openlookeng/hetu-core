@@ -231,6 +231,7 @@ public class TestHiveIntegrationSmokeTest
     private Map<InternalNode, RemoteTask> taskMap;
     private ExecutorService remoteTaskExecutor;
     private ScheduledExecutorService remoteTaskScheduledExecutor;
+    private Session testSessionTaskRetry;
 
     @SuppressWarnings("unused")
     public TestHiveIntegrationSmokeTest()
@@ -5568,7 +5569,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         Set<Split> splits = createAndGetSplits(10);
         Multimap<InternalNode, Split> producerAssignment = nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments();
@@ -5594,7 +5596,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
         Multimap<InternalNode, Split> consumerAssignment = nodeSelector.computeAssignments(splits, ImmutableList.copyOf(taskMap.values()), Optional.of(stage)).getAssignments();
 
         assertEquals(consumerAssignment.size(), consumerAssignment.size());
@@ -5650,7 +5653,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         Set<Split> producerSplits = createAndGetSplits(10);
         Multimap<InternalNode, Split> producerAssignment = nodeSelector.computeAssignments(producerSplits, ImmutableList.copyOf(taskMap.values()), Optional.of(producerStage)).getAssignments();
@@ -5676,7 +5680,8 @@ public class TestHiveIntegrationSmokeTest
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
         Set<Split> consumerSplits = createAndGetSplits(50);
 
         try {
@@ -5710,6 +5715,17 @@ public class TestHiveIntegrationSmokeTest
                 this.testSessionSortPrcntDrv40 = Session.builder(getSession())
                         .setSystemProperty("sort_based_aggregation_enabled", "true")
                         .setSystemProperty("prcnt_drivers_for_partial_aggr", "25")
+                        .build();
+            }
+        }
+    }
+
+    private void initTaskRetry()
+    {
+        synchronized (TestHiveIntegrationSmokeTest.this) {
+            if (null == testSessionTaskRetry) {
+                this.testSessionTaskRetry = Session.builder(getSession())
+                        .setSystemProperty("retry_policy", "TASK")
                         .build();
             }
         }
@@ -6944,5 +6960,14 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(computeActual("SELECT * FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
         assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
         assertUpdate("DROP SCHEMA testReadSchema4");
+    }
+
+    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "CREATE TABLE AS is not supported for transactional tables with query retries enabled")
+    public void testTaskRetryCreateTransactionalTable()
+    {
+        initTaskRetry();
+        assertUpdate("CREATE SCHEMA testTaskRetry1");
+        assertUpdate("CREATE TABLE testTaskRetry1.testTaskRetryTable1 (id int, name string)");
+        assertEquals(computeActual(testSessionTaskRetry, "CREATE TABLE testTaskRetry1.testTaskRetryTable2  with (transactional=true) as select * from testTaskRetry1.testTaskRetryTable1").getRowCount(), 1);
     }
 }

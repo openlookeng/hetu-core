@@ -50,6 +50,8 @@ import io.prestosql.cost.TaskCountEstimator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.CommentTask;
 import io.prestosql.execution.CommitTask;
 import io.prestosql.execution.CreateTableTask;
@@ -73,6 +75,7 @@ import io.prestosql.execution.ScheduledSplit;
 import io.prestosql.execution.SetPathTask;
 import io.prestosql.execution.SetSessionTask;
 import io.prestosql.execution.StartTransactionTask;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.TaskManagerConfig;
 import io.prestosql.execution.TaskSource;
 import io.prestosql.execution.resourcegroups.NoOpResourceGroupManager;
@@ -112,7 +115,6 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OutputFactory;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.StageExecutionDescriptor;
-import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.security.GroupProviderManager;
@@ -283,6 +285,7 @@ public class LocalQueryRunner
     private final JoinCompiler joinCompiler;
     private final ConnectorManager connectorManager;
     private final PluginManager pluginManager;
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
     private final ImmutableMap<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask;
 
     private final TaskManagerConfig taskManagerConfig;
@@ -438,6 +441,7 @@ public class LocalQueryRunner
         FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
         FailureDetectorManager failureDetectorManager = new FailureDetectorManager(cfg, new NoOpFailureDetector());
 
+        this.exchangeManagerRegistry = new ExchangeManagerRegistry(new ExchangeHandleResolver());
         this.pluginManager = new PluginManager(
                 nodeInfo,
                 new PluginManagerConfig(),
@@ -459,7 +463,8 @@ public class LocalQueryRunner
                 fileSystemClientManager,
                 hetuMetaStoreManager,
                 heuristicIndexerManager,
-                failureDetectorManager);
+                failureDetectorManager,
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
 
         connectorManager.addConnectorFactory(globalSystemConnectorFactory);
         connectorManager.createConnection(GlobalSystemConnector.NAME, GlobalSystemConnector.NAME, ImmutableMap.of());
@@ -837,8 +842,9 @@ public class LocalQueryRunner
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
-                tableExecuteContextManager,
-                cubeManager);
+                cubeManager,
+                exchangeManagerRegistry,
+                tableExecuteContextManager);
 
         // plan query
         StageExecutionDescriptor stageExecutionDescriptor = subplan.getFragment().getStageExecutionDescriptor();

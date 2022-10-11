@@ -20,6 +20,7 @@ import io.prestosql.spi.type.Type;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.stream.Collectors.toList;
 
@@ -104,6 +105,10 @@ public interface ValueSet
 
     Object getSingleValue();
 
+    boolean isDiscreteSet();
+
+    List<Object> getDiscreteSet();
+
     boolean containsValue(Object value);
 
     /**
@@ -155,4 +160,11 @@ public interface ValueSet
     }
 
     String toString(ConnectorSession session);
+
+    /**
+     * Try to expand {@code valueSet} into a discrete set of (at most {@code limit}) objects.
+     * For example: [1, 5] can be expanded into {1, 2, 3, 4, 5}.
+     * If the data type is not supported or the expansion results in too many values, {@code Optional.empty()} is returned.
+     */
+    Optional<Collection<Object>> tryExpandRanges(int valuesLimit);
 }

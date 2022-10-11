@@ -128,6 +128,7 @@ public final class PartitionTransforms
                 throw new UnsupportedOperationException("Unsupported type for 'hour': " + field);
             case "void":
                 return voidTransform(type);
+            default:
         }
 
         Matcher matcher = BUCKET_PATTERN.matcher(transform);

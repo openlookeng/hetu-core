@@ -25,6 +25,8 @@ import io.airlift.units.Duration;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.block.BlockAssertions;
+import io.prestosql.exchange.RetryPolicy;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
@@ -38,6 +40,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -115,9 +118,9 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
 
-        exchangeClient.addLocation(new TaskLocation(location, instanceId));
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 
         assertEquals(exchangeClient.isClosed(), false);
@@ -160,12 +163,12 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, scheduler),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
         exchangeClient.setRecoveryEnabled(NOOP_RECOVERY_UTILS.getRecoveryManager(new QueryId("query")));
 
         final String target1 = "target1";
         final String target2 = "target2";
-        exchangeClient.addLocation(new TaskLocation(location, instanceId));
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         exchangeClient.addTarget(target1);
         exchangeClient.addTarget(target2);
@@ -214,7 +217,7 @@ public class TestExchangeClient
                 mock(HttpClient.class),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
         exchangeClient.setRecoveryEnabled(NOOP_RECOVERY_UTILS.getRecoveryManager(new QueryId("query")));
 
         String origin1 = "location1";
@@ -222,12 +225,31 @@ public class TestExchangeClient
         final String target1 = "target1";
         final String target2 = "target2";
 
+        DataSize expectedMaxSize = new DataSize(11, Unit.MEGABYTE);
+        MockExchangeRequestProcessor processor = new MockExchangeRequestProcessor(expectedMaxSize);
+
+        CyclicBarrier requestComplete = new CyclicBarrier(2);
+
+        TestHttpPageBufferClient.TestingClientCallback callback = new TestHttpPageBufferClient.TestingClientCallback(requestComplete);
+
+        URI location = URI.create("http://localhost:8080");
+        String instanceId = "testing instance id";
+        HttpPageBufferClient client = new HttpPageBufferClient(new TestingHttpClient(processor, scheduler),
+                expectedMaxSize,
+                true,
+                new TaskLocation(location, instanceId),
+                callback,
+                scheduler,
+                pageBufferClientCallbackExecutor,
+                false,
+                failureDetectorManager, null, new TaskId("taskid"), RetryPolicy.NONE);
+
         PagesSerde serde = testingPagesSerde();
         exchangeClient.addTarget(target1);
-        exchangeClient.addPages(ImmutableList.of(serde.serialize(createPage(1))), origin1);
+        exchangeClient.addPages(client, ImmutableList.of(serde.serialize(createPage(1))), origin1);
         MarkerPage marker = MarkerPage.snapshotPage(1);
-        exchangeClient.addPages(ImmutableList.of(SerializedPage.forMarker(marker)), origin1);
-        exchangeClient.addPages(ImmutableList.of(serde.serialize(createPage(2))), origin2);
+        exchangeClient.addPages(client, ImmutableList.of(SerializedPage.forMarker(marker)), origin1);
+        exchangeClient.addPages(client, ImmutableList.of(serde.serialize(createPage(2))), origin2);
 
         assertPageEquals(getNextPage(exchangeClient, target1), createPage(1));
         assertPageEquals(getNextPage(exchangeClient, target1), marker);
@@ -253,15 +275,14 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
-
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
         URI location1 = URI.create("http://localhost:8081/foo");
         String instanceId1 = "testing instance id";
         processor.addPage(location1, createPage(1));
         processor.addPage(location1, createPage(2));
         processor.addPage(location1, createPage(3));
         processor.setComplete(location1);
-        exchangeClient.addLocation(new TaskLocation(location1, instanceId1));
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location1, instanceId1));
 
         assertEquals(exchangeClient.isClosed(), false);
         assertPageEquals(getNextPage(exchangeClient), createPage(1));
@@ -279,7 +300,7 @@ public class TestExchangeClient
         processor.addPage(location2, createPage(5));
         processor.addPage(location2, createPage(6));
         processor.setComplete(location2);
-        exchangeClient.addLocation(new TaskLocation(location2, instanceId2));
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location2, instanceId2));
 
         assertEquals(exchangeClient.isClosed(), false);
         assertPageEquals(getNextPage(exchangeClient), createPage(4));
@@ -327,9 +348,9 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
 
-        exchangeClient.addLocation(new TaskLocation(location, instanceId));
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
         assertEquals(exchangeClient.isClosed(), false);
 
@@ -409,8 +430,8 @@ public class TestExchangeClient
                 new TestingHttpClient(processor, newCachedThreadPool(daemonThreadsNamed("test-%s"))),
                 scheduler,
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
-                pageBufferClientCallbackExecutor, failureDetectorManager);
-        exchangeClient.addLocation(new TaskLocation(location, instanceId));
+                pageBufferClientCallbackExecutor, failureDetectorManager, (taskId, failure) -> {}, RetryPolicy.NONE, null);
+        exchangeClient.addLocation(new TaskId("taskid"), new TaskLocation(location, instanceId));
         exchangeClient.noMoreLocations();
 
         // fetch a page

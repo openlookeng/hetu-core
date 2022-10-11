@@ -106,7 +106,6 @@ public class OrcWriterOptions
         this.maxStringStatisticsLimit = maxStringStatisticsLimit;
         this.maxCompressionBufferSize = maxCompressionBufferSize;
 
-        //xjp
         this.writerIdentification = WriterIdentification.TRINO;
         this.shouldCompactMinMax = false; /*此处false随便写的*/
         this.bloomFilterColumns = Collections.emptySet();

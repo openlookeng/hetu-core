@@ -79,7 +79,18 @@ public class ColumnIdentityTest
     {
         // Setup
         // Run the test
-        final boolean result = columnIdentityUnderTest.equals("o");
+        final boolean result = columnIdentityUnderTest.equals(columnIdentityUnderTest);
+
+        // Verify the results
+        assertTrue(result);
+    }
+
+    @Test
+    public void testEquals2()
+    {
+        // Setup
+        // Run the test
+        final boolean result = columnIdentityUnderTest.equals("0");
 
         // Verify the results
         assertTrue(result);
@@ -120,11 +131,9 @@ public class ColumnIdentityTest
         Types.ListType listType = Types.ListType.ofOptional(1, new Types.StringType());
         final Types.NestedField column = Types.NestedField.optional(0, "name", new Types.StringType());
         final Types.NestedField column1 = Types.NestedField.optional(0, "name", listType);
-        Types.NestedField.of(1, true, "name", new Types.StringType());
         Types.StructType structType = Types.StructType.of(Arrays.asList(Types.NestedField.of(1, true, "name", new Types.StringType())));
         final Types.NestedField column2 = Types.NestedField.optional(0, "name", structType);
         final Types.NestedField column3 = Types.NestedField.optional(0, "name", Types.MapType.ofOptional(1, 1, new Types.StringType(), new Types.StringType()));
-
         // Run the test
         ColumnIdentity.createColumnIdentity(column);
         ColumnIdentity.createColumnIdentity(column1);

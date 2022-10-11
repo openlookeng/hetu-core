@@ -142,18 +142,18 @@ class OrcFileAppender<D>
     private static Writer newOrcWriter(OutputFile file, OrcFile.WriterOptions options, Map<String, byte[]> metadata)
     {
         final Path locPath = new Path(file.location());
-        final Writer writer;
+        final Writer write;
 
         try {
-            writer = OrcFile.createWriter(locPath, options);
+            write = OrcFile.createWriter(locPath, options);
         }
         catch (IOException ioe) {
             throw new RuntimeIOException(ioe, "Can't create file %s", locPath);
         }
 
-        metadata.forEach((key, value) -> writer.addUserMetadata(key, ByteBuffer.wrap(value)));
+        metadata.forEach((key, value) -> write.addUserMetadata(key, ByteBuffer.wrap(value)));
 
-        return writer;
+        return write;
     }
 
     @SuppressWarnings("unchecked")

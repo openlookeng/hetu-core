@@ -141,15 +141,15 @@ public class ConstantPopulatingPageSource
 
         public ConnectorPageSource build(ConnectorPageSource delegate)
         {
-            List<ColumnType> columns = this.columns.build();
-            Block[] constantValues = new Block[columns.size()];
-            int[] delegateIndexes = new int[columns.size()];
+            List<ColumnType> cols = this.columns.build();
+            Block[] constantValues = new Block[cols.size()];
+            int[] delegateIndexes = new int[cols.size()];
 
             // If no constant columns are added and the delegate columns are in order, nothing to do
             boolean isRequired = false;
 
-            for (int columnChannel = 0; columnChannel < columns.size(); columnChannel++) {
-                ColumnType column = columns.get(columnChannel);
+            for (int columnChannel = 0; columnChannel < cols.size(); columnChannel++) {
+                ColumnType column = cols.get(columnChannel);
                 if (column instanceof ConstantColumn) {
                     constantValues[columnChannel] = ((ConstantColumn) column).getValue();
                     isRequired = true;

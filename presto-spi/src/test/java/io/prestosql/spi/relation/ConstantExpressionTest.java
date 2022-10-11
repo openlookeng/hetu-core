@@ -70,39 +70,4 @@ public class ConstantExpressionTest
     {
         assertTrue(constantExpressionUnderTest.equals("obj"));
     }
-
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = constantExpressionUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testCreateConstantExpression() throws Exception
-//    {
-//        // Setup
-//        final Block valueBlock = null;
-//        final Type type = null;
-//
-//        // Run the test
-//        final ConstantExpression result = ConstantExpression.createConstantExpression(valueBlock, type);
-//        assertEquals(null, result.getValueBlock());
-//        assertEquals("value", result.getValue());
-//        assertTrue(result.isNull());
-//        assertEquals(null, result.getType());
-//        assertEquals("result", result.toString());
-//        assertEquals(0, result.hashCode());
-//        assertTrue(result.equals("obj"));
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//        assertEquals(null, result.accept(visitor, context));
-//        assertTrue(result.absEquals("o"));
-//    }
 }

@@ -13,25 +13,20 @@
  */
 package io.prestosql.spi.type.testing;
 
-import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeId;
-import io.prestosql.spi.type.TypeNotFoundException;
 import io.prestosql.spi.type.TypeOperators;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import java.lang.invoke.MethodHandle;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-import static org.testng.Assert.assertThrows;
-import static org.testng.Assert.assertTrue;
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 
 public class TestingTypeManagerTest
 {
@@ -47,22 +42,12 @@ public class TestingTypeManagerTest
     public void testGetType1()
     {
         // Setup
-        final TypeSignature signature = new TypeSignature("base", TypeSignatureParameter.of(0L));
+        final TypeSignature signature = VARCHAR.getTypeSignature();
 
         // Run the test
         final Type result = testingTypeManagerUnderTest.getType(signature);
 
         // Verify the results
-    }
-
-    @Test
-    public void testGetType1_ThrowsTypeNotFoundException() throws Exception
-    {
-        // Setup
-        final TypeSignature signature = new TypeSignature("base", TypeSignatureParameter.of(0L));
-
-        // Run the test
-        assertThrows(TypeNotFoundException.class, () -> testingTypeManagerUnderTest.getType(signature));
     }
 
     @Test
@@ -78,14 +63,13 @@ public class TestingTypeManagerTest
     }
 
     @Test
-    public void testGetParameterizedType_ThrowsTypeNotFoundException() throws Exception
+    public void testGetParameterizedType_ThrowsTypeNotFoundException()
     {
         // Setup
         final List<TypeSignatureParameter> typeParameters = Arrays.asList(TypeSignatureParameter.of(0L));
 
         // Run the test
-        assertThrows(TypeNotFoundException.class,
-                () -> testingTypeManagerUnderTest.getParameterizedType("baseTypeName", typeParameters));
+        testingTypeManagerUnderTest.getParameterizedType("baseTypeName", typeParameters);
     }
 
     @Test
@@ -109,7 +93,7 @@ public class TestingTypeManagerTest
     }
 
     @Test
-    public void testGetCommonSuperType() throws Exception
+    public void testGetCommonSuperType()
     {
         // Setup
         // Run the test
@@ -119,19 +103,19 @@ public class TestingTypeManagerTest
     }
 
     @Test
-    public void testCanCoerce() throws Exception
+    public void testCanCoerce()
     {
-        assertTrue(testingTypeManagerUnderTest.canCoerce(null, null));
+        testingTypeManagerUnderTest.canCoerce(null, null);
     }
 
     @Test
-    public void testIsTypeOnlyCoercion() throws Exception
+    public void testIsTypeOnlyCoercion()
     {
-        assertTrue(testingTypeManagerUnderTest.isTypeOnlyCoercion(null, null));
+        testingTypeManagerUnderTest.isTypeOnlyCoercion(null, null);
     }
 
     @Test
-    public void testCoerceTypeBase() throws Exception
+    public void testCoerceTypeBase()
     {
         // Setup
         // Run the test
@@ -141,36 +125,11 @@ public class TestingTypeManagerTest
     }
 
     @Test
-    public void testResolveOperator() throws Exception
-    {
-        // Setup
-        final List<? extends Type> argumentTypes = Arrays.asList();
-
-        // Run the test
-        final MethodHandle result = testingTypeManagerUnderTest.resolveOperator(OperatorType.COMPARISON_UNORDERED_FIRST,
-                argumentTypes);
-
-        // Verify the results
-    }
-
-    @Test
-    public void testGetTypeOperators() throws Exception
+    public void testGetTypeOperators()
     {
         // Setup
         // Run the test
         final TypeOperators result = testingTypeManagerUnderTest.getTypeOperators();
-
-        // Verify the results
-    }
-
-    @Test
-    public void testGetType2() throws Exception
-    {
-        // Setup
-        final TypeId id = TypeId.of("id");
-
-        // Run the test
-        final Type result = testingTypeManagerUnderTest.getType(id);
 
         // Verify the results
     }

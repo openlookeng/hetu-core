@@ -14,10 +14,12 @@
 package io.prestosql.execution.resourcegroups;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.execution.ManagedQueryExecution;
+import io.prestosql.execution.QueryState;
 import io.prestosql.server.QueryStateInfo;
 import io.prestosql.server.ResourceGroupInfo;
 import io.prestosql.spi.PrestoException;
@@ -56,7 +58,9 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public abstract class BaseResourceGroup
         implements ResourceGroup
 {
+    static final Logger log = Logger.get(BaseResourceGroup.class);
     public static final int DEFAULT_WEIGHT = 1;
+    public static final int RETRY_COUNT = 5;
 
     protected final BaseResourceGroup root;
     protected final Optional<BaseResourceGroup> parent;
@@ -111,10 +115,21 @@ public abstract class BaseResourceGroup
 
     private final CounterStat timeBetweenStartsSec = new CounterStat();
 
+    private final int noResourceMaxRetry;
+
     public BaseResourceGroup(Optional<BaseResourceGroup> parent,
             String name,
             BiConsumer<BaseResourceGroup, Boolean> jmxExportListener,
             Executor executor)
+    {
+        this(parent, name, jmxExportListener, executor, -1);
+    }
+
+    public BaseResourceGroup(Optional<BaseResourceGroup> parent,
+                             String name,
+                             BiConsumer<BaseResourceGroup, Boolean> jmxExportListener,
+                             Executor executor,
+                             int noResRetryCount)
     {
         this.parent = requireNonNull(parent, "parent is null");
         this.jmxExportListener = requireNonNull(jmxExportListener, "jmxExportListener is null");
@@ -128,6 +143,7 @@ public abstract class BaseResourceGroup
             id = new ResourceGroupId(name);
             root = this;
         }
+        this.noResourceMaxRetry = (noResRetryCount <= RETRY_COUNT) ? RETRY_COUNT : noResRetryCount;
     }
 
     /**
@@ -461,6 +477,17 @@ public abstract class BaseResourceGroup
                 enqueueQuery(query);
             }
             query.addStateChangeListener(state -> {
+                if (QueryState.ESTIMATING == state) {
+                    if (query.getRetryCount() <= noResourceMaxRetry) {
+                        synchronized (root) {
+                            enqueueQuery(query);
+                        }
+                    }
+                    else {
+                        log.warn("Query failed after %d retries in resourceGroup: %s", query.getRetryCount(), id);
+                        query.fail(new QueryQueueFullException(id));
+                    }
+                }
                 if (state.isDone()) {
                     queryFinished(query);
                 }

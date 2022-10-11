@@ -142,19 +142,6 @@ public class WindowNodeTest
         assertEquals(expectedResult, result);
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final PlanVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = windowNodeUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testReplaceChildren() throws Exception
     {

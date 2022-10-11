@@ -14,7 +14,6 @@
 package io.hetu.core.plugin.iceberg.catalog;
 
 import io.hetu.core.plugin.iceberg.ColumnIdentity;
-import io.hetu.core.plugin.iceberg.UnknownTableTypeException;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
 import io.prestosql.spi.connector.ConnectorSession;

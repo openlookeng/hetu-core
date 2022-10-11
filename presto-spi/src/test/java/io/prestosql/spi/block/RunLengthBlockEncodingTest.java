@@ -24,6 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 import static org.testng.Assert.assertEquals;
 
@@ -75,7 +76,7 @@ public class RunLengthBlockEncodingTest
     {
         // Setup
         final BlockEncodingSerde blockEncodingSerde = null;
-        final InputStream inputStream = new ByteArrayInputStream("content".getBytes());
+        final InputStream inputStream = new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Block result = runLengthBlockEncodingUnderTest.readBlock(blockEncodingSerde, inputStream);

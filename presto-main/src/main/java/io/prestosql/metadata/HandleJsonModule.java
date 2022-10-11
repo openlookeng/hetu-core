@@ -17,6 +17,9 @@ import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.ProvidesIntoSet;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.ExchangeSourceHandle;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorDeleteAsInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorIndexHandle;
@@ -38,6 +41,7 @@ public class HandleJsonModule
     public void configure(Binder binder)
     {
         binder.bind(HandleResolver.class).in(Scopes.SINGLETON);
+        binder.bind(ExchangeHandleResolver.class).in(Scopes.SINGLETON);
     }
 
     @ProvidesIntoSet
@@ -117,5 +121,17 @@ public class HandleJsonModule
     public static com.fasterxml.jackson.databind.Module partitioningHandleModule(HandleResolver resolver)
     {
         return new AbstractTypedJacksonModule<ConnectorPartitioningHandle>(ConnectorPartitioningHandle.class, resolver::getId, resolver::getPartitioningHandleClass) {};
+    }
+
+    @ProvidesIntoSet
+    public static com.fasterxml.jackson.databind.Module exchangeSinkInstanceHandleModule(ExchangeHandleResolver resolver)
+    {
+        return new AbstractTypedJacksonModule<ExchangeSinkInstanceHandle>(ExchangeSinkInstanceHandle.class, ignored -> "ExchangeSinkInstance", ignored -> resolver.getExchangeSinkInstanceHandleClass()) {};
+    }
+
+    @ProvidesIntoSet
+    public static com.fasterxml.jackson.databind.Module exchangeSourceHandleModule(ExchangeHandleResolver resolver)
+    {
+        return new AbstractTypedJacksonModule<ExchangeSourceHandle>(ExchangeSourceHandle.class, ignored -> "ExchangeSource", ignored -> resolver.getExchangeSourceHandleClass()) {};
     }
 }

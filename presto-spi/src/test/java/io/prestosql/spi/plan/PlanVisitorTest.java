@@ -31,19 +31,6 @@ public class PlanVisitorTest
 {
     private PlanVisitor<Object, C> planVisitorUnderTest;
 
-//    @BeforeMethod
-//    public void setUp() throws Exception
-//    {
-//        planVisitorUnderTest = new PlanVisitor<>()
-//        {
-//            @Override
-//            public Object visitPlan(PlanNode node, C context)
-//            {
-//                return null;
-//            }
-//        };
-//    }
-
     @Test
     public void testVisitAggregation() throws Exception
     {

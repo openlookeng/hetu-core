@@ -231,9 +231,9 @@ public class ParquetReader
         if (filter.isPresent()) {
             RowRanges rowRanges = getRowRanges(filter.get(), rowGroup);
             if (rowRanges != null && rowRanges.rowCount() < rowGroupRowCount) {
-                Optional<ColumnIndexStore> columnIndexStore = this.columnIndexStore.get(rowGroup);
-                if (columnIndexStore.isPresent()) {
-                    OffsetIndex offsetIndex = columnIndexStore.get().getOffsetIndex(columnPath);
+                Optional<ColumnIndexStore> optionalColumnIndexStore = this.columnIndexStore.get(rowGroup);
+                if (optionalColumnIndexStore.isPresent()) {
+                    OffsetIndex offsetIndex = optionalColumnIndexStore.get().getOffsetIndex(columnPath);
                     if (offsetIndex != null) {
                         return FilteredOffsetIndex.filterOffsetIndex(offsetIndex, rowRanges, rowGroupRowCount);
                     }
@@ -249,11 +249,11 @@ public class ParquetReader
 
         RowRanges rowRanges = blockRowRanges.get(blockIndex);
         if (rowRanges == null) {
-            Optional<ColumnIndexStore> columnIndexStore = this.columnIndexStore.get(blockIndex);
-            if (columnIndexStore.isPresent()) {
+            Optional<ColumnIndexStore> optionalColumnIndexStore = this.columnIndexStore.get(blockIndex);
+            if (optionalColumnIndexStore.isPresent()) {
                 rowRanges = ColumnIndexFilter.calculateRowRanges(
                         FilterCompat.get(filter),
-                        columnIndexStore.get(),
+                        optionalColumnIndexStore.get(),
                         paths.keySet(),
                         blocks.get(blockIndex).getRowCount());
                 blockRowRanges.set(blockIndex, rowRanges);

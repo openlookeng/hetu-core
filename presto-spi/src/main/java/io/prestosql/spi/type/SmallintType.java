@@ -23,6 +23,8 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.ScalarOperator;
 
 import java.util.Optional;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
@@ -124,6 +126,12 @@ public final class SmallintType
     public Optional<Range> getRange()
     {
         return Optional.of(new Range((long) Short.MIN_VALUE, (long) Short.MAX_VALUE));
+    }
+
+    @Override
+    public Optional<Stream<?>> getDiscreteValues(Range range)
+    {
+        return Optional.of(LongStream.rangeClosed((long) range.getMin(), (long) range.getMax()).boxed());
     }
 
     @Override

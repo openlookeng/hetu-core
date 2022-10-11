@@ -23,6 +23,9 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.ScalarOperator;
 
 import java.math.BigInteger;
+import java.util.Optional;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
@@ -174,5 +177,10 @@ final class ShortDecimalType
     private static boolean lessThanOrEqualOperator(long left, long right)
     {
         return left <= right;
+    }
+
+    public Optional<Stream<?>> getDiscreteValues(Range range)
+    {
+        return Optional.of(LongStream.rangeClosed((long) range.getMin(), (long) range.getMax()).boxed());
     }
 }

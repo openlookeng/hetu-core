@@ -28,7 +28,6 @@ public class IcebergParquetColumnIOConverterTest
         IcebergTableHandleTest.Type type = new IcebergTableHandleTest.Type();
         final IcebergParquetColumnIOConverter.FieldContext context = new IcebergParquetColumnIOConverter.FieldContext(type, new ColumnIdentity(0, "name", ColumnIdentity.TypeCategory.PRIMITIVE, Arrays.asList()));
         final ColumnIO columnIO = null;
-//        IcebergParquetColumnIOConverter.constructField(context, columnIO);
 
         // Run the test
         ColumnIdentity columnIdentity = new ColumnIdentity(0, "name", ColumnIdentity.TypeCategory.MAP, Arrays.asList(new ColumnIdentity(0, "name", ColumnIdentity.TypeCategory.PRIMITIVE, ImmutableList.of())));

@@ -66,23 +66,26 @@ public class PrimitiveTypeMapBuilder
 
     private void visitArrayType(ArrayType type, String name, List<String> parent)
     {
-        parent = ImmutableList.<String>builder().addAll(parent).add(name).add("list").build();
-        visitType(type.getElementType(), "element", parent);
+        List<String> listParent = parent;
+        listParent = ImmutableList.<String>builder().addAll(listParent).add(name).add("list").build();
+        visitType(type.getElementType(), "element", listParent);
     }
 
     private void visitMapType(MapType type, String name, List<String> parent)
     {
-        parent = ImmutableList.<String>builder().addAll(parent).add(name).add("key_value").build();
-        visitType(type.getKeyType(), "key", parent);
-        visitType(type.getValueType(), "value", parent);
+        List<String> listParent = parent;
+        listParent = ImmutableList.<String>builder().addAll(listParent).add(name).add("key_value").build();
+        visitType(type.getKeyType(), "key", listParent);
+        visitType(type.getValueType(), "value", listParent);
     }
 
     private void visitRowType(RowType type, String name, List<String> parent)
     {
-        parent = ImmutableList.<String>builder().addAll(parent).add(name).build();
+        List<String> listParent = parent;
+        listParent = ImmutableList.<String>builder().addAll(listParent).add(name).build();
         for (RowType.Field field : type.getFields()) {
             checkArgument(field.getName().isPresent(), "field in struct type doesn't have name");
-            visitType(field.getType(), field.getName().get(), parent);
+            visitType(field.getType(), field.getName().get(), listParent);
         }
     }
 }

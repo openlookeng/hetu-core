@@ -19,6 +19,8 @@ import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.mockito.MockitoAnnotations.initMocks;
 import static org.testng.Assert.assertEquals;
 
@@ -40,7 +42,7 @@ public class BinaryDictionaryTest
     public void testDecodeToBinary()
     {
         // Setup
-        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes());
+        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Binary result = binaryDictionaryUnderTest.decodeToBinary(0);

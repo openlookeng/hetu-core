@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static io.airlift.slice.Slices.EMPTY_SLICE;
+import static io.prestosql.operator.DynamicFilterSourceOperator.log;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DateType.DATE;
@@ -74,7 +75,7 @@ public class ExpressionConverterTest
                 ExpressionConverter.toIcebergExpression(domainOfZero);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                log.info(e.getMessage());
             }
         });
     }

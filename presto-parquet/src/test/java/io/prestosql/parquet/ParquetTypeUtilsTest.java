@@ -24,6 +24,7 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -189,7 +190,7 @@ public class ParquetTypeUtilsTest
     @Test
     public void testGetShortDecimalValue()
     {
-        assertEquals(0L, ParquetTypeUtils.getShortDecimalValue("content".getBytes()));
+        assertEquals(0L, ParquetTypeUtils.getShortDecimalValue("content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test

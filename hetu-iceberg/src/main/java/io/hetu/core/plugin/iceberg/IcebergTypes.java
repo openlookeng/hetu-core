@@ -39,60 +39,61 @@ public final class IcebergTypes
      */
     public static Object convertIcebergValueToTrino(Type icebergType, Object value)
     {
-        if (value == null) {
+        Object objValue = value;
+        if (objValue == null) {
             return null;
         }
         if (icebergType instanceof Types.BooleanType) {
             //noinspection RedundantCast
-            return (Boolean) value;
+            return (Boolean) objValue;
         }
         if (icebergType instanceof Types.IntegerType) {
-            return ((Integer) value).longValue();
+            return ((Integer) objValue).longValue();
         }
         if (icebergType instanceof Types.LongType) {
             //noinspection RedundantCast
-            return (Long) value;
+            return (Long) objValue;
         }
         if (icebergType instanceof Types.FloatType) {
-            return (long) Float.floatToIntBits((Float) value);
+            return (long) Float.floatToIntBits((Float) objValue);
         }
         if (icebergType instanceof Types.DoubleType) {
             //noinspection RedundantCast
-            return (Double) value;
+            return (Double) objValue;
         }
         if (icebergType instanceof Types.DecimalType) {
             Types.DecimalType icebergDecimalType = (Types.DecimalType) icebergType;
             DecimalType trinoDecimalType = DecimalType.createDecimalType(icebergDecimalType.precision(), icebergDecimalType.scale());
             if (isShortDecimal(trinoDecimalType)) {
-                return Decimals.encodeShortScaledValue((BigDecimal) value, trinoDecimalType.getScale());
+                return Decimals.encodeShortScaledValue((BigDecimal) objValue, trinoDecimalType.getScale());
             }
-            return Decimals.encodeScaledValue((BigDecimal) value, trinoDecimalType.getScale());
+            return Decimals.encodeScaledValue((BigDecimal) objValue, trinoDecimalType.getScale());
         }
         if (icebergType instanceof Types.StringType) {
             // Partition values are passed as String, but min/max values are passed as a CharBuffer
-            if (value instanceof CharBuffer) {
-                value = new String(((CharBuffer) value).array());
+            if (objValue instanceof CharBuffer) {
+                objValue = new String(((CharBuffer) objValue).array());
             }
-            return utf8Slice(((String) value));
+            return utf8Slice(((String) objValue));
         }
         if (icebergType instanceof Types.BinaryType) {
-            return Slices.wrappedBuffer(((ByteBuffer) value).array().clone());
+            return Slices.wrappedBuffer(((ByteBuffer) objValue).array().clone());
         }
         if (icebergType instanceof Types.DateType) {
-            return ((Integer) value).longValue();
+            return ((Integer) objValue).longValue();
         }
         if (icebergType instanceof Types.TimeType) {
-            return Math.multiplyExact((Long) value, PICOSECONDS_PER_MICROSECOND);
+            return Math.multiplyExact((Long) objValue, PICOSECONDS_PER_MICROSECOND);
         }
         if (icebergType instanceof Types.TimestampType) {
-            long epochMicros = (long) value;
+            long epochMicros = (long) objValue;
             if (((Types.TimestampType) icebergType).shouldAdjustToUTC()) {
                 return timestampTzFromMicros(epochMicros);
             }
             return epochMicros;
         }
         if (icebergType instanceof Types.UUIDType) {
-            return UuidType.javaUuidToTrinoUuid((UUID) value);
+            return UuidType.javaUuidToTrinoUuid((UUID) objValue);
         }
 
         throw new UnsupportedOperationException("Unsupported iceberg type: " + icebergType);

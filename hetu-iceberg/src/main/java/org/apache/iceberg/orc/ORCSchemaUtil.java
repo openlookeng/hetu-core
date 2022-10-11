@@ -23,6 +23,7 @@ import org.apache.orc.TypeDescription;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -307,7 +308,7 @@ public final class ORCSchemaUtil
                 else {
                     if (isRequired) {
                         throw new IllegalArgumentException(
-                                String.format("Field %d of type %s is required and was not found.", fieldId, type.toString()));
+                                String.format(Locale.ROOT, "Field %d of type %s is required and was not found.", fieldId, type.toString()));
                     }
 
                     orcType = convert(fieldId, type, false);

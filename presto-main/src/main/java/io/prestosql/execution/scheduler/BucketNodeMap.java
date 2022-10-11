@@ -42,4 +42,9 @@ public abstract class BucketNodeMap
     {
         return getAssignedNode(splitToBucket.applyAsInt(split));
     }
+
+    public final int getBucket(Split split)
+    {
+        return splitToBucket.applyAsInt(split);
+    }
 }

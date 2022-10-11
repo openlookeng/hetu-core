@@ -24,18 +24,20 @@ public class AccessControlRulesTest
 {
     private AccessControlRules accessControlRulesUnderTest;
 
+    private static final Pattern REGEX = Pattern.compile("regex");
+
     @BeforeMethod
     public void setUp() throws Exception
     {
         accessControlRulesUnderTest = new AccessControlRules(Optional.of(
-                Arrays.asList(new SchemaAccessControlRule(false, Optional.of(Pattern.compile("regex")), Optional.of(
-                        Pattern.compile("regex")), Optional.of(Pattern.compile("regex"))))),
+                Arrays.asList(new SchemaAccessControlRule(false, Optional.of(REGEX), Optional.of(
+                        REGEX), Optional.of(REGEX)))),
                 Optional.of(Arrays.asList(new TableAccessControlRule(
                         new HashSet<>(Arrays.asList(TableAccessControlRule.TablePrivilege.SELECT)), Optional.of(
-                        Pattern.compile("regex")), Optional.of(Pattern.compile("regex")), Optional.of(
-                        Pattern.compile("regex")), Optional.of(Pattern.compile("regex"))))),
+                        REGEX), Optional.of(REGEX), Optional.of(
+                        REGEX), Optional.of(REGEX)))),
                 Optional.of(Arrays.asList(new SessionPropertyAccessControlRule(false, Optional.of(
-                        Pattern.compile("regex")), Optional.of(Pattern.compile("regex")), Optional.of(
-                        Pattern.compile("regex"))))));
+                        REGEX), Optional.of(REGEX), Optional.of(
+                        REGEX)))));
     }
 }

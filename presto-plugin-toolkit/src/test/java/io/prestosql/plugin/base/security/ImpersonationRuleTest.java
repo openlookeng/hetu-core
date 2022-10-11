@@ -25,10 +25,12 @@ public class ImpersonationRuleTest
 {
     private ImpersonationRule impersonationRuleUnderTest;
 
+    private static final Pattern REGEX = Pattern.compile("regex");
+
     @BeforeMethod
     public void setUp() throws Exception
     {
-        impersonationRuleUnderTest = new ImpersonationRule(Pattern.compile("regex"), Pattern.compile("regex"), false);
+        impersonationRuleUnderTest = new ImpersonationRule(REGEX, REGEX, false);
     }
 
     @Test

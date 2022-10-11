@@ -76,20 +76,6 @@ public class S3SelectRecordCursorProviderTest
         final TypeManager typeManager = FunctionAndTypeManager.createTestFunctionAndTypeManager();
         final Map<String, String> customSplitInfo = new HashMap<>();
 
-        // Run the test
-//        final Optional<RecordCursor> result = s3SelectRecordCursorProviderUnderTest.createRecordCursor(
-//                configuration,
-//                session,
-//                path,
-//                0L,
-//                0L,
-//                0L,
-//                schema,
-//                columns,
-//                effectivePredicate,
-//                typeManager,
-//                false,
-//                customSplitInfo);
         s3SelectRecordCursorProviderUnderTest.createRecordCursor(
                 configuration,
                 session,

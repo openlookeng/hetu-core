@@ -20,6 +20,7 @@ import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KerberosTicket;
 
 import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashSet;
@@ -31,8 +32,8 @@ public class KerberosTicketUtilsTest
     {
         // Setup
         final Subject subject = new Subject(false, new HashSet<>(), new HashSet<>(), new HashSet<>());
-        final KerberosTicket expectedResult = new KerberosTicket("content".getBytes(), new KerberosPrincipal("name", 0),
-                new KerberosPrincipal("name", 0), "content".getBytes(), 0, new boolean[]{false},
+        final KerberosTicket expectedResult = new KerberosTicket("content".getBytes(StandardCharsets.UTF_8), new KerberosPrincipal("name", 0),
+                new KerberosPrincipal("name", 0), "content".getBytes(StandardCharsets.UTF_8), 0, new boolean[]{false},
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
@@ -47,8 +48,8 @@ public class KerberosTicketUtilsTest
     public void testGetRefreshTime() throws Exception
     {
         // Setup
-        final KerberosTicket ticket = new KerberosTicket("content".getBytes(), new KerberosPrincipal("name", 0),
-                new KerberosPrincipal("name", 0), "content".getBytes(), 0, new boolean[]{false},
+        final KerberosTicket ticket = new KerberosTicket("content".getBytes(StandardCharsets.UTF_8), new KerberosPrincipal("name", 0),
+                new KerberosPrincipal("name", 0), "content".getBytes(StandardCharsets.UTF_8), 0, new boolean[]{false},
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
@@ -63,8 +64,8 @@ public class KerberosTicketUtilsTest
     public void testIsOriginalTicketGrantingTicket() throws Exception
     {
         // Setup
-        final KerberosTicket ticket = new KerberosTicket("content".getBytes(), new KerberosPrincipal("name", 0),
-                new KerberosPrincipal("name", 0), "content".getBytes(), 0, new boolean[]{false},
+        final KerberosTicket ticket = new KerberosTicket("content".getBytes(StandardCharsets.UTF_8), new KerberosPrincipal("name", 0),
+                new KerberosPrincipal("name", 0), "content".getBytes(StandardCharsets.UTF_8), 0, new boolean[]{false},
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),
                 new GregorianCalendar(2020, Calendar.JANUARY, 1).getTime(),

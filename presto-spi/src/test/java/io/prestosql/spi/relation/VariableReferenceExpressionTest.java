@@ -48,19 +48,6 @@ public class VariableReferenceExpressionTest
         assertEquals("name", variableReferenceExpressionUnderTest.toString());
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = variableReferenceExpressionUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testEquals() throws Exception
     {

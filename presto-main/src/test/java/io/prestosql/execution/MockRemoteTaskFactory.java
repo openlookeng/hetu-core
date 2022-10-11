@@ -26,6 +26,8 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.NodeTaskMap.PartitionedSplitCountTracker;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
 import io.prestosql.execution.buffer.OutputBuffer;
@@ -136,7 +138,7 @@ public class MockRemoteTaskFactory
             initialSplits.put(sourceId, sourceSplit);
         }
         return createRemoteTask(TEST_SESSION, taskId, instanceId, newNode, testFragment, initialSplits.build(), OptionalInt.empty(), createInitialEmptyOutputBuffers(BROADCAST),
-                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION));
+                partitionedSplitCountTracker, true, Optional.empty(), new QuerySnapshotManager(taskId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION), OptionalInt.empty());
     }
 
     @Override
@@ -152,7 +154,7 @@ public class MockRemoteTaskFactory
             PartitionedSplitCountTracker partitionedSplitCountTracker,
             boolean summarizeTaskInfo,
             Optional<PlanNodeId> parent,
-            QuerySnapshotManager snapshotManager)
+            QuerySnapshotManager snapshotManager, OptionalInt taskPriority)
     {
         return new MockRemoteTask(taskId, instanceId, fragment, node.getNodeIdentifier(), executor, scheduledExecutor, initialSplits, totalPartitions, partitionedSplitCountTracker);
     }
@@ -184,6 +186,8 @@ public class MockRemoteTaskFactory
         private SettableFuture<?> whenSplitQueueHasSpace = SettableFuture.create();
 
         private final PartitionedSplitCountTracker partitionedSplitCountTracker;
+
+        private final AtomicBoolean taskSpillCalled = new AtomicBoolean();
 
         public MockRemoteTask(TaskId taskId,
                 String instanceId,
@@ -225,7 +229,8 @@ public class MockRemoteTaskFactory
                     taskId,
                     executor,
                     new DataSize(1, BYTE),
-                    () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"));
+                    () -> new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), "test"),
+                    new ExchangeManagerRegistry(new ExchangeHandleResolver()));
 
             this.fragment = requireNonNull(fragment, "fragment is null");
             this.nodeId = requireNonNull(nodeId, "nodeId is null");
@@ -282,7 +287,7 @@ public class MockRemoteTaskFactory
                             0,
                             new Duration(0, MILLISECONDS),
                             ImmutableMap.of(),
-                            Optional.empty()),
+                            Optional.empty(), new DataSize(0, BYTE)),
                     DateTime.now(),
                     outputBuffer.getInfo(),
                     ImmutableSet.of(),
@@ -312,7 +317,7 @@ public class MockRemoteTaskFactory
                     0,
                     new Duration(0, MILLISECONDS),
                     ImmutableMap.of(),
-                    Optional.empty());
+                    Optional.empty(), new DataSize(0, BYTE));
         }
 
         private synchronized void updateSplitQueueSpace()
@@ -454,10 +459,33 @@ public class MockRemoteTaskFactory
         }
 
         @Override
+        public void setPriority(int priority)
+        {
+            taskStateMachine.setPriority(priority);
+        }
+
+        @Override
         public void abort()
         {
             taskStateMachine.cancel(TaskState.ABORTED);
             clearSplits();
+        }
+
+        @Override
+        public void fail(Throwable cause)
+        {
+            // do nothing
+        }
+
+        @Override
+        public void failRemotely(Throwable cause)
+        {
+            //do nothing
+        }
+
+        public void spillRevocableMemory()
+        {
+            taskSpillCalled.set(true);
         }
 
         @Override

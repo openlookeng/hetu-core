@@ -88,29 +88,6 @@ public class TestIcebergGlueCatalogAccessOperations
         super(supplier);
     }
 
-//    @Override
-//    protected QueryRunner createQueryRunner()
-//            throws Exception
-//    {
-//        File tmp = Files.createTempDirectory("test_iceberg").toFile();
-//        DistributedQueryRunner queryRunner = DistributedQueryRunner.builder(testSession).build();
-//
-//        AtomicReference<GlueMetastoreStats> glueStatsReference = new AtomicReference<>();
-//        queryRunner.installPlugin(new TestingIcebergPlugin(
-//                Optional.empty(),
-//                Optional.empty(),
-//                new StealStatsModule(glueStatsReference)));
-//        queryRunner.createCatalog("iceberg", "iceberg",
-//                ImmutableMap.of(
-//                        "iceberg.catalog.type", "glue",
-//                        "hive.metastore.glue.default-warehouse-dir", tmp.getAbsolutePath()));
-//
-//        queryRunner.execute("CREATE SCHEMA " + testSchema);
-//
-//        glueStats = verifyNotNull(glueStatsReference.get(), "glueStatsReference not set");
-//        return queryRunner;
-//    }
-
     @AfterClass(alwaysRun = true)
     public void cleanUpSchema()
     {

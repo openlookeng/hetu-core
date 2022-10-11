@@ -78,9 +78,9 @@ public class TrinoRow
                 if (nextPosition == positionCount) {
                     return endOfData();
                 }
-                int position = nextPosition;
+                int place = nextPosition;
                 nextPosition++;
-                return new TrinoRow(types, page, position);
+                return new TrinoRow(types, page, place);
             }
         };
     }

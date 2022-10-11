@@ -39,6 +39,7 @@ import javax.inject.Inject;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.getQueryPriority;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.util.StatementUtils.isTransactionControlStatement;
 import static java.util.Objects.requireNonNull;
@@ -120,6 +121,7 @@ public class LocalDispatchQueryFactory
             }
 
             QueryExecution queryExecution = queryExecutionFactory.createQueryExecution(preparedQuery, stateMachine, slug, warningCollector);
+            queryExecution.setPriority(getQueryPriority(session));
             stateMachine.endSyntaxAnalysis();
             return queryExecution;
         });

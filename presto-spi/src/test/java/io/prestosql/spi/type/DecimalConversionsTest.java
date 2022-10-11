@@ -16,6 +16,8 @@ package io.prestosql.spi.type;
 import io.airlift.slice.Slice;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.testng.Assert.assertEquals;
 
 public class DecimalConversionsTest
@@ -43,7 +45,7 @@ public class DecimalConversionsTest
     public void testLongDecimalToDouble2() throws Exception
     {
         // Setup
-        final Int128 decimal = Int128.fromBigEndian("content".getBytes());
+        final Int128 decimal = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final double result = DecimalConversions.longDecimalToDouble(decimal, 0L);

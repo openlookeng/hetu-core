@@ -37,6 +37,7 @@ import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
@@ -52,6 +53,8 @@ import io.prestosql.tests.AbstractTestQueryFramework;
 import io.prestosql.tests.DistributedQueryRunner;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -79,6 +82,8 @@ public class PartitionFieldsTest
     private TestSchemaMetadata metadata;
     private HiveMetastore hiveMetastore;
     private TrinoCatalog catalog;
+
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
 
     protected PartitionFieldsTest()
     {
@@ -150,7 +155,7 @@ public class PartitionFieldsTest
                 columns.addAll(ImmutableList.of(new ConnectorMaterializedViewDefinition.Column(k, v)));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         ConnectorMaterializedViewDefinition definition = new ConnectorMaterializedViewDefinition("select 1",

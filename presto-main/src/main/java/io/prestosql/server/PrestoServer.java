@@ -40,6 +40,8 @@ import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.dynamicfilter.DynamicFilterListener;
 import io.prestosql.eventlistener.EventListenerManager;
 import io.prestosql.eventlistener.EventListenerModule;
+import io.prestosql.exchange.ExchangeManagerModule;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollectorModule;
@@ -131,7 +133,8 @@ public class PrestoServer
                 new EventListenerModule(),
                 new ServerMainModule(sqlParserOptions),
                 new NodeStateChangeModule(),
-                new WarningCollectorModule());
+                new WarningCollectorModule(),
+                new ExchangeManagerModule());
 
         modules.addAll(getAdditionalModules());
 
@@ -193,6 +196,8 @@ public class PrestoServer
             injector.getInstance(Announcer.class).start();
 
             injector.getInstance(ServerInfoResource.class).startupComplete();
+
+            injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager(fileSystemClientManager);
 
             log.info("======== SERVER STARTED ========");
         }

@@ -14,9 +14,11 @@
 package io.prestosql.plugin.hive.parquet;
 
 import com.google.common.collect.ImmutableList;
+import io.airlift.log.Logger;
 import io.prestosql.parquet.writer.ParquetWriter;
 import io.prestosql.parquet.writer.ParquetWriterOptions;
 import io.prestosql.plugin.hive.FileWriter;
+import io.prestosql.plugin.hive.HiveConnector;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
@@ -43,6 +45,8 @@ public class ParquetFileWriter
         implements FileWriter
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ParquetFileWriter.class).instanceSize();
+
+    private static final io.airlift.log.Logger log = Logger.get(HiveConnector.class);
 
     private final ParquetWriter parquetWriter;
     private final Callable<Void> rollbackAction;
@@ -74,13 +78,13 @@ public class ParquetFileWriter
         this.rollbackAction = requireNonNull(rollbackAction, "rollbackAction is null");
         this.fileInputColumnIndexes = requireNonNull(fileInputColumnIndexes, "fileInputColumnIndexes is null");
 
-        ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+        ImmutableList.Builder<Block> blockBuilder1 = ImmutableList.builder();
         for (Type fileColumnType : fileColumnTypes) {
             BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
             blockBuilder.appendNull();
-            nullBlocks.add(blockBuilder.build());
+            blockBuilder1.add(blockBuilder.build());
         }
-        this.nullBlocks = nullBlocks.build();
+        this.nullBlocks = blockBuilder1.build();
     }
 
     @Override
@@ -128,7 +132,7 @@ public class ParquetFileWriter
                 rollbackAction.call();
             }
             catch (Exception ignored) {
-                // ignore
+                log.error(ignored.getMessage());
             }
             throw new PrestoException(HIVE_WRITER_CLOSE_ERROR, "Error committing write parquet to Hive", e);
         }

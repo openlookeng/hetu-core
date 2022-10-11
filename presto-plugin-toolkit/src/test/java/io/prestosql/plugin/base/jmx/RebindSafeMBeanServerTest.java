@@ -50,6 +50,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -1270,12 +1271,12 @@ public class RebindSafeMBeanServerTest
 
         // Configure MBeanServer.deserialize(...).
         final ObjectInputStream spyObjectInputStream = spy(
-                new ObjectInputStream(new ByteArrayInputStream("content".getBytes())));
+                new ObjectInputStream(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8))));
         when(mockMbeanServer.deserialize(eq(new ObjectName("domain", "key", "value")), any(byte[].class)))
                 .thenReturn(spyObjectInputStream);
 
         // Run the test
-        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes());
+        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1294,7 +1295,7 @@ public class RebindSafeMBeanServerTest
                 .thenReturn(spyObjectInputStream);
 
         // Run the test
-        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes());
+        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1345,7 +1346,7 @@ public class RebindSafeMBeanServerTest
 
         // Run the test
         assertThrows(OperationsException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes(StandardCharsets.UTF_8)));
         verify(spyObjectInputStream).close();
     }
 
@@ -1360,7 +1361,7 @@ public class RebindSafeMBeanServerTest
         // Run the test
         assertThrows(
                 InstanceNotFoundException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1373,7 +1374,7 @@ public class RebindSafeMBeanServerTest
 
         // Run the test
         assertThrows(OperationsException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize(name, "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1382,11 +1383,11 @@ public class RebindSafeMBeanServerTest
         // Setup
         // Configure MBeanServer.deserialize(...).
         final ObjectInputStream spyObjectInputStream = spy(
-                new ObjectInputStream(new ByteArrayInputStream("content".getBytes())));
+                new ObjectInputStream(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8))));
         when(mockMbeanServer.deserialize(eq("className"), any(byte[].class))).thenReturn(spyObjectInputStream);
 
         // Run the test
-        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes());
+        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1402,7 +1403,7 @@ public class RebindSafeMBeanServerTest
         when(mockMbeanServer.deserialize(eq("className"), any(byte[].class))).thenReturn(spyObjectInputStream);
 
         // Run the test
-        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes());
+        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1449,7 +1450,7 @@ public class RebindSafeMBeanServerTest
         when(mockMbeanServer.deserialize(eq("className"), any(byte[].class))).thenReturn(spyObjectInputStream);
 
         // Run the test
-        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes());
+        final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1464,7 +1465,7 @@ public class RebindSafeMBeanServerTest
         // Run the test
         assertThrows(
                 OperationsException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1476,7 +1477,7 @@ public class RebindSafeMBeanServerTest
         // Run the test
         assertThrows(
                 ReflectionException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize("className", "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1487,13 +1488,13 @@ public class RebindSafeMBeanServerTest
 
         // Configure MBeanServer.deserialize(...).
         final ObjectInputStream spyObjectInputStream = spy(
-                new ObjectInputStream(new ByteArrayInputStream("content".getBytes())));
+                new ObjectInputStream(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8))));
         when(mockMbeanServer.deserialize(eq("className"), eq(new ObjectName("domain", "key", "value")),
                 any(byte[].class))).thenReturn(spyObjectInputStream);
 
         // Run the test
         final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", loaderName,
-                "content".getBytes());
+                "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1513,7 +1514,7 @@ public class RebindSafeMBeanServerTest
 
         // Run the test
         final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", loaderName,
-                "content".getBytes());
+                "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1564,7 +1565,7 @@ public class RebindSafeMBeanServerTest
 
         // Run the test
         final ObjectInputStream result = rebindSafeMBeanServerUnderTest.deserialize("className", loaderName,
-                "content".getBytes());
+                "content".getBytes(StandardCharsets.UTF_8));
 
         // Verify the results
         verify(spyObjectInputStream).close();
@@ -1581,7 +1582,7 @@ public class RebindSafeMBeanServerTest
 
         // Run the test
         assertThrows(InstanceNotFoundException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1596,7 +1597,7 @@ public class RebindSafeMBeanServerTest
         // Run the test
         assertThrows(
                 OperationsException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -1611,7 +1612,7 @@ public class RebindSafeMBeanServerTest
         // Run the test
         assertThrows(
                 ReflectionException.class,
-                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes()));
+                () -> rebindSafeMBeanServerUnderTest.deserialize("className", loaderName, "content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test

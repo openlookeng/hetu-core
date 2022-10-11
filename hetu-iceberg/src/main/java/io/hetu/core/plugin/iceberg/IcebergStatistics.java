@@ -210,19 +210,19 @@ final class IcebergStatistics
 
         public IcebergStatistics build()
         {
-            ImmutableMap.Builder<Integer, Object> minValues = ImmutableMap.builder();
-            ImmutableMap.Builder<Integer, Object> maxValues = ImmutableMap.builder();
+            ImmutableMap.Builder<Integer, Object> minValue = ImmutableMap.builder();
+            ImmutableMap.Builder<Integer, Object> maxValue = ImmutableMap.builder();
 
             columnStatistics.forEach((fieldId, statistics) -> {
-                statistics.getMin().ifPresent(min -> minValues.put(fieldId, min));
-                statistics.getMax().ifPresent(max -> maxValues.put(fieldId, max));
+                statistics.getMin().ifPresent(min -> minValue.put(fieldId, min));
+                statistics.getMax().ifPresent(max -> maxValue.put(fieldId, max));
             });
 
-            Map<Integer, Long> nullCounts = this.nullCounts.entrySet().stream()
+            Map<Integer, Long> counts = this.nullCounts.entrySet().stream()
                     .filter(entry -> entry.getValue().isPresent())
                     .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().get()));
 
-            Map<Integer, Long> nanCounts = this.nanCounts.entrySet().stream()
+            Map<Integer, Long> nanCount = this.nanCounts.entrySet().stream()
                     .filter(entry -> entry.getValue().isPresent())
                     .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().get()));
 
@@ -230,10 +230,10 @@ final class IcebergStatistics
                     recordCount,
                     fileCount,
                     size,
-                    minValues.build(),
-                    maxValues.build(),
-                    nullCounts,
-                    nanCounts,
+                    minValue.build(),
+                    maxValue.build(),
+                    counts,
+                    nanCount,
                     ImmutableMap.copyOf(columnSizes));
         }
 

@@ -22,6 +22,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.ScheduleResult.BlockedReason;
 import io.prestosql.execution.scheduler.group.DynamicLifespanScheduler;
 import io.prestosql.execution.scheduler.group.FixedLifespanScheduler;

@@ -113,10 +113,10 @@ public class PartitionData
             return null;
         }
 
-        JsonNode partitionValues = jsonNode.get(PARTITION_VALUES_FIELD);
+        JsonNode values = jsonNode.get(PARTITION_VALUES_FIELD);
         Object[] objects = new Object[types.length];
         int index = 0;
-        for (JsonNode partitionValue : partitionValues) {
+        for (JsonNode partitionValue : values) {
             objects[index] = getValue(partitionValue, types[index]);
             index++;
         }

@@ -34,7 +34,6 @@ public class CommitTaskDataTest
     public void setUp() throws Exception
     {
         initMocks(this);
-//        commitTaskDataUnderTest = new CommitTaskData("path", 0L, mockMetrics, Optional.of("value"));
         commitTaskDataUnderTest = new CommitTaskData(
                 "path",
                 IcebergFileFormat.ORC,

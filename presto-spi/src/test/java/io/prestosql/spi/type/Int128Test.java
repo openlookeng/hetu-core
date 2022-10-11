@@ -16,6 +16,7 @@ package io.prestosql.spi.type;
 import org.testng.annotations.Test;
 
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
@@ -27,16 +28,16 @@ public class Int128Test
     public void testFromBigEndian() throws Exception
     {
         // Run the test
-        final Int128 result = Int128.fromBigEndian("content".getBytes());
+        final Int128 result = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0L, result.getHigh());
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());
@@ -49,7 +50,7 @@ public class Int128Test
     {
         // Setup
         // Run the test
-        assertThrows(ArithmeticException.class, () -> Int128.fromBigEndian("content".getBytes()));
+        assertThrows(ArithmeticException.class, () -> Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -61,11 +62,11 @@ public class Int128Test
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());
@@ -82,11 +83,11 @@ public class Int128Test
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());
@@ -103,11 +104,11 @@ public class Int128Test
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());
@@ -124,11 +125,11 @@ public class Int128Test
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());
@@ -145,11 +146,11 @@ public class Int128Test
         assertEquals(0L, result.getLow());
         assertTrue(result.equals("o"));
         assertEquals(0, result.hashCode());
-        final Int128 other = Int128.fromBigEndian("content".getBytes());
+        final Int128 other = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, result.compareTo(other));
         assertEquals("result", result.toString());
         assertEquals(new BigInteger("100"), result.toBigInteger());
-        assertEquals("content".getBytes(), result.toBigEndianBytes());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), result.toBigEndianBytes());
         assertEquals(0L, result.toLong());
         assertEquals(0L, result.toLongExact());
         assertEquals(new long[]{0L}, result.toLongArray());

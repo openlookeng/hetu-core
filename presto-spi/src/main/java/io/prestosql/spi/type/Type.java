@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.stream.Stream;
 
 import static io.prestosql.spi.type.TypeOperatorDeclaration.NO_TYPE_OPERATOR_DECLARATION;
 import static java.util.Objects.requireNonNull;
@@ -205,6 +206,14 @@ public interface Type
      * The type of the values must match {@link #getJavaType}
      */
     default Optional<Range> getRange()
+    {
+        return Optional.empty();
+    }
+
+    /**
+     * Returns a stream of discrete values inside the specified range (if supported by this type).
+     */
+    default Optional<Stream<?>> getDiscreteValues(Range range)
     {
         return Optional.empty();
     }

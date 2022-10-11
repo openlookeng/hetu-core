@@ -22,6 +22,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 
 public class HiveBlockEncodingSerdeTest
 {
@@ -37,7 +38,7 @@ public class HiveBlockEncodingSerdeTest
     public void testReadBlock()
     {
         // Setup
-        final SliceInput input = new InputStreamSliceInput(new ByteArrayInputStream("content".getBytes()));
+        final SliceInput input = new InputStreamSliceInput(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
 
         // Run the test
         final Block result = hiveBlockEncodingSerdeUnderTest.readBlock(input);

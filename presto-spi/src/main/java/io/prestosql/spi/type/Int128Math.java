@@ -156,15 +156,15 @@ public final class Int128Math
 
         boolean negative = high < 0;
 
-        if (negative) {
-            long tmpHigh = negateHighExact(high, low);
-            long tmpLow = negateLowExact(high, low);
+        long newHigh = high;
+        long newLow = low;
 
-            high = tmpHigh;
-            low = tmpLow;
+        if (negative) {
+            newHigh = negateHighExact(newHigh, newLow);
+            newLow = negateLowExact(newHigh, newLow);
         }
 
-        multiplyPositives(high, low, POWERS_OF_TEN[rescaleFactor].getHigh(), POWERS_OF_TEN[rescaleFactor].getLow(), result, offset);
+        multiplyPositives(newHigh, newLow, POWERS_OF_TEN[rescaleFactor].getHigh(), POWERS_OF_TEN[rescaleFactor].getLow(), result, offset);
 
         if (negative) {
             long tmpHigh = negateHighExact(result[offset], result[offset + 1]);
@@ -254,23 +254,22 @@ public final class Int128Math
         boolean leftNegative = leftHigh < 0;
         boolean rightNegative = rightHigh < 0;
 
-        if (leftNegative) {
-            long tmpLow = negateLowExact(leftHigh, leftLow);
-            long tmpHigh = negateHighExact(leftHigh, leftLow);
+        long leHigh = leftHigh;
+        long leLow = leftLow;
+        long riHigh = rightHigh;
+        long riLow = rightLow;
 
-            leftLow = tmpLow;
-            leftHigh = tmpHigh;
+        if (leftNegative) {
+            leLow = negateLowExact(leHigh, leLow);
+            leHigh = negateHighExact(leHigh, leLow);
         }
 
         if (rightNegative) {
-            long tmpLow = negateLowExact(rightHigh, rightLow);
-            long tmpHigh = negateHighExact(rightHigh, rightLow);
-
-            rightLow = tmpLow;
-            rightHigh = tmpHigh;
+            riLow = negateLowExact(riHigh, riLow);
+            riHigh = negateHighExact(riHigh, riLow);
         }
 
-        multiplyPositives(leftHigh, leftLow, rightHigh, rightLow, result, offset);
+        multiplyPositives(leHigh, leLow, riHigh, riLow, result, offset);
 
         if (leftNegative != rightNegative) {
             long tmpHigh = negateHighExact(result[offset], result[offset + 1]);
@@ -283,32 +282,6 @@ public final class Int128Math
 
     private static void multiplyPositives(long leftHigh, long leftLow, long rightHigh, long rightLow, long[] result, int offset)
     {
-        /*
-            Given a and b, two 128 bit values composed of 64 bit values (a_H, a_L) and (b_H, b_L), respectively,
-            computes the product in the following way:
-
-                                                                                  a_H a_L
-                                                                                * b_H b_L
-             -----------------------------------------------------------------------------------
-                  64 bits    |       64 bits       |       64 bits       |        64 bits
-                             |                     |                     |
-                             |                     | z1_H= (a_L * b_L)_H | z1_L = (a_L * b_L)_L
-                             | z2_H= (a_L * b_H)_H | z2_L= (a_L * b_H)_L |
-                             | z3_H= (a_H * b_L)_H | z3_L= (a_H * b_L)_L |
-              (a_H * b_H)_H  |       (a_H * b_H)_L |                     |
-             -----------------------------------------------------------------------------------
-                             |                     |      result_H       |      result_L
-
-            The product is performed on positive values. The product overflows
-            * if any of the terms above 128 bits is non-zero:
-               * a_H and b_H are both non-zero
-               * z2_H is non-zero
-               * z3_H is non-zero
-            * result_H is negative (high bit of a java long is set) -- since the original numbers are positive, the result cannot be negative
-            * any of z1_H, z2_L and z3_L are negative -- since the original numbers are positive, these intermediate
-              results cannot be negative
-         */
-
         long z1High = unsignedMultiplyHigh(leftLow, rightLow);
         long z1Low = leftLow * rightLow;
         long z2Low = leftLow * rightHigh;
@@ -344,11 +317,11 @@ public final class Int128Math
     {
         boolean rightNegative = right < 0;
         boolean leftNegative = left < 0;
-        left = abs(left);
-        right = abs(right);
+        long lef = abs(left);
+        long rig = abs(right);
 
-        long resultLow = left * right;
-        long resultHigh = MathUtil.multiplyHigh(left, right);
+        long resultLow = lef * rig;
+        long resultHigh = MathUtil.multiplyHigh(lef, rig);
 
         if (leftNegative != rightNegative) {
             return Int128.valueOf(
@@ -722,23 +695,24 @@ public final class Int128Math
     private static void scaleDown(long high, long low, int scaleFactor, long[] result, int offset, boolean roundUp)
     {
         boolean negative = high < 0;
-        if (negative) {
-            long tmpLow = negateLowExact(high, low);
-            long tmpHigh = negateHighExact(high, low);
 
-            low = tmpLow;
-            high = tmpHigh;
+        long newHigh = high;
+        long newLow = low;
+
+        if (negative) {
+            newHigh = negateLowExact(high, low);
+            newLow = negateHighExact(high, low);
         }
 
         // Scales down for 10**rescaleFactor.
         // Because divide by int has limited divisor, we choose code path with the least amount of divisions
         if ((scaleFactor - 1) / MAX_POWER_OF_FIVE_INT < (scaleFactor - 1) / MAX_POWER_OF_TEN_INT) {
             // scale down for 10**rescale is equivalent to scaling down with 5**rescaleFactor first, then with 2**rescaleFactor
-            scaleDownFive(high, low, scaleFactor, result, offset);
+            scaleDownFive(newHigh, newLow, scaleFactor, result, offset);
             shiftRight(result[offset], result[offset + 1], scaleFactor, roundUp, result, offset);
         }
         else {
-            scaleDownTen(high, low, scaleFactor, result, offset, roundUp);
+            scaleDownTen(newHigh, newLow, scaleFactor, result, offset, roundUp);
         }
 
         if (negative) {
@@ -756,19 +730,24 @@ public final class Int128Math
             throw new IllegalArgumentException("Value must be positive");
         }
 
+        long newHigh = high;
+        long newLow = low;
+
+        int newFiveScale = fiveScale;
+
         while (true) {
-            int powerFive = Math.min(fiveScale, MAX_POWER_OF_FIVE_INT);
-            fiveScale -= powerFive;
+            int powerFive = Math.min(newFiveScale, MAX_POWER_OF_FIVE_INT);
+            newFiveScale -= powerFive;
 
             int divisor = POWERS_OF_FIVES_INT[powerFive];
-            dividePositives(high, low, divisor, result, offset);
+            dividePositives(newHigh, newLow, divisor, result, offset);
 
-            if (fiveScale == 0) {
+            if (newFiveScale == 0) {
                 return;
             }
 
-            high = result[offset];
-            low = result[offset + 1];
+            newHigh = result[offset];
+            newLow = result[offset + 1];
         }
     }
 
@@ -782,18 +761,22 @@ public final class Int128Math
             throw new IllegalArgumentException("Value must be positive");
         }
 
+        long newHigh = high;
+        long newLow = low;
+        int newTenScale = tenScale;
+
         boolean needsRounding;
         do {
-            int powerTen = Math.min(tenScale, MAX_POWER_OF_TEN_INT);
-            tenScale -= powerTen;
+            int powerTen = Math.min(newTenScale, MAX_POWER_OF_TEN_INT);
+            newTenScale -= powerTen;
 
             int divisor = POWERS_OF_TEN_INT[powerTen];
-            needsRounding = divideCheckRound(high, low, divisor, result, offset);
+            needsRounding = divideCheckRound(newHigh, newLow, divisor, result, offset);
 
-            high = result[offset];
-            low = result[offset + 1];
+            newHigh = result[offset];
+            newLow = result[offset + 1];
         }
-        while (tenScale > 0);
+        while (newTenScale > 0);
 
         if (roundUp && needsRounding) {
             incrementUnsafe(result, offset);
@@ -810,30 +793,30 @@ public final class Int128Math
             return;
         }
 
+        long newHigh = high;
+        long newlow = low;
+
         boolean needsRounding;
         if (shift < 64) {
-            needsRounding = roundUp && (low & (1L << (shift - 1))) != 0;
+            needsRounding = roundUp && (newlow & (1L << (shift - 1))) != 0;
 
-            low = (high << 1 << (63 - shift)) | (low >>> shift);
-            high = high >> shift;
+            newlow = (newHigh << 1 << (63 - shift)) | (newlow >>> shift);
+            newHigh = newHigh >> shift;
         }
         else {
-            needsRounding = roundUp && (high & (1L << (shift - 64 - 1))) != 0;
+            needsRounding = roundUp && (newHigh & (1L << (shift - 64 - 1))) != 0;
 
-            low = high >> (shift - 64);
-            high = 0;
+            newlow = newHigh >> (shift - 64);
+            newHigh = 0;
         }
 
         if (needsRounding) {
-            long tmpHigh = incrementHigh(high, low);
-            long tmpLow = incrementLow(high, low);
-
-            high = tmpHigh;
-            low = tmpLow;
+            newHigh = incrementHigh(newHigh, newlow);
+            newlow = incrementLow(newHigh, newlow);
         }
 
-        result[offset] = high;
-        result[offset + 1] = low;
+        result[offset] = newHigh;
+        result[offset + 1] = newlow;
     }
 
     public static Int128 floorDiv(Int128 dividend, Int128 divisor)
@@ -850,23 +833,22 @@ public final class Int128Math
         boolean divisorIsNegative = divisorHigh < 0;
         boolean quotientIsNegative = (dividendIsNegative != divisorIsNegative);
 
-        if (dividendIsNegative) {
-            long tmpLow = negateLowExact(dividendHigh, dividendLow);
-            long tmpHigh = negateHighExact(dividendHigh, dividendLow);
+        long diviLow = dividendLow;
+        long diviHigh = dividendHigh;
+        long tmpLow = divisorLow;
+        long tmpHigh = divisorHigh;
 
-            dividendLow = tmpLow;
-            dividendHigh = tmpHigh;
+        if (dividendIsNegative) {
+            diviLow = negateLowExact(dividendHigh, dividendLow);
+            diviHigh = negateHighExact(dividendHigh, dividendLow);
         }
 
         if (divisorIsNegative) {
-            long tmpLow = negateLowExact(divisorHigh, divisorLow);
-            long tmpHigh = negateHighExact(divisorHigh, divisorLow);
-
-            divisorLow = tmpLow;
-            divisorHigh = tmpHigh;
+            tmpLow = negateLowExact(divisorHigh, divisorLow);
+            tmpHigh = negateHighExact(divisorHigh, divisorLow);
         }
 
-        dividePositives(dividendHigh, dividendLow, 0, divisorHigh, divisorLow, 0, quotient, remainder);
+        dividePositives(diviHigh, diviLow, 0, tmpHigh, tmpLow, 0, quotient, remainder);
 
         if (quotientIsNegative) {
             // negateExact not needed since all positive values can be negated without overflow
@@ -897,29 +879,28 @@ public final class Int128Math
         boolean divisorIsNegative = divisorHigh < 0;
         boolean quotientIsNegative = (dividendIsNegative != divisorIsNegative);
 
-        if (dividendIsNegative) {
-            long tmpLow = negateLowExact(dividendHigh, dividendLow);
-            long tmpHigh = negateHighExact(dividendHigh, dividendLow);
+        long diviLow = dividendLow;
+        long diviHigh = dividendHigh;
+        long tmpLow = divisorLow;
+        long tmpHigh = divisorHigh;
 
-            dividendLow = tmpLow;
-            dividendHigh = tmpHigh;
+        if (dividendIsNegative) {
+            tmpLow = negateLowExact(dividendHigh, dividendLow);
+            tmpHigh = negateHighExact(dividendHigh, dividendLow);
         }
 
         if (divisorIsNegative) {
-            long tmpLow = negateLowExact(divisorHigh, divisorLow);
-            long tmpHigh = negateHighExact(divisorHigh, divisorLow);
-
-            divisorLow = tmpLow;
-            divisorHigh = tmpHigh;
+            tmpLow = negateLowExact(divisorHigh, divisorLow);
+            tmpHigh = negateHighExact(divisorHigh, divisorLow);
         }
 
-        dividePositives(dividendHigh, dividendLow, dividendScaleFactor, divisorHigh, divisorLow, divisorScaleFactor, quotient, remainder);
+        dividePositives(diviHigh, diviLow, dividendScaleFactor, tmpHigh, tmpLow, divisorScaleFactor, quotient, remainder);
 
         shiftLeft(remainder, 1);
         long remainderLow = remainder[1];
         long remainderHigh = remainder[0];
 
-        if (compareUnsigned(remainderHigh, remainderLow, divisorHigh, divisorLow) >= 0) {
+        if (compareUnsigned(remainderHigh, remainderLow, tmpHigh, tmpLow) >= 0) {
             incrementUnsafe(quotient, 0);
         }
 
@@ -958,23 +939,22 @@ public final class Int128Math
         boolean dividendIsNegative = dividendHigh < 0;
         boolean divisorIsNegative = divisorHigh < 0;
 
-        if (dividendIsNegative) {
-            long tmpLow = negateLowExact(dividendHigh, dividendLow);
-            long tmpHigh = negateHighExact(dividendHigh, dividendLow);
+        long diviLow = dividendLow;
+        long diviHigh = dividendHigh;
+        long tmpLow = divisorLow;
+        long tmpHigh = divisorHigh;
 
-            dividendLow = tmpLow;
-            dividendHigh = tmpHigh;
+        if (dividendIsNegative) {
+            tmpLow = negateLowExact(dividendHigh, dividendLow);
+            tmpHigh = negateHighExact(dividendHigh, dividendLow);
         }
 
         if (divisorIsNegative) {
-            long tmpLow = negateLowExact(divisorHigh, divisorLow);
-            long tmpHigh = negateHighExact(divisorHigh, divisorLow);
-
-            divisorLow = tmpLow;
-            divisorHigh = tmpHigh;
+            tmpLow = negateLowExact(divisorHigh, divisorLow);
+            tmpHigh = negateHighExact(divisorHigh, divisorLow);
         }
 
-        dividePositives(dividendHigh, dividendLow, dividendScaleFactor, divisorHigh, divisorLow, divisorScaleFactor, quotient, remainder);
+        dividePositives(diviHigh, diviLow, dividendScaleFactor, tmpHigh, tmpLow, divisorScaleFactor, quotient, remainder);
 
         if (dividendIsNegative) {
             // negateExact not needed since all positive values can be negated without overflow
@@ -1118,17 +1098,6 @@ public final class Int128Math
             return 0;
         }
 
-        // Check if qhat is greater than expected considering only first 3 digits of a dividend
-        // This step help to eliminate all the cases when the estimation is greater than q by 2
-        // and eliminates most of the cases when qhat is greater than q by 1
-        //
-        // u2 * b * b + u1 * b + u0 >= (v1 * b + v0) * qhat
-        // u2 * b * b + u1 * b + u0 >= v1 * b * qhat + v0 * qhat
-        // u2 * b * b + u1 * b - v1 * b * qhat >=  v0 * qhat - u0
-        // (u21 - v1 * qhat) * b >=  v0 * qhat - u0
-        // (u21 - v1 * qhat) * b + u0 >=  v0 * qhat
-        // When ((u21 - v1 * qhat) * b + u0) is less than (v0 * qhat) decrease qhat by one
-
         int iterations = 0;
         long rhat = u21 - toUnsignedLong(v1) * qhat;
         while (Long.compareUnsigned(rhat, INT_BASE) < 0 && Long.compareUnsigned(toUnsignedLong(v0) * qhat, combineInts(lowInt(rhat), u0)) > 0) {
@@ -1203,7 +1172,6 @@ public final class Int128Math
         if (shifts == 0) {
             return number;
         }
-        // wordShifts = shifts / 32
         int wordShifts = shifts >>> 5;
         // we don't wan't to loose any leading bits
         for (int i = 0; i < wordShifts; i++) {
@@ -1213,7 +1181,6 @@ public final class Int128Math
             arraycopy(number, 0, number, wordShifts, length - wordShifts);
             fill(number, 0, wordShifts, 0);
         }
-        // bitShifts = shifts % 32
         int bitShifts = shifts & 0b11111;
         if (bitShifts > 0) {
             // we don't wan't to loose any leading bits
@@ -1232,7 +1199,6 @@ public final class Int128Math
         if (shifts == 0) {
             return number;
         }
-        // wordShifts = shifts / 32
         int wordShifts = shifts >>> 5;
         // we don't wan't to loose any trailing bits
         for (int i = 0; i < wordShifts; i++) {
@@ -1242,7 +1208,6 @@ public final class Int128Math
             arraycopy(number, wordShifts, number, 0, length - wordShifts);
             fill(number, length - wordShifts, length, 0);
         }
-        // bitShifts = shifts % 32
         int bitShifts = shifts & 0b11111;
         if (bitShifts > 0) {
             // we don't wan't to loose any trailing bits

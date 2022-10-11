@@ -1193,7 +1193,7 @@ public class IcebergMetadata
     @Override
     public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return beginInsert(session, tableHandle, false); //todo xjp
+        return beginInsert(session, tableHandle, false);
     }
 
     @Override
@@ -1214,7 +1214,7 @@ public class IcebergMetadata
                 icebergTable.location(),
                 getFileFormat(icebergTable),
                 icebergTable.properties(),
-                RetryMode.RETRIES_ENABLED); //TODO xjp
+                RetryMode.RETRIES_ENABLED);
     }
 
     @Override

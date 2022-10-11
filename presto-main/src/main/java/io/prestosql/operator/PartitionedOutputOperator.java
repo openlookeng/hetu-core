@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.buffer.OutputBuffer;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
@@ -266,7 +267,7 @@ public class PartitionedOutputOperator
                 replicatesAnyRow,
                 nullChannel,
                 outputBuffer,
-                operatorContext.getDriverContext().getSerde(),
+                operatorContext,
                 sourceTypes,
                 maxMemory);
 
@@ -366,7 +367,7 @@ public class PartitionedOutputOperator
     }
 
     @RestorableConfig(stateClassName = "PagePartitionerState", uncapturedFields = {"outputBuffer", "sourceTypes", "partitionFunction", "partitionChannels",
-            "partitionConstants", "serde", "pageBuilders"})
+            "partitionConstants", "operatorContext", "pageBuilders"})
     private static class PagePartitioner
             implements Restorable
     {
@@ -377,13 +378,13 @@ public class PartitionedOutputOperator
         private final PartitionFunction partitionFunction;
         private final List<Integer> partitionChannels;
         private final List<Optional<Block>> partitionConstants;
-        private final PagesSerde serde;
         private final PageBuilder[] pageBuilders;
         private final boolean replicatesAnyRow;
         private final OptionalInt nullChannel; // when present, send the position to every partition if this channel is null.
         private final AtomicLong rowsAdded = new AtomicLong();
         private final AtomicLong pagesAdded = new AtomicLong();
         private boolean hasAnyRowBeenReplicated;
+        private final OperatorContext operatorContext;
 
         public PagePartitioner(
                 String id,
@@ -393,7 +394,7 @@ public class PartitionedOutputOperator
                 boolean replicatesAnyRow,
                 OptionalInt nullChannel,
                 OutputBuffer outputBuffer,
-                PagesSerde serde,
+                OperatorContext operatorContext,
                 List<Type> sourceTypes,
                 DataSize maxMemory)
         {
@@ -407,7 +408,7 @@ public class PartitionedOutputOperator
             this.nullChannel = requireNonNull(nullChannel, "nullChannel is null");
             this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
             this.sourceTypes = requireNonNull(sourceTypes, "sourceTypes is null");
-            this.serde = requireNonNull(serde, "serde is null");
+            this.operatorContext = requireNonNull(operatorContext, "serde is null");
 
             int partitionCount = partitionFunction.getPartitionCount();
             int pageSize = min(DEFAULT_MAX_PAGE_SIZE_IN_BYTES, ((int) maxMemory.toBytes()) / partitionCount);
@@ -508,11 +509,19 @@ public class PartitionedOutputOperator
                     Page pagePartition = partitionPageBuilder.build();
                     partitionPageBuilder.reset();
 
-                    List<SerializedPage> serializedPages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
-                            .map(page -> serde.serialize(page))
-                            .collect(toImmutableList());
+                    DirectSerialisationType serialisationType = outputBuffer.getExchangeDirectSerialisationType();
+                    if (outputBuffer.isSpoolingOutputBuffer() && serialisationType != DirectSerialisationType.OFF) {
+                        PagesSerde directSerde = (serialisationType == DirectSerialisationType.JAVA) ? operatorContext.getDriverContext().getJavaSerde() : operatorContext.getDriverContext().getKryoSerde();
+                        List<Page> pages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
+                        outputBuffer.enqueuePages(partition, pages, id, directSerde);
+                    }
+                    else {
+                        List<SerializedPage> serializedPages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
+                                .map(page -> operatorContext.getDriverContext().getSerde().serialize(page))
+                                .collect(toImmutableList());
 
-                    outputBuffer.enqueue(partition, serializedPages, id);
+                        outputBuffer.enqueue(partition, serializedPages, id);
+                    }
                     pagesAdded.incrementAndGet();
                     rowsAdded.addAndGet(pagePartition.getPositionCount());
                 }

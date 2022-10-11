@@ -13,9 +13,18 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.exchange.ExchangeId;
+import io.prestosql.exchange.RetryPolicy;
+import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.spi.QueryId;
 
 public interface ExchangeClientSupplier
 {
-    ExchangeClient get(LocalMemoryContext systemMemoryContext);
+    ExchangeClient get(
+            LocalMemoryContext systemMemoryContext,
+            TaskFailureListener taskFailureListener,
+            RetryPolicy retryPolicy,
+            ExchangeId exchangeId,
+            QueryId queryId);
 }

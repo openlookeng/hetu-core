@@ -393,7 +393,8 @@ public class UnaliasSymbolReferences
                     node.getSourceFragmentIds(),
                     canonicalizeAndDistinct(node.getOutputSymbols()),
                     node.getOrderingScheme().map(this::canonicalizeAndDistinct),
-                    node.getExchangeType());
+                    node.getExchangeType(),
+                    node.getRetryPolicy());
         }
 
         @Override

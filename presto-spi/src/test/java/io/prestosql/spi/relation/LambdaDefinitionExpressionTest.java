@@ -69,17 +69,4 @@ public class LambdaDefinitionExpressionTest
     {
         assertEquals(0, lambdaDefinitionExpressionUnderTest.hashCode());
     }
-
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = lambdaDefinitionExpressionUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
 }

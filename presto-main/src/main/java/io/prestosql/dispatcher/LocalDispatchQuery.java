@@ -35,6 +35,7 @@ import org.joda.time.DateTime;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static com.google.common.util.concurrent.Futures.nonCancellationPropagating;
@@ -61,6 +62,7 @@ public class LocalDispatchQuery
 
     private final Consumer<QueryExecution> querySubmitter;
     private final SettableFuture<?> submitted = SettableFuture.create();
+    private AtomicInteger retryCount = new AtomicInteger();
 
     public LocalDispatchQuery(
             QueryStateMachine stateMachine,
@@ -101,6 +103,7 @@ public class LocalDispatchQuery
 
     private void startExecution(QueryExecution queryExecution)
     {
+        queryExecution.setTryCount(retryCount.getAndIncrement());
         queryExecutor.execute(() -> {
             if (stateMachine.transitionToDispatching()) {
                 try {
@@ -278,5 +281,11 @@ public class LocalDispatchQuery
         catch (Exception ignored) {
             return Optional.empty();
         }
+    }
+
+    @Override
+    public int getRetryCount()
+    {
+        return retryCount.get();
     }
 }

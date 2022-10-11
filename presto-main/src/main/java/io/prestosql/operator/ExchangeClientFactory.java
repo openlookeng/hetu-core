@@ -16,8 +16,13 @@ package io.prestosql.operator;
 import io.airlift.concurrent.ThreadPoolExecutorMBean;
 import io.airlift.http.client.HttpClient;
 import io.airlift.units.DataSize;
+import io.prestosql.exchange.ExchangeId;
+import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
+import io.prestosql.execution.TaskFailureListener;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.spi.QueryId;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 
@@ -46,34 +51,41 @@ public class ExchangeClientFactory
     private final ThreadPoolExecutorMBean executorMBean;
     private final ExecutorService pageBufferClientCallbackExecutor;
     private final FailureDetectorManager failureDetectorManager;
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+    private final DataSize deduplicationBufferSize;
 
     @Inject
     public ExchangeClientFactory(
             ExchangeClientConfig config,
             @ForExchange HttpClient httpClient,
             @ForExchange ScheduledExecutorService scheduler,
-            FailureDetectorManager failureDetectorManager)
+            FailureDetectorManager failureDetectorManager,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         this(
                 config.getMaxBufferSize(),
+                config.getDeduplicationBufferSize(),
                 config.getMaxResponseSize(),
                 config.getConcurrentRequestMultiplier(),
                 config.isAcknowledgePages(),
                 config.getPageBufferClientMaxCallbackThreads(),
                 httpClient,
                 scheduler,
-                failureDetectorManager);
+                failureDetectorManager,
+                exchangeManagerRegistry);
     }
 
     public ExchangeClientFactory(
             DataSize maxBufferedBytes,
+            DataSize deduplicationBufferSize,
             DataSize maxResponseSize,
             int concurrentRequestMultiplier,
             boolean acknowledgePages,
             int pageBufferClientMaxCallbackThreads,
             HttpClient httpClient,
             ScheduledExecutorService scheduler,
-            FailureDetectorManager failureDetectorManager)
+            FailureDetectorManager failureDetectorManager,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         this.maxBufferedBytes = requireNonNull(maxBufferedBytes, "maxBufferedBytes is null");
         this.concurrentRequestMultiplier = concurrentRequestMultiplier;
@@ -91,6 +103,8 @@ public class ExchangeClientFactory
 
         this.pageBufferClientCallbackExecutor = newFixedThreadPool(pageBufferClientMaxCallbackThreads, daemonThreadsNamed("page-buffer-client-callback-%s"));
         this.executorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) pageBufferClientCallbackExecutor);
+        this.deduplicationBufferSize = requireNonNull(deduplicationBufferSize, "deduplicationBufferSize is null");
+        this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
 
         checkArgument(maxBufferedBytes.toBytes() > 0, "maxBufferSize must be at least 1 byte: %s", maxBufferedBytes);
         checkArgument(maxResponseSize.toBytes() > 0, "maxResponseSize must be at least 1 byte: %s", maxResponseSize);
@@ -111,8 +125,25 @@ public class ExchangeClientFactory
     }
 
     @Override
-    public ExchangeClient get(LocalMemoryContext systemMemoryContext)
+    public ExchangeClient get(
+            LocalMemoryContext systemMemoryContext,
+            TaskFailureListener taskFailureListener,
+            RetryPolicy retryPolicy,
+            ExchangeId exchangeId,
+            QueryId queryId)
     {
+        DirectExchangeBuffer buffer;
+        switch (retryPolicy) {
+            case TASK:
+                buffer = new DeduplicatingDirectExchangeBuffer(scheduler, deduplicationBufferSize, retryPolicy, exchangeManagerRegistry, queryId, exchangeId);
+                break;
+            case NONE:
+                buffer = null;
+                break;
+            default:
+                throw new IllegalArgumentException("unexpected retry policy: " + retryPolicy);
+        }
+
         return new ExchangeClient(
                 maxBufferedBytes,
                 maxResponseSize,
@@ -122,6 +153,9 @@ public class ExchangeClientFactory
                 scheduler,
                 systemMemoryContext,
                 pageBufferClientCallbackExecutor,
-                failureDetectorManager);
+                failureDetectorManager,
+                taskFailureListener,
+                retryPolicy,
+                buffer);
     }
 }

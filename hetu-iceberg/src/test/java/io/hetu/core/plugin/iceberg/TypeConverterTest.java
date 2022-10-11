@@ -14,6 +14,7 @@
 package io.hetu.core.plugin.iceberg;
 
 import io.hetu.core.plugin.iceberg.util.IcebergTestUtil;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.type.ArrayType;
 import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.BooleanType;
@@ -30,6 +31,8 @@ import io.prestosql.spi.type.testing.TestingTypeManager;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import java.util.HashMap;
@@ -49,6 +52,8 @@ public class TypeConverterTest
 {
     private static TestingTypeManager typeManager = new TestingTypeManager();
 
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
+
     @Test
     public void testToTrinoType()
     {
@@ -66,6 +71,12 @@ public class TypeConverterTest
         TypeConverter.toTrinoType(Types.TimestampType.withoutZone(), typeManager);
         TypeConverter.toTrinoType(new Types.StringType(), typeManager);
         TypeConverter.toTrinoType(new Types.UUIDType(), typeManager);
+    }
+
+    @Test
+    public void testToTrinoType12()
+    {
+        TypeConverter.toTrinoType(Types.ListType.ofOptional(1, new Types.BooleanType()), typeManager);
     }
 
     @Test
@@ -90,6 +101,14 @@ public class TypeConverterTest
     }
 
     @Test
+    public void testToIcebergType2()
+    {
+        toIcebergType(VarbinaryType.VARBINARY);
+        toIcebergType(DateType.DATE);
+        toIcebergType(TIME);
+    }
+
+    @Test
     public void testToIcebergType()
     {
         toIcebergType(BooleanType.BOOLEAN);
@@ -100,19 +119,18 @@ public class TypeConverterTest
         toIcebergType(DecimalType.createDecimalType());
         toIcebergType(VarcharType.createUnboundedVarcharType());
         toIcebergType(CharType.createCharType(3));
-        toIcebergType(VarbinaryType.VARBINARY);
-        toIcebergType(DateType.DATE);
-        toIcebergType(TIME);
         List<io.prestosql.spi.type.Type> types = typeManager.getTypes();
         try {
             toIcebergType(types.get(6));
         }
         catch (Exception e) {
+            LOG.error(e.getMessage());
         }
         try {
             toIcebergType(TIMESTAMP_TZ_MICROS);
         }
         catch (Exception e) {
+            LOG.error(e.getMessage());
         }
         toIcebergType(UUID);
 

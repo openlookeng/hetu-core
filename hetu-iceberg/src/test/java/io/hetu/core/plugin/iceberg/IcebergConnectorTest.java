@@ -107,7 +107,6 @@ public class IcebergConnectorTest
                         new Procedure.Argument("TABLE", VARCHAR.getTypeSignature()),
                         new Procedure.Argument("SNAPSHOT_ID", BIGINT.getTypeSignature())),
                 ROLLBACK_TO_SNAPSHOT);
-//        Procedure procedure = new Procedure("schema", "NAME", Arrays.asList(new Procedure.Argument("NAME", charType, true, "defaultValue")), mockMethodHandle);
         TableProcedureMetadata name = new TableProcedureMetadata("NAME", TableProcedureExecutionMode.coordinatorOnly(),
                 Arrays.asList(objectPropertyMetadata));
         icebergConnectorUnderTest = new IcebergConnector(value,

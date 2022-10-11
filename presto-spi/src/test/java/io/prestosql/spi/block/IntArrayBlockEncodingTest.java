@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
@@ -83,27 +84,12 @@ public class IntArrayBlockEncodingTest
         // Verify the results
     }
 
-//    @Test
-//    public void testRead() throws Exception
-//    {
-//        // Setup
-//        final Kryo kryo = new Kryo();
-//        final Input input = new Input("content".getBytes(), 0, 0);
-//        final IntArrayBlock expectedResult = new IntArrayBlock(0, Optional.of(new boolean[]{false}), new int[]{0});
-//
-//        // Run the test
-//        final IntArrayBlock result = intArrayBlockEncodingUnderTest.read(kryo, input, Object.class);
-//
-//        // Verify the results
-//        assertEquals(expectedResult, result);
-//    }
-
     @Test
     public void testReadBlock2()
     {
         // Setup
         final BlockEncodingSerde blockEncodingSerde = null;
-        final InputStream input = new ByteArrayInputStream("content".getBytes());
+        final InputStream input = new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Block result = intArrayBlockEncodingUnderTest.readBlock(blockEncodingSerde, input);
@@ -168,20 +154,6 @@ public class IntArrayBlockEncodingTest
 
         // Verify the results
     }
-
-//    @Test
-//    public void testWriteBlock2() throws Exception
-//    {
-//        // Setup
-//        final BlockEncodingSerde blockEncodingSerde = null;
-//        final OutputStream output = new ByteArrayOutputStream();
-//        final Block block = null;
-//
-//        // Run the test
-//        intArrayBlockEncodingUnderTest.writeBlock(blockEncodingSerde, output, block);
-//
-//        // Verify the results
-//    }
 
     @Test
     public void testWriteBlock2_BrokenOutput() throws Exception

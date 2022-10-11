@@ -34,6 +34,7 @@ import io.prestosql.plugin.hive.HiveHdfsConfiguration;
 import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.SplitWeight;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
@@ -58,6 +59,8 @@ import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.types.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -99,6 +102,8 @@ public class IcebergSplitSourceTest
     private CachingHiveMetastore cachingHiveMetastore;
     private IcebergSplitSource icebergSplitSource;
 
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
+
     protected IcebergSplitSourceTest()
     {
         super(IcebergSplitSourceTest::createQueryRunner);
@@ -107,11 +112,11 @@ public class IcebergSplitSourceTest
     private static QueryRunner createQueryRunner()
             throws Exception
     {
-        Session session = testSessionBuilder()
+        Session dialogue = testSessionBuilder()
                 .setCatalog("test_catalog")
                 .setSchema("test_schema")
                 .build();
-        return new DistributedQueryRunner(session, 1);
+        return new DistributedQueryRunner(dialogue, 1);
     }
 
     @BeforeMethod
@@ -315,154 +320,13 @@ public class IcebergSplitSourceTest
             return tableHandle;
         }
         catch (Exception e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage());
         }
         finally {
             tempFile.close();
         }
         return null;
     }
-
-//    @Test
-//    public void testGetNextBatch()
-//    {
-//        // Setup
-//        when(mockDynamicFilter.isAwaitable()).thenReturn(false);
-//
-//        // Configure DynamicFilter.getCurrentPredicate(...).
-//        final TupleDomain<ColumnHandle> columnHandleTupleDomain = TupleDomain.withColumnDomains(new HashMap<>());
-//        when(mockDynamicFilter.getCurrentPredicate()).thenReturn(columnHandleTupleDomain);
-//
-//        // Configure IcebergTableHandle.getUnenforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getUnenforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain);
-//
-//        // Configure IcebergTableHandle.getEnforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain1 = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getEnforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain1);
-//
-//        when(mockTableScan.filter(any(Expression.class))).thenReturn(null);
-//        when(mockTableScan.targetSplitSize()).thenReturn(0L);
-//
-//        // Run the test
-//        final CompletableFuture<ConnectorSplitSource.ConnectorSplitBatch> result = icebergSplitSourceUnderTest.getNextBatch(
-//                null, 0);
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testGetNextBatch_DynamicFilterGetCurrentPredicateReturnsNoItem()
-//    {
-//        // Setup
-//        when(mockDynamicFilter.isAwaitable()).thenReturn(false);
-//        when(mockDynamicFilter.getCurrentPredicate()).thenReturn(TupleDomain.none());
-//
-//        // Configure IcebergTableHandle.getUnenforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getUnenforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain);
-//
-//        // Configure IcebergTableHandle.getEnforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain1 = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getEnforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain1);
-//
-//        when(mockTableScan.filter(any(Expression.class))).thenReturn(null);
-//        when(mockTableScan.targetSplitSize()).thenReturn(0L);
-//
-//        // Run the test
-//        final CompletableFuture<ConnectorSplitSource.ConnectorSplitBatch> result = icebergSplitSourceUnderTest.getNextBatch(
-//                null, 0);
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testGetNextBatch_IcebergTableHandleGetUnenforcedPredicateReturnsNoItem()
-//    {
-//        // Setup
-//        when(mockDynamicFilter.isAwaitable()).thenReturn(false);
-//
-//        // Configure DynamicFilter.getCurrentPredicate(...).
-//        final TupleDomain<ColumnHandle> columnHandleTupleDomain = TupleDomain.withColumnDomains(new HashMap<>());
-//        when(mockDynamicFilter.getCurrentPredicate()).thenReturn(columnHandleTupleDomain);
-//
-//        when(mockTableHandle.getUnenforcedPredicate()).thenReturn(TupleDomain.none());
-//
-//        // Configure IcebergTableHandle.getEnforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getEnforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain);
-//
-//        when(mockTableScan.filter(any(Expression.class))).thenReturn(null);
-//        when(mockTableScan.targetSplitSize()).thenReturn(0L);
-//
-//        // Run the test
-//        final CompletableFuture<ConnectorSplitSource.ConnectorSplitBatch> result = icebergSplitSourceUnderTest.getNextBatch(
-//                null, 0);
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testGetNextBatch_IcebergTableHandleGetEnforcedPredicateReturnsNoItem()
-//    {
-//        // Setup
-//        when(mockDynamicFilter.isAwaitable()).thenReturn(false);
-//
-//        // Configure DynamicFilter.getCurrentPredicate(...).
-//        final TupleDomain<ColumnHandle> columnHandleTupleDomain = TupleDomain.withColumnDomains(new HashMap<>());
-//        when(mockDynamicFilter.getCurrentPredicate()).thenReturn(columnHandleTupleDomain);
-//
-//        // Configure IcebergTableHandle.getUnenforcedPredicate(...).
-//        final TupleDomain<IcebergColumnHandle> icebergColumnHandleTupleDomain = TupleDomain.withColumnDomains(
-//                new HashMap<>());
-//        when(mockTableHandle.getUnenforcedPredicate()).thenReturn(icebergColumnHandleTupleDomain);
-//
-//        when(mockTableHandle.getEnforcedPredicate()).thenReturn(TupleDomain.none());
-//        when(mockTableScan.filter(any(Expression.class))).thenReturn(null);
-//        when(mockTableScan.targetSplitSize()).thenReturn(0L);
-//
-//        // Run the test
-//        final CompletableFuture<ConnectorSplitSource.ConnectorSplitBatch> result = icebergSplitSourceUnderTest.getNextBatch(
-//                null, 0);
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testIsFinished()
-//    {
-//        // Setup
-//        // Run the test
-//        final boolean result = icebergSplitSourceUnderTest.isFinished();
-//
-//        // Verify the results
-//        assertTrue(result);
-//    }
-
-//    @Test
-//    public void testGetTableExecuteSplitsInfo()
-//    {
-//        // Setup
-//        // Run the test
-//        final Optional<List<Object>> result = icebergSplitSourceUnderTest.getTableExecuteSplitsInfo();
-//
-//        // Verify the results
-//    }
-//
-//    @Test
-//    public void testClose()
-//    {
-//        // Setup
-//        // Run the test
-//        icebergSplitSourceUnderTest.close();
-//
-//        // Verify the results
-//    }
 
     @Test
     public void testFileMatchesPredicate()

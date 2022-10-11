@@ -66,16 +66,18 @@ public final class HiveApplyProjectionUtil
     {
         ImmutableList.Builder<Integer> ordinals = ImmutableList.builder();
 
+        ConnectorExpression connectorExpression = expression;
+
         Variable target;
         while (true) {
-            if (expression instanceof Variable) {
-                target = (Variable) expression;
+            if (connectorExpression instanceof Variable) {
+                target = (Variable) connectorExpression;
                 break;
             }
-            else if (expression instanceof FieldDereference) {
-                FieldDereference dereference = (FieldDereference) expression;
+            else if (connectorExpression instanceof FieldDereference) {
+                FieldDereference dereference = (FieldDereference) connectorExpression;
                 ordinals.add(dereference.getField());
-                expression = dereference.getTarget();
+                connectorExpression = dereference.getTarget();
             }
             else {
                 throw new IllegalArgumentException("expression is not a valid dereference chain");

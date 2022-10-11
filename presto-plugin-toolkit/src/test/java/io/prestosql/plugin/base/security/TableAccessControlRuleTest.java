@@ -29,13 +29,15 @@ public class TableAccessControlRuleTest
 {
     private TableAccessControlRule tableAccessControlRuleUnderTest;
 
+    private static final Pattern REGEX = Pattern.compile("regex");
+
     @BeforeMethod
     public void setUp() throws Exception
     {
         tableAccessControlRuleUnderTest = new TableAccessControlRule(
                 new HashSet<>(Arrays.asList(TableAccessControlRule.TablePrivilege.SELECT)),
-                Optional.of(Pattern.compile("regex")), Optional.of(Pattern.compile("regex")),
-                Optional.of(Pattern.compile("regex")), Optional.of(Pattern.compile("regex")));
+                Optional.of(REGEX), Optional.of(REGEX),
+                Optional.of(REGEX), Optional.of(REGEX));
     }
 
     @Test

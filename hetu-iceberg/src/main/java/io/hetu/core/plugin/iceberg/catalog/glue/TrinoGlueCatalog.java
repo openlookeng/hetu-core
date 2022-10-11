@@ -60,6 +60,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.Transaction;
+import org.apache.orc.impl.BufferChunk;
 
 import java.time.Duration;
 import java.util.List;
@@ -100,6 +101,8 @@ public class TrinoGlueCatalog
     private final Optional<String> defaultSchemaLocation;
     private final AWSGlueAsync glueClient;
     private final GlueMetastoreStats stats;
+    private static final io.prestosql.hive.$internal.org.slf4j.Logger LOG =
+            io.prestosql.hive.$internal.org.slf4j.LoggerFactory.getLogger(BufferChunk.class);
 
     private final Map<SchemaTableName, TableMetadata> tableMetadataCache = new ConcurrentHashMap<>();
 
@@ -248,6 +251,7 @@ public class TrinoGlueCatalog
                                     .collect(toImmutableList()));
                 }
                 catch (EntityNotFoundException e) {
+                    LOG.error("Entity Not Found Exception");
                     // Namespace may have been deleted
                 }
             }

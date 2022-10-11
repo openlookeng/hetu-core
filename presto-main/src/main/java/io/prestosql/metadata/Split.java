@@ -17,8 +17,10 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.SplitWeight;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSplit;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +30,8 @@ import static java.util.Objects.requireNonNull;
 
 public final class Split
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(Split.class).instanceSize();
+
     private final CatalogName catalogName;
     private final ConnectorSplit connectorSplit;
     private final Lifespan lifespan;
@@ -81,6 +85,11 @@ public final class Split
         return connectorSplit.isRemotelyAccessible();
     }
 
+    public SplitWeight getSplitWeight()
+    {
+        return connectorSplit.getSplitWeight();
+    }
+
     @Override
     public String toString()
     {
@@ -89,5 +98,13 @@ public final class Split
                 .add("connectorSplit", connectorSplit)
                 .add("lifespan", lifespan)
                 .toString();
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + catalogName.getRetainedSizeInBytes()
+                + connectorSplit.getRetainedSizeInBytes()
+                + lifespan.getRetainedSizeInBytes();
     }
 }

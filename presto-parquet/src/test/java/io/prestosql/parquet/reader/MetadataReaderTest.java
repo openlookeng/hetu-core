@@ -28,6 +28,7 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static org.testng.Assert.assertThrows;
@@ -84,7 +85,7 @@ public class MetadataReaderTest
     public void testReadFooter3() throws Exception
     {
         // Setup
-        final FSDataInputStream inputStream = new FSDataInputStream(new ByteArrayInputStream("content".getBytes()));
+        final FSDataInputStream inputStream = new FSDataInputStream(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         final Path file = new Path("scheme", "authority", "path");
 
         // Run the test

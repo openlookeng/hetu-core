@@ -61,7 +61,6 @@ public class ForwardingConnectorAccessControlTest
     public void testCheckCanCreateSchema()
     {
         // Setup
-        //final ConnectorTransactionHandle transactionHandle = null;
         ConnectorTransactionHandle connectorTransactionHandle = new ConnectorTransactionHandle()
         {
         };

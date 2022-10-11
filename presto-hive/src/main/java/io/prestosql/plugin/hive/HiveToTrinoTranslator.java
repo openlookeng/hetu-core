@@ -111,16 +111,13 @@ public final class HiveToTrinoTranslator
             char c = input.next();
 
             if (c == '"') {
-                // escape " as ""
                 output.append("\"\"");
             }
             else if (c == '`' && input.hasNext() && input.peek() == '`') {
-                // un-escape `` as `
                 output.append('`');
                 input.next();
             }
             else if (c == '`') {
-                // end of identifier
                 output.append('"');
                 return;
             }

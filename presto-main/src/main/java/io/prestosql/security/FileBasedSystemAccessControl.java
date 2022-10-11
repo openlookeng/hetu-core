@@ -509,6 +509,11 @@ public class FileBasedSystemAccessControl
         }
     }
 
+    @Override
+    public void checkCanSetTableProperties(Identity context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+    {
+    }
+
     private boolean canAccessNodeInfo(Identity identity)
     {
         for (NodeInformationRule rule : nodeInfoRules) {

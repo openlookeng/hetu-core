@@ -137,7 +137,7 @@ An UPDATE operation is a combination of DELETE and ADD operations. First the adm
 
 Other coordinators and workers periodically check the catalog properties file in the shared filesystem and perform changes accordingly on the local file system.
 
-Catalog properties including ``connector-name`` and ``properties`` can be modified. However, the **catalog name** CAN NOT be changed.
+Catalog properties including ``properties`` can be modified. However, the **catalog name** CAN NOT be changed. Users are not advised to update `connector-name` using a PUT request, and you can first delete the catalog and then perform a POST request.
 
 Take Hive as an example, by curl you can update the catalog with the following command, the following updated `hive.allow-drop-table` parameters:
 

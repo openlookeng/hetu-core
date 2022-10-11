@@ -115,14 +115,14 @@ public final class IcebergQueryRunner
                 queryRunner.createCatalog("tpch", "tpch");
 
                 queryRunner.installPlugin(new IcebergPlugin());
-                Map<String, String> icebergProperties = new HashMap<>(this.icebergProperties.build());
-                if (!icebergProperties.containsKey("iceberg.catalog.type")) {
+                Map<String, String> properties = new HashMap<>(this.icebergProperties.build());
+                if (!properties.containsKey("iceberg.catalog.type")) {
                     Path dataDir = metastoreDirectory.map(File::toPath).orElseGet(() -> queryRunner.getCoordinator().getBaseDataDir().resolve("iceberg_data"));
-                    icebergProperties.put("iceberg.catalog.type", "TESTING_FILE_METASTORE");
-                    icebergProperties.put("hive.metastore.catalog.dir", dataDir.toString());
+                    properties.put("iceberg.catalog.type", "TESTING_FILE_METASTORE");
+                    properties.put("hive.metastore.catalog.dir", dataDir.toString());
                 }
 
-                queryRunner.createCatalog(ICEBERG_CATALOG, "iceberg", icebergProperties);
+                queryRunner.createCatalog(ICEBERG_CATALOG, "iceberg", properties);
                 schemaInitializer.orElse(SchemaInitializer.builder().build()).accept(queryRunner);
 
                 return queryRunner;
@@ -137,20 +137,5 @@ public final class IcebergQueryRunner
     public static void main(String[] args)
             throws Exception
     {
-//        DistributedQueryRunner queryRunner = null;
-//        try {
-//            queryRunner = IcebergQueryRunner.builder()
-//                    .setExtraProperties(ImmutableMap.of("http-server.http.port", "8080"))
-//                    .setInitialTables(TpchTable.getTables())
-//                    .build();
-//        }
-//        catch (Throwable t) {
-//            log.error(t);
-//            System.exit(1);
-//        }
-//        Thread.sleep(10);
-//        Logger log = Logger.get(IcebergQueryRunner.class);
-//        log.info("======== SERVER STARTED ========");
-//        log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
     }
 }

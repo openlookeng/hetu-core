@@ -64,7 +64,7 @@ public class OrcMetadataWriter
     public OrcMetadataWriter(WriterIdentification writerIdentification)
     {
         this.writerIdentification = requireNonNull(writerIdentification, "writerIdentification is null");
-        this.useLegacyVersion = false; //xjp 此处false随便写的 4.20
+        this.useLegacyVersion = false;
     }
 
     @Override

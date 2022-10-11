@@ -48,6 +48,7 @@ import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.TaskOutputOperator;
 import io.prestosql.operator.exchange.LocalExchangeSinkOperator;
 import io.prestosql.snapshot.MarkerSplit;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
@@ -88,6 +89,7 @@ import static io.prestosql.execution.SqlTaskExecution.SplitsState.ADDING_SPLITS;
 import static io.prestosql.execution.SqlTaskExecution.SplitsState.FINISHED;
 import static io.prestosql.execution.SqlTaskExecution.SplitsState.NO_MORE_SPLITS;
 import static io.prestosql.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
@@ -174,7 +176,8 @@ public class SqlTaskExecution
             LocalExecutionPlan localExecutionPlan,
             TaskExecutor taskExecutor,
             Executor notificationExecutor,
-            SplitMonitor queryMonitor)
+            SplitMonitor queryMonitor,
+            int queryPriorityTag)
     {
         SqlTaskExecution task = new SqlTaskExecution(
                 taskStateMachine,
@@ -183,7 +186,8 @@ public class SqlTaskExecution
                 localExecutionPlan,
                 taskExecutor,
                 queryMonitor,
-                notificationExecutor);
+                notificationExecutor,
+                queryPriorityTag);
         try (SetThreadName ignored = new SetThreadName("Task-%s", task.getTaskId())) {
             // The scheduleDriversForTaskLifeCycle method calls enqueueDriverSplitRunner, which registers a callback with access to this object.
             // The call back is accessed from another thread, so this code can not be placed in the constructor.
@@ -200,7 +204,8 @@ public class SqlTaskExecution
             LocalExecutionPlan localExecutionPlan,
             TaskExecutor taskExecutor,
             SplitMonitor splitMonitor,
-            Executor notificationExecutor)
+            Executor notificationExecutor,
+            int queryPriorityTag)
     {
         this.taskStateMachine = requireNonNull(taskStateMachine, "taskStateMachine is null");
         this.taskId = taskStateMachine.getTaskId();
@@ -264,7 +269,7 @@ public class SqlTaskExecution
 
             // don't register the task if it is already completed (most likely failed during planning above)
             if (!taskStateMachine.getState().isDone()) {
-                taskHandle = createTaskHandle(taskStateMachine, taskContext, outputBuffer, localExecutionPlan, taskExecutor);
+                taskHandle = createTaskHandle(taskStateMachine, taskContext, outputBuffer, localExecutionPlan, taskExecutor, queryPriorityTag);
             }
             else {
                 taskHandle = null;
@@ -280,14 +285,16 @@ public class SqlTaskExecution
             TaskContext taskContext,
             OutputBuffer outputBuffer,
             LocalExecutionPlan localExecutionPlan,
-            TaskExecutor taskExecutor)
+            TaskExecutor taskExecutor,
+            int queryPriorityTag)
     {
         TaskHandle localTaskHandle = taskExecutor.addTask(
                 taskStateMachine.getTaskId(),
                 outputBuffer::getUtilization,
                 getInitialSplitsPerNode(taskContext.getSession()),
                 getSplitConcurrencyAdjustmentInterval(taskContext.getSession()),
-                getMaxDriversPerTask(taskContext.getSession()));
+                getMaxDriversPerTask(taskContext.getSession()),
+                queryPriorityTag);
         taskStateMachine.addStateChangeListener(state -> {
             if (state.isDone()) {
                 taskExecutor.removeTask(localTaskHandle);
@@ -793,13 +800,29 @@ public class SqlTaskExecution
         // no more output will be created
         outputBuffer.setNoMorePages();
 
+        BufferState bufferState = outputBuffer.getState();
         // are there still pages in the output buffer
-        if (!outputBuffer.isFinished()) {
+        if (!bufferState.isTerminal()) {
+            taskStateMachine.transitionToFlushing();
             return;
         }
 
-        // Cool! All done!
-        taskStateMachine.finished();
+        if (bufferState == BufferState.FINISHED) {
+            // Cool! All done!
+            taskStateMachine.finished();
+            return;
+        }
+
+        if (bufferState == BufferState.FAILED) {
+            Throwable failureCause = outputBuffer.getFailureCause()
+                    .orElseGet(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Output buffer is failed but the failure cause is missing"));
+            taskStateMachine.failed(failureCause);
+            return;
+        }
+
+        // The only terminal state that remains is ABORTED.
+        // Buffer is expected to be aborted only if the task itself is aborted. In this scenario the following statement is expected to be noop.
+        taskStateMachine.failed(new PrestoException(GENERIC_INTERNAL_ERROR, "Unexpected buffer state: " + bufferState));
     }
 
     @Override
@@ -855,6 +878,13 @@ public class SqlTaskExecution
         }
         else {
             log.warn("Task Resume requested when its not suspended: %s", taskStateMachine.getState().toString());
+        }
+    }
+
+    public void setQueryPriorityTag()
+    {
+        if (taskHandle != null) {
+            taskHandle.setQueryPriorityTag(taskStateMachine.getPriority());
         }
     }
 

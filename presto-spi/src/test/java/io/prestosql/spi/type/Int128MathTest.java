@@ -15,6 +15,8 @@ package io.prestosql.spi.type;
 
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.testng.Assert.assertEquals;
 
 public class Int128MathTest
@@ -23,7 +25,7 @@ public class Int128MathTest
     public void testPowerOfTen() throws Exception
     {
         // Setup
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.powerOfTen(0);
@@ -46,8 +48,8 @@ public class Int128MathTest
     public void testRescale2() throws Exception
     {
         // Setup
-        final Int128 decimal = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 decimal = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.rescale(decimal, 0);
@@ -70,8 +72,8 @@ public class Int128MathTest
     public void testRescaleTruncate2() throws Exception
     {
         // Setup
-        final Int128 decimal = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 decimal = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.rescaleTruncate(decimal, 0);
@@ -110,9 +112,9 @@ public class Int128MathTest
     public void testSubtract2() throws Exception
     {
         // Setup
-        final Int128 left = Int128.fromBigEndian("content".getBytes());
-        final Int128 right = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 left = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 right = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.subtract(left, right);
@@ -125,9 +127,9 @@ public class Int128MathTest
     public void testMultiply1()
     {
         // Setup
-        final Int128 left = Int128.fromBigEndian("content".getBytes());
-        final Int128 right = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 left = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 right = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.multiply(left, right);
@@ -140,7 +142,7 @@ public class Int128MathTest
     public void testMultiply3()
     {
         // Setup
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.multiply(0L, 0L, 0L, 0L);
@@ -153,8 +155,8 @@ public class Int128MathTest
     public void testMultiply4()
     {
         // Setup
-        final Int128 left = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 left = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.multiply(left, 0L);
@@ -167,7 +169,7 @@ public class Int128MathTest
     public void testMultiply5()
     {
         // Setup
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.multiply(0L, 0L);
@@ -180,7 +182,7 @@ public class Int128MathTest
     public void testMultiply256Destructive1()
     {
         // Setup
-        final Int128 right = Int128.fromBigEndian("content".getBytes());
+        final Int128 right = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         Int128Math.multiply256Destructive(new int[]{0}, right);
@@ -212,8 +214,8 @@ public class Int128MathTest
     public void testCompareAbsolute1() throws Exception
     {
         // Setup
-        final Int128 left = Int128.fromBigEndian("content".getBytes());
-        final Int128 right = Int128.fromBigEndian("content".getBytes());
+        final Int128 left = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 right = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final int result = Int128Math.compareAbsolute(left, right);
@@ -232,8 +234,8 @@ public class Int128MathTest
     public void testAbsExact() throws Exception
     {
         // Setup
-        final Int128 value = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 value = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.absExact(value);
@@ -246,8 +248,8 @@ public class Int128MathTest
     public void testNegate1()
     {
         // Setup
-        final Int128 value = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 value = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.negate(value);
@@ -260,8 +262,8 @@ public class Int128MathTest
     public void testNegateExact() throws Exception
     {
         // Setup
-        final Int128 value = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 value = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.negateExact(value);
@@ -284,9 +286,9 @@ public class Int128MathTest
     public void testFloorDiv1()
     {
         // Setup
-        final Int128 dividend = Int128.fromBigEndian("content".getBytes());
-        final Int128 divisor = Int128.fromBigEndian("content".getBytes());
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 dividend = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 divisor = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.floorDiv(dividend, divisor);
@@ -299,7 +301,7 @@ public class Int128MathTest
     public void testDivideRoundUp() throws Exception
     {
         // Setup
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.divideRoundUp(0L, 0L, 0, 0L, 0L, 0);
@@ -322,7 +324,7 @@ public class Int128MathTest
     public void testRemainder() throws Exception
     {
         // Setup
-        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes());
+        final Int128 expectedResult = Int128.fromBigEndian("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final Int128 result = Int128Math.remainder(0L, 0L, 0, 0L, 0L, 0);

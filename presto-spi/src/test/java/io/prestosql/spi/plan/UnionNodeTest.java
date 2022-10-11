@@ -38,19 +38,6 @@ public class UnionNodeTest
                 ImmutableListMultimap.of(new Symbol("name"), new Symbol("name")), Arrays.asList(new Symbol("name")));
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final PlanVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = unionNodeUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testReplaceChildren() throws Exception
     {

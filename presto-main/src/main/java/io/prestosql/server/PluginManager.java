@@ -22,6 +22,7 @@ import io.airlift.resolver.DefaultArtifact;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.resourcegroups.ResourceGroupManager;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.FailureDetectorPlugin;
@@ -115,6 +116,9 @@ public class PluginManager
     private final FileSystemClientManager fileSystemClientManager;
     private final FailureDetectorManager failureDetectorManager;
     private final HeuristicIndexerManager heuristicIndexerManager;
+
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+
     private final SessionPropertyDefaults sessionPropertyDefaults;
     private final ArtifactResolver resolver;
     private final File installedPluginsDir;
@@ -142,7 +146,8 @@ public class PluginManager
             FileSystemClientManager fileSystemClientManager,
             HetuMetaStoreManager hetuMetaStoreManager,
             HeuristicIndexerManager heuristicIndexerManager,
-            FailureDetectorManager failureDetectorManager)
+            FailureDetectorManager failureDetectorManager,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         requireNonNull(nodeInfo, "nodeInfo is null");
         requireNonNull(config, "config is null");
@@ -175,6 +180,26 @@ public class PluginManager
         this.hetuMetaStoreManager = requireNonNull(hetuMetaStoreManager, "hetuMetaStoreManager is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         this.failureDetectorManager = requireNonNull(failureDetectorManager, "failureDetectorManager is null");
+        this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
+    }
+
+    private static List<File> listFiles(File installedPluginsDir)
+    {
+        if (installedPluginsDir != null && installedPluginsDir.isDirectory()) {
+            File[] files = installedPluginsDir.listFiles();
+            if (files != null) {
+                Arrays.sort(files);
+                return ImmutableList.copyOf(files);
+            }
+        }
+        return ImmutableList.of();
+    }
+
+    private static List<Artifact> sortedArtifacts(List<Artifact> artifacts)
+    {
+        List<Artifact> list = new ArrayList<>(artifacts);
+        Collections.sort(list, Ordering.natural().nullsLast().onResultOf(Artifact::getFile));
+        return list;
     }
 
     public void loadPlugins()
@@ -428,24 +453,5 @@ public class PluginManager
     {
         ClassLoader parent = getClass().getClassLoader();
         return new PluginClassLoader(urls, parent, SPI_PACKAGES);
-    }
-
-    private static List<File> listFiles(File installedPluginsDir)
-    {
-        if (installedPluginsDir != null && installedPluginsDir.isDirectory()) {
-            File[] files = installedPluginsDir.listFiles();
-            if (files != null) {
-                Arrays.sort(files);
-                return ImmutableList.copyOf(files);
-            }
-        }
-        return ImmutableList.of();
-    }
-
-    private static List<Artifact> sortedArtifacts(List<Artifact> artifacts)
-    {
-        List<Artifact> list = new ArrayList<>(artifacts);
-        Collections.sort(list, Ordering.natural().nullsLast().onResultOf(Artifact::getFile));
-        return list;
     }
 }

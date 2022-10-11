@@ -499,19 +499,20 @@ public class OrcReader
             Optional<OrcWriteValidation> writeValidation)
             throws IOException
     {
-        orcDataSource = wrapWithCacheIfTiny(orcDataSource, options.getTinyStripeThreshold());
+        OrcDataSource orcDataSource1 = orcDataSource;
+        orcDataSource1 = wrapWithCacheIfTiny(orcDataSource1, options.getTinyStripeThreshold());
 
         // read the tail of the file, and check if the file is actually empty
-        long estimatedFileSize = orcDataSource.getEstimatedSize();
+        long estimatedFileSize = orcDataSource1.getEstimatedSize();
         if (estimatedFileSize > 0 && estimatedFileSize <= MAGIC.length()) {
-            throw new OrcCorruptionException(orcDataSource.getId(), "Invalid file size %s", estimatedFileSize);
+            throw new OrcCorruptionException(orcDataSource1.getId(), "Invalid file size %s", estimatedFileSize);
         }
 
         long expectedReadSize = min(estimatedFileSize, EXPECTED_FOOTER_SIZE);
-        Slice fileTail = orcDataSource.readTail(toIntExact(expectedReadSize));
+        Slice fileTail = orcDataSource1.readTail(toIntExact(expectedReadSize));
         if (fileTail.length() == 0) {
             return Optional.empty();
         }
-        return Optional.of(new OrcReader(orcDataSource, options.getMaxMergeDistance(), options.getTinyStripeThreshold(), options.getMaxBlockSize()));
+        return Optional.of(new OrcReader(orcDataSource1, options.getMaxMergeDistance(), options.getTinyStripeThreshold(), options.getMaxBlockSize()));
     }
 }

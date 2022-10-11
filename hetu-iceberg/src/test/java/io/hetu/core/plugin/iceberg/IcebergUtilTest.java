@@ -23,6 +23,7 @@ import io.prestosql.plugin.hive.metastore.SortingColumn;
 import io.prestosql.plugin.hive.metastore.Storage;
 import io.prestosql.plugin.hive.metastore.StorageFormat;
 import io.prestosql.plugin.hive.metastore.Table;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockBuilderStatus;
@@ -30,8 +31,20 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
+import io.prestosql.spi.type.BigintType;
+import io.prestosql.spi.type.BooleanType;
+import io.prestosql.spi.type.DateType;
+import io.prestosql.spi.type.DoubleType;
+import io.prestosql.spi.type.IntegerType;
+import io.prestosql.spi.type.RealType;
+import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.spi.type.VarbinaryType;
+import io.prestosql.spi.type.VarcharType;
+import io.prestosql.type.UuidType;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionField;
@@ -46,6 +59,8 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.LocationProvider;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
@@ -60,6 +75,8 @@ import static org.testng.Assert.assertEquals;
 
 public class IcebergUtilTest
 {
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
+
     @Test
     public void testIsIcebergTable()
     {
@@ -403,13 +420,28 @@ public class IcebergUtilTest
     @Test
     public void testDeserializePartitionValue()
     {
-        // Setup
-        final io.prestosql.spi.type.Type type = null;
-
-        // Run the test
-        final Object result = IcebergUtil.deserializePartitionValue(type, "valueString", "name");
-
-        // Verify the results
+        Map<io.prestosql.spi.type.Type, Object> map = new HashMap<>();
+        map.put(BooleanType.BOOLEAN, true);
+        map.put(BooleanType.BOOLEAN, false);
+        map.put(IntegerType.INTEGER, 1);
+        map.put(BigintType.BIGINT, 1);
+        map.put(RealType.REAL, 1);
+        map.put(DoubleType.DOUBLE, 1);
+        map.put(DateType.DATE, 1);
+        map.put(TimeType.TIME_MICROS, 1);
+        map.put(TimestampType.TIMESTAMP_MICROS, 1);
+        map.put(TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS, 1);
+        map.put(VarcharType.VARCHAR, 1);
+        map.put(VarbinaryType.VARBINARY, 1);
+        map.put(UuidType.UUID, 1);
+        map.forEach((k, v) -> {
+            try {
+                IcebergUtil.deserializePartitionValue(k, v.toString(), k.toString());
+            }
+            catch (Exception e) {
+                LOG.error(e.getMessage());
+            }
+        });
     }
 
     @Test
@@ -475,7 +507,7 @@ public class IcebergUtilTest
         final TrinoCatalog catalog = null;
         final ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(
                 new SchemaTableName("schemaName", "tableName"), Arrays.asList(
-                        new ColumnMetadata("name", null, false, "comment", "extraInfo", false, new HashMap<>(), false)),
+                new ColumnMetadata("name", null, false, "comment", "extraInfo", false, new HashMap<>(), false)),
                 new HashMap<>(), Optional.of("value"), Optional.of(
                 Arrays.asList(new ColumnMetadata("name", null, false, "comment", "extraInfo", false, new HashMap<>(),
                         false))), Optional.of(new HashSet<>(

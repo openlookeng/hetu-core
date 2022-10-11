@@ -74,10 +74,10 @@ public class TableExecuteNode
         this.preferredPartitioningScheme = requireNonNull(preferredPartitioningScheme, "preferredPartitioningScheme is null");
         checkArgument(!partitioningScheme.isPresent() || !preferredPartitioningScheme.isPresent(), "Both partitioningScheme and preferredPartitioningScheme cannot be present");
 
-        ImmutableList.Builder<Symbol> outputs = ImmutableList.<Symbol>builder()
+        ImmutableList.Builder<Symbol> symbolBuilder = ImmutableList.<Symbol>builder()
                 .add(rowCountSymbol)
                 .add(fragmentSymbol);
-        this.outputs = outputs.build();
+        this.outputs = symbolBuilder.build();
     }
 
     @JsonProperty
@@ -143,7 +143,7 @@ public class TableExecuteNode
     @Override
     public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
     {
-        return visitor.visitTableExecute(this, context); //todo xjp
+        return visitor.visitTableExecute(this, context);
     }
 
     @Override

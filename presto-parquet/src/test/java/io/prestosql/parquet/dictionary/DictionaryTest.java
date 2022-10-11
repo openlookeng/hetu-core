@@ -18,6 +18,8 @@ import org.apache.parquet.io.api.Binary;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.testng.Assert.assertThrows;
 
 public class DictionaryTest
@@ -42,7 +44,7 @@ public class DictionaryTest
     public void testDecodeToBinary()
     {
         // Setup
-        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes());
+        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
         // Verify the results
         assertThrows(UnsupportedOperationException.class, () -> dictionaryUnderTest.decodeToBinary(0));
     }

@@ -27,6 +27,8 @@ import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.TableExecuteContext;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.BucketedSplitPlacementPolicy;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.heuristicindex.SplitFiltering;

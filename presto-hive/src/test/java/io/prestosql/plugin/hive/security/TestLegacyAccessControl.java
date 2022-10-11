@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 
 import static io.prestosql.spi.testing.InterfaceTestUtils.assertAllMethodsOverridden;
@@ -47,77 +46,6 @@ public class TestLegacyAccessControl
     {
         initMocks(this);
         legacyAccessControlTest = new LegacyAccessControl(function, new LegacySecurityConfig());
-    }
-
-    @Test
-    public void test()
-    {
-        HashSet<String> strings = new HashSet<>();
-        Set<String> strings1 = legacyAccessControlTest.filterSchemas(null, null, strings);
-        legacyAccessControlTest.checkCanCreateSchema(null, null, null);
-        legacyAccessControlTest.checkCanDropSchema(null, null, null);
-        legacyAccessControlTest.checkCanRenameSchema(null, null, null, null);
-        legacyAccessControlTest.checkCanShowSchemas(null, null);
-        legacyAccessControlTest.checkCanCreateTable(null, null, null);
-        legacyAccessControlTest.checkCanShowTablesMetadata(null, null, null);
-        legacyAccessControlTest.checkCanShowColumnsMetadata(null, null, null);
-        legacyAccessControlTest.checkCanSelectFromColumns(null, null, null, null);
-        legacyAccessControlTest.checkCanInsertIntoTable(null, null, null);
-        legacyAccessControlTest.checkCanDeleteFromTable(null, null, null);
-        legacyAccessControlTest.checkCanCreateView(null, null, null);
-        legacyAccessControlTest.checkCanDropView(null, null, null);
-        legacyAccessControlTest.checkCanCreateViewWithSelectFromColumns(null, null, null, null);
-        legacyAccessControlTest.checkCanSetCatalogSessionProperty(null, null, null);
-        legacyAccessControlTest.checkCanGrantTablePrivilege(null, null, null, null, null, true);
-        legacyAccessControlTest.checkCanRevokeTablePrivilege(null, null, null, null, null, true);
-        legacyAccessControlTest.checkCanCreateRole(null, null, null, null);
-        legacyAccessControlTest.checkCanDropRole(null, null, null);
-        legacyAccessControlTest.checkCanGrantRoles(null, null, null, null, true, null, null);
-        legacyAccessControlTest.checkCanRevokeRoles(null, null, null, null, true, null, null);
-        legacyAccessControlTest.checkCanSetRole(null, null, null, null);
-        legacyAccessControlTest.checkCanShowRoles(null, null, null);
-        legacyAccessControlTest.checkCanShowCurrentRoles(null, null, null);
-        legacyAccessControlTest.checkCanShowRoleGrants(null, null, null);
-        legacyAccessControlTest.checkCanUpdateTable(null, null, null);
-        legacyAccessControlTest.checkCanCreateIndex(null, null, null);
-        legacyAccessControlTest.checkCanDropIndex(null, null, null);
-        legacyAccessControlTest.checkCanRenameIndex(null, null, null, null);
-        legacyAccessControlTest.checkCanUpdateIndex(null, null, null);
-        legacyAccessControlTest.checkCanShowIndex(null, null, null);
-        legacyAccessControlTest.checkCanDropTable(new GlobalSystemTransactionHandle(TransactionId.create()), ConnectorIdentity.ofUser("user"), SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanDropTable()
-    {
-        LegacySecurityConfig legacySecurityConfig = new LegacySecurityConfig().setAllowDropTable(true);
-        LegacyAccessControl legacyAccessControl = new LegacyAccessControl(function, legacySecurityConfig);
-        legacyAccessControl.checkCanDropTable(new HiveTransactionHandle(true), ConnectorIdentity.ofUser("user"), SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanDropTable2()
-    {
-        legacyAccessControlTest.checkCanDropTable(new GlobalSystemTransactionHandle(TransactionId.create()), ConnectorIdentity.ofUser("user"), SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanRenameTable()
-    {
-        legacyAccessControlTest.checkCanRenameTable(
-                new GlobalSystemTransactionHandle(TransactionId.create()),
-                ConnectorIdentity.ofUser("user"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanSetTableComment()
-    {
-        legacyAccessControlTest.checkCanSetTableComment(
-                new GlobalSystemTransactionHandle(TransactionId.create()),
-                ConnectorIdentity.ofUser("user"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"));
     }
 
     @Test
@@ -138,33 +66,6 @@ public class TestLegacyAccessControl
                 ConnectorIdentity.ofUser("user"),
                 SchemaTableName.schemaTableName("schemaname", "tablename"),
                 Arrays.asList(name));
-    }
-
-    @Test
-    public void testCheckCanAddColumn()
-    {
-        legacyAccessControlTest.checkCanAddColumn(
-                new GlobalSystemTransactionHandle(TransactionId.create()),
-                ConnectorIdentity.ofUser("user"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanDropColumn()
-    {
-        legacyAccessControlTest.checkCanDropColumn(
-                new GlobalSystemTransactionHandle(TransactionId.create()),
-                ConnectorIdentity.ofUser("user"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"));
-    }
-
-    @Test
-    public void testCheckCanRenameColumn()
-    {
-        legacyAccessControlTest.checkCanRenameColumn(
-                new GlobalSystemTransactionHandle(TransactionId.create()),
-                ConnectorIdentity.ofUser("user"),
-                SchemaTableName.schemaTableName("schemaname", "tablename"));
     }
 
     @Test

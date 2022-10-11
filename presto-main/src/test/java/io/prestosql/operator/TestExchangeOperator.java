@@ -21,7 +21,11 @@ import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.testing.TestingHttpClient;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.Lifespan;
+import io.prestosql.execution.TaskId;
 import io.prestosql.failuredetector.FailureDetectorManager;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.failuredetector.TimeoutFailureRetryFactory;
@@ -58,6 +62,8 @@ import static io.prestosql.operator.TestingTaskBuffer.PAGE;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -90,7 +96,7 @@ public class TestExchangeOperator
         httpClient = new TestingHttpClient(new TestingExchangeHttpClientHandler(taskBuffers), scheduler);
         FailureDetectorManager.addFailureRetryFactory(new TimeoutFailureRetryFactory());
 
-        exchangeClientSupplier = (systemMemoryUsageListener) -> new ExchangeClient(
+        exchangeClientSupplier = (systemMemoryUsageListener, taskFailureListener, retryPolicy, exchangeId, queryId) -> new ExchangeClient(
                 new DataSize(32, MEGABYTE),
                 new DataSize(10, MEGABYTE),
                 3,
@@ -98,7 +104,7 @@ public class TestExchangeOperator
                 httpClient,
                 scheduler,
                 systemMemoryUsageListener,
-                pageBufferClientCallbackExecutor, new FailureDetectorManager(new NoOpFailureDetector(), "60s"));
+                pageBufferClientCallbackExecutor, new FailureDetectorManager(new NoOpFailureDetector(), "60s"), taskFailureListener, retryPolicy, null);
     }
 
     @AfterClass(alwaysRun = true)
@@ -214,7 +220,9 @@ public class TestExchangeOperator
 
     private static Split newRemoteSplit(String taskId)
     {
-        return new Split(REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId), "new split test instance id"), Lifespan.taskWide());
+        RemoteSplit.DirectExchangeInput exchangeInput = mock(RemoteSplit.DirectExchangeInput.class);
+        when(exchangeInput.getTaskId()).thenReturn(new TaskId("taskId"));
+        return new Split(REMOTE_CONNECTOR_ID, new RemoteSplit(URI.create("http://localhost/" + taskId), "new split test instance id", exchangeInput), Lifespan.taskWide());
     }
 
     @Test
@@ -324,7 +332,7 @@ public class TestExchangeOperator
 
     private SourceOperator createExchangeOperator(Session session)
     {
-        ExchangeOperatorFactory operatorFactory = new ExchangeOperatorFactory(0, new PlanNodeId("test"), exchangeClientSupplier);
+        ExchangeOperatorFactory operatorFactory = new ExchangeOperatorFactory(0, new PlanNodeId("test"), exchangeClientSupplier, RetryPolicy.NONE, new ExchangeManagerRegistry(new ExchangeHandleResolver()));
 
         DriverContext driverContext = createTaskContext(scheduler, scheduledExecutor, session)
                 .addPipelineContext(0, true, true, false)

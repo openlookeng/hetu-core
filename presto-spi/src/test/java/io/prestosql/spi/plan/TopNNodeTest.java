@@ -80,19 +80,6 @@ public class TopNNodeTest
         assertEquals(Collections.emptyList(), result);
     }
 
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final PlanVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = topNNodeUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
-
     @Test
     public void testReplaceChildren() throws Exception
     {

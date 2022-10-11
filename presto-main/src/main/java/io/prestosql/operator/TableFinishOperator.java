@@ -20,6 +20,8 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.execution.TableExecuteContext;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.operator.OperationTimer.OperationTiming;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
@@ -32,7 +34,6 @@ import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.statistics.ComputedStatistics;
 import io.prestosql.spi.type.Type;
-import io.prestosql.sql.planner.TableExecuteContext;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 
 import java.io.Serializable;
@@ -95,8 +96,8 @@ public class TableFinishOperator
             Operator aggregationOperator = statisticsAggregationOperatorFactory.createOperator(driverContext);
             boolean cpuTimerEnabled = !(aggregationOperator instanceof DevNullOperator) && isStatisticsCpuTimerEnabled(session);
             QueryId queryId = driverContext.getPipelineContext().getTaskContext().getQueryContext().getQueryId();
-            TableExecuteContext tableExecuteContext = tableExecuteContextManager.getTableExecuteContextForQuery(queryId);
-            return new TableFinishOperator(context, tableFinisher, aggregationOperator, descriptor, tableExecuteContext, cpuTimerEnabled);
+            TableExecuteContext tableExecuteContextForQuery = tableExecuteContextManager.getTableExecuteContextForQuery(queryId);
+            return new TableFinishOperator(context, tableFinisher, aggregationOperator, descriptor, tableExecuteContextForQuery, cpuTimerEnabled);
         }
 
         @Override

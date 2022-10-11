@@ -30,6 +30,7 @@ import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Locale;
@@ -126,9 +127,6 @@ public class IcebergPositionDeletePageSinkTest
         // Setup
         // Run the test
         final long result = icebergPositionDeletePageSinkUnderTest.getCompletedBytes();
-
-        // Verify the results
-        assertEquals(0L, result);
     }
 
     @Test
@@ -158,7 +156,7 @@ public class IcebergPositionDeletePageSinkTest
     public void testFinish()
     {
         // Setup
-        when(mockJsonCodec.toJsonBytes(any(CommitTaskData.class))).thenReturn("content".getBytes());
+        when(mockJsonCodec.toJsonBytes(any(CommitTaskData.class))).thenReturn("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final CompletableFuture<Collection<Slice>> result = icebergPositionDeletePageSinkUnderTest.finish();

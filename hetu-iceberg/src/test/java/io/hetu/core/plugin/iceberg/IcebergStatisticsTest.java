@@ -24,6 +24,7 @@ import org.apache.iceberg.types.Types;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -48,7 +49,7 @@ public class IcebergStatisticsTest
         HashMap<Integer, Long> integerLongHashMap = new HashMap<>();
         HashMap<Integer, byte[]> integerHashMap = new HashMap<>();
         Integer i = 2;
-        TrinoDeleteFile path = new TrinoDeleteFile(i.longValue(), 1, FileContent.DATA, "path", FileFormat.ORC, 1, 1, integerLongHashMap, integerLongHashMap, integerLongHashMap, integerLongHashMap, integerHashMap, integerHashMap, "path".getBytes(), Arrays.asList(1), 1, Arrays.asList(i.longValue()));
+        TrinoDeleteFile path = new TrinoDeleteFile(i.longValue(), 1, FileContent.DATA, "path", FileFormat.ORC, 1, 1, integerLongHashMap, integerLongHashMap, integerLongHashMap, integerLongHashMap, integerHashMap, integerHashMap, "path".getBytes(StandardCharsets.UTF_8), Arrays.asList(1), 1, Arrays.asList(i.longValue()));
         DummyFileScanTask dummyFileScanTask = new DummyFileScanTask("path", Arrays.asList(path));
         DataFile file = dummyFileScanTask.file();
 //        TrinoDeleteFile trinoDeleteFile = TrinoDeleteFile.copyOf(new TrinoDeleteFileTest.DeleteFile());

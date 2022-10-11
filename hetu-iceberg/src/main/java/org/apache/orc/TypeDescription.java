@@ -393,10 +393,10 @@ public class TypeDescription
                 break;
             case DECIMAL: {
                 requireChar(source, '(');
-                int precision = parseInt(source);
+                int accurate = parseInt(source);
                 requireChar(source, ',');
                 result.withScale(parseInt(source));
-                result.withPrecision(precision);
+                result.withPrecision(accurate);
                 requireChar(source, ')');
                 break;
             }
@@ -847,7 +847,7 @@ public class TypeDescription
      */
     public List<TypeDescription> getChildren()
     {
-        return children == null ? null : Collections.unmodifiableList(children);
+        return children == null ? Collections.emptyList() : Collections.unmodifiableList(children);
     }
 
     /**
@@ -857,14 +857,15 @@ public class TypeDescription
      */
     private int assignIds(int startId)
     {
-        id = startId++;
+        int startId1 = startId;
+        id = startId1++;
         if (children != null) {
             for (TypeDescription child : children) {
-                startId = child.assignIds(startId);
+                startId1 = child.assignIds(startId1);
             }
         }
-        maxId = startId - 1;
-        return startId;
+        maxId = startId1 - 1;
+        return startId1;
     }
 
     public TypeDescription(Category category)
@@ -1030,12 +1031,12 @@ public class TypeDescription
     public TypeDescription findSubtype(int goal)
     {
         // call getId method to make sure the ids are assigned
-        int id = getId();
-        if (goal < id || goal > maxId) {
-            throw new IllegalArgumentException("Unknown type id " + id + " in " +
+        int typeId = getId();
+        if (goal < typeId || goal > maxId) {
+            throw new IllegalArgumentException("Unknown type id " + typeId + " in " +
                     toJson());
         }
-        if (goal == id) {
+        if (goal == typeId) {
             return this;
         }
         else {

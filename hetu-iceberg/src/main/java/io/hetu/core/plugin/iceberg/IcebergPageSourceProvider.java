@@ -356,10 +356,11 @@ public class IcebergPageSourceProvider
             Optional<NameMapping> nameMapping,
             Map<Integer, Optional<String>> partitionKeys)
     {
+        long fileSize1 = fileSize;
         try {
             FileStatus fileStatus = hdfsEnvironment.doAs(session.getIdentity().getUser(),
                     () -> hdfsEnvironment.getFileSystem(hdfsContext, path).getFileStatus(path));
-            fileSize = fileStatus.getLen();
+            fileSize1 = fileStatus.getLen();
         }
         catch (IOException e) {
             throw new PrestoException(ICEBERG_FILESYSTEM_ERROR, e);
@@ -374,7 +375,7 @@ public class IcebergPageSourceProvider
                         path,
                         start,
                         length,
-                        fileSize,
+                        fileSize1,
                         dataColumns,
                         predicate,
                         orcReaderOptions
@@ -398,7 +399,7 @@ public class IcebergPageSourceProvider
                         path,
                         start,
                         length,
-                        fileSize,
+                        fileSize1,
                         dataColumns,
                         parquetReaderOptions
                                 .withMaxReadBlockSize(getParquetMaxReadBlockSize(session)),

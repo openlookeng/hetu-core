@@ -43,24 +43,6 @@ public class SyncPartitionMetadataProcedureTest
             {
             }
         };
-//        Supplier<TransactionalMetadata> supplier = new Supplier<TransactionalMetadata>() {
-//            @Override
-//            public TransactionalMetadata get() {
-//                TransactionalMetadata transactionalMetadata = new TransactionalMetadata()
-//                {
-//                    @Override
-//                    public void commit()
-//                    {
-//                    }
-//
-//                    @Override
-//                    public void rollback()
-//                    {
-//                    }
-//                };
-//                return transactionalMetadata;
-//            }
-//        };
         syncPartitionMetadataProcedureUnderTest = new SyncPartitionMetadataProcedure(() -> transactionalMetadata, mockHdfsEnvironment);
     }
 

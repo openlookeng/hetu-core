@@ -69,14 +69,14 @@ public class TypeOperators
 
     public TypeOperators()
     {
-        ConcurrentHashMap<Object, Object> cache = new ConcurrentHashMap<>();
+        ConcurrentHashMap<Object, Object> concurrentHashMap = new ConcurrentHashMap<>();
         this.cache = (operatorConvention, supplier) -> {
             // preform explicit get before calling computeIfAbsent since computeIfAbsent cause lock contention
-            Object operator = cache.get(operatorConvention);
+            Object operator = concurrentHashMap.get(operatorConvention);
             if (operator != null) {
                 return operator;
             }
-            return cache.computeIfAbsent(operatorConvention, key -> supplier.get());
+            return concurrentHashMap.computeIfAbsent(operatorConvention, key -> supplier.get());
         };
     }
 

@@ -66,11 +66,5 @@ public class TimeTypeTest
         final Block<Object> block4 = null;
         assertEquals(null, result.get(block4, 0));
         assertEquals(Optional.of(new Type.Range("min", "max")), result.getRange());
-//        assertEquals(null, result.read(null));
-//        final TypeOperators typeOperators = new TypeOperators((val1, val2) -> {
-//            return "value";
-//        });
-//        assertEquals(TypeOperatorDeclaration.extractOperatorDeclaration(Object.class, null, Object.class),
-//                result.getTypeOperatorDeclaration(typeOperators));
     }
 }

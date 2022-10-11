@@ -143,6 +143,9 @@ public class ClusterMemoryManager
     private final Map<String, RemoteNodeMemory> nodes = new LinkedHashMap<>();
 
     @GuardedBy("this")
+    private final Map<String, RemoteNodeMemory> cnNodes = new LinkedHashMap<>();
+
+    @GuardedBy("this")
     private final Map<String, RemoteNodeMemory> allNodes = new LinkedHashMap<>();
 
     @GuardedBy("this")
@@ -592,6 +595,9 @@ public class ClusterMemoryManager
                 allNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
                 eventListenerManager.eventEnhanced(new AuditLogEvent("Unknown", node.getInternalUri().toString(), "Add Node: " + node.getNodeIdentifier(), "Cluster", "INFO"));
             }
+            else if (!cnNodes.containsKey(node.getNodeIdentifier()) && isCoordinator(node)) {
+                cnNodes.put(node.getNodeIdentifier(), new RemoteNodeMemory(node, httpClient, memoryInfoCodec, assignmentsRequestCodec, locationFactory.createMemoryInfoLocation(node), isBinaryEncoding));
+            }
         }
 
         // Schedule refresh
@@ -603,6 +609,15 @@ public class ClusterMemoryManager
         for (RemoteNodeMemory node : allNodes.values()) {
             node.asyncRefresh(assignments);
         }
+
+        for (RemoteNodeMemory node : cnNodes.values()) {
+            node.asyncRefresh(assignments);
+        }
+    }
+
+    private boolean isCoordinator(InternalNode node)
+    {
+        return node.isCoordinator();
     }
 
     private boolean shouldIncludeNode(InternalNode node)
@@ -653,6 +668,18 @@ public class ClusterMemoryManager
                     "Worker";
             String workerId = entry.getKey() + " [" + entry.getValue().getNode().getHost() + "] " + role;
             memoryInfo.put(workerId, entry.getValue().getInfo());
+        }
+        return memoryInfo;
+    }
+
+    public synchronized Map<String, Optional<MemoryInfo>> getWorkerMemoryInfoWithoutRole()
+    {
+        Map<String, Optional<MemoryInfo>> memoryInfo = new HashMap<>();
+        for (Entry<String, RemoteNodeMemory> entry : nodes.entrySet()) {
+            memoryInfo.put(entry.getKey(), entry.getValue().getInfo());
+        }
+        for (Entry<String, RemoteNodeMemory> entry : cnNodes.entrySet()) {
+            memoryInfo.put(entry.getKey(), entry.getValue().getInfo());
         }
         return memoryInfo;
     }

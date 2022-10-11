@@ -20,6 +20,7 @@ import org.testng.annotations.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
@@ -62,7 +63,7 @@ public class FSDataInputStreamTailTest
     public void testReadTailForFileSize() throws Exception
     {
         // Setup
-        final FSDataInputStream inputStream = new FSDataInputStream(new ByteArrayInputStream("content".getBytes()));
+        final FSDataInputStream inputStream = new FSDataInputStream(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
 
         // Run the test
         final long result = FSDataInputStreamTail.readTailForFileSize("path", 0L, inputStream);

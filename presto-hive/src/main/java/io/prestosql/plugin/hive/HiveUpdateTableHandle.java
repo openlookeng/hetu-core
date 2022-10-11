@@ -46,6 +46,7 @@ public class HiveUpdateTableHandle
                 bucketProperty,
                 tableStorageFormat,
                 partitionStorageFormat,
+                false,
                 false);
     }
 }

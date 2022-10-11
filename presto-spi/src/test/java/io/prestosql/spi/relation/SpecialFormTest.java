@@ -70,17 +70,4 @@ public class SpecialFormTest
     {
         assertEquals(0, specialFormUnderTest.hashCode());
     }
-
-//    @Test
-//    public void testAccept() throws Exception
-//    {
-//        // Setup
-//        final RowExpressionVisitor<R, C> visitor = null;
-//        final C context = null;
-//
-//        // Run the test
-//        final R result = specialFormUnderTest.accept(visitor, context);
-//
-//        // Verify the results
-//    }
 }

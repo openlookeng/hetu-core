@@ -204,13 +204,13 @@ public class OrcFileWriter
 
         this.fileInputColumnIndexes = requireNonNull(fileInputColumnIndexes, "fileInputColumnIndexes is null");
 
-        ImmutableList.Builder<Block> nullBlocks = ImmutableList.builder();
+        ImmutableList.Builder<Block> blocks = ImmutableList.builder();
         for (Type fileColumnType : fileColumnTypes) {
             BlockBuilder blockBuilder = fileColumnType.createBlockBuilder(null, 1, 0);
             blockBuilder.appendNull();
-            nullBlocks.add(blockBuilder.build());
+            blocks.add(blockBuilder.build());
         }
-        this.nullBlocks = nullBlocks.build();
+        this.nullBlocks = blocks.build();
         this.validationInputFactory = validationInputFactory;
         orcWriter = new OrcWriter(
                 orcDataSink,

@@ -27,12 +27,14 @@ public class SessionPropertyAccessControlRuleTest
 {
     private SessionPropertyAccessControlRule sessionPropertyAccessControlRuleUnderTest;
 
+    private static final Pattern REGEX = Pattern.compile("regex");
+
     @BeforeMethod
     public void setUp() throws Exception
     {
         sessionPropertyAccessControlRuleUnderTest = new SessionPropertyAccessControlRule(false,
-                Optional.of(Pattern.compile("regex")), Optional.of(Pattern.compile("regex")),
-                Optional.of(Pattern.compile("regex")));
+                Optional.of(REGEX), Optional.of(REGEX),
+                Optional.of(REGEX));
     }
 
     @Test

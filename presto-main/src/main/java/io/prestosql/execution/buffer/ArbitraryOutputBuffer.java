@@ -21,7 +21,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.ClientBuffer.PagesSupplier;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
@@ -71,7 +70,7 @@ import static java.util.Objects.requireNonNull;
  * A buffer that assigns pages to queues based on a first come, first served basis.
  */
 @RestorableConfig(uncapturedFields = {"memoryManager", "taskContext", "inputChannels", "snapshotState", "outputBuffers",
-        "masterBuffer", "buffers", "markersForNewBuffers", "state", "noMoreInputChannels"})
+        "masterBuffer", "buffers", "markersForNewBuffers", "noMoreInputChannels", "stateMachine"})
 public class ArbitraryOutputBuffer
         implements OutputBuffer, MultiInputRestorable
 {
@@ -94,18 +93,18 @@ public class ArbitraryOutputBuffer
     @GuardedBy("this")
     private final List<SerializedPageReference> markersForNewBuffers = new ArrayList<>();
 
-    private final StateMachine<BufferState> state;
+    private final OutputBufferStateMachine stateMachine;
 
     private final AtomicLong totalPagesAdded = new AtomicLong();
     private final AtomicLong totalRowsAdded = new AtomicLong();
 
     public ArbitraryOutputBuffer(
-            StateMachine<BufferState> state,
+            OutputBufferStateMachine state,
             DataSize maxBufferSize,
             Supplier<LocalMemoryContext> systemMemoryContextSupplier,
             Executor notificationExecutor)
     {
-        this.state = requireNonNull(state, "state is null");
+        this.stateMachine = requireNonNull(state, "state is null");
         requireNonNull(maxBufferSize, "maxBufferSize is null");
         checkArgument(maxBufferSize.toBytes() > 0, "maxBufferSize must be at least 1");
         this.memoryManager = new OutputBufferMemoryManager(
@@ -118,13 +117,13 @@ public class ArbitraryOutputBuffer
     @Override
     public void addStateChangeListener(StateChangeListener<BufferState> stateChangeListener)
     {
-        state.addStateChangeListener(stateChangeListener);
+        stateMachine.addStateChangeListener(stateChangeListener);
     }
 
     @Override
     public boolean isFinished()
     {
-        return state.get() == FINISHED;
+        return stateMachine.getState() == FINISHED;
     }
 
     @Override
@@ -136,7 +135,7 @@ public class ArbitraryOutputBuffer
     @Override
     public boolean isOverutilized()
     {
-        return (memoryManager.getUtilization() >= 0.5) || !state.get().canAddPages();
+        return (memoryManager.getUtilization() >= 0.5) || !stateMachine.getState().canAddPages();
     }
 
     @Override
@@ -147,7 +146,7 @@ public class ArbitraryOutputBuffer
         //
 
         // always get the state first before any other stats
-        BufferState bufferState = this.state.get();
+        BufferState bufferState = this.stateMachine.getState();
 
         // buffers it a concurrent collection so it is safe to access out side of guard
         // in this case we only want a snapshot of the current buffers
@@ -185,7 +184,7 @@ public class ArbitraryOutputBuffer
         synchronized (this) {
             // ignore buffers added after query finishes, which can happen when a query is canceled
             // also ignore old versions, which is normal
-            BufferState bufferState = this.state.get();
+            BufferState bufferState = this.stateMachine.getState();
             if (bufferState.isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
                 return;
             }
@@ -201,12 +200,12 @@ public class ArbitraryOutputBuffer
 
             // update state if no more buffers is set
             if (outputBuffers.isNoMoreBufferIds()) {
-                this.state.compareAndSet(OPEN, NO_MORE_BUFFERS);
-                this.state.compareAndSet(NO_MORE_PAGES, FLUSHING);
+                this.stateMachine.compareAndSet(OPEN, NO_MORE_BUFFERS);
+                this.stateMachine.compareAndSet(NO_MORE_PAGES, FLUSHING);
             }
         }
 
-        if (!state.get().canAddBuffers()) {
+        if (!stateMachine.getState().canAddBuffers()) {
             noMoreBuffers();
         }
 
@@ -227,7 +226,7 @@ public class ArbitraryOutputBuffer
 
         // ignore pages after "no more pages" is set
         // this can happen with a limit query
-        if (!state.get().canAddPages()) {
+        if (!stateMachine.getState().canAddPages()) {
             return;
         }
 
@@ -278,7 +277,7 @@ public class ArbitraryOutputBuffer
             clientBuffer.loadPagesIfNecessary(masterBuffer);
         }
 
-        if (targetClients != null && state.get().canAddBuffers()) {
+        if (targetClients != null && stateMachine.getState().canAddBuffers()) {
             // targetClients != null means current page is a marker page
             // Record the marker so when new buffers are added, the marker is sent to those new buffers
             serializedPageReferences.forEach(SerializedPageReference::addReference);
@@ -324,11 +323,26 @@ public class ArbitraryOutputBuffer
     }
 
     @Override
+    public void abort()
+    {
+        if (stateMachine.abort()) {
+            memoryManager.setNoBlockOnFull();
+            forceFreeMemory();
+        }
+    }
+
+    @Override
+    public Optional<Throwable> getFailureCause()
+    {
+        return stateMachine.getFailureCause();
+    }
+
+    @Override
     public void setNoMorePages()
     {
         checkState(!Thread.holdsLock(this), "Can not set no more pages while holding a lock on this");
-        state.compareAndSet(OPEN, NO_MORE_PAGES);
-        state.compareAndSet(NO_MORE_BUFFERS, FLUSHING);
+        stateMachine.compareAndSet(OPEN, NO_MORE_PAGES);
+        stateMachine.compareAndSet(NO_MORE_BUFFERS, FLUSHING);
         memoryManager.setNoBlockOnFull();
 
         masterBuffer.setNoMorePages();
@@ -342,12 +356,18 @@ public class ArbitraryOutputBuffer
     }
 
     @Override
+    public BufferState getState()
+    {
+        return stateMachine.getState();
+    }
+
+    @Override
     public void destroy()
     {
         checkState(!Thread.holdsLock(this), "Can not destroy while holding a lock on this");
 
         // ignore destroy if the buffer already in a terminal state.
-        if (state.setIf(FINISHED, oldState -> !oldState.isTerminal())) {
+        if (stateMachine.setIf(FINISHED, oldState -> !oldState.isTerminal())) {
             noMoreBuffers();
 
             masterBuffer.destroy();
@@ -363,7 +383,7 @@ public class ArbitraryOutputBuffer
     public void fail()
     {
         // ignore fail if the buffer already in a terminal state.
-        if (state.setIf(FAILED, oldState -> !oldState.isTerminal())) {
+        if (stateMachine.setIf(FAILED, oldState -> !oldState.isTerminal())) {
             memoryManager.setNoBlockOnFull();
             forceFreeMemory();
             // DO NOT destroy buffers or set no more pages.  The coordinator manages the teardown of failed queries.
@@ -392,7 +412,7 @@ public class ArbitraryOutputBuffer
         // NOTE: buffers are allowed to be created in the FINISHED state because destroy() can move to the finished state
         // without a clean "no-more-buffers" message from the scheduler.  This happens with limit queries and is ok because
         // the buffer will be immediately destroyed.
-        BufferState bufferState = this.state.get();
+        BufferState bufferState = this.stateMachine.getState();
         checkState(bufferState.canAddBuffers() || !outputBuffers.isNoMoreBufferIds(), "No more buffers already set");
 
         // NOTE: buffers are allowed to be created before they are explicitly declared by setOutputBuffers
@@ -451,7 +471,7 @@ public class ArbitraryOutputBuffer
         // This buffer type assigns each page to a single, arbitrary reader,
         // so we don't need to wait for no-more-buffers to finish the buffer.
         // Any readers added after finish will simply receive no data.
-        BufferState bufferState = this.state.get();
+        BufferState bufferState = this.stateMachine.getState();
         if ((bufferState == FLUSHING) || ((bufferState == NO_MORE_PAGES) && masterBuffer.isEmpty())) {
             if (safeGetBuffersSnapshot().stream().allMatch(ClientBuffer::isDestroyed)) {
                 destroy();

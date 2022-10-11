@@ -37,6 +37,7 @@ import java.util.function.Function;
 import java.util.stream.Collector;
 
 import static java.lang.String.format;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -105,6 +106,34 @@ public final class TupleDomain<T>
     }
 
     /**
+     * Extract all column constraints that define a non-empty set of discrete values allowed for the columns in their respective Domains.
+     * Returns an empty Optional if the Domain is none.
+     */
+    public static <T> Optional<Map<T, List<NullableValue>>> extractDiscreteValues(TupleDomain<T> tupleDomain)
+    {
+        if (!tupleDomain.getDomains().isPresent()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(tupleDomain.getDomains().get()
+                .entrySet().stream()
+                .filter(entry -> entry.getValue().isNullableDiscreteSet())
+                .collect(toLinkedMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            Domain.DiscreteSet discreteValues = entry.getValue().getNullableDiscreteSet();
+                            List<NullableValue> nullableValues = new ArrayList<>();
+                            for (Object value : discreteValues.getNonNullValues()) {
+                                nullableValues.add(new NullableValue(entry.getValue().getType(), value));
+                            }
+                            if (discreteValues.containsNull()) {
+                                nullableValues.add(new NullableValue(entry.getValue().getType(), null));
+                            }
+                            return unmodifiableList(nullableValues);
+                        })));
+    }
+
+    /**
      * Convert a map of columns to values into the TupleDomain which requires
      * those columns to be fixed to those values. Null is allowed as a fixed value.
      */
@@ -140,9 +169,9 @@ public final class TupleDomain<T>
             return all();
         }
 
-        Map<T, Domain> domains = this.domains.get();
-        HashMap<U, Domain> result = new LinkedHashMap<>(domains.size());
-        for (Map.Entry<T, Domain> entry : domains.entrySet()) {
+        Map<T, Domain> tDomainMap = this.domains.get();
+        HashMap<U, Domain> result = new LinkedHashMap<>(tDomainMap.size());
+        for (Map.Entry<T, Domain> entry : tDomainMap.entrySet()) {
             U key = function.apply(entry.getKey());
             requireNonNull(key, () -> format("mapping function %s returned null for %s", function, entry.getKey()));
 

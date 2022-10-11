@@ -44,7 +44,7 @@ headless: true
     - [State store]({{< relref "./docs/admin/state-store.md" >}})
     - [Meta Store]({{< relref "./docs/admin/meta-store.md" >}})
     - [Audit Log]({{< relref "./docs/admin/audit-log.md" >}})
-    - [Reliable Execution]({{< relref "./docs/admin/reliable-execution.md" >}})
+    - [Reliable Execution]({{< relref "./docs/admin/reliable-query/_index.md" >}})
     - [JDBC Data Source Multi-Split Management]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [Extension Physical Execution Planner]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
@@ -93,6 +93,7 @@ headless: true
     - [openGauss]({{< relref "./docs/connector/opengauss.md" >}})
     - [Oracle]({{< relref "./docs/connector/oracle.md" >}})
     - [PostgreSQL]({{< relref "./docs/connector/postgresql.md" >}})
+    - [SingleData]({{< relref "./docs/connector/singledata.md" >}})
     - [SQL Server]({{< relref "./docs/connector/sqlserver.md" >}})
     - [System]({{< relref "./docs/connector/system.md" >}})
     - [Thrift]({{< relref "./docs/connector/thrift.md" >}})
@@ -220,6 +221,7 @@ headless: true
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
 - [Release Notes]("#")
+    - [1.8.0 (30 Nov 2022)]({{< relref "./docs/releasenotes/releasenotes-1.8.0.md" >}})
     - [1.7.0 (30 Jun 2022)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})
     - [1.6.1 (27 Apr 2022)]({{< relref "./docs/releasenotes/releasenotes-1.6.1.md" >}})
     - [1.6.0 (30 Mar 2022)]({{< relref "./docs/releasenotes/releasenotes-1.6.0.md" >}})

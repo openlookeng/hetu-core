@@ -183,7 +183,9 @@ public final class ScalarFunctionAdapter
             IcebergInvocationConvention actualConvention,
             IcebergInvocationConvention expectedConvention)
     {
-        requireNonNull(methodHandle, "methodHandle is null");
+        MethodHandle methodHandle1 = methodHandle;
+
+        requireNonNull(methodHandle1, "methodHandle is null");
         requireNonNull(actualConvention, "actualConvention is null");
         requireNonNull(expectedConvention, "expectedConvention is null");
         if (actualConvention.getArgumentConventions().size() != expectedConvention.getArgumentConventions().size()) {
@@ -198,7 +200,7 @@ public final class ScalarFunctionAdapter
         }
 
         // adapt return first, since return-null-on-null parameter convention must know if the return type is nullable
-        methodHandle = adaptReturn(methodHandle, actualConvention.getReturnConvention(), expectedConvention.getReturnConvention());
+        methodHandle1 = adaptReturn(methodHandle1, actualConvention.getReturnConvention(), expectedConvention.getReturnConvention());
 
         // adapt parameters one at a time
         int parameterIndex = 0;
@@ -214,8 +216,8 @@ public final class ScalarFunctionAdapter
             Type argumentType = actualArgumentTypes.get(argumentIndex);
             InvocationArgumentConvention actualArgumentConvention = actualConvention.getArgumentConvention(argumentIndex);
             InvocationArgumentConvention expectedArgumentConvention = expectedConvention.getArgumentConvention(argumentIndex);
-            methodHandle = adaptParameter(
-                    methodHandle,
+            methodHandle1 = adaptParameter(
+                    methodHandle1,
                     parameterIndex,
                     argumentType,
                     actualArgumentConvention,
@@ -226,7 +228,7 @@ public final class ScalarFunctionAdapter
                 parameterIndex++;
             }
         }
-        return methodHandle;
+        return methodHandle1;
     }
 
     private MethodHandle adaptReturn(
@@ -234,15 +236,17 @@ public final class ScalarFunctionAdapter
             InvocationReturnConvention actualReturnConvention,
             InvocationReturnConvention expectedReturnConvention)
     {
+        MethodHandle methodHandle1 = methodHandle;
+
         if (actualReturnConvention == expectedReturnConvention) {
-            return methodHandle;
+            return methodHandle1;
         }
 
-        Class<?> returnType = methodHandle.type().returnType();
+        Class<?> returnType = methodHandle1.type().returnType();
         if (expectedReturnConvention == NULLABLE_RETURN) {
             if (actualReturnConvention == FAIL_ON_NULL) {
                 // box return
-                return explicitCastArguments(methodHandle, methodHandle.type().changeReturnType(wrap(returnType)));
+                return explicitCastArguments(methodHandle1, methodHandle1.type().changeReturnType(wrap(returnType)));
             }
         }
 
@@ -254,8 +258,8 @@ public final class ScalarFunctionAdapter
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.UNDEFINED_VALUE_FOR_NULL) {
                     // currently, we just perform unboxing, which converts nulls to Java primitive default value
-                    methodHandle = explicitCastArguments(methodHandle, methodHandle.type().changeReturnType(unwrap(returnType)));
-                    return methodHandle;
+                    methodHandle1 = explicitCastArguments(methodHandle1, methodHandle1.type().changeReturnType(unwrap(returnType)));
+                    return methodHandle1;
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.THROW_ON_NULL) {
@@ -266,7 +270,7 @@ public final class ScalarFunctionAdapter
                             throwTrinoNullArgumentException(adapter.type()),
                             adapter);
 
-                    return filterReturnValue(methodHandle, adapter);
+                    return filterReturnValue(methodHandle1, adapter);
                 }
             }
         }
@@ -281,8 +285,10 @@ public final class ScalarFunctionAdapter
             InvocationArgumentConvention expectedArgumentConvention,
             InvocationReturnConvention returnConvention)
     {
+        MethodHandle castArguments = methodHandle;
+
         if (actualArgumentConvention == expectedArgumentConvention) {
-            return methodHandle;
+            return castArguments;
         }
         if (actualArgumentConvention == BLOCK_POSITION) {
             throw new IllegalArgumentException("Block and position argument can not be adapted");
@@ -295,16 +301,16 @@ public final class ScalarFunctionAdapter
         if (expectedArgumentConvention == NEVER_NULL) {
             if (actualArgumentConvention == BOXED_NULLABLE) {
                 // if actual argument is boxed primitive, change method handle to accept a primitive and then box to actual method
-                if (isWrapperType(methodHandle.type().parameterType(parameterIndex))) {
-                    MethodType targetType = methodHandle.type().changeParameterType(parameterIndex, unwrap(methodHandle.type().parameterType(parameterIndex)));
-                    methodHandle = explicitCastArguments(methodHandle, targetType);
+                if (isWrapperType(castArguments.type().parameterType(parameterIndex))) {
+                    MethodType targetType = castArguments.type().changeParameterType(parameterIndex, unwrap(castArguments.type().parameterType(parameterIndex)));
+                    castArguments = explicitCastArguments(castArguments, targetType);
                 }
-                return methodHandle;
+                return castArguments;
             }
 
             if (actualArgumentConvention == NULL_FLAG) {
                 // actual method takes value and null flag, so change method handle to not have the flag and always pass false to the actual method
-                return insertArguments(methodHandle, parameterIndex + 1, false);
+                return insertArguments(castArguments, parameterIndex + 1, false);
             }
 
             throw new IllegalArgumentException("Unsupported actual argument convention: " + actualArgumentConvention);
@@ -318,13 +324,13 @@ public final class ScalarFunctionAdapter
                 }
 
                 // box argument
-                Class<?> boxedType = wrap(methodHandle.type().parameterType(parameterIndex));
-                MethodType targetType = methodHandle.type().changeParameterType(parameterIndex, boxedType);
-                methodHandle = explicitCastArguments(methodHandle, targetType);
+                Class<?> boxedType = wrap(castArguments.type().parameterType(parameterIndex));
+                MethodType targetType = castArguments.type().changeParameterType(parameterIndex, boxedType);
+                castArguments = explicitCastArguments(castArguments, targetType);
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.UNDEFINED_VALUE_FOR_NULL) {
                     // currently, we just perform unboxing, which converts nulls to Java primitive default value
-                    return methodHandle;
+                    return castArguments;
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.RETURN_NULL_ON_NULL) {
@@ -332,9 +338,9 @@ public final class ScalarFunctionAdapter
                         throw new IllegalArgumentException("RETURN_NULL_ON_NULL adaptation can not be used with FAIL_ON_NULL return convention");
                     }
                     return guardWithTest(
-                            isNullArgument(methodHandle.type(), parameterIndex),
-                            returnNull(methodHandle.type()),
-                            methodHandle);
+                            isNullArgument(castArguments.type(), parameterIndex),
+                            returnNull(castArguments.type()),
+                            castArguments);
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.THROW_ON_NULL) {
@@ -344,7 +350,7 @@ public final class ScalarFunctionAdapter
                             throwTrinoNullArgumentException(adapterType),
                             identity(boxedType));
 
-                    return collectArguments(methodHandle, parameterIndex, adapter);
+                    return collectArguments(castArguments, parameterIndex, adapter);
                 }
             }
 
@@ -353,25 +359,22 @@ public final class ScalarFunctionAdapter
                 // signature is based on a boxed Long argument.
 
                 // 3. unbox the value (if null the java default is sent)
-                // long, boolean => Long, boolean
-                Class<?> parameterType = methodHandle.type().parameterType(parameterIndex);
-                methodHandle = explicitCastArguments(methodHandle, methodHandle.type().changeParameterType(parameterIndex, wrap(parameterType)));
+                Class<?> parameterType = castArguments.type().parameterType(parameterIndex);
+                castArguments = explicitCastArguments(castArguments, castArguments.type().changeParameterType(parameterIndex, wrap(parameterType)));
 
                 // 2. replace second argument with the result of isNull
-                // long, boolean => Long, Long
-                methodHandle = filterArguments(
-                        methodHandle,
+                castArguments = filterArguments(
+                        castArguments,
                         parameterIndex + 1,
                         explicitCastArguments(IS_NULL_METHOD, methodType(boolean.class, wrap(parameterType))));
 
                 // 1. Duplicate the argument, so we have two copies of the value
-                // Long, Long => Long
-                int[] reorder = IntStream.range(0, methodHandle.type().parameterCount())
+                int[] reorder = IntStream.range(0, castArguments.type().parameterCount())
                         .map(i -> i <= parameterIndex ? i : i - 1)
                         .toArray();
-                MethodType newType = methodHandle.type().dropParameterTypes(parameterIndex + 1, parameterIndex + 2);
-                methodHandle = permuteArguments(methodHandle, newType, reorder);
-                return methodHandle;
+                MethodType newType = castArguments.type().dropParameterTypes(parameterIndex + 1, parameterIndex + 2);
+                castArguments = permuteArguments(castArguments, newType, reorder);
+                return castArguments;
             }
 
             throw new IllegalArgumentException("Unsupported actual argument convention: " + actualArgumentConvention);
@@ -386,8 +389,8 @@ public final class ScalarFunctionAdapter
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.UNDEFINED_VALUE_FOR_NULL) {
                     // add null flag to call
-                    methodHandle = dropArguments(methodHandle, parameterIndex + 1, boolean.class);
-                    return methodHandle;
+                    castArguments = dropArguments(castArguments, parameterIndex + 1, boolean.class);
+                    return castArguments;
                 }
 
                 // if caller sets null flag, return null, otherwise invoke target
@@ -396,27 +399,27 @@ public final class ScalarFunctionAdapter
                         throw new IllegalArgumentException("RETURN_NULL_ON_NULL adaptation can not be used with FAIL_ON_NULL return convention");
                     }
                     // add null flag to call
-                    methodHandle = dropArguments(methodHandle, parameterIndex + 1, boolean.class);
+                    castArguments = dropArguments(castArguments, parameterIndex + 1, boolean.class);
                     return guardWithTest(
-                            isTrueNullFlag(methodHandle.type(), parameterIndex),
-                            returnNull(methodHandle.type()),
-                            methodHandle);
+                            isTrueNullFlag(castArguments.type(), parameterIndex),
+                            returnNull(castArguments.type()),
+                            castArguments);
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.THROW_ON_NULL) {
-                    MethodHandle adapter = identity(methodHandle.type().parameterType(parameterIndex));
+                    MethodHandle adapter = identity(castArguments.type().parameterType(parameterIndex));
                     adapter = dropArguments(adapter, 1, boolean.class);
                     adapter = guardWithTest(
                             isTrueNullFlag(adapter.type(), 0),
                             throwTrinoNullArgumentException(adapter.type()),
                             adapter);
 
-                    return collectArguments(methodHandle, parameterIndex, adapter);
+                    return collectArguments(castArguments, parameterIndex, adapter);
                 }
             }
 
             if (actualArgumentConvention == BOXED_NULLABLE) {
-                return collectArguments(methodHandle, parameterIndex, boxedToNullFlagFilter(methodHandle.type().parameterType(parameterIndex)));
+                return collectArguments(castArguments, parameterIndex, boxedToNullFlagFilter(castArguments.type().parameterType(parameterIndex)));
             }
 
             throw new IllegalArgumentException("Unsupported actual argument convention: " + actualArgumentConvention);
@@ -424,22 +427,22 @@ public final class ScalarFunctionAdapter
 
         // caller will pass boolean true in the next argument for SQL null
         if (expectedArgumentConvention == BLOCK_POSITION) {
-            MethodHandle getBlockValue = getBlockValue(argumentType, methodHandle.type().parameterType(parameterIndex));
+            MethodHandle getBlockValue = getBlockValue(argumentType, castArguments.type().parameterType(parameterIndex));
 
             if (actualArgumentConvention == NEVER_NULL) {
                 if (nullAdaptationPolicy == NullAdaptationPolicy.UNDEFINED_VALUE_FOR_NULL) {
                     // Current, null is not checked, so whatever type returned is passed through
-                    methodHandle = collectArguments(methodHandle, parameterIndex, getBlockValue);
-                    return methodHandle;
+                    castArguments = collectArguments(castArguments, parameterIndex, getBlockValue);
+                    return castArguments;
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.RETURN_NULL_ON_NULL && returnConvention != FAIL_ON_NULL) {
                     // if caller sets null flag, return null, otherwise invoke target
-                    methodHandle = collectArguments(methodHandle, parameterIndex, getBlockValue);
+                    castArguments = collectArguments(castArguments, parameterIndex, getBlockValue);
                     return guardWithTest(
-                            isBlockPositionNull(methodHandle.type(), parameterIndex),
-                            returnNull(methodHandle.type()),
-                            methodHandle);
+                            isBlockPositionNull(castArguments.type(), parameterIndex),
+                            returnNull(castArguments.type()),
+                            castArguments);
                 }
 
                 if (nullAdaptationPolicy == NullAdaptationPolicy.THROW_ON_NULL || nullAdaptationPolicy == NullAdaptationPolicy.UNSUPPORTED || nullAdaptationPolicy == NullAdaptationPolicy.RETURN_NULL_ON_NULL) {
@@ -448,7 +451,7 @@ public final class ScalarFunctionAdapter
                             throwTrinoNullArgumentException(getBlockValue.type()),
                             getBlockValue);
 
-                    return collectArguments(methodHandle, parameterIndex, adapter);
+                    return collectArguments(castArguments, parameterIndex, adapter);
                 }
             }
 
@@ -458,28 +461,26 @@ public final class ScalarFunctionAdapter
                         isBlockPositionNull(getBlockValue.type(), 0),
                         returnNull(getBlockValue.type()),
                         getBlockValue);
-                methodHandle = collectArguments(methodHandle, parameterIndex, getBlockValue);
-                return methodHandle;
+                castArguments = collectArguments(castArguments, parameterIndex, getBlockValue);
+                return castArguments;
             }
 
             if (actualArgumentConvention == NULL_FLAG) {
-                // long, boolean => long, Block, int
                 MethodHandle isNull = isBlockPositionNull(getBlockValue.type(), 0);
-                methodHandle = collectArguments(methodHandle, parameterIndex + 1, isNull);
+                castArguments = collectArguments(castArguments, parameterIndex + 1, isNull);
 
-                // long, Block, int => Block, int, Block, int
                 getBlockValue = guardWithTest(
                         isBlockPositionNull(getBlockValue.type(), 0),
                         returnNull(getBlockValue.type()),
                         getBlockValue);
-                methodHandle = collectArguments(methodHandle, parameterIndex, getBlockValue);
+                castArguments = collectArguments(castArguments, parameterIndex, getBlockValue);
 
-                int[] reorder = IntStream.range(0, methodHandle.type().parameterCount())
+                int[] reorder = IntStream.range(0, castArguments.type().parameterCount())
                         .map(i -> i <= parameterIndex + 1 ? i : i - 2)
                         .toArray();
-                MethodType newType = methodHandle.type().dropParameterTypes(parameterIndex + 2, parameterIndex + 4);
-                methodHandle = permuteArguments(methodHandle, newType, reorder);
-                return methodHandle;
+                MethodType newType = castArguments.type().dropParameterTypes(parameterIndex + 2, parameterIndex + 4);
+                castArguments = permuteArguments(castArguments, newType, reorder);
+                return castArguments;
             }
 
             throw new IllegalArgumentException("Unsupported actual argument convention: " + actualArgumentConvention);

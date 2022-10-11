@@ -67,10 +67,11 @@ public class DecoratedHiveMetastoreModule
             SharedHiveMetastoreCache sharedHiveMetastoreCache)
     {
         // wrap the raw metastore with decorators like the RecordingHiveMetastore
-        metastoreFactory = new DecoratingHiveMetastoreFactory(metastoreFactory, decorators);
+        HiveMetastoreFactory hiveMetastoreFactory = metastoreFactory;
+        hiveMetastoreFactory = new DecoratingHiveMetastoreFactory(hiveMetastoreFactory, decorators);
 
         // cross TX metastore cache is enabled wrapper with caching metastore
-        return sharedHiveMetastoreCache.createCachingHiveMetastoreFactory(metastoreFactory);
+        return sharedHiveMetastoreCache.createCachingHiveMetastoreFactory(hiveMetastoreFactory);
     }
 
     private static class DecoratingHiveMetastoreFactory

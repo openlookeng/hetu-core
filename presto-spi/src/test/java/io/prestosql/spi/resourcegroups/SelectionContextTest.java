@@ -15,11 +15,4 @@ package io.prestosql.spi.resourcegroups;
 
 public class SelectionContextTest
 {
-//    private SelectionContext<T> selectionContextUnderTest;
-
-//    @BeforeMethod
-//    public void setUp() throws Exception
-//    {
-//        selectionContextUnderTest = new SelectionContext<>(new ResourceGroupId("name"), null);
-//    }
 }

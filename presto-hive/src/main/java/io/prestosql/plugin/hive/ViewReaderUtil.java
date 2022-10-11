@@ -170,11 +170,12 @@ public final class ViewReaderUtil
 
         public static ConnectorViewDefinition decodeViewData(String viewData)
         {
-            checkCondition(viewData.startsWith(VIEW_PREFIX), HIVE_INVALID_VIEW_DATA, "View data missing prefix: %s", viewData);
-            checkCondition(viewData.endsWith(VIEW_SUFFIX), HIVE_INVALID_VIEW_DATA, "View data missing suffix: %s", viewData);
-            viewData = viewData.substring(VIEW_PREFIX.length());
-            viewData = viewData.substring(0, viewData.length() - VIEW_SUFFIX.length());
-            byte[] bytes = Base64.getDecoder().decode(viewData);
+            String data = viewData;
+            checkCondition(data.startsWith(VIEW_PREFIX), HIVE_INVALID_VIEW_DATA, "View data missing prefix: %s", data);
+            checkCondition(data.endsWith(VIEW_SUFFIX), HIVE_INVALID_VIEW_DATA, "View data missing suffix: %s", data);
+            data = data.substring(VIEW_PREFIX.length());
+            data = data.substring(0, data.length() - VIEW_SUFFIX.length());
+            byte[] bytes = Base64.getDecoder().decode(data);
             return VIEW_CODEC.fromJson(bytes);
         }
     }
@@ -205,7 +206,7 @@ public final class ViewReaderUtil
                 RelDataType rowType = rel.getRowType();
                 List<ViewColumn> columns = rowType.getFieldList().stream()
                         .map(field -> new ViewColumn(
-                                field.getName(), //todo xjp fromSqlType 没有实现
+                                field.getName(),
                                 typeManager.fromSqlType(getTypeString(field.getType())).getTypeSignature()))
                         .collect(toImmutableList());
                 return new ConnectorViewDefinition(

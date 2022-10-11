@@ -48,10 +48,10 @@ public class SchemaInitializer
     @Override
     public void accept(QueryRunner queryRunner)
     {
-        String schemaProperties = this.schemaProperties.entrySet().stream()
+        String properties = this.schemaProperties.entrySet().stream()
                 .map(entry -> entry.getKey() + " = " + entry.getValue())
                 .collect(Collectors.joining(", ", " WITH ( ", " )"));
-        queryRunner.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName + (this.schemaProperties.size() > 0 ? schemaProperties : ""));
+        queryRunner.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName + (this.schemaProperties.size() > 0 ? properties : ""));
         copyTpchTables(queryRunner, "tpch", TINY_SCHEMA_NAME, queryRunner.getDefaultSession(), clonedTpchTables);
     }
 

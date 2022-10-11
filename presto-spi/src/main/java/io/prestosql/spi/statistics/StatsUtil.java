@@ -13,7 +13,6 @@
  */
 package io.prestosql.spi.statistics;
 
-//import io.prestosql.spi.type.*;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Int128;
 import io.prestosql.spi.type.LongTimestamp;

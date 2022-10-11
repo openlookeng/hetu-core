@@ -74,6 +74,7 @@ import io.prestosql.spi.connector.ConstraintApplicationResult;
 import io.prestosql.spi.connector.DiscretePredicates;
 import io.prestosql.spi.connector.InMemoryRecordSet;
 import io.prestosql.spi.connector.RecordCursor;
+import io.prestosql.spi.connector.RetryMode;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.connector.SchemaTablePrefix;
 import io.prestosql.spi.connector.SystemTable;
@@ -140,6 +141,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.concat;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Streams.stream;
 import static io.prestosql.plugin.hive.HiveBucketing.bucketedOnTimestamp;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
@@ -164,6 +166,7 @@ import static io.prestosql.plugin.hive.HiveUtil.isPrestoView;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
 import static io.prestosql.plugin.hive.HiveUtil.verifyPartitionTypeSupported;
 import static io.prestosql.plugin.hive.HiveWriteUtils.isS3FileSystem;
+import static io.prestosql.plugin.hive.HiveWriterFactory.computeNonTransactionalBucketedFilename;
 import static io.prestosql.plugin.hive.HiveWriterFactory.getSnapshotSubFileIndex;
 import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotFile;
 import static io.prestosql.plugin.hive.HiveWriterFactory.isSnapshotSubFile;
@@ -175,6 +178,7 @@ import static io.prestosql.spi.StandardErrorCode.INVALID_SCHEMA_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
+import static io.prestosql.spi.connector.RetryMode.NO_RETRIES;
 import static io.prestosql.spi.predicate.TupleDomain.withColumnDomains;
 import static io.prestosql.spi.security.PrincipalType.USER;
 import static io.prestosql.spi.statistics.TableStatisticType.ROW_COUNT;
@@ -861,7 +865,9 @@ public class HiveMetadata
                 principalPrivileges,
                 Optional.empty(),
                 ignoreExisting,
-                new PartitionStatistics(basicStatistics, ImmutableMap.of()));
+                new PartitionStatistics(basicStatistics, ImmutableMap.of()),
+                Optional.empty(),
+                false);
     }
 
     protected Map<String, String> getEmptyTableProperties(ConnectorTableMetadata tableMetadata, Optional<HiveBucketProperty> bucketProperty, HdfsContext hdfsContext)
@@ -1273,7 +1279,13 @@ public class HiveMetadata
     }
 
     @Override
-    public HiveOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
+    {
+        return beginCreateTable(session, tableMetadata, layout, NO_RETRIES);
+    }
+
+    @Override
+    public HiveOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout, RetryMode retryMode)
     {
         if (getExternalLocation(tableMetadata.getProperties()) != null || isExternalTable(tableMetadata.getProperties())) {
             throw new PrestoException(NOT_SUPPORTED, "External tables cannot be created using CREATE TABLE AS");
@@ -1314,6 +1326,10 @@ public class HiveMetadata
 
         Optional<WriteIdInfo> writeIdInfo = Optional.empty();
         if (AcidUtils.isTransactionalTable(tableProperties)) {
+            if (retryMode != NO_RETRIES) {
+                throw new PrestoException(NOT_SUPPORTED, "CREATE TABLE AS is not supported for transactional tables with query retries enabled");
+            }
+
             //Create the HiveTableHandle for just to obtain writeIds.
             List<HiveColumnHandle> partitionColumnHandles = partitionedBy.stream()
                     .map(columnHandlesByName::get)
@@ -1346,7 +1362,8 @@ public class HiveMetadata
                 partitionedBy,
                 bucketProperty,
                 session.getUser(),
-                tableProperties);
+                tableProperties,
+                retryMode != NO_RETRIES);
 
         LocationService.WriteInfo writeInfo = locationService.getQueryWriteInfo(locationHandle);
         metastore.declareIntentionToWrite(session, writeInfo.getWriteMode(), writeInfo.getWritePath(), schemaTableName);
@@ -1426,7 +1443,20 @@ public class HiveMetadata
             tableStatistics = new PartitionStatistics(HiveBasicStatistics.createEmptyStatistics(), ImmutableMap.of());
         }
 
-        metastore.createTable(session, table, principalPrivileges, Optional.of(writeInfo.getWritePath()), false, tableStatistics);
+        if (handle.getPartitionedBy().isEmpty()) {
+            List<String> fileNames;
+            if (partitionUpdates.isEmpty()) {
+                // creating empty table via CTAS ... WITH NO DATA
+                fileNames = ImmutableList.of();
+            }
+            else {
+                fileNames = getOnlyElement(partitionUpdates).getFileNames();
+            }
+            metastore.createTable(session, table, principalPrivileges, Optional.of(writeInfo.getWritePath()), false, tableStatistics, Optional.of(fileNames), handle.isRetriesEnabled());
+        }
+        else {
+            metastore.createTable(session, table, principalPrivileges, Optional.of(writeInfo.getWritePath()), false, tableStatistics, Optional.empty(), false);
+        }
 
         if (!handle.getPartitionedBy().isEmpty()) {
             if (HiveSessionProperties.isRespectTableFormat(session)) {
@@ -1447,7 +1477,9 @@ public class HiveMetadata
                                 buildPartitionObject(session, table, update),
                                 update.getWritePath(),
                                 partitionStatistics,
-                                HiveACIDWriteType.NONE);
+                                HiveACIDWriteType.NONE,
+                                Optional.of(update.getFileNames()),
+                                handle.isRetriesEnabled());
                     })).collect(toList());
             futures.forEach(future -> {
                 try {
@@ -1513,12 +1545,17 @@ public class HiveMetadata
         JobConf conf = ConfigurationUtils.toJobConf(hdfsEnvironment.getConfiguration(hdfsContext, targetPath));
         String fileExtension = HiveWriterFactory.getFileExtension(conf, StorageFormat.fromHiveStorageFormat(storageFormat));
         Set<String> fileNames = ImmutableSet.copyOf(partitionUpdate.getFileNames());
+        Set<Integer> bucketsWithFiles = fileNames.stream()
+                .map(HiveWriterFactory::getBucketFromFileName)
+                .collect(toImmutableSet());
+
         ImmutableList.Builder<String> missingFileNamesBuilder = ImmutableList.builder();
         for (int i = 0; i < bucketCount; i++) {
-            String fileName = HiveWriterFactory.computeBucketedFileName(session.getQueryId(), i) + fileExtension;
-            if (!fileNames.contains(fileName)) {
-                missingFileNamesBuilder.add(fileName);
+            if (bucketsWithFiles.contains(i)) {
+                continue;
             }
+            String fileName = computeNonTransactionalBucketedFilename(session.getQueryId(), i) + fileExtension;
+            missingFileNamesBuilder.add(fileName);
         }
         List<String> missingFileNames = missingFileNamesBuilder.build();
         verify(fileNames.size() + missingFileNames.size() == bucketCount);
@@ -1564,17 +1601,29 @@ public class HiveMetadata
     @Override
     public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT);
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT, NO_RETRIES);
+    }
+
+    @Override
+    public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT, retryMode);
     }
 
     @Override
     public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite)
     {
-        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT_OVERWRITE);
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT_OVERWRITE, NO_RETRIES);
+    }
+
+    @Override
+    public HiveInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, boolean isOverwrite, RetryMode retryMode)
+    {
+        return beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.INSERT_OVERWRITE, retryMode);
     }
 
     private HiveInsertTableHandle beginInsertUpdateInternal(ConnectorSession session, ConnectorTableHandle tableHandle,
-                                                            Optional<String> partition, HiveACIDWriteType writeType)
+                                                            Optional<String> partition, HiveACIDWriteType writeType, RetryMode retryMode)
     {
         HiveIdentity identity = new HiveIdentity(session);
         SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
@@ -1589,6 +1638,11 @@ public class HiveMetadata
             if (!HiveWriteUtils.isWritableType(column.getType())) {
                 throw new PrestoException(NOT_SUPPORTED, String.format("Inserting into Hive table %s with column type %s not supported", tableName, column.getType()));
             }
+        }
+
+        boolean isTransactional = AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle).getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")));
+        if (isTransactional && retryMode != NO_RETRIES && (writeType == HiveACIDWriteType.INSERT || writeType == HiveACIDWriteType.INSERT_OVERWRITE)) {
+            throw new PrestoException(NOT_SUPPORTED, "Inserting into Hive transactional tables is not supported with query retries enabled");
         }
 
         List<HiveColumnHandle> handles = hiveColumnHandles(table).stream()
@@ -1610,8 +1664,7 @@ public class HiveMetadata
         }
 
         Optional<WriteIdInfo> writeIdInfo = Optional.empty();
-        if (AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle)
-                .getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")))) {
+        if (isTransactional) {
             Optional<Long> writeId = metastore.getTableWriteId(session, (HiveTableHandle) tableHandle, writeType);
             if (!writeId.isPresent()) {
                 throw new IllegalStateException("No validWriteIds present");
@@ -1636,7 +1689,8 @@ public class HiveMetadata
                 tableStorageFormat,
                 HiveSessionProperties.isRespectTableFormat(session) ? tableStorageFormat :
                         HiveSessionProperties.getHiveStorageFormat(session),
-                writeType == HiveACIDWriteType.INSERT_OVERWRITE);
+                writeType == HiveACIDWriteType.INSERT_OVERWRITE,
+                retryMode != NO_RETRIES);
 
         LocationService.WriteInfo writeInfo = locationService.getQueryWriteInfo(locationHandle);
         metastore.declareIntentionToWrite(session, writeInfo.getWriteMode(), writeInfo.getWritePath(), tableName);
@@ -1734,7 +1788,8 @@ public class HiveMetadata
                             partitionUpdate.getWritePath(),
                             partitionUpdate.getFileNames(),
                             partitionStatistics,
-                            hiveACIDWriteType);
+                            hiveACIDWriteType,
+                            handle.isRetriesEnabled());
                 }
                 else {
                     throw new IllegalArgumentException("Unsupported update mode: " + partitionUpdate.getUpdateMode());
@@ -1756,7 +1811,8 @@ public class HiveMetadata
                         partitionUpdate.getWritePath(),
                         partitionUpdate.getFileNames(),
                         partitionStatistics,
-                        hiveACIDWriteType);
+                        hiveACIDWriteType,
+                        handle.isRetriesEnabled());
             }
             else if (partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.NEW || partitionUpdate.getUpdateMode() == PartitionUpdate.UpdateMode.OVERWRITE) {
                 finishInsertInNewPartition(session, handle, table, columnTypes, partitionUpdate, partitionComputedStatistics, hiveACIDWriteType);
@@ -1779,7 +1835,7 @@ public class HiveMetadata
     @Override
     public HiveUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.UPDATE);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.UPDATE, NO_RETRIES);
         return new HiveUpdateTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
                 insertTableHandle.getInputColumns(), insertTableHandle.getPageSinkMetadata(),
                 insertTableHandle.getLocationHandle(), insertTableHandle.getBucketProperty(),
@@ -1787,9 +1843,18 @@ public class HiveMetadata
     }
 
     @Override
+    public HiveUpdateTableHandle beginUpdateAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Updating a Hive tables is not supported with query retries enabled");
+        }
+        return beginUpdateAsInsert(session, tableHandle);
+    }
+
+    @Override
     public HiveDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.DELETE);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, Optional.empty(), HiveACIDWriteType.DELETE, NO_RETRIES);
         //Delete needs only partitionColumn and bucketing columns data
         List<HiveColumnHandle> inputColumns = insertTableHandle.getInputColumns().stream().filter(HiveColumnHandle::isRequired).collect(toList());
         return new HiveDeleteAsInsertTableHandle(insertTableHandle.getSchemaName(), insertTableHandle.getTableName(),
@@ -1799,13 +1864,22 @@ public class HiveMetadata
     }
 
     @Override
+    public HiveDeleteAsInsertTableHandle beginDeletesAsInsert(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Deleting from Hive tables is not supported with query retries enabled");
+        }
+        return beginDeletesAsInsert(session, tableHandle);
+    }
+
+    @Override
     public Optional<ConnectorOutputMetadata> finishUpdateAsInsert(ConnectorSession session, ConnectorUpdateTableHandle updateHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
     {
         HiveUpdateTableHandle updateTableHandle = (HiveUpdateTableHandle) updateHandle;
         HiveInsertTableHandle insertTableHandle = new HiveInsertTableHandle(updateTableHandle.getSchemaName(), updateTableHandle.getTableName(),
                 updateTableHandle.getInputColumns(), updateTableHandle.getPageSinkMetadata(),
                 updateTableHandle.getLocationHandle(), updateTableHandle.getBucketProperty(),
-                updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false);
+                updateTableHandle.getTableStorageFormat(), updateTableHandle.getPartitionStorageFormat(), false, updateTableHandle.isRetriesEnabled());
         return finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, null, HiveACIDWriteType.UPDATE);
     }
 
@@ -1816,14 +1890,14 @@ public class HiveMetadata
         HiveInsertTableHandle insertTableHandle = new HiveInsertTableHandle(deleteTableHandle.getSchemaName(), deleteTableHandle.getTableName(),
                 deleteTableHandle.getInputColumns(), deleteTableHandle.getPageSinkMetadata(),
                 deleteTableHandle.getLocationHandle(), deleteTableHandle.getBucketProperty(),
-                deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false);
+                deleteTableHandle.getTableStorageFormat(), deleteTableHandle.getPartitionStorageFormat(), false, deleteTableHandle.isRetriesEnabled());
         return finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, null, HiveACIDWriteType.DELETE);
     }
 
     @Override
     public ConnectorVacuumTableHandle beginVacuum(ConnectorSession session, ConnectorTableHandle tableHandle, boolean full, boolean unify, Optional<String> partition)
     {
-        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, unify ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM);
+        HiveInsertTableHandle insertTableHandle = beginInsertUpdateInternal(session, tableHandle, partition, unify ? HiveACIDWriteType.VACUUM_UNIFY : HiveACIDWriteType.VACUUM, NO_RETRIES);
         if ((!session.getSource().get().isEmpty()) &&
                 session.getSource().get().equals("auto-vacuum")) {
             metastore.setVacuumTableHandle((HiveTableHandle) tableHandle);
@@ -1841,7 +1915,7 @@ public class HiveMetadata
         HiveInsertTableHandle insertTableHandle = new HiveInsertTableHandle(vacuumTableHandle.getSchemaName(), vacuumTableHandle.getTableName(),
                 vacuumTableHandle.getInputColumns(), vacuumTableHandle.getPageSinkMetadata(),
                 vacuumTableHandle.getLocationHandle(), vacuumTableHandle.getBucketProperty(),
-                vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false);
+                vacuumTableHandle.getTableStorageFormat(), vacuumTableHandle.getPartitionStorageFormat(), false, vacuumTableHandle.isRetriesEnabled());
         List<PartitionUpdate> partitionUpdates = new ArrayList<>();
         Optional<ConnectorOutputMetadata> connectorOutputMetadata =
                 finishInsertInternal(session, insertTableHandle, fragments, computedStatistics, partitionUpdates,
@@ -1951,7 +2025,7 @@ public class HiveMetadata
         }
 
         try {
-            metastore.createTable(session, table, principalPrivileges, Optional.empty(), false, new PartitionStatistics(HiveBasicStatistics.createEmptyStatistics(), ImmutableMap.of()));
+            metastore.createTable(session, table, principalPrivileges, Optional.empty(), false, new PartitionStatistics(HiveBasicStatistics.createEmptyStatistics(), ImmutableMap.of()), Optional.empty(), false);
         }
         catch (TableAlreadyExistsException e) {
             throw new ViewAlreadyExistsException(e.getTableName());
@@ -2073,6 +2147,15 @@ public class HiveMetadata
             throw new PrestoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions" +
                     " are deleted entirely for Non-Transactional tables");
         }
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle, RetryMode retryMode)
+    {
+        if (retryMode != NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "Deleting from Hive tables is not supported with query retries enabled");
+        }
+        return beginDelete(session, tableHandle);
     }
 
     @Override
@@ -3104,7 +3187,7 @@ public class HiveMetadata
         metastore.dropTable(session, handle.getSchemaName(), handle.getTableName());
 
         // create the table with the new location
-        metastore.createTable(session, table, principalPrivileges, Optional.of(partitionUpdate.getWritePath()), false, partitionStatistics);
+        metastore.createTable(session, table, principalPrivileges, Optional.of(partitionUpdate.getWritePath()), false, partitionStatistics, Optional.of(partitionUpdate.getFileNames()), handle.isRetriesEnabled());
     }
 
     protected void finishInsertInNewPartition(ConnectorSession session, HiveInsertTableHandle handle, Table table, Map<String, Type> columnTypes, PartitionUpdate partitionUpdate, Map<List<String>, ComputedStatistics> partitionComputedStatistics, HiveACIDWriteType acidWriteType)
@@ -3122,7 +3205,8 @@ public class HiveMetadata
                 partitionUpdate.getStatistics(),
                 columnTypes,
                 getColumnStatistics(partitionComputedStatistics, partition.getValues()));
-        metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType);
+        metastore.addPartition(session, handle.getSchemaName(), handle.getTableName(), partition, partitionUpdate.getWritePath(), partitionStatistics, acidWriteType,
+                Optional.of(partitionUpdate.getFileNames()), handle.isRetriesEnabled());
     }
 
     public void setExternalTable(boolean externalTable)

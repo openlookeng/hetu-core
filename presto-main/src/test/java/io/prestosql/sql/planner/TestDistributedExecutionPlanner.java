@@ -21,6 +21,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import io.prestosql.Session;
 import io.prestosql.cost.StatsAndCosts;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.TableMetadata;
 import io.prestosql.metadata.TableProperties;
@@ -520,6 +521,7 @@ public class TestDistributedExecutionPlanner
                 Arrays.stream(fragmentId).mapToObj(String::valueOf).map(PlanFragmentId::new).collect(Collectors.toList()),
                 ImmutableList.of(symbol),
                 Optional.empty(),
-                GATHER);
+                GATHER,
+                RetryPolicy.NONE);
     }
 }

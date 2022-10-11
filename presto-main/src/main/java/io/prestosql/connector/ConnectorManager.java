@@ -591,9 +591,9 @@ public class ConnectorManager
 
         public MaterializedConnector(CatalogName catalogName, Connector connector)
         {
-            List<PropertyMetadata<?>> materializedViewProperties = connector.getMaterializedViewProperties();
-            requireNonNull(materializedViewProperties, format("Connector '%s' returned a null materialized view properties set", catalogName));
-            this.materializedViewProperties = ImmutableList.copyOf(materializedViewProperties);
+            List<PropertyMetadata<?>> materializedViewPropertie = connector.getMaterializedViewProperties();
+            requireNonNull(materializedViewPropertie, format("Connector '%s' returned a null materialized view properties set", catalogName));
+            this.materializedViewProperties = ImmutableList.copyOf(materializedViewPropertie);
 
             this.catalogName = requireNonNull(catalogName, "catalogName is null");
             this.connector = requireNonNull(connector, "connector is null");

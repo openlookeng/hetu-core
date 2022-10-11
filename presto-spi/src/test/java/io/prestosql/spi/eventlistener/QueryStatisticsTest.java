@@ -18,6 +18,7 @@ import org.testng.annotations.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
@@ -29,12 +30,39 @@ public class QueryStatisticsTest
     @BeforeMethod
     public void setUp() throws Exception
     {
-        queryStatisticsUnderTest = new QueryStatistics(Duration.ofDays(0L), Duration.ofDays(0L),
-                Duration.ofDays(0L), Optional.of(Duration.ofDays(0L)), Optional.of(Duration.ofDays(0L)),
-                Optional.of(Duration.ofDays(0L)), 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0.0,
-                Arrays.asList(new StageGcStatistics(0, 0, 0, 0, 0, 0, 0)), 0, false,
+        queryStatisticsUnderTest = new QueryStatistics(
+                Duration.ofDays(0L),
+                Duration.ofDays(0L),
+                Duration.ofDays(0L),
+                Optional.of(Duration.ofDays(0L)),
+                Optional.of(Duration.ofDays(0L)),
+                Optional.of(Duration.ofDays(0L)),
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0.0,
+                0.0,
+                Collections.emptyList(),
+                1,
+                false,
                 Arrays.asList(new StageCpuDistribution(0, 0, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0.0)),
-                Arrays.asList("value"), Optional.of("value"));
+                Arrays.asList("value"),
+                Optional.of("value"),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
     }
 
     @Test

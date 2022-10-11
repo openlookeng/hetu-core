@@ -89,6 +89,8 @@ public class TaskContext
     private final AtomicReference<DateTime> lastExecutionStartTime = new AtomicReference<>();
     private final AtomicReference<DateTime> executionEndTime = new AtomicReference<>();
 
+    private final AtomicLong currentPeakUserMemoryReservation = new AtomicLong(0);
+
     private final Set<Lifespan> completedDriverGroups = newConcurrentHashSet();
 
     private final List<PipelineContext> pipelineContexts = new CopyOnWriteArrayList<>();
@@ -112,6 +114,7 @@ public class TaskContext
     private final PlanNodeId consumerId;
 
     private final PagesSerdeFactory serdeFactory;
+    private final PagesSerdeFactory kryoSerdeFactory;
     private final TaskSnapshotManager snapshotManager;
     private final QueryRecoveryManager queryRecoveryManager;
 
@@ -130,10 +133,11 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
-        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, snapshotManager, queryRecoveryManager);
+        TaskContext taskContext = new TaskContext(queryContext, taskStateMachine, gcMonitor, notificationExecutor, yieldExecutor, session, taskMemoryContext, perOperatorCpuTimerEnabled, cpuTimerEnabled, totalPartitions, consumerId, serdeFactory, kryoSerdeFactory, snapshotManager, queryRecoveryManager);
         taskContext.initialize();
         return taskContext;
     }
@@ -150,6 +154,7 @@ public class TaskContext
             OptionalInt totalPartitions,
             PlanNodeId consumerId,
             PagesSerdeFactory serdeFactory,
+            PagesSerdeFactory kryoSerdeFactory,
             TaskSnapshotManager snapshotManager,
             QueryRecoveryManager queryRecoveryManager)
     {
@@ -167,6 +172,7 @@ public class TaskContext
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
         this.consumerId = consumerId;
         this.serdeFactory = serdeFactory;
+        this.kryoSerdeFactory = kryoSerdeFactory;
         this.snapshotManager = requireNonNull(snapshotManager, "snapshotManager is null");
         this.queryRecoveryManager = queryRecoveryManager;
     }
@@ -462,6 +468,8 @@ public class TaskContext
         long outputPositions = 0;
 
         long physicalWrittenDataSize = 0;
+        long inputBlockedTime = 0;
+        long outputBlockedTime = 0;
 
         for (PipelineStats pipeline : pipelineStats) {
             if (pipeline.getLastEndTime() != null) {
@@ -492,11 +500,14 @@ public class TaskContext
 
                 processedInputDataSize += pipeline.getProcessedInputDataSize().toBytes();
                 processedInputPositions += pipeline.getProcessedInputPositions();
+                inputBlockedTime += pipeline.getInputBlockedTime().roundTo(NANOSECONDS);
             }
 
             if (pipeline.isOutputPipeline()) {
                 outputDataSize += pipeline.getOutputDataSize().toBytes();
                 outputPositions += pipeline.getOutputPositions();
+
+                outputBlockedTime += pipeline.getOutputBlockedTime().roundTo(NANOSECONDS);
             }
 
             physicalWrittenDataSize += pipeline.getPhysicalWrittenDataSize().toBytes();
@@ -521,6 +532,7 @@ public class TaskContext
         Duration fullGcTime = getFullGcTime();
 
         long userMemory = taskMemoryContext.getUserMemory();
+        currentPeakUserMemoryReservation.updateAndGet(oldValue -> max(oldValue, userMemory));
 
         synchronized (cumulativeMemoryLock) {
             double sinceLastPeriodMillis = (System.nanoTime() - lastTaskStatCallNanos) / 1_000_000.0;
@@ -559,6 +571,7 @@ public class TaskContext
                 succinctBytes(userMemory),
                 succinctBytes(taskMemoryContext.getRevocableMemory()),
                 succinctBytes(taskMemoryContext.getSystemMemory()),
+                succinctBytes(currentPeakUserMemoryReservation.get()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -577,7 +590,9 @@ public class TaskContext
                 succinctBytes(physicalWrittenDataSize),
                 fullGcCount,
                 fullGcTime,
-                pipelineStats);
+                pipelineStats,
+                new Duration(inputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(outputBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit());
     }
 
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
@@ -624,8 +639,18 @@ public class TaskContext
         return serdeFactory;
     }
 
+    public PagesSerdeFactory getKryoSerdeFactory()
+    {
+        return kryoSerdeFactory;
+    }
+
     public QueryRecoveryManager getRecoveryManager()
     {
         return queryRecoveryManager;
+    }
+
+    public void sourceTaskFailed(TaskId taskId, Throwable failure)
+    {
+        taskStateMachine.sourceTaskFailed(taskId, failure);
     }
 }

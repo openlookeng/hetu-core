@@ -37,7 +37,7 @@ public final class TimestampWithTimeZoneType
     private TimestampWithTimeZoneType()
     {
         super(parseTypeSignature(StandardTypes.TIMESTAMP_WITH_TIME_ZONE));
-        this.precision = 0; //xjp,此处随便写的值
+        this.precision = 0;
     }
 
     public static TimestampWithTimeZoneType createTimestampWithTimeZoneType(int precision)

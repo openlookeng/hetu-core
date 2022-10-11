@@ -51,20 +51,20 @@ public class DoubleRange
         requireNonNull(minTrinoNativeValue, "minTrinoNativeValue is null");
         requireNonNull(maxTrinoNativeValue, "maxTrinoNativeValue is null");
 
-        OptionalDouble min = toStatsRepresentation(type, minTrinoNativeValue);
-        OptionalDouble max = toStatsRepresentation(type, maxTrinoNativeValue);
+        OptionalDouble minOptionalDouble = toStatsRepresentation(type, minTrinoNativeValue);
+        OptionalDouble maxOptionalDouble = toStatsRepresentation(type, maxTrinoNativeValue);
 
-        if (!min.isPresent() && !max.isPresent()) {
+        if (!minOptionalDouble.isPresent() && !maxOptionalDouble.isPresent()) {
             return Optional.empty();
         }
-        if (!min.isPresent() || !max.isPresent()) {
+        if (!minOptionalDouble.isPresent() || !maxOptionalDouble.isPresent()) {
             throw new IllegalStateException(format(
                     "One of min/max was converted to stats representation while the other was not for type %s: %s, %s",
                     type,
-                    min,
-                    max));
+                    minOptionalDouble,
+                    maxOptionalDouble));
         }
-        return Optional.of(new DoubleRange(min.getAsDouble(), max.getAsDouble()));
+        return Optional.of(new DoubleRange(minOptionalDouble.getAsDouble(), maxOptionalDouble.getAsDouble()));
     }
 
     public double getMin()

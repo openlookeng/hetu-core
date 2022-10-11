@@ -41,10 +41,10 @@ class ExpressionToSearchArgument
 {
     static SearchArgument convert(Expression expr, TypeDescription readSchema)
     {
-        Map<Integer, String> idToColumnName = ORCSchemaUtil.idToOrcName(ORCSchemaUtil.convert(readSchema));
-        SearchArgument.Builder builder = SearchArgumentFactory.newBuilder();
-        ExpressionVisitors.visit(expr, new ExpressionToSearchArgument(builder, idToColumnName)).invoke();
-        return builder.build();
+        Map<Integer, String> idToColName = ORCSchemaUtil.idToOrcName(ORCSchemaUtil.convert(readSchema));
+        SearchArgument.Builder theBuilder = SearchArgumentFactory.newBuilder();
+        ExpressionVisitors.visit(expr, new ExpressionToSearchArgument(theBuilder, idToColName)).invoke();
+        return theBuilder.build();
     }
 
     // Currently every predicate in ORC requires a PredicateLeaf.Type field which is not available for these Iceberg types
@@ -179,7 +179,6 @@ class ExpressionToSearchArgument
     public <T> Action gt(Bound<T> expr, Literal<T> lit)
     {
         // ORC SearchArguments do not have a greaterThan predicate, so we use not(lessThanOrEquals)
-        // e.g. x > 5 => not(x <= 5)
         return () -> this.builder.startNot()
                 .lessThanEquals(idToColumnName.get(expr.ref().fieldId()),
                         type(expr.ref().type()),
@@ -191,7 +190,6 @@ class ExpressionToSearchArgument
     public <T> Action gtEq(Bound<T> expr, Literal<T> lit)
     {
         // ORC SearchArguments do not have a greaterThanOrEquals predicate, so we use not(lessThan)
-        // e.g. x >= 5 => not(x < 5)
         return () -> this.builder.startNot()
                 .lessThan(idToColumnName.get(expr.ref().fieldId()),
                         type(expr.ref().type()),

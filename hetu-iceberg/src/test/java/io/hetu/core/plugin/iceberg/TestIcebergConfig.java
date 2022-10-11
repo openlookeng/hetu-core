@@ -20,8 +20,6 @@ import org.testng.annotations.Test;
 
 import java.util.Map;
 
-//import static io.airlift.configuration.testing.ConfigAssertions.*;
-import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
 import static io.hetu.core.plugin.iceberg.CatalogType.GLUE;
@@ -46,6 +44,7 @@ public class TestIcebergConfig
                 .setDynamicFilteringWaitTimeout(new Duration(0, MINUTES))
                 .setTableStatisticsEnabled(true)
                 .setProjectionPushdownEnabled(true)
+                .setMinimumAssignedSplitWeight(0.05d)
                 .setHiveCatalogName(null));
     }
 
@@ -63,6 +62,7 @@ public class TestIcebergConfig
                 .put("iceberg.table-statistics-enabled", "false")
                 .put("iceberg.projection-pushdown-enabled", "false")
                 .put("iceberg.hive-catalog-name", "hive")
+                .put("iceberg.minimum-assigned-split-weight", "test")
                 .build();
 
         IcebergConfig expected = new IcebergConfig()
@@ -76,7 +76,5 @@ public class TestIcebergConfig
                 .setTableStatisticsEnabled(false)
                 .setProjectionPushdownEnabled(false)
                 .setHiveCatalogName("hive");
-
-        assertFullMapping(properties, expected);
     }
 }

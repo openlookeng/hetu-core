@@ -47,6 +47,7 @@ import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.orc.OrcReaderConfig;
 import io.prestosql.plugin.hive.orc.OrcWriterConfig;
 import io.prestosql.plugin.hive.parquet.ParquetReaderConfig;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.SplitWeight;
@@ -79,6 +80,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.types.Types;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -125,6 +128,7 @@ public class IcebergPageSourceProviderTest
     private static final ColumnIdentity DATA_COLUMN_IDENTITY = new ColumnIdentity(2, DATA_COLUMN.getName(), ARRAY, ImmutableList.of(child2));
     private static final int KEY_COLUMN_VALUE = 42;
     private static final String DATA_COLUMN_VALUE = "hello world";
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
     private static final Schema TABLE_SCHEMA = new Schema(
             optional(KEY_COLUMN_IDENTITY.getId(), KEY_COLUMN.getName(), Types.IntegerType.get()),
             optional(DATA_COLUMN_IDENTITY.getId(), DATA_COLUMN.getName(), Types.StringType.get()));
@@ -403,7 +407,7 @@ public class IcebergPageSourceProviderTest
             return pageSource;
         }
         catch (Exception e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage());
         }
         finally {
             tempFile.close();

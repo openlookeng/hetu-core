@@ -18,6 +18,7 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.relation.RowExpression;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -34,11 +35,11 @@ public class DynamicFilterFactoryTest
         // Setup
         final ColumnHandle columnHandle = null;
         final BloomFilterDynamicFilter expectedResult = new BloomFilterDynamicFilter("filterId", null,
-                "content".getBytes(), DynamicFilter.Type.LOCAL);
+                "content".getBytes(StandardCharsets.UTF_8), DynamicFilter.Type.LOCAL);
 
         // Run the test
         final BloomFilterDynamicFilter result = DynamicFilterFactory.create("filterId", columnHandle,
-                "content".getBytes(), DynamicFilter.Type.LOCAL);
+                "content".getBytes(StandardCharsets.UTF_8), DynamicFilter.Type.LOCAL);
 
         // Verify the results
         assertEquals(expectedResult, result);

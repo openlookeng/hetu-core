@@ -75,7 +75,7 @@ public class StringStatisticsBuilder
         this.maximum = maximum;
         this.sum = sum;
         this.bloomFilterBuilder = null;
-        this.shouldCompactMinMax = false; //xjp 此处false随便写的
+        this.shouldCompactMinMax = false;
     }
 
     public StringStatisticsBuilder withStringStatisticsLimit(int limitInBytes)

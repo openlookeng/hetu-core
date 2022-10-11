@@ -26,6 +26,7 @@ import io.prestosql.Session;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dispatcher.DispatchQuery;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.metadata.Catalog;
@@ -61,6 +62,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
@@ -258,7 +260,7 @@ public class AutoVacuumScanner
 
         ExchangeClient exchangeClient = this.exchangeClientSupplier.get(
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(),
-                        DataCenterStatementResource.class.getSimpleName()));
+                        DataCenterStatementResource.class.getSimpleName()), null, getRetryPolicy(session), new ExchangeId("direct-exchange-auto-vacuum-scanner"), session.getQueryId());
         return Query.create(session, slug, queryManager, exchangeClient, directExecutor(), timeoutExecutor,
                 blockEncodingSerde);
     }

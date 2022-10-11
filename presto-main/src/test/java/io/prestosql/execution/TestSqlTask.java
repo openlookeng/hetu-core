@@ -18,9 +18,12 @@ import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.BufferState;
 import io.prestosql.execution.buffer.OutputBuffers;
@@ -72,6 +75,7 @@ import static org.testng.Assert.fail;
 @Test(singleThreaded = true)
 public class TestSqlTask
 {
+    private static final Logger LOG = Logger.get(TestSqlTask.class);
     public static final OutputBufferId OUT = new OutputBufferId(0);
     private final TaskExecutor taskExecutor;
     private final ScheduledExecutorService taskNotificationExecutor;
@@ -119,7 +123,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -132,7 +136,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -147,11 +151,11 @@ public class TestSqlTask
 
         TaskInfo taskInfo = sqlTask.updateTask(TEST_SESSION,
                 Optional.of(PLAN_FRAGMENT),
-                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), false)),
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -162,6 +166,13 @@ public class TestSqlTask
         assertEquals(results.getSerializedPages().size(), 1);
         assertEquals(results.getSerializedPages().get(0).getPositionCount(), 1);
 
+        sqlTask.updateTask(TEST_SESSION,
+                Optional.of(PLAN_FRAGMENT),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                null, 1);
         for (boolean moreResults = true; moreResults; moreResults = !results.isBufferComplete()) {
             results = sqlTask.getTaskResults(OUT, results.getToken() + results.getSerializedPages().size(), new DataSize(1, MEGABYTE)).get();
         }
@@ -191,7 +202,7 @@ public class TestSqlTask
                         .withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
         assertNull(taskInfo.getStats().getEndTime());
 
@@ -216,15 +227,23 @@ public class TestSqlTask
 
         TaskInfo taskInfo = sqlTask.updateTask(TEST_SESSION,
                 Optional.of(PLAN_FRAGMENT),
-                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), false)),
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+
+        sqlTask.updateTask(TEST_SESSION,
+                Optional.of(PLAN_FRAGMENT),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                null, 1);
 
         sqlTask.abortTaskResults(OUT);
 
@@ -242,11 +261,11 @@ public class TestSqlTask
 
         TaskInfo taskInfo = sqlTask.updateTask(TEST_SESSION,
                 Optional.of(PLAN_FRAGMENT),
-                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), false)),
                 createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
                 OptionalInt.empty(),
                 Optional.empty(),
-                null);
+                null, 1);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
         taskInfo = sqlTask.getTaskInfo();
@@ -266,6 +285,13 @@ public class TestSqlTask
 
         taskInfo = sqlTask.resume(TaskState.RUNNING);
         assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+        taskInfo = sqlTask.updateTask(TEST_SESSION,
+                Optional.of(PLAN_FRAGMENT),
+                ImmutableList.of(new TaskSource(TABLE_SCAN_NODE_ID, ImmutableSet.of(SPLIT), true)),
+                createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds(),
+                OptionalInt.empty(),
+                Optional.empty(),
+                null, 1);
 
         for (boolean moreResults = true; moreResults; moreResults = !results.isBufferComplete()) {
             results = sqlTask.getTaskResults(OUT, results.getToken() + results.getSerializedPages().size(), new DataSize(1, MEGABYTE)).get();
@@ -353,14 +379,14 @@ public class TestSqlTask
             fail("expected TimeoutException");
         }
         catch (TimeoutException expected) {
-            // expected
+            LOG.info(expected.getMessage());
         }
         assertFalse(sqlTask.getTaskResults(OUT, 0, new DataSize(1, MEGABYTE)).isDone());
     }
 
     private SqlTask createInitialTask()
     {
-        TaskId taskId = new TaskId("query", 0, nextTaskId.incrementAndGet());
+        TaskId taskId = new TaskId("query", 0, nextTaskId.incrementAndGet(), 0);
         String instanceId = "0-query_test_instance_id";
         URI location = URI.create("fake://task/" + taskId);
 
@@ -389,6 +415,7 @@ public class TestSqlTask
                 Functions.identity(),
                 new DataSize(32, MEGABYTE),
                 new CounterStat(),
-                createTestMetadataManager());
+                createTestMetadataManager(),
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()));
     }
 }

@@ -37,6 +37,7 @@ import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Database;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ConnectorMaterializedViewDefinition;
@@ -55,6 +56,8 @@ import io.prestosql.tests.DistributedQueryRunner;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -91,6 +94,8 @@ public class PartitionTransformsTest
     private TestSchemaMetadata metadata;
     private HiveMetastore hiveMetastore;
     private TrinoCatalog catalog;
+
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
 
     protected PartitionTransformsTest()
     {
@@ -161,21 +166,15 @@ public class PartitionTransformsTest
         map.put("month(testmonth)", TypeId.of("date"));
         map.put("testday", TypeId.of("date"));
         map.put("day(testday)", TypeId.of("date"));
-//        map.put("testhour", TypeId.of("date"));
-//        map.put("hour(testhour)", TypeId.of("date"));
         map.put("testvoid", TypeId.of("integer"));
         map.put("void(testvoid)", TypeId.of("integer"));
-//        map.put("[testbucket2]", TypeId.of("varchar"));
-//        map.put("bucket[testbucket2]", TypeId.of("varchar"));
-//        map.put("[testtruncate3]", TypeId.of("varchar"));
-//        map.put("truncate[testtruncate3]", TypeId.of("varchar"));
         List<ConnectorMaterializedViewDefinition.Column> columns = new ArrayList<>();
         map.forEach((k, v) -> {
             try {
                 columns.addAll(ImmutableList.of(new ConnectorMaterializedViewDefinition.Column(k, v)));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         ConnectorMaterializedViewDefinition definition = new ConnectorMaterializedViewDefinition("select 1",
@@ -274,7 +273,7 @@ public class PartitionTransformsTest
             PartitionTransforms.getColumnTransform(field, type);
         }
         catch (Exception e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage());
         }
     }
 

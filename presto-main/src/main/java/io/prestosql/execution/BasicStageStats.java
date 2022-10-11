@@ -34,6 +34,8 @@ public class BasicStageStats
             false,
 
             0,
+
+            0,
             0,
             0,
             0,
@@ -48,9 +50,12 @@ public class BasicStageStats
             0,
 
             0,
+            0,
             new DataSize(0, BYTE),
             new DataSize(0, BYTE),
 
+            new Duration(0, MILLISECONDS),
+            new Duration(0, MILLISECONDS),
             new Duration(0, MILLISECONDS),
             new Duration(0, MILLISECONDS),
 
@@ -60,6 +65,7 @@ public class BasicStageStats
             OptionalDouble.empty());
 
     private final boolean isScheduled;
+    private final int failedTasks;
     private final int totalDrivers;
     private final int queuedDrivers;
     private final int runningDrivers;
@@ -71,16 +77,21 @@ public class BasicStageStats
     private final DataSize rawInputDataSize;
     private final long rawInputPositions;
     private final long cumulativeUserMemory;
+    private final long failedCumulativeUserMemory;
     private final DataSize userMemoryReservation;
     private final DataSize totalMemoryReservation;
     private final Duration totalCpuTime;
+    private final Duration failedCpuTime;
     private final Duration totalScheduledTime;
+    private final Duration failedScheduledTime;
     private final boolean fullyBlocked;
     private final Set<BlockedReason> blockedReasons;
     private final OptionalDouble progressPercentage;
 
     public BasicStageStats(
             boolean isScheduled,
+
+            int failedTasks,
 
             int totalDrivers,
             int queuedDrivers,
@@ -97,11 +108,14 @@ public class BasicStageStats
             long rawInputPositions,
 
             long cumulativeUserMemory,
+            long failedCumulativeUserMemory,
             DataSize userMemoryReservation,
             DataSize totalMemoryReservation,
 
             Duration totalCpuTime,
+            Duration failedCpuTime,
             Duration totalScheduledTime,
+            Duration failedScheduledTime,
 
             boolean fullyBlocked,
             Set<BlockedReason> blockedReasons,
@@ -109,6 +123,7 @@ public class BasicStageStats
             OptionalDouble progressPercentage)
     {
         this.isScheduled = isScheduled;
+        this.failedTasks = failedTasks;
         this.totalDrivers = totalDrivers;
         this.queuedDrivers = queuedDrivers;
         this.runningDrivers = runningDrivers;
@@ -120,10 +135,13 @@ public class BasicStageStats
         this.rawInputDataSize = requireNonNull(rawInputDataSize, "rawInputDataSize is null");
         this.rawInputPositions = rawInputPositions;
         this.cumulativeUserMemory = cumulativeUserMemory;
+        this.failedCumulativeUserMemory = failedCumulativeUserMemory;
         this.userMemoryReservation = requireNonNull(userMemoryReservation, "userMemoryReservation is null");
         this.totalMemoryReservation = requireNonNull(totalMemoryReservation, "totalMemoryReservation is null");
         this.totalCpuTime = requireNonNull(totalCpuTime, "totalCpuTime is null");
+        this.failedCpuTime = requireNonNull(failedCpuTime, "failedCpuTime is null");
         this.totalScheduledTime = requireNonNull(totalScheduledTime, "totalScheduledTime is null");
+        this.failedScheduledTime = requireNonNull(failedScheduledTime, "failedScheduledTime is null");
         this.fullyBlocked = fullyBlocked;
         this.blockedReasons = ImmutableSet.copyOf(requireNonNull(blockedReasons, "blockedReasons is null"));
         this.progressPercentage = requireNonNull(progressPercentage, "progressPercentage is null");
@@ -132,6 +150,11 @@ public class BasicStageStats
     public boolean isScheduled()
     {
         return isScheduled;
+    }
+
+    public int getFailedTasks()
+    {
+        return failedTasks;
     }
 
     public int getTotalDrivers()
@@ -189,6 +212,11 @@ public class BasicStageStats
         return cumulativeUserMemory;
     }
 
+    public long getFailedCumulativeUserMemory()
+    {
+        return failedCumulativeUserMemory;
+    }
+
     public DataSize getUserMemoryReservation()
     {
         return userMemoryReservation;
@@ -204,9 +232,19 @@ public class BasicStageStats
         return totalCpuTime;
     }
 
+    public Duration getFailedCpuTime()
+    {
+        return failedCpuTime;
+    }
+
     public Duration getTotalScheduledTime()
     {
         return totalScheduledTime;
+    }
+
+    public Duration getFailedScheduledTime()
+    {
+        return failedScheduledTime;
     }
 
     public boolean isFullyBlocked()
@@ -226,17 +264,22 @@ public class BasicStageStats
 
     public static BasicStageStats aggregateBasicStageStats(Iterable<BasicStageStats> stages)
     {
+        int localFailedTasks = 0;
+
         int localTotalDrivers = 0;
         int localQueuedDrivers = 0;
         int localRunningDrivers = 0;
         int localCompletedDrivers = 0;
 
         long localCumulativeUserMemory = 0;
+        long failedLocalCumulativeUserMemory = 0;
         long localUserMemoryReservation = 0;
         long localTotalMemoryReservation = 0;
 
         long totalScheduledTimeMillis = 0;
+        long failedScheduledTimeMillis = 0;
         long localTotalCpuTime = 0;
+        long localFailedCpuTime = 0;
 
         long localPhysicalInputDataSize = 0;
         long localPhysicalInputPositions = 0;
@@ -253,17 +296,22 @@ public class BasicStageStats
         Set<BlockedReason> localBlockedReasons = new HashSet<>();
 
         for (BasicStageStats stageStats : stages) {
+            localFailedTasks += stageStats.getFailedTasks();
+
             localTotalDrivers += stageStats.getTotalDrivers();
             localQueuedDrivers += stageStats.getQueuedDrivers();
             localRunningDrivers += stageStats.getRunningDrivers();
             localCompletedDrivers += stageStats.getCompletedDrivers();
 
             localCumulativeUserMemory += stageStats.getCumulativeUserMemory();
+            failedLocalCumulativeUserMemory += stageStats.getFailedCumulativeUserMemory();
             localUserMemoryReservation += stageStats.getUserMemoryReservation().toBytes();
             localTotalMemoryReservation += stageStats.getTotalMemoryReservation().toBytes();
 
             totalScheduledTimeMillis += stageStats.getTotalScheduledTime().roundTo(MILLISECONDS);
+            failedScheduledTimeMillis += stageStats.getFailedScheduledTime().roundTo(MILLISECONDS);
             localTotalCpuTime += stageStats.getTotalCpuTime().roundTo(MILLISECONDS);
+            localFailedCpuTime += stageStats.getFailedCpuTime().roundTo(MILLISECONDS);
 
             localScheduled &= stageStats.isScheduled();
 
@@ -288,6 +336,8 @@ public class BasicStageStats
         return new BasicStageStats(
                 localScheduled,
 
+                localFailedTasks,
+
                 localTotalDrivers,
                 localQueuedDrivers,
                 localRunningDrivers,
@@ -303,11 +353,14 @@ public class BasicStageStats
                 localRawInputPositions,
 
                 localCumulativeUserMemory,
+                failedLocalCumulativeUserMemory,
                 succinctBytes(localUserMemoryReservation),
                 succinctBytes(localTotalMemoryReservation),
 
                 new Duration(localTotalCpuTime, MILLISECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(localFailedCpuTime, MILLISECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalScheduledTimeMillis, MILLISECONDS).convertToMostSuccinctTimeUnit(),
+                new Duration(failedScheduledTimeMillis, MILLISECONDS).convertToMostSuccinctTimeUnit(),
 
                 localFullyBlocked,
                 localBlockedReasons,

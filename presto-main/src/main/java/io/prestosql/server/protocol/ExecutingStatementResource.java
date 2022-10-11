@@ -24,6 +24,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.client.QueryResults;
 import io.prestosql.client.QueryStatusInfo;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.ExchangeClient;
@@ -66,6 +67,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.jaxrs.AsyncResponseHandler.bindAsyncResponse;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.client.PrestoHeaders.PRESTO_ADDED_PREPARE;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CLEAR_SESSION;
 import static io.prestosql.client.PrestoHeaders.PRESTO_CLEAR_TRANSACTION_ID;
@@ -194,7 +196,7 @@ public class ExecutingStatementResource
         }
 
         query = queries.computeIfAbsent(queryId, id -> {
-            ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), ExecutingStatementResource.class.getSimpleName()));
+            ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(), ExecutingStatementResource.class.getSimpleName()), null, getRetryPolicy(session), new ExchangeId("direct-exchange-query-results"), queryId);
             if (SystemSessionProperties.isRecoveryEnabled(session)) {
                 exchangeClient.setRecoveryEnabled(recoveryUtils.getOrCreateRecoveryManager(queryId, session));
             }

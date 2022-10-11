@@ -1459,7 +1459,6 @@ public class CachingHiveMetastore
         requireNonNull(tableName, "tableName is null");
         requireNonNull(partitionColumns, "partitionColumns is null");
         requireNonNull(partitionValues, "partitionValues is null");
-        //todo xjp
         String providedPartitionName = makePartName(partitionColumns, partitionValues);
         invalidatePartitionCache(schemaName, tableName, partitionNameToCheck -> Stream.of(partitionNameToCheck).map(value -> value.equals(providedPartitionName)).findFirst().orElse(false));
     }

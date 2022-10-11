@@ -20,7 +20,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.SystemSessionProperties;
-import io.prestosql.execution.StateMachine;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -53,12 +52,12 @@ import static io.prestosql.execution.buffer.BufferState.OPEN;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(stateClassName = "PartitionedOutputBufferState", uncapturedFields = {"state", "outputBuffers", "memoryManager", "taskContext",
-        "snapshotStates", "isSnapshotEnabled", "partitions", "noMoreInputChannels", "inputChannels"})
+@RestorableConfig(stateClassName = "PartitionedOutputBufferState", uncapturedFields = {"outputBuffers", "memoryManager", "taskContext",
+        "snapshotStates", "isSnapshotEnabled", "partitions", "noMoreInputChannels", "inputChannels", "stateMachine"})
 public class PartitionedOutputBuffer
         implements OutputBuffer, MultiInputRestorable
 {
-    private final StateMachine<BufferState> state;
+    private final OutputBufferStateMachine stateMachine;
     private final OutputBuffers outputBuffers;
     private final OutputBufferMemoryManager memoryManager;
     // Snapshot: Output buffers can receive markers from multiple drivers
@@ -74,14 +73,13 @@ public class PartitionedOutputBuffer
     private final AtomicLong totalRowsAdded = new AtomicLong();
 
     public PartitionedOutputBuffer(
-            StateMachine<BufferState> state,
+            OutputBufferStateMachine state,
             OutputBuffers outputBuffers,
             DataSize maxBufferSize,
             Supplier<LocalMemoryContext> systemMemoryContextSupplier,
             Executor notificationExecutor)
     {
-        this.state = requireNonNull(state, "state is null");
-
+        this.stateMachine = requireNonNull(state, "state is null");
         requireNonNull(outputBuffers, "outputBuffers is null");
         checkArgument(outputBuffers.getType() == PARTITIONED, "Expected a PARTITIONED output buffer descriptor");
         checkArgument(outputBuffers.isNoMoreBufferIds(), "Expected a final output buffer descriptor");
@@ -107,13 +105,13 @@ public class PartitionedOutputBuffer
     @Override
     public void addStateChangeListener(StateChangeListener<BufferState> stateChangeListener)
     {
-        state.addStateChangeListener(stateChangeListener);
+        stateMachine.addStateChangeListener(stateChangeListener);
     }
 
     @Override
     public boolean isFinished()
     {
-        return state.get() == FINISHED;
+        return stateMachine.getState() == FINISHED;
     }
 
     @Override
@@ -136,7 +134,7 @@ public class PartitionedOutputBuffer
         //
 
         // always get the state first before any other stats
-        BufferState bufferState = this.state.get();
+        BufferState bufferState = this.stateMachine.getState();
 
         int totalBufferedPages = 0;
         ImmutableList.Builder<BufferInfo> infos = ImmutableList.builder();
@@ -167,7 +165,7 @@ public class PartitionedOutputBuffer
 
         // ignore buffers added after query finishes, which can happen when a query is canceled
         // also ignore old versions, which is normal
-        if (state.get().isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
+        if (stateMachine.getState().isTerminal() || outputBuffers.getVersion() >= newOutputBuffers.getVersion()) {
             return;
         }
 
@@ -195,7 +193,7 @@ public class PartitionedOutputBuffer
 
         // ignore pages after "no more pages" is set
         // this can happen with a limit query
-        if (!state.get().canAddPages()) {
+        if (!stateMachine.getState().canAddPages()) {
             return;
         }
 
@@ -280,10 +278,25 @@ public class PartitionedOutputBuffer
     }
 
     @Override
+    public void abort()
+    {
+        if (stateMachine.abort()) {
+            memoryManager.setNoBlockOnFull();
+            forceFreeMemory();
+        }
+    }
+
+    @Override
+    public Optional<Throwable> getFailureCause()
+    {
+        return stateMachine.getFailureCause();
+    }
+
+    @Override
     public void setNoMorePages()
     {
-        state.compareAndSet(OPEN, NO_MORE_PAGES);
-        state.compareAndSet(NO_MORE_BUFFERS, FLUSHING);
+        stateMachine.compareAndSet(OPEN, NO_MORE_PAGES);
+        stateMachine.compareAndSet(NO_MORE_BUFFERS, FLUSHING);
         memoryManager.setNoBlockOnFull();
 
         partitions.forEach(ClientBuffer::setNoMorePages);
@@ -292,10 +305,16 @@ public class PartitionedOutputBuffer
     }
 
     @Override
+    public BufferState getState()
+    {
+        return stateMachine.getState();
+    }
+
+    @Override
     public void destroy()
     {
         // ignore destroy if the buffer already in a terminal state.
-        if (state.setIf(FINISHED, oldState -> !oldState.isTerminal())) {
+        if (stateMachine.setIf(FINISHED, oldState -> !oldState.isTerminal())) {
             partitions.forEach(ClientBuffer::destroy);
             memoryManager.setNoBlockOnFull();
             forceFreeMemory();
@@ -306,7 +325,7 @@ public class PartitionedOutputBuffer
     public void fail()
     {
         // ignore fail if the buffer already in a terminal state.
-        if (state.setIf(FAILED, oldState -> !oldState.isTerminal())) {
+        if (stateMachine.setIf(FAILED, oldState -> !oldState.isTerminal())) {
             memoryManager.setNoBlockOnFull();
             forceFreeMemory();
             // DO NOT destroy buffers or set no more pages.  The coordinator manages the teardown of failed queries.
@@ -327,7 +346,7 @@ public class PartitionedOutputBuffer
 
     private void checkFlushComplete()
     {
-        if (state.get() != FLUSHING && state.get() != NO_MORE_BUFFERS) {
+        if (stateMachine.getState() != FLUSHING && stateMachine.getState() != NO_MORE_BUFFERS) {
             return;
         }
 

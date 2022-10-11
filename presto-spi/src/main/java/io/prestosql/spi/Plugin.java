@@ -149,16 +149,20 @@ public interface Plugin
     }
 
     default void setExternalFunctionsDir(File externalFuncsDir)
-    {}
+    {
+    }
 
     default void setMaxFunctionRunningTimeEnable(boolean enable)
-    {}
+    {
+    }
 
     default void setMaxFunctionRunningTimeInSec(long time)
-    {}
+    {
+    }
 
     default void setFunctionRunningThreadPoolSize(int size)
-    {}
+    {
+    }
 
     default Iterable<FunctionNamespaceManagerFactory> getFunctionNamespaceManagerFactories()
     {

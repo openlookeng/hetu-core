@@ -26,6 +26,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.LazyOutputBuffer;
@@ -49,6 +50,7 @@ import io.prestosql.sql.planner.PlanFragment;
 import org.joda.time.DateTime;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 import java.net.URI;
 import java.util.List;
@@ -114,9 +116,10 @@ public class SqlTask
             Function<SqlTask, ?> onDone,
             DataSize maxBufferSize,
             CounterStat failedTasks,
-            Metadata metadata)
+            Metadata metadata,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
-        SqlTask sqlTask = new SqlTask(taskId, instanceId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata);
+        SqlTask sqlTask = new SqlTask(taskId, instanceId, location, nodeId, queryContext, sqlTaskExecutionFactory, taskNotificationExecutor, maxBufferSize, metadata, exchangeManagerRegistry);
         sqlTask.initialize(onDone, failedTasks);
         return sqlTask;
     }
@@ -130,7 +133,8 @@ public class SqlTask
             SqlTaskExecutionFactory sqlTaskExecutionFactory,
             ExecutorService taskNotificationExecutor,
             DataSize maxBufferSize,
-            Metadata metadata)
+            Metadata metadata,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         this.taskId = requireNonNull(taskId, "taskId is null");
         this.taskInstanceId = requireNonNull(instanceId, "instanceId is null");
@@ -149,7 +153,8 @@ public class SqlTask
                 maxBufferSize,
                 // Pass a memory context supplier instead of a memory context to the output buffer,
                 // because we haven't created the task context that holds the the memory context yet.
-                () -> queryContext.getTaskContext(taskInstanceId).localSystemMemoryContext());
+                () -> queryContext.getTaskContext(taskInstanceId).localSystemMemoryContext(),
+                exchangeManagerRegistry);
         taskStateMachine = new TaskStateMachine(taskId, taskNotificationExecutor);
 
         log.debug("Created new SqlTask object for task %s, with instanceId %s", taskId, taskInstanceId);
@@ -270,6 +275,7 @@ public class SqlTask
         Duration fullGcTime = new Duration(0, MILLISECONDS);
         Map<Long, SnapshotInfo> snapshotCaptureResult = ImmutableMap.of();
         Optional<RestoreResult> snapshotRestoreResult = Optional.empty();
+        DataSize peakUserMemoryReservation = new DataSize(0, BYTE);
         TaskInfo finalTaskInfo = taskHolder.getFinalTaskInfo();
         if (finalTaskInfo != null) {
             TaskStats taskStats = finalTaskInfo.getStats();
@@ -279,6 +285,7 @@ public class SqlTask
             userMemoryReservation = taskStats.getUserMemoryReservation();
             systemMemoryReservation = taskStats.getSystemMemoryReservation();
             revocableMemoryReservation = taskStats.getRevocableMemoryReservation();
+            peakUserMemoryReservation = taskStats.getPeakUserMemoryReservation();
             fullGcCount = taskStats.getFullGcCount();
             fullGcTime = taskStats.getFullGcTime();
 
@@ -331,7 +338,8 @@ public class SqlTask
                 fullGcCount,
                 fullGcTime,
                 snapshotCaptureResult,
-                snapshotRestoreResult);
+                snapshotRestoreResult,
+                peakUserMemoryReservation);
     }
 
     private TaskStats getTaskStats(TaskHolder taskHolder)
@@ -407,7 +415,7 @@ public class SqlTask
     }
 
     public TaskInfo updateTask(Session session, Optional<PlanFragment> fragment, List<TaskSource> sources, OutputBuffers outputBuffers, OptionalInt totalPartitions, Optional<PlanNodeId> consumer,
-            Map<String, CommonTableExecutionContext> cteCtx)
+                               Map<String, CommonTableExecutionContext> cteCtx, int queryPriorityTag)
     {
         try {
             // The LazyOutput buffer does not support write methods, so the actual
@@ -427,7 +435,7 @@ public class SqlTask
                 if (taskExecution == null) {
                     checkState(fragment.isPresent(), "fragment must be present");
                     loadDCCatalogForUpdateTask(metadata, sources);
-                    taskExecution = sqlTaskExecutionFactory.create(taskInstanceId, session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx);
+                    taskExecution = sqlTaskExecutionFactory.create(taskInstanceId, session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, consumer, cteCtx, queryPriorityTag);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);
                     isRecoveryEnabled = SystemSessionProperties.isRecoveryEnabled(session);
@@ -461,38 +469,9 @@ public class SqlTask
                     return taskHolder.getFinalTaskInfo();
                 }
 
-                if (taskStateMachine.getState() == RUNNING) {
-                    taskExecution = taskHolder.getTaskExecution();
-                    if (taskExecution != null) {
-                        AtomicLong bytesRevokedAtomic = new AtomicLong();
-                        queryContext.accept(new VoidTraversingQueryContextVisitor<AtomicLong>()
-                        {
-                            @Override
-                            public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
-                            {
-                                if (remainingBytesToRevoke.get() < 0) {
-                                    // exit immediately if no work needs to be done
-                                    return null;
-                                }
-                                return super.visitQueryContext(queryContext, remainingBytesToRevoke);
-                            }
-
-                            @Override
-                            public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
-                            {
-                                if (remainingBytesToRevoke.get() > 0) {
-                                    long revokedBytes = operatorContext.requestMemoryRevoking();
-                                    if (revokedBytes > 0) {
-                                        remainingBytesToRevoke.addAndGet(revokedBytes);
-                                        log.debug("revoked bytes current: %s, total: %s", revokedBytes, remainingBytesToRevoke.get());
-                                    }
-                                }
-                                return null;
-                            }
-                        }, bytesRevokedAtomic);
-
-                        taskExecution.suspendTask();
-                    }
+                taskExecution = taskHolder.getTaskExecution();
+                if (spillRevocableMem(taskExecution) > 0) {
+                    taskExecution.suspendTask();
                 }
             }
         }
@@ -505,6 +484,45 @@ public class SqlTask
         }
 
         return getTaskInfo();
+    }
+
+    @GuardedBy("this")
+    private long spillRevocableMem(SqlTaskExecution taskExecution)
+    {
+        if (taskStateMachine.getState() == RUNNING) {
+            if (taskExecution != null) {
+                AtomicLong bytesRevokedAtomic = new AtomicLong(1);
+                queryContext.accept(new VoidTraversingQueryContextVisitor<AtomicLong>()
+                {
+                    @Override
+                    public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
+                    {
+                        if (remainingBytesToRevoke.get() < 0) {
+                            // exit immediately if no work needs to be done
+                            return null;
+                        }
+                        return super.visitQueryContext(queryContext, remainingBytesToRevoke);
+                    }
+
+                    @Override
+                    public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
+                    {
+                        if (remainingBytesToRevoke.get() >= 0) {
+                            long revokedBytes = operatorContext.requestMemoryRevoking();
+                            if (revokedBytes > 0) {
+                                remainingBytesToRevoke.addAndGet(revokedBytes);
+                                log.debug("revoked bytes current: %s, total: %s", revokedBytes, remainingBytesToRevoke.get());
+                            }
+                        }
+                        return null;
+                    }
+                }, bytesRevokedAtomic);
+
+                return bytesRevokedAtomic.get();
+            }
+        }
+
+        return 0;
     }
 
     public TaskInfo resume(TaskState targetState)
@@ -521,6 +539,32 @@ public class SqlTask
                 if (taskExecution != null) {
                     taskExecution.resumeTask();
                 }
+            }
+        }
+        catch (Error e) {
+            failed(e);
+            throw e;
+        }
+        catch (RuntimeException e) {
+            failed(e);
+        }
+
+        return getTaskInfo();
+    }
+
+    public TaskInfo spill(TaskState targetState)
+    {
+        try {
+            SqlTaskExecution taskExecution;
+            synchronized (this) {
+                // is task already complete?
+                TaskHolder taskHolder = taskHolderReference.get();
+                if (taskHolder.isFinished()) {
+                    return taskHolder.getFinalTaskInfo();
+                }
+
+                taskExecution = taskHolder.getTaskExecution();
+                spillRevocableMem(taskExecution);
             }
         }
         catch (Error e) {
@@ -576,6 +620,24 @@ public class SqlTask
     public String toString()
     {
         return taskId.toString();
+    }
+
+    public TaskInfo setPriority(Integer taskPriority)
+    {
+        taskStateMachine.setPriority(taskPriority);
+        SqlTaskExecution taskExecution;
+        synchronized (this) {
+            // is task already complete?
+            TaskHolder taskHolder = taskHolderReference.get();
+            if (taskHolder.isFinished()) {
+                return taskHolder.getFinalTaskInfo();
+            }
+            taskExecution = taskHolder.getTaskExecution();
+            if (taskExecution != null) {
+                taskExecution.setQueryPriorityTag();
+            }
+        }
+        return getTaskInfo();
     }
 
     private static final class TaskHolder
@@ -656,5 +718,10 @@ public class SqlTask
     public boolean isRecoveryEnabled()
     {
         return isRecoveryEnabled;
+    }
+
+    public void addSourceTaskFailureListener(TaskFailureListener listener)
+    {
+        taskStateMachine.addSourceTaskFailureListener(listener);
     }
 }

@@ -45,32 +45,11 @@ public abstract class BaseSharedMetastoreTest
         assertQuery("SELECT * FROM hive_with_redirections." + schema + ".region", "SELECT * FROM region");
         assertQuery("SELECT * FROM iceberg_with_redirections." + schema + ".nation", "SELECT * FROM nation");
         assertQuery("SELECT * FROM iceberg_with_redirections." + schema + ".region", "SELECT * FROM region");
-
-//        assertThatThrownBy(() -> query("SELECT * FROM iceberg." + schema + ".region"))
-//                .hasMessageContaining("Not an Iceberg table");
-//        assertThatThrownBy(() -> query("SELECT * FROM hive." + schema + ".nation"))
-//                .hasMessageContaining("Cannot query Iceberg table");
     }
 
     @Test
     public void testReadInformationSchema()
     {
-//        assertThat(query("SELECT table_schema FROM hive.information_schema.tables WHERE table_name = 'region' AND table_schema='" + schema + "'"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SELECT table_schema FROM iceberg.information_schema.tables WHERE table_name = 'nation' AND table_schema='" + schema + "'"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SELECT table_schema FROM hive_with_redirections.information_schema.tables WHERE table_name = 'region' AND table_schema='" + schema + "'"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SELECT table_schema FROM hive_with_redirections.information_schema.tables WHERE table_name = 'nation' AND table_schema='" + schema + "'"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SELECT table_schema FROM iceberg_with_redirections.information_schema.tables WHERE table_name = 'region' AND table_schema='" + schema + "'"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-
         assertQuery("SELECT table_name, column_name from hive.information_schema.columns WHERE table_schema = '" + schema + "'",
                 "VALUES ('region', 'regionkey'), ('region', 'name'), ('region', 'comment')");
         assertQuery("SELECT table_name, column_name from iceberg.information_schema.columns WHERE table_schema = '" + schema + "'",
@@ -92,31 +71,11 @@ public abstract class BaseSharedMetastoreTest
         assertQuery("SHOW TABLES FROM hive." + schema, "VALUES 'region', 'nation'");
         assertQuery("SHOW TABLES FROM hive_with_redirections." + schema, "VALUES 'region', 'nation'");
         assertQuery("SHOW TABLES FROM iceberg_with_redirections." + schema, "VALUES 'region', 'nation'");
-
-//        assertThatThrownBy(() -> query("SHOW CREATE TABLE iceberg." + schema + ".region"))
-//                .hasMessageContaining("Not an Iceberg table");
-//        assertThatThrownBy(() -> query("SHOW CREATE TABLE hive." + schema + ".nation"))
-//                .hasMessageContaining("Cannot query Iceberg table");
-//
-//        assertThatThrownBy(() -> query("DESCRIBE iceberg." + schema + ".region"))
-//                .hasMessageContaining("Not an Iceberg table");
-//        assertThatThrownBy(() -> query("DESCRIBE hive." + schema + ".nation"))
-//                .hasMessageContaining("Cannot query Iceberg table");
     }
 
     @Test
     public void testShowSchemas()
     {
-//        assertThat(query("SHOW SCHEMAS FROM hive"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SHOW SCHEMAS FROM iceberg"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-//        assertThat(query("SHOW SCHEMAS FROM hive_with_redirections"))
-//                .skippingTypesCheck()
-//                .containsAll("VALUES '" + schema + "'");
-
         String showCreateHiveSchema = (String) computeActual("SHOW CREATE SCHEMA hive." + schema).getOnlyValue();
         assertEquals(
                 showCreateHiveSchema,

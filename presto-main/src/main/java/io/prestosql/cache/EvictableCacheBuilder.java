@@ -24,7 +24,6 @@ import org.gaul.modernizer_maven_annotations.SuppressModernizer;
 
 import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkState;
@@ -142,11 +141,11 @@ public final class EvictableCacheBuilder<K, V>
     {
         if (cacheDisabled()) {
             // Silently providing a behavior different from Guava's could be surprising, so require explicit choice.
-            DisabledCacheImplementation disabledCacheImplementation = this.disabledCacheImplementation.orElseThrow(() -> new IllegalStateException(
+            DisabledCacheImplementation disabledCache = this.disabledCacheImplementation.orElseThrow(() -> new IllegalStateException(
                     "Even when cache is disabled, the loads are synchronized and both load results and failures are shared between threads. " +
                             "This is rarely desired, thus builder caller is expected to either opt-in into this behavior with shareResultsAndFailuresEvenIfDisabled(), " +
                             "or choose not to share results (and failures) between concurrent invocations with shareNothingWhenDisabled()."));
-            switch (disabledCacheImplementation) {
+            switch (disabledCache) {
                 case NOOP:
                     return new EmptyCache<>(loader, recordStats);
                 case GUAVA:
@@ -160,7 +159,7 @@ public final class EvictableCacheBuilder<K, V>
                     }
                     return buildUnsafeCache(cacheBuilder, loader);
             }
-            throw new UnsupportedOperationException("Unsupported option: " + disabledCacheImplementation);
+            throw new UnsupportedOperationException("Unsupported option: " + disabledCache);
         }
 
         if (!(maximumSize.isPresent() || maximumWeight.isPresent() || expireAfterWrite.isPresent())) {

@@ -28,6 +28,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
@@ -48,7 +49,7 @@ public class ParquetColumnChunkTest
     public void setUp() throws Exception
     {
         initMocks(this);
-        parquetColumnChunkUnderTest = new ParquetColumnChunk(Optional.of("value"), mockDescriptor, "content".getBytes(),
+        parquetColumnChunkUnderTest = new ParquetColumnChunk(Optional.of("value"), mockDescriptor, "content".getBytes(StandardCharsets.UTF_8),
                 0);
     }
 

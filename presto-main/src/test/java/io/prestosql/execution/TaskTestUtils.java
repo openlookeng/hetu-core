@@ -22,6 +22,8 @@ import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.event.SplitMonitor;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeHandleResolver;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.TestSqlTaskManager.MockExchangeClientSupplier;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.scheduler.LegacyNetworkTopology;
@@ -146,6 +148,7 @@ public final class TaskTestUtils
         SeedStoreManager seedStoreManager = new SeedStoreManager(fileSystemClientManager);
         StateStoreProvider stateStoreProvider = new LocalStateStoreProvider(seedStoreManager);
         HeuristicIndexerManager heuristicIndexerManager = new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager());
+        TableExecuteContextManager tableExecuteContextManager = new TableExecuteContextManager();
 
         return new LocalExecutionPlanner(
                 metadata,
@@ -179,13 +182,14 @@ public final class TaskTestUtils
                 new StateStoreListenerManager(stateStoreProvider),
                 new DynamicFilterCacheManager(),
                 heuristicIndexerManager,
-                null,
-                cubeManager);
+                cubeManager,
+                new ExchangeManagerRegistry(new ExchangeHandleResolver()),
+                tableExecuteContextManager);
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)
     {
-        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty(), Optional.empty(), null);
+        return sqlTask.updateTask(TEST_SESSION, Optional.of(PLAN_FRAGMENT), taskSources, outputBuffers, OptionalInt.empty(), Optional.empty(), null, 1);
     }
 
     public static SplitMonitor createTestSplitMonitor()

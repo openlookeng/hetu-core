@@ -88,7 +88,6 @@ class MessageTypeConverter
                     element.setConverted_type(getConvertedType(groupType.getOriginalType()));
                 }
                 if (groupType.getLogicalTypeAnnotation() != null) {
-                    //todo xjp ,version is too low ,no this method
                     LogicalType logicalType = null;
                     element.setLogicalType(logicalType);
                 }

@@ -39,12 +39,16 @@ import io.airlift.jmx.testing.TestingJmxModule;
 import io.airlift.json.JsonModule;
 import io.airlift.node.testing.TestingNodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
+import io.hetu.core.filesystem.HdfsFileSystemClientFactory;
+import io.hetu.core.filesystem.LocalFileSystemClientFactory;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.dynamicfilter.DynamicFilterListener;
 import io.prestosql.eventlistener.EventListenerManager;
+import io.prestosql.exchange.ExchangeManagerModule;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.QueryInfo;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.execution.SqlQueryManager;
@@ -164,6 +168,8 @@ public class TestingPrestoServer
     private final boolean coordinator;
     private StateStoreProvider stateStoreProvider;
 
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+
     public static class TestShutdownAction
             implements ShutdownAction
     {
@@ -257,6 +263,7 @@ public class TestingPrestoServer
                 .add(new PasswordSecurityModule())
                 .add(new ServerMainModule(parserOptions))
                 .add(new TestingWarningCollectorModule())
+                .add(new ExchangeManagerModule())
                 .add(binder -> {
                     binder.bind(TestingAccessControlManager.class).in(Scopes.SINGLETON);
                     binder.bind(TestingEventListenerManager.class).in(Scopes.SINGLETON);
@@ -268,6 +275,7 @@ public class TestingPrestoServer
                     binder.bind(ShutdownAction.class).to(TestShutdownAction.class).in(Scopes.SINGLETON);
                     binder.bind(NodeStateChangeHandler.class).in(Scopes.SINGLETON);
                     binder.bind(ProcedureTester.class).in(Scopes.SINGLETON);
+                    binder.bind(ExchangeManagerRegistry.class).in(Scopes.SINGLETON);
                 });
 
         if (discoveryUri != null) {
@@ -301,6 +309,10 @@ public class TestingPrestoServer
         lifeCycleManager = injector.getInstance(LifeCycleManager.class);
 
         pluginManager = injector.getInstance(PluginManager.class);
+        FileSystemClientManager fileSystemClientManager = injector.getInstance(FileSystemClientManager.class);
+        fileSystemClientManager.addFileSystemClientFactories(new HdfsFileSystemClientFactory());
+        fileSystemClientManager.addFileSystemClientFactories(new LocalFileSystemClientFactory());
+        fileSystemClientManager.loadFactoryConfigs();
 
         connectorManager = injector.getInstance(ConnectorManager.class);
 
@@ -343,7 +355,10 @@ public class TestingPrestoServer
         announcer = injector.getInstance(Announcer.class);
 
         injector.getInstance(ServerInfoResource.class).startupComplete();
+        injector.getInstance(ExchangeManagerRegistry.class).loadExchangeManager(fileSystemClientManager);
         announcer.forceAnnounce();
+
+        exchangeManagerRegistry = injector.getInstance(ExchangeManagerRegistry.class);
 
         refreshNodes();
     }
@@ -476,9 +491,9 @@ public class TestingPrestoServer
     /**
      * Hetu DC Connector requires this method to create DC catalogs in the testing server for unit test.
      *
-     * @param catalogName the catalog name
+     * @param catalogName   the catalog name
      * @param connectorName connector name
-     * @param properties catalog properties
+     * @param properties    catalog properties
      * @return the set of dynamic catalog names
      */
     public Set<CatalogName> createDCCatalog(String catalogName, String connectorName, Map<String, String> properties)

@@ -23,6 +23,7 @@ import org.apache.iceberg.expressions.Expression;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 
@@ -41,7 +42,7 @@ public class DummyFileScanTaskTest
                 Arrays.asList(
                         new TrinoDeleteFile(0L, 0, FileContent.DATA, "path", FileFormat.ORC, 0L, 0L, new HashMap<>(),
                                 new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-                                "content".getBytes(), Arrays.asList(0), 0, Arrays.asList(0L))));
+                                "content".getBytes(StandardCharsets.UTF_8), Arrays.asList(0), 0, Arrays.asList(0L))));
     }
 
     @Test

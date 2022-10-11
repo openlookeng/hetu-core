@@ -24,20 +24,28 @@ import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterService;
+import io.prestosql.exchange.ExchangeManagerRegistry;
 import io.prestosql.execution.LocationFactory;
 import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.QueryPreparer;
 import io.prestosql.execution.QueryStateMachine;
 import io.prestosql.execution.RemoteTaskFactory;
 import io.prestosql.execution.SqlQueryExecution;
+import io.prestosql.execution.SqlTaskManager;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.ExecutionPolicy;
+import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeScheduler;
+import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
+import io.prestosql.execution.scheduler.TaskDescriptorStorage;
+import io.prestosql.execution.scheduler.TaskExecutionStats;
+import io.prestosql.execution.scheduler.TaskSourceFactory;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.operator.TableExecuteContextManager;
+import io.prestosql.resourcemanager.QueryResourceManagerService;
 import io.prestosql.security.AccessControl;
 import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PrestoException;
@@ -104,6 +112,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 import static io.prestosql.SystemSessionProperties.isExecutionPlanCacheEnabled;
+import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
 
 public class CachedSqlQueryExecution
         extends SqlQueryExecution
@@ -112,21 +121,28 @@ public class CachedSqlQueryExecution
     private final BeginTableWrite beginTableWrite;
 
     public CachedSqlQueryExecution(QueryPreparer.PreparedQuery preparedQuery, QueryStateMachine stateMachine,
-            String slug, Metadata metadata, CubeManager cubeManager, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
-            NodePartitioningManager nodePartitioningManager, NodeScheduler nodeScheduler,
-            List<PlanOptimizer> planOptimizers, PlanFragmenter planFragmenter, RemoteTaskFactory remoteTaskFactory,
-            LocationFactory locationFactory, int scheduleSplitBatchSize, ExecutorService queryExecutor,
-            ScheduledExecutorService schedulerExecutor, FailureDetector failureDetector, NodeTaskMap nodeTaskMap,
-            QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
-            StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
-            DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
-            HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, RecoveryUtils recoveryUtils,
+                                   String slug, Metadata metadata, CubeManager cubeManager, AccessControl accessControl, SqlParser sqlParser, SplitManager splitManager,
+                                   NodePartitioningManager nodePartitioningManager, NodeScheduler nodeScheduler,
+                                   List<PlanOptimizer> planOptimizers, PlanFragmenter planFragmenter, RemoteTaskFactory remoteTaskFactory,
+                                   LocationFactory locationFactory, int scheduleSplitBatchSize, ExecutorService queryExecutor,
+                                   ScheduledExecutorService schedulerExecutor, FailureDetector failureDetector, NodeTaskMap nodeTaskMap,
+                                   QueryExplainer queryExplainer, ExecutionPolicy executionPolicy, SplitSchedulerStats schedulerStats,
+                                   StatsCalculator statsCalculator, CostCalculator costCalculator, WarningCollector warningCollector,
+                                   DynamicFilterService dynamicFilterService, Optional<Cache<Integer, CachedSqlQueryExecutionPlan>> cache,
+                                   HeuristicIndexerManager heuristicIndexerManager, StateStoreProvider stateStoreProvider, RecoveryUtils recoveryUtils,
+                                   ExchangeManagerRegistry exchangeManagerRegistry, SqlTaskManager coordinatorTaskManager, TaskSourceFactory taskSourceFactory,
+                                   TaskDescriptorStorage taskDescriptorStorage, NodeAllocatorService nodeAllocatorService,
+                                   PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats,
+                                   QueryResourceManagerService queryResourceManager,
                                    TableExecuteContextManager tableExecuteContextManager)
     {
         super(tableExecuteContextManager, preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
                 scheduleSplitBatchSize, queryExecutor, schedulerExecutor, failureDetector, nodeTaskMap, queryExplainer,
-                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService, heuristicIndexerManager, stateStoreProvider, recoveryUtils);
+                executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService,
+                heuristicIndexerManager, stateStoreProvider, recoveryUtils, exchangeManagerRegistry, coordinatorTaskManager,
+                taskSourceFactory, taskDescriptorStorage, nodeAllocatorService, partitionMemoryEstimatorFactory, taskExecutionStats,
+                queryResourceManager);
         this.cache = cache;
         this.beginTableWrite = new BeginTableWrite(metadata);
     }
@@ -274,7 +290,7 @@ public class CachedSqlQueryExecution
             Map<String, Object> systemSessionProperties)
     {
         // build a new plan
-        Plan plan = logicalPlanner.plan(analysis, true);
+        Plan plan = logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(getSession()));
         // Cache the plan
         CachedSqlQueryExecutionPlan newCachedPlan = new CachedSqlQueryExecutionPlan(statement, tableNames, tableStatistics, planOptimizers, plan,
                 analysis.getParameters(), columnTypes, getSession().getTimeZoneKey(), getSession().getIdentity(), systemSessionProperties);

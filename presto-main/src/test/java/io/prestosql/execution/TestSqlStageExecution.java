@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.dynamicfilter.DynamicFilterService;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TestSqlTaskManager.MockLocationFactory;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.NoOpFailureDetector;
@@ -123,7 +124,8 @@ public class TestSqlStageExecution
                 new DynamicFilterService(new LocalStateStoreProvider(
                         new SeedStoreManager(new FileSystemClientManager()))),
                 new QuerySnapshotManager(stageId.getQueryId(), NOOP_RECOVERY_UTILS, TEST_SESSION),
-                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()));
+                new QueryRecoveryManager(NOOP_RECOVERY_UTILS, TEST_SESSION, stageId.getQueryId()),
+                Optional.empty());
 
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
@@ -177,7 +179,8 @@ public class TestSqlStageExecution
                 ImmutableList.of(new PlanFragmentId("source")),
                 ImmutableList.of(new Symbol("column")),
                 Optional.empty(),
-                REPARTITION);
+                REPARTITION,
+                RetryPolicy.NONE);
 
         ImmutableMap.Builder<Symbol, Type> types = ImmutableMap.builder();
         for (Symbol symbol : planNode.getOutputSymbols()) {

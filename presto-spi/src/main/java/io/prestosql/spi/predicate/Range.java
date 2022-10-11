@@ -19,6 +19,7 @@ import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.Type;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -124,6 +125,16 @@ public final class Range
     public Marker getLow()
     {
         return low;
+    }
+
+    public Optional<Object> getLowValue()
+    {
+        return low.getValueBlock().isPresent() ? Optional.of(low.getValue()) : Optional.empty();
+    }
+
+    public Optional<Object> getHighValue()
+    {
+        return high.getValueBlock().isPresent() ? Optional.of(high.getValue()) : Optional.empty();
     }
 
     @JsonProperty

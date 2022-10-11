@@ -18,6 +18,8 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.testng.Assert.assertEquals;
 
 public class ParquetTimestampUtilsTest
@@ -26,7 +28,7 @@ public class ParquetTimestampUtilsTest
     public void testGetTimestampMillis()
     {
         // Setup
-        final Binary timestampBinary = Binary.fromReusedByteArray("content".getBytes());
+        final Binary timestampBinary = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final long result = ParquetTimestampUtils.getTimestampMillis(timestampBinary);
@@ -39,7 +41,7 @@ public class ParquetTimestampUtilsTest
     public void testDecodeInt96Timestamp()
     {
         // Setup
-        final Binary timestampBinary = Binary.fromReusedByteArray("content".getBytes());
+        final Binary timestampBinary = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final DecodedTimestamp result = ParquetTimestampUtils.decodeInt96Timestamp(timestampBinary);

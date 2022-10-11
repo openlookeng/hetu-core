@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.log.Logger;
 import io.airlift.stats.TestingGcMonitor;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -28,6 +29,7 @@ import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.buffer.BufferResult;
 import io.prestosql.execution.buffer.BufferState;
 import io.prestosql.execution.buffer.OutputBuffer;
+import io.prestosql.execution.buffer.OutputBufferStateMachine;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.execution.executor.TaskExecutor;
@@ -92,8 +94,6 @@ import static io.prestosql.block.BlockAssertions.createStringSequenceBlock;
 import static io.prestosql.block.BlockAssertions.createStringsBlock;
 import static io.prestosql.execution.TaskTestUtils.TABLE_SCAN_NODE_ID;
 import static io.prestosql.execution.TaskTestUtils.createTestSplitMonitor;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
@@ -112,6 +112,7 @@ import static org.testng.Assert.assertFalse;
 @Test(singleThreaded = true)
 public class TestSqlTaskExecution
 {
+    private static final Logger LOG = Logger.get(TestSqlTaskExecution.class);
     private static final OutputBufferId OUTPUT_BUFFER_ID = new OutputBufferId(0);
     private static final CatalogName CONNECTOR_ID = new CatalogName("test");
     private static final Duration ASSERT_WAIT_TIMEOUT = new Duration(1, HOURS);
@@ -132,7 +133,7 @@ public class TestSqlTaskExecution
         taskExecutor.start();
 
         try {
-            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1"), taskNotificationExecutor);
+            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1.0"), taskNotificationExecutor);
             PartitionedOutputBuffer outputBuffer = newTestingOutputBuffer(taskNotificationExecutor);
             OutputBufferConsumer outputBufferConsumer = new OutputBufferConsumer(outputBuffer, OUTPUT_BUFFER_ID);
 
@@ -175,7 +176,7 @@ public class TestSqlTaskExecution
                     localExecutionPlan,
                     taskExecutor,
                     taskNotificationExecutor,
-                    createTestSplitMonitor());
+                    createTestSplitMonitor(), 1);
 
             //
             // test body
@@ -279,9 +280,9 @@ public class TestSqlTaskExecution
                     throw new UnsupportedOperationException();
             }
 
+            assertEquals(taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS), TaskState.FLUSHING);
             outputBufferConsumer.abort(); // complete the task by calling abort on it
-            TaskState taskState = taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS);
-            assertEquals(taskState, TaskState.FINISHED);
+            assertEquals(taskStateMachine.getStateChange(TaskState.FLUSHING).get(10, SECONDS), TaskState.FINISHED);
         }
         finally {
             taskExecutor.stop();
@@ -303,7 +304,7 @@ public class TestSqlTaskExecution
         taskExecutor.start();
 
         try {
-            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1"), taskNotificationExecutor);
+            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1.0"), taskNotificationExecutor);
             PartitionedOutputBuffer outputBuffer = newTestingOutputBuffer(taskNotificationExecutor);
             OutputBufferConsumer outputBufferConsumer = new OutputBufferConsumer(outputBuffer, OUTPUT_BUFFER_ID);
 
@@ -346,7 +347,7 @@ public class TestSqlTaskExecution
                     localExecutionPlan,
                     taskExecutor,
                     taskNotificationExecutor,
-                    createTestSplitMonitor());
+                    createTestSplitMonitor(), 1);
 
             //
             // test body
@@ -474,9 +475,9 @@ public class TestSqlTaskExecution
                     throw new UnsupportedOperationException();
             }
 
+            assertEquals(taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS), TaskState.FLUSHING);
             outputBufferConsumer.abort(); // complete the task by calling abort on it
-            TaskState taskState = taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS);
-            assertEquals(taskState, TaskState.FINISHED);
+            assertEquals(taskStateMachine.getStateChange(TaskState.FLUSHING).get(10, SECONDS), TaskState.FINISHED);
         }
         finally {
             taskExecutor.stop();
@@ -495,7 +496,7 @@ public class TestSqlTaskExecution
         taskExecutor.start();
 
         try {
-            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1"), taskNotificationExecutor);
+            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("query.1.1.0"), taskNotificationExecutor);
             PartitionedOutputBuffer outputBuffer = newTestingOutputBuffer(taskNotificationExecutor);
             OutputBufferConsumer outputBufferConsumer = new OutputBufferConsumer(outputBuffer, OUTPUT_BUFFER_ID);
 
@@ -621,7 +622,7 @@ public class TestSqlTaskExecution
                     localExecutionPlan,
                     taskExecutor,
                     taskNotificationExecutor,
-                    createTestSplitMonitor());
+                    createTestSplitMonitor(), 1);
 
             //
             // test body
@@ -776,9 +777,9 @@ public class TestSqlTaskExecution
                     throw new UnsupportedOperationException();
             }
 
+            assertEquals(taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS), TaskState.FLUSHING);
             outputBufferConsumer.abort(); // complete the task by calling abort on it
-            TaskState taskState = taskStateMachine.getStateChange(TaskState.RUNNING).get(10, SECONDS);
-            assertEquals(taskState, TaskState.FINISHED);
+            assertEquals(taskStateMachine.getStateChange(TaskState.FLUSHING).get(10, SECONDS), TaskState.FINISHED);
         }
         finally {
             taskExecutor.stop();
@@ -813,7 +814,7 @@ public class TestSqlTaskExecution
     private PartitionedOutputBuffer newTestingOutputBuffer(ScheduledExecutorService taskNotificationExecutor)
     {
         return new PartitionedOutputBuffer(
-                new StateMachine<>("bufferState", taskNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", taskNotificationExecutor),
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withBuffer(OUTPUT_BUFFER_ID, 0)
                         .withNoMoreBufferIds(),
@@ -833,7 +834,7 @@ public class TestSqlTaskExecution
                 Thread.sleep(10);
             }
             catch (InterruptedException e) {
-                // do nothing
+                LOG.info(e.getMessage());
             }
         }
         assertEquals(actualSupplier.get(), expected);

@@ -40,10 +40,13 @@ public final class Priority
     private final int level;
     private final long levelPriority;
 
-    public Priority(int level, long levelPriority)
+    private final int queryPriorityTag;
+
+    public Priority(int level, long levelPriority, int queryPriorityTag)
     {
         this.level = level;
         this.levelPriority = levelPriority;
+        this.queryPriorityTag = queryPriorityTag;
     }
 
     public int getLevel()
@@ -56,12 +59,18 @@ public final class Priority
         return levelPriority;
     }
 
+    public int getQueryPriorityTag()
+    {
+        return queryPriorityTag;
+    }
+
     @Override
     public String toString()
     {
         return toStringHelper(this)
                 .add("level", level)
                 .add("levelPriority", levelPriority)
+                .add("queryPriorityTag", queryPriorityTag)
                 .toString();
     }
 }

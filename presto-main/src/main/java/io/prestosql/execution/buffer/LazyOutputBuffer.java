@@ -17,20 +17,28 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.ExtendedSettableFuture;
+import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
-import io.prestosql.execution.StateMachine;
+import io.prestosql.exchange.ExchangeManager;
+import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.ExchangeSink;
+import io.prestosql.exchange.ExchangeSinkInstanceHandle;
+import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.TaskContext;
+import io.prestosql.spi.Page;
 
 import javax.annotation.concurrent.GuardedBy;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -41,14 +49,14 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.prestosql.execution.buffer.BufferResult.emptyResults;
 import static io.prestosql.execution.buffer.BufferState.FAILED;
 import static io.prestosql.execution.buffer.BufferState.FINISHED;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static java.util.Objects.requireNonNull;
 
 public class LazyOutputBuffer
         implements OutputBuffer
 {
-    private final StateMachine<BufferState> state;
+    private static final Logger LOG = Logger.get(LazyOutputBuffer.class);
+    private final OutputBufferStateMachine stateMachine;
+
     private final DataSize maxBufferSize;
     private final Supplier<LocalMemoryContext> systemMemoryContextSupplier;
     private final Executor executor;
@@ -61,31 +69,35 @@ public class LazyOutputBuffer
 
     @GuardedBy("this")
     private final List<PendingRead> pendingReads = new ArrayList<>();
+    private final ExchangeManagerRegistry exchangeManagerRegistry;
+    private Optional<ExchangeSink> exchangeSink;
 
     public LazyOutputBuffer(
             TaskId taskId,
             Executor executor,
             DataSize maxBufferSize,
-            Supplier<LocalMemoryContext> systemMemoryContextSupplier)
+            Supplier<LocalMemoryContext> systemMemoryContextSupplier,
+            ExchangeManagerRegistry exchangeManagerRegistry)
     {
         requireNonNull(taskId, "taskId is null");
         this.executor = requireNonNull(executor, "executor is null");
-        state = new StateMachine<>(taskId + "-buffer", executor, OPEN, TERMINAL_BUFFER_STATES);
+        stateMachine = new OutputBufferStateMachine(taskId, executor);
         this.maxBufferSize = requireNonNull(maxBufferSize, "maxBufferSize is null");
         checkArgument(maxBufferSize.toBytes() > 0, "maxBufferSize must be at least 1");
         this.systemMemoryContextSupplier = requireNonNull(systemMemoryContextSupplier, "systemMemoryContextSupplier is null");
+        this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
     }
 
     @Override
     public void addStateChangeListener(StateChangeListener<BufferState> stateChangeListener)
     {
-        state.addStateChangeListener(stateChangeListener);
+        stateMachine.addStateChangeListener(stateChangeListener);
     }
 
     @Override
     public boolean isFinished()
     {
-        return state.get() == FINISHED;
+        return stateMachine.getState() == FINISHED;
     }
 
     @Override
@@ -127,7 +139,7 @@ public class LazyOutputBuffer
             //
             // NOTE: this code must be lock free to not hanging state machine updates
             //
-            BufferState bufferState = this.state.get();
+            BufferState bufferState = this.stateMachine.getState();
 
             return new OutputBufferInfo(
                     "UNINITIALIZED",
@@ -152,19 +164,33 @@ public class LazyOutputBuffer
         synchronized (this) {
             if (delegate == null) {
                 // ignore set output if buffer was already destroyed or failed
-                if (state.get().isTerminal()) {
+                if (stateMachine.getState().isTerminal()) {
                     return;
                 }
                 switch (newOutputBuffers.getType()) {
                     case PARTITIONED:
-                        delegate = new PartitionedOutputBuffer(state, newOutputBuffers, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new PartitionedOutputBuffer(stateMachine, newOutputBuffers, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
                     case BROADCAST:
-                        delegate = new BroadcastOutputBuffer(state, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new BroadcastOutputBuffer(stateMachine, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
                     case ARBITRARY:
-                        delegate = new ArbitraryOutputBuffer(state, maxBufferSize, systemMemoryContextSupplier, executor);
+                        delegate = new ArbitraryOutputBuffer(stateMachine, maxBufferSize, systemMemoryContextSupplier, executor);
                         break;
+                    default:
+                        //TODO(Alex): decide the spool output buffer
+                        LOG.info("Unexpected output buffer type: " + newOutputBuffers.getType());
+                }
+
+                if (newOutputBuffers.getExchangeSinkInstanceHandle().isPresent()) {
+                    ExchangeSinkInstanceHandle exchangeSinkInstanceHandle = newOutputBuffers.getExchangeSinkInstanceHandle()
+                            .orElseThrow(() -> new IllegalArgumentException("exchange sink handle is expected to be present for buffer type EXTERNAL"));
+                    ExchangeManager exchangeManager = exchangeManagerRegistry.getExchangeManager();
+                    ExchangeSink exchangeSinkInstance = exchangeManager.createSink(exchangeSinkInstanceHandle, false); //TODO: create directories
+                    this.exchangeSink = Optional.ofNullable(exchangeSinkInstance);
+                }
+                else {
+                    this.exchangeSink = Optional.empty();
                 }
 
                 // process pending aborts and reads outside of synchronized lock
@@ -173,6 +199,11 @@ public class LazyOutputBuffer
                 bufferPendingReads = ImmutableList.copyOf(this.pendingReads);
                 this.pendingReads.clear();
             }
+            this.exchangeSink.ifPresent(sink -> delegate = new SpoolingExchangeOutputBuffer(
+                    stateMachine,
+                    newOutputBuffers,
+                    sink,
+                    systemMemoryContextSupplier));
             outputBuffer = delegate;
         }
 
@@ -191,7 +222,7 @@ public class LazyOutputBuffer
         OutputBuffer outputBuffer;
         synchronized (this) {
             if (delegate == null) {
-                if (state.get() == FINISHED) {
+                if (stateMachine.getState() == FINISHED) {
                     return immediateFuture(emptyResults(0, true));
                 }
 
@@ -229,6 +260,28 @@ public class LazyOutputBuffer
             outputBuffer = delegate;
         }
         outputBuffer.abort(bufferId);
+    }
+
+    @Override
+    public void abort()
+    {
+        OutputBuffer outputBuffer = delegate;
+        if (outputBuffer == null) {
+            synchronized (this) {
+                if (delegate == null) {
+                    stateMachine.abort();
+                    return;
+                }
+                outputBuffer = delegate;
+            }
+        }
+        outputBuffer.abort();
+    }
+
+    @Override
+    public Optional<Throwable> getFailureCause()
+    {
+        return stateMachine.getFailureCause();
     }
 
     @Override
@@ -276,6 +329,12 @@ public class LazyOutputBuffer
     }
 
     @Override
+    public BufferState getState()
+    {
+        return stateMachine.getState();
+    }
+
+    @Override
     public void destroy()
     {
         OutputBuffer outputBuffer;
@@ -283,7 +342,7 @@ public class LazyOutputBuffer
         synchronized (this) {
             if (delegate == null) {
                 // ignore destroy if the buffer already in a terminal state.
-                if (!state.setIf(FINISHED, state -> !state.isTerminal())) {
+                if (!stateMachine.setIf(FINISHED, state -> !state.isTerminal())) {
                     return;
                 }
 
@@ -311,7 +370,7 @@ public class LazyOutputBuffer
         synchronized (this) {
             if (delegate == null) {
                 // ignore fail if the buffer already in a terminal state.
-                state.setIf(FAILED, state -> !state.isTerminal());
+                stateMachine.setIf(FAILED, state -> !state.isTerminal());
 
                 // Do not free readers on fail
                 return;
@@ -402,5 +461,31 @@ public class LazyOutputBuffer
             outputBuffer = delegate;
         }
         outputBuffer.addInputChannel(inputId);
+    }
+
+    @Override
+    public boolean isSpoolingOutputBuffer()
+    {
+        return delegate != null && delegate.isSpoolingOutputBuffer();
+    }
+
+    public DirectSerialisationType getExchangeDirectSerialisationType()
+    {
+        DirectSerialisationType type = DirectSerialisationType.OFF;
+        if (delegate != null) {
+            type = delegate.getExchangeDirectSerialisationType();
+        }
+        return type;
+    }
+
+    @Override
+    public void enqueuePages(int partition, List<Page> pages, String id, PagesSerde directSerde)
+    {
+        OutputBuffer outputBuffer;
+        synchronized (this) {
+            checkState(delegate != null, "delegate is null");
+            outputBuffer = delegate;
+        }
+        outputBuffer.enqueuePages(partition, pages, id, directSerde);
     }
 }

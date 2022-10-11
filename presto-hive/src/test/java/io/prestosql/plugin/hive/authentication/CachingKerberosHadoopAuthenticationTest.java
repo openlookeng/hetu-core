@@ -30,9 +30,6 @@ public class CachingKerberosHadoopAuthenticationTest
     public void setUp() throws Exception
     {
         initMocks(this);
-//        KerberosAuthentication kerberosAuthentication = new KerberosAuthentication("principal", "/media/kong/70202495202463F6/workspace/hetu-core/docker/README.md");
-//        HdfsConfigurationInitializer hdfsConfigurationInitializer = new HdfsConfigurationInitializer(new HiveConfig());
-//        KerberosHadoopAuthentication kerberosHadoopAuthentication = KerberosHadoopAuthentication.createKerberosHadoopAuthentication(kerberosAuthentication, hdfsConfigurationInitializer);
         cachingKerberosHadoopAuthenticationUnderTest = new CachingKerberosHadoopAuthentication(mockDelegate);
     }
 

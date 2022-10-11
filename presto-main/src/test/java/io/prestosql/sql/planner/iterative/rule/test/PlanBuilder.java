@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import io.prestosql.Session;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.IndexHandle;
 import io.prestosql.metadata.Metadata;
@@ -972,7 +973,7 @@ public class PlanBuilder
 
     public RemoteSourceNode remoteSourceNode(List<PlanFragmentId> fragmentIds, List<Symbol> symbols, ExchangeNode.Type exchangeType)
     {
-        return new RemoteSourceNode(idAllocator.getNextId(), fragmentIds, symbols, Optional.empty(), exchangeType);
+        return new RemoteSourceNode(idAllocator.getNextId(), fragmentIds, symbols, Optional.empty(), exchangeType, RetryPolicy.NONE);
     }
 
     public RowExpression rowExpression(String sql)

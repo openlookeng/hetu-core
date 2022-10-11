@@ -50,6 +50,7 @@ public class TestTaskStats
             new DataSize(12, BYTE),
             new DataSize(13, BYTE),
             new DataSize(14, BYTE),
+            new DataSize(14, BYTE),
             new Duration(15, NANOSECONDS),
             new Duration(16, NANOSECONDS),
             new Duration(18, NANOSECONDS),
@@ -76,7 +77,9 @@ public class TestTaskStats
             26,
             new Duration(27, NANOSECONDS),
 
-            ImmutableList.of(TestPipelineStats.EXPECTED));
+            ImmutableList.of(TestPipelineStats.EXPECTED),
+            new Duration(27, NANOSECONDS),
+            new Duration(27, NANOSECONDS));
 
     @Test
     public void testJson()

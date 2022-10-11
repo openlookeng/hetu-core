@@ -23,7 +23,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -33,6 +35,7 @@ import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableCollection;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableSet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toCollection;
@@ -123,6 +126,11 @@ public class EquatableValueSet
                 .collect(toList()));
     }
 
+    public int getValuesCount()
+    {
+        return entries.size();
+    }
+
     @Override
     public boolean isNone()
     {
@@ -148,6 +156,23 @@ public class EquatableValueSet
             throw new IllegalStateException("EquatableValueSet does not have just a single value");
         }
         return entries.iterator().next().getValue();
+    }
+
+    @Override
+    public boolean isDiscreteSet()
+    {
+        return whiteList && !entries.isEmpty();
+    }
+
+    @Override
+    public List<Object> getDiscreteSet()
+    {
+        if (!isDiscreteSet()) {
+            throw new IllegalStateException("EquatableValueSet is not a discrete set");
+        }
+        return unmodifiableList(entries.stream()
+                .map(ValueEntry::getValue)
+                .collect(Collectors.toList()));
     }
 
     @Override
@@ -225,6 +250,25 @@ public class EquatableValueSet
     }
 
     @Override
+    public boolean overlaps(ValueSet other)
+    {
+        EquatableValueSet otherValueSet = checkCompatibility(other);
+
+        if (whiteList && otherValueSet.isWhiteList()) {
+            return setsOverlap(entries, otherValueSet.entries);
+        }
+        else if (whiteList) {
+            return !otherValueSet.entries.containsAll(entries);
+        }
+        else if (otherValueSet.isWhiteList()) {
+            return !entries.containsAll(otherValueSet.entries);
+        }
+        else {
+            return true;
+        }
+    }
+
+    @Override
     public EquatableValueSet union(ValueSet other)
     {
         EquatableValueSet otherValueSet = checkCompatibility(other);
@@ -244,6 +288,29 @@ public class EquatableValueSet
     }
 
     @Override
+    public boolean contains(ValueSet other)
+    {
+        EquatableValueSet otherValueSet = checkCompatibility(other);
+
+        if (isWhiteList() && otherValueSet.isWhiteList()) {
+            return entries.containsAll(otherValueSet.entries);
+        }
+        if (whiteList) {
+            /* Note: This isn't correct for a finite universe of values.
+             * For example, for boolean universe: {true, false}
+             * `this` being [inclusive, {true}] and `other` being [excluding, {false}]
+             * `this.contains(other)` should return true, since the domains are equal.
+             * However, we return false for consistency with `this.union(other).equals(this)`
+             */
+            return false;
+        }
+        if (otherValueSet.isWhiteList()) {
+            return !setsOverlap(entries, otherValueSet.entries);
+        }
+        return otherValueSet.entries.containsAll(entries);
+    }
+
+    @Override
     public EquatableValueSet complement()
     {
         return new EquatableValueSet(type, !whiteList, entries);
@@ -257,11 +324,36 @@ public class EquatableValueSet
                 .collect(Collectors.joining(", ")) + " ]";
     }
 
+    @Override
+    public Optional<Collection<Object>> tryExpandRanges(int valuesLimit)
+    {
+        if (isWhiteList() && getValuesCount() <= valuesLimit) {
+            return Optional.of(getValues());
+        }
+        return Optional.empty();
+    }
+
     private static <T> Set<T> intersect(Set<T> set1, Set<T> set2)
     {
+        if (set1.size() > set2.size()) {
+            return intersect(set2, set1);
+        }
         return set1.stream()
                 .filter(set2::contains)
                 .collect(toLinkedSet());
+    }
+
+    private static <T> boolean setsOverlap(Set<T> set1, Set<T> set2)
+    {
+        if (set1.size() > set2.size()) {
+            return setsOverlap(set2, set1);
+        }
+        for (T element : set1) {
+            if (set2.contains(element)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static <T> Set<T> union(Set<T> set1, Set<T> set2)

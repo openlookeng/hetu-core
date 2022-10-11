@@ -46,12 +46,6 @@ public class TestHiveTableHandle
     }
 
     @Test
-    public void testGetUpdateProcessor()
-    {
-        Optional<HiveUpdateProcessor> updateProcessor = hiveTableHandleTest.getUpdateProcessor();
-    }
-
-    @Test
     public void testGetSchemaPrefixedTableName()
     {
         String schemaPrefixedTableName = hiveTableHandleTest.getSchemaPrefixedTableName();

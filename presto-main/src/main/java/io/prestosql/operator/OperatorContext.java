@@ -21,6 +21,7 @@ import io.airlift.stats.CounterStat;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.TaskId;
 import io.prestosql.memory.QueryContextVisitor;
 import io.prestosql.memory.context.AggregatedMemoryContext;
@@ -123,6 +124,7 @@ public class OperatorContext
     private final MemoryTrackingContext operatorMemoryContext;
     private final boolean snapshotEnabled;
     private final boolean recoveryEnabled;
+    private final RetryPolicy retryPolicy;
 
     public OperatorContext(
             int operatorId,
@@ -148,6 +150,7 @@ public class OperatorContext
 
         this.snapshotEnabled = SystemSessionProperties.isSnapshotEnabled(driverContext.getSession());
         this.recoveryEnabled = SystemSessionProperties.isRecoveryEnabled(driverContext.getSession());
+        this.retryPolicy = SystemSessionProperties.getRetryPolicy(driverContext.getSession());
     }
 
     public int getOperatorId()
@@ -821,6 +824,11 @@ public class OperatorContext
     public boolean isRecoveryEnabled()
     {
         return recoveryEnabled;
+    }
+
+    public RetryPolicy getRetryPolicy()
+    {
+        return retryPolicy;
     }
 
     public String getUniqueId()

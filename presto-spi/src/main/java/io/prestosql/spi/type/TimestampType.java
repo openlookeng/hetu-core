@@ -43,7 +43,7 @@ public final class TimestampType
     private TimestampType()
     {
         super(parseTypeSignature(StandardTypes.TIMESTAMP));
-        this.precision = 0; //xjp 此处随便写的值
+        this.precision = 0;
     }
 
     public static TimestampType createTimestampWithTimeZoneType(int precision)

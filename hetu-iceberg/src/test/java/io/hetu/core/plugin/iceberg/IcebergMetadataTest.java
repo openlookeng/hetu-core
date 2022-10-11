@@ -50,6 +50,7 @@ import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.orc.OrcReaderConfig;
 import io.prestosql.plugin.hive.orc.OrcWriterConfig;
 import io.prestosql.plugin.hive.parquet.ParquetReaderConfig;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.SplitWeight;
 import io.prestosql.spi.block.IntArrayBlock;
 import io.prestosql.spi.connector.BeginTableExecuteResult;
@@ -113,6 +114,8 @@ import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -166,6 +169,7 @@ public class IcebergMetadataTest
     private TestSchemaMetadata metadata;
     private IcebergPageSourceProvider icebergPageSourceProvider;
     private HiveMetastore hiveMetastore;
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
 
     protected IcebergMetadataTest()
     {
@@ -409,7 +413,7 @@ public class IcebergMetadataTest
                 icebergMetadata.createTable(connectorSession, connectorTableMetadata, false);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         strings.forEach(item -> {
@@ -431,7 +435,7 @@ public class IcebergMetadataTest
                 }
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -455,7 +459,7 @@ public class IcebergMetadataTest
                 icebergMetadata.createTable(connectorSession, connectorTableMetadata, false);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         List<SchemaTableName> schemaTableNames = icebergMetadata.listTables(connectorSession, Optional.of("test_schema"));
@@ -464,7 +468,7 @@ public class IcebergMetadataTest
                 icebergMetadata.getSystemTable(connectorSession, item);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -515,7 +519,7 @@ public class IcebergMetadataTest
                         Arrays.asList(icebergColumnHandle));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -554,7 +558,7 @@ public class IcebergMetadataTest
                         Arrays.asList(icebergColumnHandle));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -568,6 +572,7 @@ public class IcebergMetadataTest
                 ConnectorTableProperties result = icebergMetadata.getTableProperties(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -581,6 +586,7 @@ public class IcebergMetadataTest
                 ConnectorTableMetadata result = icebergMetadata.getTableMetadata(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -600,6 +606,7 @@ public class IcebergMetadataTest
                 Map<String, ColumnHandle> result = icebergMetadata.getColumnHandles(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -614,6 +621,7 @@ public class IcebergMetadataTest
                 ColumnMetadata result = icebergMetadata.getColumnMetadata(connectorSession, item, columnHandles.values().stream().findFirst().get());
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -682,6 +690,7 @@ public class IcebergMetadataTest
                 icebergMetadata.setTableComment(connectorSession, item, Optional.of("testComment"));
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -696,6 +705,7 @@ public class IcebergMetadataTest
                 Optional<ConnectorNewTableLayout> result = icebergMetadata.getNewTableLayout(connectorSession, connectorTableMetadata);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -718,6 +728,7 @@ public class IcebergMetadataTest
                 icebergMetadata.beginCreateTable(connectorSession, connectorTableMetadata, Optional.of(connectorNewTableLayout), RetryMode.NO_RETRIES);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -761,7 +772,7 @@ public class IcebergMetadataTest
                 fragments.add(slice);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         return fragments;
@@ -796,7 +807,7 @@ public class IcebergMetadataTest
                 fragments.add(slice);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         return fragments;
@@ -848,6 +859,7 @@ public class IcebergMetadataTest
                 Optional<ConnectorOutputMetadata> result = icebergMetadata.finishCreateTable(connectorSession, connectorOutputTableHandle, fragments, computedStatistics);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -895,10 +907,6 @@ public class IcebergMetadataTest
         final Collection<ComputedStatistics> computedStatistics = Arrays.asList(
                 ComputedStatistics.restoreComputedStatistics("state", null));
 
-        // Configure JsonCodec.fromJson(...).
-//        final CommitTaskData commitTaskData = new CommitTaskData("path", 0L,
-//                new MetricsWrapper(0L, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-//                        new HashMap<>(), new HashMap<>()), Optional.of("value"));
         final CommitTaskData commitTaskData = new CommitTaskData(
                 "path",
                 ORC,
@@ -932,15 +940,17 @@ public class IcebergMetadataTest
                 Optional<ConnectorNewTableLayout> result = icebergMetadata.getInsertLayout(connectorSession, item);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
 
     private ConnectorInsertTableHandle testBeginInsert(RetryMode...retryModes)
     {
-        if (retryModes.length == 0) {
-            retryModes = new RetryMode[]{RetryMode.NO_RETRIES};
+        RetryMode[] retryModes1 = retryModes;
+
+        if (retryModes1.length == 0) {
+            retryModes1 = new RetryMode[]{RetryMode.NO_RETRIES};
         }
         List<IcebergTableHandle> tableHandles = getTableHandles();
         IcebergColumnHandle icebergColumnHandle = new IcebergColumnHandle(
@@ -949,7 +959,7 @@ public class IcebergMetadataTest
                 ImmutableList.of(),
                 BIGINT,
                 Optional.empty());
-        return icebergMetadata.beginInsert(connectorSession, tableHandles.stream().findFirst().get(), Arrays.asList(icebergColumnHandle), retryModes[0]);
+        return icebergMetadata.beginInsert(connectorSession, tableHandles.stream().findFirst().get(), Arrays.asList(icebergColumnHandle), retryModes1[0]);
     }
 
     @Test
@@ -1021,10 +1031,6 @@ public class IcebergMetadataTest
         final Collection<ComputedStatistics> computedStatistics = Arrays.asList(
                 ComputedStatistics.restoreComputedStatistics("state", null));
 
-        // Configure JsonCodec.fromJson(...).
-//        final CommitTaskData commitTaskData = new CommitTaskData("path", 0L,
-//                new MetricsWrapper(0L, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-//                        new HashMap<>(), new HashMap<>()), Optional.of("value"));
         final CommitTaskData commitTaskData = new CommitTaskData(
                 "path",
                 ORC,
@@ -1058,6 +1064,7 @@ public class IcebergMetadataTest
                 ColumnHandle result = icebergMetadata.getDeleteRowIdColumnHandle(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1131,10 +1138,6 @@ public class IcebergMetadataTest
         final ConnectorTableExecuteHandle tableExecuteHandle = null;
         final Collection<Slice> fragments = Arrays.asList();
 
-        // Configure JsonCodec.fromJson(...).
-//        final CommitTaskData commitTaskData = new CommitTaskData("path", 0L,
-//                new MetricsWrapper(0L, new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-//                        new HashMap<>(), new HashMap<>()), Optional.of("value"));
         final CommitTaskData commitTaskData = new CommitTaskData(
                 "path",
                 ORC,
@@ -1167,6 +1170,7 @@ public class IcebergMetadataTest
                 Optional<Object> result = icebergMetadata.getInfo(item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1180,6 +1184,7 @@ public class IcebergMetadataTest
                 icebergMetadata.dropTable(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1195,6 +1200,7 @@ public class IcebergMetadataTest
                 icebergMetadata.renameTable(connectorSession, item, newTable);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1208,6 +1214,7 @@ public class IcebergMetadataTest
                 icebergMetadata.addColumn(connectorSession, item, columnMetadata);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1240,7 +1247,7 @@ public class IcebergMetadataTest
                 });
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1256,7 +1263,7 @@ public class IcebergMetadataTest
                 });
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1269,6 +1276,7 @@ public class IcebergMetadataTest
                 Optional<ConnectorTableHandle> result = icebergMetadata.applyDelete(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1281,6 +1289,7 @@ public class IcebergMetadataTest
                 ConnectorTableHandle result = icebergMetadata.beginDelete(connectorSession, item);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1439,6 +1448,7 @@ public class IcebergMetadataTest
                 icebergMetadata.setTableAuthorization(connectorSession, item, principal);
             }
             catch (Exception e) {
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1553,7 +1563,7 @@ public class IcebergMetadataTest
                 icebergMetadata.setColumnComment(connectorSession, item, getIcebergColumnHandle(), Optional.of("test_schema"));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1582,7 +1592,7 @@ public class IcebergMetadataTest
                 icebergMetadata.beginUpdate(connectorSession, item, Collections.emptyList());
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1598,7 +1608,7 @@ public class IcebergMetadataTest
                 icebergMetadata.finishUpdate(connectorSession, item, fragments);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1614,7 +1624,7 @@ public class IcebergMetadataTest
                 icebergMetadata.finishUpdate(connectorSession, item, fragments);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }
@@ -1630,7 +1640,7 @@ public class IcebergMetadataTest
                 icebergMetadata.finishUpdate(connectorSession, item, fragments);
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
     }

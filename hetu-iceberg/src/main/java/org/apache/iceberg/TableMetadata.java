@@ -60,9 +60,9 @@ public class TableMetadata
                                                  String location,
                                                  Map<String, String> properties)
     {
-        int formatVersion = PropertyUtil.propertyAsInt(properties, TableProperties.FORMAT_VERSION,
+        int version = PropertyUtil.propertyAsInt(properties, TableProperties.FORMAT_VERSION,
                 DEFAULT_TABLE_FORMAT_VERSION);
-        return newTableMetadata(schema, spec, sortOrder, location, unreservedProperties(properties), formatVersion);
+        return newTableMetadata(schema, spec, sortOrder, location, unreservedProperties(properties), version);
     }
 
     public static TableMetadata newTableMetadata(Schema schema,
@@ -71,9 +71,9 @@ public class TableMetadata
                                                  Map<String, String> properties)
     {
         SortOrder sortOrder = SortOrder.unsorted();
-        int formatVersion = PropertyUtil.propertyAsInt(properties, TableProperties.FORMAT_VERSION,
+        int version = PropertyUtil.propertyAsInt(properties, TableProperties.FORMAT_VERSION,
                 DEFAULT_TABLE_FORMAT_VERSION);
-        return newTableMetadata(schema, spec, sortOrder, location, unreservedProperties(properties), formatVersion);
+        return newTableMetadata(schema, spec, sortOrder, location, unreservedProperties(properties), version);
     }
 
     private static Map<String, String> unreservedProperties(Map<String, String> rawProperties)
@@ -94,8 +94,8 @@ public class TableMetadata
                 "Table properties should not contain reserved properties, but got %s", properties);
 
         // reassign all column ids to ensure consistency
-        AtomicInteger lastColumnId = new AtomicInteger(0);
-        Schema freshSchema = TypeUtil.assignFreshIds(INITIAL_SCHEMA_ID, schema, lastColumnId::incrementAndGet);
+        AtomicInteger lastColId = new AtomicInteger(0);
+        Schema freshSchema = TypeUtil.assignFreshIds(INITIAL_SCHEMA_ID, schema, lastColId::incrementAndGet);
 
         // rebuild the partition spec using the new column ids
         PartitionSpec.Builder specBuilder = PartitionSpec.builderFor(freshSchema)
@@ -121,7 +121,7 @@ public class TableMetadata
 
         return new TableMetadata(null, formatVersion, UUID.randomUUID().toString(), location,
                 INITIAL_SEQUENCE_NUMBER, System.currentTimeMillis(),
-                lastColumnId.get(), freshSchema.schemaId(), ImmutableList.of(freshSchema),
+                lastColId.get(), freshSchema.schemaId(), ImmutableList.of(freshSchema),
                 freshSpec.specId(), ImmutableList.of(freshSpec), freshSpec.lastAssignedFieldId(),
                 freshSortOrderId, ImmutableList.of(freshSortOrder),
                 ImmutableMap.copyOf(properties), -1, ImmutableList.of(),

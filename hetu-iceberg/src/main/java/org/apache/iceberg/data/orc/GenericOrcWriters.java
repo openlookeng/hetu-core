@@ -607,6 +607,7 @@ public class GenericOrcWriters
                     return delete.pos();
                 case 2:
                     return delete.row();
+                default:
             }
             throw new IllegalArgumentException("Cannot get value for invalid index: " + index);
         }

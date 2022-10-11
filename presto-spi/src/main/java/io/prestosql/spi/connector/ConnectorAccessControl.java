@@ -67,7 +67,7 @@ import static java.util.Collections.emptySet;
 
 public interface ConnectorAccessControl
 {
-    default void checkCanSetTableProperties(Identity identity, SchemaTableName tableName, Map<String, Optional<Object>> properties)
+    default void checkCanSetTableProperties(ConnectorSecurityContext context, SchemaTableName tableName, Map<String, Optional<Object>> properties)
     {
         denySetTableProperties(tableName.toString());
     }

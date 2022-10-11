@@ -51,6 +51,8 @@ public class DriverStats
 
     private final Duration totalScheduledTime;
     private final Duration totalCpuTime;
+    private final Duration inputBlockedTime;
+    private final Duration outputBlockedTime;
     private final Duration totalBlockedTime;
     private final boolean fullyBlocked;
     private final Set<BlockedReason> blockedReasons;
@@ -118,6 +120,8 @@ public class DriverStats
         this.physicalWrittenDataSize = new DataSize(0, BYTE);
 
         this.operatorStats = ImmutableList.of();
+        this.inputBlockedTime = new Duration(0, MILLISECONDS);
+        this.outputBlockedTime = new Duration(0, MILLISECONDS);
     }
 
     @JsonCreator
@@ -160,7 +164,10 @@ public class DriverStats
 
             @JsonProperty("physicalWrittenDataSize") DataSize physicalWrittenDataSize,
 
-            @JsonProperty("operatorStats") List<OperatorStats> operatorStats)
+            @JsonProperty("operatorStats") List<OperatorStats> operatorStats,
+
+            @JsonProperty("inputBlockedTime") Duration inputBlockedTime,
+            @JsonProperty("outputBlockedTime") Duration outputBlockedTime)
     {
         this.lifespan = lifespan;
 
@@ -206,6 +213,9 @@ public class DriverStats
         this.physicalWrittenDataSize = requireNonNull(physicalWrittenDataSize, "writtenDataSize is null");
 
         this.operatorStats = ImmutableList.copyOf(requireNonNull(operatorStats, "operatorStats is null"));
+
+        this.inputBlockedTime = requireNonNull(inputBlockedTime, "inputBlockedTime is null");
+        this.outputBlockedTime = requireNonNull(outputBlockedTime, "outputBlockedTime is null");
     }
 
     @JsonProperty
@@ -382,5 +392,17 @@ public class DriverStats
     public List<OperatorStats> getOperatorStats()
     {
         return operatorStats;
+    }
+
+    @JsonProperty
+    public Duration getInputBlockedTime()
+    {
+        return inputBlockedTime;
+    }
+
+    @JsonProperty
+    public Duration getOutputBlockedTime()
+    {
+        return outputBlockedTime;
     }
 }

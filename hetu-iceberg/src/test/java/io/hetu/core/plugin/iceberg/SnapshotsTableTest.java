@@ -139,7 +139,6 @@ public class SnapshotsTableTest
                         return null;
                     }
                 };
-//                location.addStagedSnapshot(snapshot);
                 TableMetadata tableMetadata = location.replaceCurrentSnapshot(snapshot);
                 return tableMetadata;
             }

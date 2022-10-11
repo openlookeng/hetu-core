@@ -19,6 +19,8 @@ import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 public class TypeSerdeTest
 {
     @Test
@@ -65,7 +67,7 @@ public class TypeSerdeTest
     {
         // Setup
         final TypeManager typeManager = null;
-        final Input sliceInput = new Input("content".getBytes(), 0, 0);
+        final Input sliceInput = new Input("content".getBytes(StandardCharsets.UTF_8), 0, 0);
 
         // Run the test
         final Type result = TypeSerde.readType(typeManager, sliceInput);

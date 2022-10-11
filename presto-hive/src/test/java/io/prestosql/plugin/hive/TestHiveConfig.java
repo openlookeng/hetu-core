@@ -20,6 +20,7 @@ import io.airlift.configuration.testing.ConfigAssertions;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
+import io.hetu.core.common.util.DataSizeOfUtil;
 import io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode;
 import io.prestosql.plugin.hive.s3.S3FileSystemType;
 import org.testng.annotations.Test;
@@ -150,6 +151,8 @@ public class TestHiveConfig
                 .setVacuumCollectorInterval(new Duration(5, TimeUnit.MINUTES))
                 .setMaxSplitsToGroup(1)
                 .setWorkerMetaStoreCacheEnabled(false)
+                .setDeleteSchemaLocationsFallback(false)
+                .setTargetMaxFileSize(DataSizeOfUtil.of(1, GIGABYTE))
                 .setMetastoreWriteBatchSize(8));
     }
 
@@ -280,6 +283,8 @@ public class TestHiveConfig
                 .put("hive.max-splits-to-group", "20")
                 .put("hive.worker-metastore-cache-enabled", "true")
                 .put("hive.metastore-write-batch-size", "64")
+                .put("hive.delete-schema-locations-fallback", "true")
+                .put("hive.target-max-file-size", "2GB")
                 .build();
 
         HiveConfig expected = new HiveConfig()
@@ -396,7 +401,9 @@ public class TestHiveConfig
                 .setVacuumCollectorInterval(new Duration(5, TimeUnit.SECONDS))
                 .setMaxSplitsToGroup(20)
                 .setWorkerMetaStoreCacheEnabled(true)
-                .setMetastoreWriteBatchSize(64);
+                .setMetastoreWriteBatchSize(64)
+                .setDeleteSchemaLocationsFallback(true)
+                .setTargetMaxFileSize(DataSizeOfUtil.of(2, GIGABYTE));
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

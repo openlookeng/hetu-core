@@ -46,7 +46,8 @@ public class HiveOutputTableHandle
             @JsonProperty("partitionedBy") List<String> partitionedBy,
             @JsonProperty("bucketProperty") Optional<HiveBucketProperty> bucketProperty,
             @JsonProperty("tableOwner") String tableOwner,
-            @JsonProperty("additionalTableParameters") Map<String, String> additionalTableParameters)
+            @JsonProperty("additionalTableParameters") Map<String, String> additionalTableParameters,
+            @JsonProperty("retriesEnabled") boolean retriesEnabled)
     {
         super(
                 schemaName,
@@ -57,7 +58,8 @@ public class HiveOutputTableHandle
                 bucketProperty,
                 tableStorageFormat,
                 partitionStorageFormat,
-                false);
+                false,
+                retriesEnabled);
 
         this.partitionedBy = ImmutableList.copyOf(requireNonNull(partitionedBy, "partitionedBy is null"));
         this.tableOwner = requireNonNull(tableOwner, "tableOwner is null");

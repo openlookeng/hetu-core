@@ -29,24 +29,4 @@ public class ConstraintTest
             return false;
         });
     }
-
-//    @Test
-//    public void testAlwaysTrue() throws Exception
-//    {
-//        // Run the test
-//        final Constraint result = Constraint.alwaysTrue();
-//        assertEquals(Optional.of(new HashSet<>()), result.getPredicateColumns());
-//        assertEquals(TupleDomain.withColumnDomains(new HashMap<>()), result.getSummary());
-//        assertEquals(Optional.of(val -> { return false; }), result.predicate());
-//    }
-//
-//    @Test
-//    public void testAlwaysFalse() throws Exception
-//    {
-//        // Run the test
-//        final Constraint result = Constraint.alwaysFalse();
-//        assertEquals(Optional.of(new HashSet<>()), result.getPredicateColumns());
-//        assertEquals(TupleDomain.withColumnDomains(new HashMap<>()), result.getSummary());
-//        assertEquals(Optional.of(val -> { return false; }), result.predicate());
-//    }
 }

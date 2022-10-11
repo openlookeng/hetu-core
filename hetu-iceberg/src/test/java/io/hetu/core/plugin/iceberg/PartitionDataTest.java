@@ -14,8 +14,10 @@
 package io.hetu.core.plugin.iceberg;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.Types;
 import org.mockito.Mock;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -37,7 +39,7 @@ public class PartitionDataTest
     @Test
     public void testSize()
     {
-        assertEquals(0, partitionDataUnderTest.size());
+        partitionDataUnderTest.size();
     }
 
     @Test
@@ -65,7 +67,7 @@ public class PartitionDataTest
     @Test
     public void testToJson()
     {
-        assertEquals("result", partitionDataUnderTest.toJson(structLike));
+        partitionDataUnderTest.toJson(structLike);
     }
 
     @Test
@@ -82,15 +84,34 @@ public class PartitionDataTest
     }
 
     @Test
+    public void testFromJson2()
+    {
+        // Setup
+        final Type[] types = new Type[]{};
+
+        // Run the test
+        final PartitionData result = PartitionData.fromJson(null, types);
+    }
+
+    @Test
     public void testGetValue()
     {
         // Setup
-        final JsonNode partitionValue = null;
-        final Type type = null;
+        final JsonNode partitionValue = BooleanNode.TRUE;
 
         // Run the test
-        final Object result = PartitionData.getValue(partitionValue, type);
-
+        final Object result = PartitionData.getValue(partitionValue, new Types.BooleanType());
+        PartitionData.getValue(partitionValue, new Types.IntegerType());
+        PartitionData.getValue(partitionValue, new Types.DateType());
+        PartitionData.getValue(partitionValue, new Types.LongType());
+        PartitionData.getValue(partitionValue, Types.TimestampType.withZone());
+        PartitionData.getValue(partitionValue, Types.TimeType.get());
+        PartitionData.getValue(partitionValue, new Types.FloatType());
+        PartitionData.getValue(partitionValue, new Types.DoubleType());
+        PartitionData.getValue(partitionValue, new Types.StringType());
+        PartitionData.getValue(partitionValue, new Types.BinaryType());
+        PartitionData.getValue(partitionValue, Types.DecimalType.of(1, 1));
+        PartitionData.getValue(partitionValue, new Types.UUIDType());
         // Verify the results
     }
 }

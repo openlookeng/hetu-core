@@ -37,18 +37,14 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static io.prestosql.orc.TupleDomainOrcPredicate.checkInBloomFilter;
-import static io.prestosql.orc.TupleDomainOrcPredicate.extractDiscreteValues;
 import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
-import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
@@ -266,33 +262,7 @@ public class TestOrcBloomFilters
     }
 
     @Test
-    public void testExtractValuesFromSingleDomain()
-    {
-        Map<Type, Object> testValues = ImmutableMap.<Type, Object>builder()
-                .put(BOOLEAN, true)
-                .put(INTEGER, 1234L)
-                .put(SMALLINT, 789L)
-                .put(TINYINT, 77L)
-                .put(DATE, 901L)
-                .put(TIMESTAMP, 987654L)
-                .put(BIGINT, 4321L)
-                .put(DOUBLE, 0.123)
-                .put(REAL, (long) (floatToIntBits(0.456f)))
-                .put(VARCHAR, wrappedBuffer(TEST_STRING))
-                .build();
-
-        for (Map.Entry<Type, Object> testValue : testValues.entrySet()) {
-            Domain predicateDomain = Domain.singleValue(testValue.getKey(), testValue.getValue());
-            Optional<Collection<Object>> discreteValues = extractDiscreteValues(predicateDomain.getValues());
-            assertTrue(discreteValues.isPresent());
-            Collection<Object> objects = discreteValues.get();
-            assertEquals(objects.size(), 1);
-            assertEquals(objects.iterator().next(), testValue.getValue());
-        }
-    }
-
-    @Test
-    // simulate query on a 2 columns where 1 is used as part of the where, with and without bloom filter
+    // simulate query on 2 columns where 1 is used as part of the where, with and without bloom filter
     public void testMatches()
     {
         TupleDomainOrcPredicate predicate = TupleDomainOrcPredicate.builder()

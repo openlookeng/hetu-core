@@ -27,12 +27,14 @@ public class SchemaAccessControlRuleTest
 {
     private SchemaAccessControlRule schemaAccessControlRuleUnderTest;
 
+    private static final Pattern REGEX = Pattern.compile("regex");
+
     @BeforeMethod
     public void setUp() throws Exception
     {
         schemaAccessControlRuleUnderTest = new SchemaAccessControlRule(false,
-                Optional.of(Pattern.compile("regex")), Optional.of(Pattern.compile("regex")),
-                Optional.of(Pattern.compile("regex")));
+                Optional.of(REGEX), Optional.of(REGEX),
+                Optional.of(REGEX));
     }
 
     @Test

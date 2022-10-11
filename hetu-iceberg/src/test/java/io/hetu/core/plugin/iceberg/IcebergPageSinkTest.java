@@ -41,6 +41,7 @@ import io.prestosql.plugin.hive.authentication.NoHdfsAuthentication;
 import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.orc.OrcWriterConfig;
+import io.prestosql.queryeditorui.output.persistors.FlatFilePersistor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.SplitWeight;
@@ -70,9 +71,12 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.io.LocationProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -81,7 +85,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 import static io.hetu.core.plugin.iceberg.IcebergPageSourceProviderTest.writeOrcContent;
@@ -115,6 +118,8 @@ public class IcebergPageSinkTest
 
     private IcebergPageSink icebergPageSinkUnderTest;
 
+    private static final Logger LOG = LoggerFactory.getLogger(FlatFilePersistor.class);
+
     protected IcebergPageSinkTest()
     {
         super(IcebergPageSinkTest::createQueryRunner);
@@ -123,11 +128,11 @@ public class IcebergPageSinkTest
     private static QueryRunner createQueryRunner()
             throws Exception
     {
-        Session session = testSessionBuilder()
+        Session dialogue = testSessionBuilder()
                 .setCatalog("test_catalog")
                 .setSchema("test_schema")
                 .build();
-        return new DistributedQueryRunner(session, 1);
+        return new DistributedQueryRunner(dialogue, 1);
     }
 
     @BeforeMethod
@@ -210,7 +215,7 @@ public class IcebergPageSinkTest
                 columns.addAll(ImmutableList.of(new ConnectorMaterializedViewDefinition.Column(k, v)));
             }
             catch (Exception e) {
-                e.printStackTrace();
+                LOG.error(e.getMessage());
             }
         });
         ConnectorMaterializedViewDefinition definition = new ConnectorMaterializedViewDefinition("select 1",
@@ -283,7 +288,7 @@ public class IcebergPageSinkTest
             return tableHandle;
         }
         catch (Exception e) {
-            e.printStackTrace();
+            LOG.error(e.getMessage());
         }
         finally {
             tempFile.close();
@@ -356,9 +361,9 @@ public class IcebergPageSinkTest
     {
         int[] arraySize = new int[] {16, 0, 13, 1, 2, 11, 4, 7};
         long[][] expectedValues = new long[arraySize.length][];
-        Random rand = new Random(47);
+        SecureRandom secureRandom = new SecureRandom();
         for (int i = 0; i < arraySize.length; i++) {
-            expectedValues[i] = rand.longs(arraySize[i]).toArray();
+            expectedValues[i] = secureRandom.longs(arraySize[i]).toArray();
         }
         BlockBuilder blockBuilder = new ArrayBlockBuilder(elementType, null, 100, 100);
         for (long[] expectedValue : expectedValues) {

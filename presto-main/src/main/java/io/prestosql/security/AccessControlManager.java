@@ -165,7 +165,7 @@ public class AccessControlManager
 
         systemAuthorizationCheck(control -> control.checkCanSetTableProperties(securityContext.toSystemSecurityContext().getIdentity(), tableName.asCatalogSchemaTableName(), properties));
 
-        catalogAuthorizationCheck(tableName.getCatalogName(), securityContext, (control, context) -> control.checkCanSetTableProperties(new Identity(context.getIdentity().getUser(), context.getIdentity().getPrincipal()), tableName.asSchemaTableName(), properties));
+        catalogAuthorizationCheck(tableName.getCatalogName(), securityContext, (control, context) -> control.checkCanSetTableProperties(context, tableName.asSchemaTableName(), properties));
     }
 
     private void systemAuthorizationCheck(Consumer<SystemAccessControl> check)

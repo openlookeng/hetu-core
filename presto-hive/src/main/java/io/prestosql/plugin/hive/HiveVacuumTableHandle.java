@@ -62,6 +62,7 @@ public class HiveVacuumTableHandle
                 bucketProperty,
                 tableStorageFormat,
                 partitionStorageFormat,
+                false,
                 false);
         this.full = full;
         this.unify = unify;

@@ -198,7 +198,6 @@ public class SharedHiveMetastoreCache
         private CachingHiveMetastore createUserCachingMetastore(String user)
         {
             ConnectorIdentity identity = ConnectorIdentity.ofUser(user);
-            //todo xjp
             return null;
         }
 

@@ -122,9 +122,11 @@ public class ParquetWriter
 
         checkArgument(page.getChannelCount() == columnWriters.size());
 
-        while (page != null) {
-            int chunkRows = min(page.getPositionCount(), writerOption.getBatchSize());
-            Page chunk = page.getRegion(0, chunkRows);
+        Page page1 = page;
+
+        while (page1 != null) {
+            int chunkRows = min(page1.getPositionCount(), writerOption.getBatchSize());
+            Page chunk = page1.getRegion(0, chunkRows);
 
             // avoid chunk with huge logical size
             while (chunkRows > 1 && chunk.getLogicalSizeInBytes() > chunkMaxLogicalBytes) {
@@ -133,11 +135,11 @@ public class ParquetWriter
             }
 
             // Remove chunk from current page
-            if (chunkRows < page.getPositionCount()) {
-                page = page.getRegion(chunkRows, page.getPositionCount() - chunkRows);
+            if (chunkRows < page1.getPositionCount()) {
+                page1 = page1.getRegion(chunkRows, page1.getPositionCount() - chunkRows);
             }
             else {
-                page = null;
+                page1 = null;
             }
 
             writeChunk(chunk);

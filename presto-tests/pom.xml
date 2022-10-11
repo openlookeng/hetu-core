@@ -5,7 +5,7 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.hetu.core</groupId>
-        <version>1.8.0-SNAPSHOT</version>
+        <version>1.9.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>presto-tests</artifactId>
@@ -249,7 +249,6 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-filesystem-client</artifactId>
-            <scope>test</scope>
         </dependency>
 
     </dependencies>

@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 import javax.validation.constraints.NotNull;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +39,7 @@ public class TrinoDeleteFileTest
     {
         trinoDeleteFileUnderTest = new TrinoDeleteFile(0L, 0, FileContent.DATA, "path", FileFormat.ORC, 0L, 0L,
                 new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
-                "content".getBytes(),
+                "content".getBytes(StandardCharsets.UTF_8),
                 Arrays.asList(0), 0, Arrays.asList(0L));
     }
 
@@ -107,14 +108,14 @@ public class TrinoDeleteFileTest
     @Test
     public void testKeyMetadataAsByteArray()
     {
-        assertEquals("content".getBytes(), trinoDeleteFileUnderTest.keyMetadataAsByteArray());
+        assertEquals("content".getBytes(StandardCharsets.UTF_8), trinoDeleteFileUnderTest.keyMetadataAsByteArray());
     }
 
     @Test
     public void testKeyMetadata()
     {
         // Setup
-        final ByteBuffer expectedResult = ByteBuffer.wrap("content".getBytes());
+        final ByteBuffer expectedResult = ByteBuffer.wrap("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final ByteBuffer result = trinoDeleteFileUnderTest.keyMetadata();
@@ -288,6 +289,12 @@ public class TrinoDeleteFileTest
     }
 
     @Test
+    public void test1()
+    {
+        trinoDeleteFileUnderTest.partition();
+    }
+
+    @Test
     public void test()
     {
         trinoDeleteFileUnderTest.pos();
@@ -295,7 +302,6 @@ public class TrinoDeleteFileTest
         trinoDeleteFileUnderTest.content();
         trinoDeleteFileUnderTest.path();
         trinoDeleteFileUnderTest.format();
-        trinoDeleteFileUnderTest.partition();
         trinoDeleteFileUnderTest.recordCount();
         trinoDeleteFileUnderTest.fileSizeInBytes();
         trinoDeleteFileUnderTest.columnSizes();

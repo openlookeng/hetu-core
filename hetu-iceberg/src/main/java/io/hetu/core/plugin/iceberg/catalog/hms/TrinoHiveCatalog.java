@@ -341,8 +341,9 @@ public class TrinoHiveCatalog
     @Override
     public void createView(ConnectorSession session, SchemaTableName schemaViewName, ConnectorViewDefinition definition, boolean replace)
     {
+        ConnectorViewDefinition connectorViewDefinition = definition;
         if (isUsingSystemSecurity) {
-            definition = definition.withoutOwner();
+            connectorViewDefinition = connectorViewDefinition.withoutOwner();
         }
 
         io.prestosql.plugin.hive.metastore.Table.Builder tableBuilder = io.prestosql.plugin.hive.metastore.Table.builder()
@@ -353,7 +354,7 @@ public class TrinoHiveCatalog
                 .setDataColumns(ImmutableList.of(new Column("dummy", HIVE_STRING, Optional.empty())))
                 .setPartitionColumns(ImmutableList.of())
                 .setParameters(createViewProperties(session))
-                .setViewOriginalText(Optional.of(encodeViewData(definition)))
+                .setViewOriginalText(Optional.of(encodeViewData(connectorViewDefinition)))
                 .setViewExpandedText(Optional.of(PRESTO_VIEW_EXPANDED_TEXT_MARKER));
 
         tableBuilder.getStorageBuilder()

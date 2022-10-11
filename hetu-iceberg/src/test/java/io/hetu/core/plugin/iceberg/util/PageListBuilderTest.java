@@ -162,6 +162,8 @@ public class PageListBuilderTest
         // Setup
         final Iterable<Long> values = Arrays.asList(0L);
 
+        pageListBuilderUnderTest.beginRow();
+
         // Run the test
         pageListBuilderUnderTest.appendBigintArray(values);
 
@@ -172,7 +174,7 @@ public class PageListBuilderTest
     public void testAppendVarcharArray()
     {
         // Setup
-        final Iterable<String> values = Arrays.asList("value");
+        final Iterable<String> values = Arrays.asList("value", "value", "value");
 
         // Run the test
         pageListBuilderUnderTest.appendVarcharArray(values);

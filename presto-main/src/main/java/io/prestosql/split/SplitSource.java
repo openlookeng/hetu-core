@@ -42,6 +42,11 @@ public interface SplitSource
 
     boolean isFinished();
 
+    default Optional<List<Object>> getTableExecuteSplitsInfo()
+    {
+        return Optional.empty();
+    }
+
     class SplitBatch
     {
         private final List<Split> splits;

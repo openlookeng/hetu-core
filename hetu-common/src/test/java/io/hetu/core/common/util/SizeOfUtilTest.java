@@ -16,6 +16,7 @@ package io.hetu.core.common.util;
 
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -39,7 +40,7 @@ public class SizeOfUtilTest<T>
     @Test
     public void testSizeOf2()
     {
-        SizeOfUtil.sizeOf("content".getBytes());
+        SizeOfUtil.sizeOf("content".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

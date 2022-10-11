@@ -16,6 +16,8 @@ package io.prestosql.spi.type;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
@@ -27,14 +29,14 @@ public class SqlVarbinaryTest
     @BeforeMethod
     public void setUp() throws Exception
     {
-        sqlVarbinaryUnderTest = new SqlVarbinary("content".getBytes());
+        sqlVarbinaryUnderTest = new SqlVarbinary("content".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
     public void testCompareTo() throws Exception
     {
         // Setup
-        final SqlVarbinary obj = new SqlVarbinary("content".getBytes());
+        final SqlVarbinary obj = new SqlVarbinary("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         final int result = sqlVarbinaryUnderTest.compareTo(obj);
@@ -47,7 +49,7 @@ public class SqlVarbinaryTest
     public void testCompareTo_ThrowsNullPointerException() throws Exception
     {
         // Setup
-        final SqlVarbinary obj = new SqlVarbinary("content".getBytes());
+        final SqlVarbinary obj = new SqlVarbinary("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         assertThrows(NullPointerException.class, () -> sqlVarbinaryUnderTest.compareTo(obj));
@@ -57,7 +59,7 @@ public class SqlVarbinaryTest
     public void testCompareTo_ThrowsClassCastException() throws Exception
     {
         // Setup
-        final SqlVarbinary obj = new SqlVarbinary("content".getBytes());
+        final SqlVarbinary obj = new SqlVarbinary("content".getBytes(StandardCharsets.UTF_8));
 
         // Run the test
         assertThrows(ClassCastException.class, () -> sqlVarbinaryUnderTest.compareTo(obj));

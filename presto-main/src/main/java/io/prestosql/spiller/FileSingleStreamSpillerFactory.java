@@ -197,7 +197,7 @@ public class FileSingleStreamSpillerFactory
         if (spillEncryptionEnabled) {
             spillCipher = Optional.of(new AesSpillCipher());
         }
-        PagesSerde serde = serdeFactory.createPagesSerdeForSpill(spillCipher, spillDirectSerdeEnabled, useKryo);
+        PagesSerde serde = serdeFactory.createDirectPagesSerde(spillCipher, spillDirectSerdeEnabled, useKryo);
         Path spillPath;
         if (spillToHdfsPath != null) {
             spillPath = getHdfsSpillPath(spillToHdfsPath);

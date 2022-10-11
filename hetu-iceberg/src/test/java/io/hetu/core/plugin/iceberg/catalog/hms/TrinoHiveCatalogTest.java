@@ -243,9 +243,9 @@ public class TrinoHiveCatalogTest
     @Test
     public void testCreateMaterializedView()
     {
-        TestSchemaMetadata metadata = IcebergTestUtil.getMetadata();
-        Session session = IcebergTestUtil.getSession(metadata);
-        List<QualifiedObjectName> iceberg = metadata.metadata.listTables(session, new QualifiedTablePrefix("test_catalog"));
+        TestSchemaMetadata schemaMetadata = IcebergTestUtil.getMetadata();
+        Session dialogue = IcebergTestUtil.getSession(schemaMetadata);
+        List<QualifiedObjectName> iceberg = schemaMetadata.metadata.listTables(dialogue, new QualifiedTablePrefix("test_catalog"));
         SchemaTableName schemaTableName = new SchemaTableName("test_schema", "another_table");
         List<ConnectorMaterializedViewDefinition.Column> columns = Arrays.asList(new ConnectorMaterializedViewDefinition.Column("test", TypeId.of("integer")));
         ConnectorMaterializedViewDefinition definition = new ConnectorMaterializedViewDefinition(
@@ -258,7 +258,7 @@ public class TrinoHiveCatalogTest
                 Optional.of("value"),
                 new HashMap<>());
         // Run the test
-        trinoHiveCatalogUnderTest.createMaterializedView(IcebergTestUtil.getConnectorSession(metadata), schemaTableName, definition, false, false);
+        trinoHiveCatalogUnderTest.createMaterializedView(IcebergTestUtil.getConnectorSession(schemaMetadata), schemaTableName, definition, false, false);
 
         List<SchemaTableName> list = testListTables();
 
@@ -417,7 +417,7 @@ public class TrinoHiveCatalogTest
     @Test
     public void testRedirectTable()
     {
-        ConnectorSession session = new ConnectorSession()
+        ConnectorSession dialogue = new ConnectorSession()
         {
             @Override
             public String getQueryId()
@@ -467,10 +467,10 @@ public class TrinoHiveCatalogTest
                 return (T) "hive_catalog_name";
             }
         };
-        SchemaTableName tableName = new SchemaTableName("namespace", "tableName");
+        SchemaTableName schemaTableName = new SchemaTableName("namespace", "tableName");
         Optional<CatalogSchemaTableName> expectedResult = Optional.of(
                 new CatalogSchemaTableName("catalogName", "schemaName", "tableName"));
 
-        trinoHiveCatalogUnderTest.redirectTable(session, tableName);
+        trinoHiveCatalogUnderTest.redirectTable(dialogue, schemaTableName);
     }
 }

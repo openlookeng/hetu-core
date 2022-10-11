@@ -37,12 +37,6 @@ public class PropertyServiceTest
         assertTrue(PropertyService.getBooleanProperty("key"));
     }
 
-//    @Test
-//    public void testGetLongProperty() throws Exception
-//    {
-//        assertEquals(0L, PropertyService.getLongProperty("key"));
-//    }
-
     @Test
     public void testGetDoubleProperty() throws Exception
     {

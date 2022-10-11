@@ -614,7 +614,6 @@ public final class ValidateDependenciesChecker
         @Override
         public Void visitTableExecute(PlanNode node, Set<Symbol> context)
         {
-//        public Void visitTableExecute(PlanNode node, Set<Symbol> context) {
             TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
             PlanNode source = tableExecuteNode.getSource();
             source.accept(this, context); // visit child

@@ -103,7 +103,7 @@ public class FlushHiveMetastoreCacheProcedure
 
     private void doFlushMetadataCache(Optional<String> schemaName, Optional<String> tableName, List<String> partitionColumns, List<String> partitionValues)
     {
-        CachingHiveMetastore cachingHiveMetastore = this.cachingHiveMetastore
+        CachingHiveMetastore cachingHive = this.cachingHiveMetastore
                 .orElseThrow(() -> new PrestoException(HiveErrorCode.HIVE_METASTORE_ERROR, "Cannot flush, metastore cache is not enabled"));
 
         checkState(
@@ -111,10 +111,10 @@ public class FlushHiveMetastoreCacheProcedure
                 "Parameters partition_column and partition_value should have same length");
 
         if (!schemaName.isPresent() && !tableName.isPresent() && partitionColumns.isEmpty()) {
-            cachingHiveMetastore.flushCache();
+            cachingHive.flushCache();
         }
         else if (schemaName.isPresent() && tableName.isPresent() && !partitionColumns.isEmpty()) {
-            cachingHiveMetastore.flushPartitionCache(schemaName.get(), tableName.get(), partitionColumns, partitionValues);
+            cachingHive.flushPartitionCache(schemaName.get(), tableName.get(), partitionColumns, partitionValues);
         }
         else {
             throw new PrestoException(

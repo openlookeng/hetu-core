@@ -15,7 +15,7 @@
 package io.prestosql.operator;
 
 import io.airlift.units.DataSize;
-import io.prestosql.execution.StateMachine;
+import io.prestosql.execution.buffer.OutputBufferStateMachine;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
@@ -38,8 +38,6 @@ import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.RowPagesBuilder.rowPagesBuilder;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
-import static io.prestosql.execution.buffer.BufferState.OPEN;
-import static io.prestosql.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.PARTITIONED;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
@@ -92,7 +90,7 @@ public class TestTaskOutputOperator
     private PartitionedOutputBuffer newTestingOutputBuffer(ScheduledExecutorService taskNotificationExecutor)
     {
         return new PartitionedOutputBuffer(
-                new StateMachine<>("bufferState", taskNotificationExecutor, OPEN, TERMINAL_BUFFER_STATES),
+                new OutputBufferStateMachine("bufferState", taskNotificationExecutor),
                 createInitialEmptyOutputBuffers(PARTITIONED)
                         .withBuffer(new OutputBuffers.OutputBufferId(0), 0)
                         .withNoMoreBufferIds(),

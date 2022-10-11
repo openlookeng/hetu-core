@@ -84,7 +84,7 @@ public class TestDbResourceGroupConfigurationManager
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), prodEnvironment);
         List<ResourceGroupSpec> groups = manager.getRootGroups();
         assertEquals(groups.size(), 1);
-        InternalResourceGroup prodGlobal = new InternalResourceGroup(Optional.empty(), "prod_global", (group, export) -> {}, directExecutor());
+        InternalResourceGroup prodGlobal = new InternalResourceGroup(Optional.empty(), "prod_global", (group, export) -> {}, directExecutor(), DEFAULT_WEIGHT);
         manager.configure(prodGlobal, new SelectionContext<>(prodGlobal.getId(), new ResourceGroupIdTemplate("prod_global")));
         // Hetu: add values for new parameters softReservedMemory and hardReservedConcurrency
         assertEqualsResourceGroup(prodGlobal, "10MB", 1000, 100, 100, WEIGHTED, DEFAULT_WEIGHT, true, new Duration(1, HOURS), new Duration(1, DAYS));
@@ -96,7 +96,7 @@ public class TestDbResourceGroupConfigurationManager
         // check the dev configuration
         manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), devEnvironment);
         assertEquals(groups.size(), 1);
-        InternalResourceGroup devGlobal = new InternalResourceGroup(Optional.empty(), "dev_global", (group, export) -> {}, directExecutor());
+        InternalResourceGroup devGlobal = new InternalResourceGroup(Optional.empty(), "dev_global", (group, export) -> {}, directExecutor(), DEFAULT_WEIGHT);
         manager.configure(devGlobal, new SelectionContext<>(prodGlobal.getId(), new ResourceGroupIdTemplate("dev_global")));
         assertEqualsResourceGroup(devGlobal, "1MB", 1000, 100, 100, WEIGHTED, DEFAULT_WEIGHT, true, new Duration(1, HOURS), new Duration(1, DAYS));
         assertEquals(manager.getSelectors().size(), 1);
@@ -120,7 +120,7 @@ public class TestDbResourceGroupConfigurationManager
         dao.insertSelector(2, 1, null, null, null, null, null);
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
         AtomicBoolean exported = new AtomicBoolean();
-        InternalResourceGroup global = new InternalResourceGroup(Optional.empty(), "global", (group, export) -> exported.set(export), directExecutor());
+        InternalResourceGroup global = new InternalResourceGroup(Optional.empty(), "global", (group, export) -> exported.set(export), directExecutor(), DEFAULT_WEIGHT);
         manager.configure(global, new SelectionContext<>(global.getId(), new ResourceGroupIdTemplate("global")));
         assertEqualsResourceGroup(global, "1MB", 1000, 100, 100, WEIGHTED, DEFAULT_WEIGHT, true, new Duration(1, HOURS), new Duration(1, DAYS));
         exported.set(false);
@@ -183,7 +183,7 @@ public class TestDbResourceGroupConfigurationManager
         dao.insertResourceGroupsGlobalProperties("cpu_quota_period", "1h");
         dao.insertSelector(2, 1, null, null, null, null, null);
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
-        InternalResourceGroup missing = new InternalResourceGroup(Optional.empty(), "missing", (group, export) -> {}, directExecutor());
+        InternalResourceGroup missing = new InternalResourceGroup(Optional.empty(), "missing", (group, export) -> {}, directExecutor(), DEFAULT_WEIGHT);
 
         assertThatThrownBy(() -> manager.configure(missing, new SelectionContext<>(missing.getId(), new ResourceGroupIdTemplate("missing"))))
                 .isInstanceOf(IllegalStateException.class)
@@ -207,7 +207,7 @@ public class TestDbResourceGroupConfigurationManager
         DbResourceGroupConfigurationManager manager = new DbResourceGroupConfigurationManager((poolId, listener) -> {}, new DbResourceGroupConfig(), daoProvider.get(), ENVIRONMENT);
         manager.start();
         AtomicBoolean exported = new AtomicBoolean();
-        InternalResourceGroup global = new InternalResourceGroup(Optional.empty(), "global", (group, export) -> exported.set(export), directExecutor());
+        InternalResourceGroup global = new InternalResourceGroup(Optional.empty(), "global", (group, export) -> exported.set(export), directExecutor(), DEFAULT_WEIGHT);
         manager.configure(global, new SelectionContext<>(global.getId(), new ResourceGroupIdTemplate("global")));
         InternalResourceGroup globalSub = global.getOrCreateSubGroup("sub");
         manager.configure(globalSub, new SelectionContext<>(globalSub.getId(), new ResourceGroupIdTemplate("global.sub")));

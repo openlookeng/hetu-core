@@ -61,7 +61,6 @@ public class ForwardingSystemAccessControlTest
     public void testCheckCanSetUser()
     {
         // Setup
-        //final Optional<Principal> principal = Optional.empty();
         Principal principal = new Principal()
         {
             @Override

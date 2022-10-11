@@ -91,21 +91,18 @@ public class CombinedDynamicFilter
     @Override
     public boolean isAwaitable()
     {
-        //todo xjp 待补充
         return false;
     }
 
     @Override
     public CompletableFuture<?> isBlocked()
     {
-        //todo xjp 待补充
         return null;
     }
 
     @Override
     public TupleDomain<ColumnHandle> getCurrentPredicate()
     {
-        //todo xjp 待补充
         return null;
     }
 }

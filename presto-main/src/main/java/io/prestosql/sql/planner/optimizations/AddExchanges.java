@@ -596,22 +596,24 @@ public class AddExchanges
         {
             PlanWithProperties newSource = source.accept(this, preferredProperties);
 
-            if (!partitioningScheme.isPresent()) {
+            Optional<PartitioningScheme> optionalPartitioningScheme = partitioningScheme;
+
+            if (!optionalPartitioningScheme.isPresent()) {
                 if (scaleWriters && writerTarget.supportsReportingWrittenBytes(metadata, session)) {
-                    partitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(SCALED_WRITER_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
+                    optionalPartitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(SCALED_WRITER_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
                 }
                 else if (redistributeWrites) {
-                    partitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(FIXED_ARBITRARY_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
+                    optionalPartitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(FIXED_ARBITRARY_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
                 }
             }
 
-            if (partitioningScheme.isPresent() && !newSource.getProperties().isCompatibleTablePartitioningWith(partitioningScheme.get().getPartitioning(), false, metadata, session)) {
+            if (optionalPartitioningScheme.isPresent() && !newSource.getProperties().isCompatibleTablePartitioningWith(optionalPartitioningScheme.get().getPartitioning(), false, metadata, session)) {
                 newSource = withDerivedProperties(
                         partitionedExchange(
                                 idAllocator.getNextId(),
                                 REMOTE,
                                 newSource.getNode(),
-                                partitioningScheme.get()),
+                                optionalPartitioningScheme.get()),
                         newSource.getProperties());
             }
             return rebaseAndDeriveProperties(node, newSource);

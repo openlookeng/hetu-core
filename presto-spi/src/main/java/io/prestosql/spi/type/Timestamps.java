@@ -83,14 +83,16 @@ public class Timestamps
             throw new IllegalArgumentException("value must be >= 0");
         }
 
+        long newValue = value;
+
         if (fromPrecision <= toPrecision) {
-            value *= scaleFactor(fromPrecision, toPrecision);
+            newValue *= scaleFactor(fromPrecision, toPrecision);
         }
         else {
-            value /= scaleFactor(toPrecision, fromPrecision);
+            newValue /= scaleFactor(toPrecision, fromPrecision);
         }
 
-        return value;
+        return newValue;
     }
 
     private static long scaleFactor(int fromPrecision, int toPrecision)

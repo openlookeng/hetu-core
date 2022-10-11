@@ -59,4 +59,14 @@ public interface ResourceGroupManager<C>
     {
         return false;
     }
+
+    default long getSoftCpuLimit(ResourceGroupId resourceGroupId)
+    {
+        return -1;
+    }
+
+    default long getHardCpuLimit(ResourceGroupId resourceGroupId)
+    {
+        return -1;
+    }
 }

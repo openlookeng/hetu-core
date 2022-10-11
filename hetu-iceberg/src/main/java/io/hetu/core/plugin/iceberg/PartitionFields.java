@@ -105,6 +105,7 @@ public final class PartitionFields
             case "hour":
             case "void":
                 return format("%s(%s)", transform, name);
+            default:
         }
 
         Matcher matcher = ICEBERG_BUCKET_PATTERN.matcher(transform);

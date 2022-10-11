@@ -50,6 +50,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
+import static io.prestosql.SystemSessionProperties.RETRY_POLICY;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -131,7 +132,8 @@ public final class Session
         this.startTime = startTime;
         requireNonNull(systemProperties, "systemProperties is null");
         if (Boolean.parseBoolean(systemProperties.get(RECOVERY_ENABLED))
-                || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))) {
+                || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))
+                    || "TASK".equals(systemProperties.get(RETRY_POLICY))) {
             // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
             this.systemProperties = new HashMap<>(systemProperties);
         }
@@ -570,6 +572,11 @@ public final class Session
     public static SessionBuilder builder(Session session)
     {
         return new SessionBuilder(session);
+    }
+
+    public void disableTaskRetry()
+    {
+        systemProperties.put(RETRY_POLICY, "NONE");
     }
 
     public static class SessionBuilder

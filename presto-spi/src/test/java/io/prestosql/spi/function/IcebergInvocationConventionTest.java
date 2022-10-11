@@ -78,7 +78,6 @@ public class IcebergInvocationConventionTest
                 IcebergInvocationConvention.InvocationArgumentConvention.NEVER_NULL);
         assertEquals(IcebergInvocationConvention.InvocationReturnConvention.FAIL_ON_NULL, result.getReturnConvention());
         assertEquals(IcebergInvocationConvention.InvocationArgumentConvention.NEVER_NULL, result.getArgumentConvention(0));
-//        assertTrue(result.hasSession());
         assertEquals("result", result.toString());
         assertEquals(Arrays.asList(IcebergInvocationConvention.InvocationArgumentConvention.NEVER_NULL),
                 result.getArgumentConventions());

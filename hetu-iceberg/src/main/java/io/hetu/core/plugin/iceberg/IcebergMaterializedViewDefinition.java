@@ -59,11 +59,12 @@ public class IcebergMaterializedViewDefinition
 
     public static IcebergMaterializedViewDefinition decodeMaterializedViewData(String data)
     {
-        checkCondition(data.startsWith(MATERIALIZED_VIEW_PREFIX), HIVE_INVALID_VIEW_DATA, "Materialized View data missing prefix: %s", data);
-        checkCondition(data.endsWith(MATERIALIZED_VIEW_SUFFIX), HIVE_INVALID_VIEW_DATA, "Materialized View data missing suffix: %s", data);
-        data = data.substring(MATERIALIZED_VIEW_PREFIX.length());
-        data = data.substring(0, data.length() - MATERIALIZED_VIEW_SUFFIX.length());
-        byte[] bytes = Base64.getDecoder().decode(data);
+        String dataStr = data;
+        checkCondition(dataStr.startsWith(MATERIALIZED_VIEW_PREFIX), HIVE_INVALID_VIEW_DATA, "Materialized View data missing prefix: %s", dataStr);
+        checkCondition(dataStr.endsWith(MATERIALIZED_VIEW_SUFFIX), HIVE_INVALID_VIEW_DATA, "Materialized View data missing suffix: %s", dataStr);
+        dataStr = dataStr.substring(MATERIALIZED_VIEW_PREFIX.length());
+        dataStr = dataStr.substring(0, dataStr.length() - MATERIALIZED_VIEW_SUFFIX.length());
+        byte[] bytes = Base64.getDecoder().decode(dataStr);
         return materializedViewCodec.fromJson(bytes);
     }
 

@@ -22,8 +22,10 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.spi.util.SizeOf;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,11 +39,15 @@ import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.SYNTHESIZED;
 import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
 import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
+import static io.prestosql.spi.util.SizeOf.estimatedSizeOf;
+import static io.prestosql.spi.util.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 public class HiveColumnHandle
         implements ColumnHandle
 {
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveColumnHandle.class).instanceSize();
+
     public static final int UPDATE_ROW_ID_COLUMN_INDEX = -16;
     public static final int PATH_COLUMN_INDEX = -11;
     public static final String PATH_COLUMN_NAME = "$path";
@@ -290,5 +296,14 @@ public class HiveColumnHandle
     public static boolean isUpdateColumnHandle(HiveColumnHandle column)
     {
         return column.getHiveColumnIndex() == ROW_ID__COLUMN_INDEX;
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE
+                + estimatedSizeOf(name)
+                + hiveType.getRetainedSizeInBytes()
+                + sizeOf(comment, SizeOf::estimatedSizeOf)
+                + estimatedSizeOf(name);
     }
 }

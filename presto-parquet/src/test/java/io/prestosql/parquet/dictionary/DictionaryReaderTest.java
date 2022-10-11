@@ -21,6 +21,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
@@ -57,7 +58,7 @@ public class DictionaryReaderTest
     public void testInitFromPage_ThrowsIOException()
     {
         // Setup
-        final ByteBufferInputStream in = ByteBufferInputStream.wrap(ByteBuffer.wrap("content".getBytes()));
+        final ByteBufferInputStream in = ByteBufferInputStream.wrap(ByteBuffer.wrap("content".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -79,10 +80,10 @@ public class DictionaryReaderTest
     public void testReadBytes()
     {
         // Setup
-        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes());
+        final Binary expectedResult = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
 
         // Configure Dictionary.decodeToBinary(...).
-        final Binary binary = Binary.fromReusedByteArray("content".getBytes());
+        final Binary binary = Binary.fromReusedByteArray("content".getBytes(StandardCharsets.UTF_8));
         when(mockDictionary.decodeToBinary(0)).thenReturn(binary);
 
         // Run the test

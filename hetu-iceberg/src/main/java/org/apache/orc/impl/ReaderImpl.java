@@ -571,7 +571,7 @@ public class ReaderImpl
         OrcProto.PostScript ps;
         OrcProto.FileTail.Builder fileTailBuilder = OrcProto.FileTail.newBuilder();
         long modificationTime;
-        try (FSDataInputStream file = fs.open(path)) {
+        try (FSDataInputStream paper = fs.open(path)) {
             // figure out the size of the file using the option or filesystem
             long size;
             if (maxFileLength == Long.MAX_VALUE) {
@@ -599,30 +599,30 @@ public class ReaderImpl
             //read last bytes into buffer to get PostScript
             int readSize = (int) Math.min(size, DIRECTORY_SIZE_GUESS);
             buffer = ByteBuffer.allocate(readSize);
-            file.readFully((size - readSize),
+            paper.readFully((size - readSize),
                     buffer.array(), buffer.arrayOffset(), readSize);
             buffer.position(0);
 
             //read the PostScript
             //get length of PostScript
             int psLen = buffer.get(readSize - 1) & 0xff;
-            ensureOrcFooter(file, path, psLen, buffer);
+            ensureOrcFooter(paper, path, psLen, buffer);
             int psOffset = readSize - 1 - psLen;
             ps = extractPostScript(buffer, path, psLen, psOffset);
             bufferSize = (int) ps.getCompressionBlockSize();
-            CompressionKind compressionKind = CompressionKind.valueOf(ps.getCompression().name());
+            CompressionKind kind = CompressionKind.valueOf(ps.getCompression().name());
             fileTailBuilder.setPostscriptLength(psLen).setPostscript(ps);
 
             int footerSize = (int) ps.getFooterLength();
-            int metadataSize = (int) ps.getMetadataLength();
+            int psMetadataLength = (int) ps.getMetadataLength();
 
             //check if extra bytes need to be read
-            int extra = Math.max(0, psLen + 1 + footerSize + metadataSize - readSize);
-            int tailSize = 1 + psLen + footerSize + metadataSize;
+            int extra = Math.max(0, psLen + 1 + footerSize + psMetadataLength - readSize);
+            int tailSize = 1 + psLen + footerSize + psMetadataLength;
             if (extra > 0) {
                 //more bytes need to be read, seek back to the right place and read extra bytes
                 ByteBuffer extraBuf = ByteBuffer.allocate(extra + readSize);
-                file.readFully((size - readSize - extra), extraBuf.array(),
+                paper.readFully((size - readSize - extra), extraBuf.array(),
                         extraBuf.arrayOffset() + extraBuf.position(), extra);
                 extraBuf.position(extra);
                 //append with already read bytes
@@ -635,7 +635,7 @@ public class ReaderImpl
             }
             else {
                 //footer is already in the bytes in buffer, just adjust position, length
-                buffer.position(psOffset - footerSize - metadataSize);
+                buffer.position(psOffset - footerSize - psMetadataLength);
                 buffer.limit(buffer.position() + tailSize);
             }
 
@@ -645,12 +645,12 @@ public class ReaderImpl
             ByteBuffer footerBuffer = buffer.slice();
             buffer.reset();
             OrcProto.Footer footer;
-            CompressionCodec codec = OrcCodecPool.getCodec(compressionKind);
+            CompressionCodec codec = OrcCodecPool.getCodec(kind);
             try {
                 footer = extractFooter(footerBuffer, 0, footerSize, codec, bufferSize);
             }
             finally {
-                OrcCodecPool.returnCodec(compressionKind, codec);
+                OrcCodecPool.returnCodec(kind, codec);
             }
             fileTailBuilder.setFooter(footer);
         }
@@ -663,14 +663,15 @@ public class ReaderImpl
 
     private static void read(FSDataInputStream file, BufferChunk chunks) throws IOException
     {
-        while (chunks != null) {
-            if (!chunks.hasData()) {
-                int len = chunks.getLength();
+        BufferChunk bufferChunk = chunks;
+        while (bufferChunk != null) {
+            if (!bufferChunk.hasData()) {
+                int len = bufferChunk.getLength();
                 ByteBuffer bb = ByteBuffer.allocate(len);
-                file.readFully(chunks.getOffset(), bb.array(), bb.arrayOffset(), len);
-                chunks.setChunk(bb);
+                file.readFully(bufferChunk.getOffset(), bb.array(), bb.arrayOffset(), len);
+                bufferChunk.setChunk(bb);
             }
-            chunks = (BufferChunk) chunks.next;
+            bufferChunk = (BufferChunk) bufferChunk.next;
         }
     }
 

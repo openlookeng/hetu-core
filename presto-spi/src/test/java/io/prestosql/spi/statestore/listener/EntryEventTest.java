@@ -14,33 +14,6 @@
  */
 package io.prestosql.spi.statestore.listener;
 
-//import io.prestosql.spi.block.TestMethodHandleUtil;
-//import io.prestosql.spi.statestore.Member;
-//import org.checkerframework.checker.units.qual.K;
-//import org.mockito.Mock;
-//import org.testng.annotations.BeforeMethod;
-//import org.testng.annotations.Test;
-//
-//import static org.mockito.MockitoAnnotations.initMocks;
-//import static org.testng.Assert.assertEquals;
-
 public class EntryEventTest
 {
-//    @Mock
-//    private Member mockMember;
-//
-//    private EntryEvent<K,V> entryEventUnderTest;
-//
-//    @BeforeMethod
-//    public void setUp() throws Exception
-//    {
-//        initMocks(this);
-//        entryEventUnderTest = new EntryEvent<>(mockMember, 0, null, null, null);
-//    }
-//
-//    @Test
-//    public void testToString() throws Exception
-//    {
-//        assertEquals("result", entryEventUnderTest.toString());
-//    }
 }

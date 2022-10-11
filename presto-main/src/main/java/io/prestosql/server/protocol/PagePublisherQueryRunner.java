@@ -24,6 +24,7 @@ import io.prestosql.client.DataCenterQueryResults;
 import io.prestosql.client.StatementStats;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
+import io.prestosql.exchange.ExchangeId;
 import io.prestosql.execution.QueryManager;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
 import io.prestosql.operator.ExchangeClient;
@@ -51,6 +52,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_LAYER_DYNAMIC_FILTER;
 import static io.prestosql.statestore.StateStoreConstants.CROSS_REGION_DYNAMIC_FILTER_COLLECTION;
@@ -220,7 +222,7 @@ public class PagePublisherQueryRunner
 
         ExchangeClient exchangeClient = this.exchangeClientSupplier.get(
                 new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext(),
-                        DataCenterStatementResource.class.getSimpleName()));
+                        DataCenterStatementResource.class.getSimpleName()), null, getRetryPolicy(session), new ExchangeId("direct-exchange-page-publisher-queryrunner"), session.getQueryId());
         return Query.create(session, slug, queryManager, exchangeClient, executor, timeoutExecutor,
                 blockEncodingSerde);
     }

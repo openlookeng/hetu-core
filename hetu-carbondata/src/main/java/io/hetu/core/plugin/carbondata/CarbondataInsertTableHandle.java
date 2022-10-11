@@ -51,7 +51,7 @@ public class CarbondataInsertTableHandle
     {
         super(schemaName, tableName, inputColumns, pageSinkMetadata,
                 locationHandle, bucketProperty, tableStorageFormat,
-                partitionStorageFormat, isOverwrite);
+                partitionStorageFormat, isOverwrite, false);
 
         this.additionalConf = ImmutableMap.copyOf(requireNonNull(additionalConf, "additional conf map is null"));
     }

@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.OpenOption;
 import java.nio.file.Paths;
 import java.util.Properties;
@@ -67,7 +68,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -113,7 +114,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -311,7 +312,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -358,7 +359,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -545,7 +546,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -592,7 +593,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -935,7 +936,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
@@ -982,7 +983,7 @@ public class FileBasedLockTest
         when(mockFs.getAttribute(Paths.get("filename.txt"), "lastModifiedTime")).thenReturn("result");
 
         // Configure HetuFileSystemClient.newInputStream(...).
-        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes()));
+        final InputStream spyInputStream = spy(new ByteArrayInputStream("content".getBytes(StandardCharsets.UTF_8)));
         when(mockFs.newInputStream(Paths.get("filename.txt"))).thenReturn(spyInputStream);
 
         // Run the test
