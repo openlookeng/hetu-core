@@ -31,7 +31,6 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.StageExecutionDescriptor;
-import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.SplitSource;

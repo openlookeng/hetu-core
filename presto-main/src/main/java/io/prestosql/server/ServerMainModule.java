@@ -110,7 +110,6 @@ import io.prestosql.operator.ForExchange;
 import io.prestosql.operator.LookupJoinOperators;
 import io.prestosql.operator.OperatorStats;
 import io.prestosql.operator.PagesIndex;
-import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.security.PasswordSecurityConfig;
 import io.prestosql.seedstore.SeedStoreManager;

@@ -34,7 +34,6 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.heuristicindex.SplitFiltering;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
-import io.prestosql.operator.TableExecuteContextManager;
 import io.prestosql.snapshot.MarkerSplit;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
@@ -45,7 +44,6 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.split.EmptySplit;
 import io.prestosql.split.SplitSource;
 import io.prestosql.split.SplitSource.SplitBatch;
-import io.prestosql.sql.planner.TableExecuteContext;
 
 import java.util.ArrayList;
 import java.util.HashMap;

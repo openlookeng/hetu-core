@@ -300,7 +300,7 @@ public final class Domain
 
     public Domain simplify(int threshold)
     {
-        Optional<ValueSet> simplifiedValueSet = values.getValuesProcessor().transform(
+        ValueSet simplifiedValueSet = values.getValuesProcessor().<Optional<ValueSet>>transform(
                 ranges -> {
                     if (ranges.getRangeCount() <= threshold) {
                         return Optional.empty();
@@ -313,33 +313,9 @@ public final class Domain
                     }
                     return Optional.of(ValueSet.all(values.getType()));
                 },
-                allOrNone -> Optional.empty());
-        if (!simplifiedValueSet.isPresent()) {
-            return this;
-        }
-        return Domain.create(simplifiedValueSet.get(), nullAllowed);
-    }
-
-    public Domain simplify(int threshold)
-    {
-        Optional<ValueSet> simplifiedValueSet = values.getValuesProcessor().transform(
-                ranges -> {
-                    if (ranges.getRangeCount() <= threshold) {
-                        return Optional.empty();
-                    }
-                    return Optional.of(ValueSet.ofRanges(ranges.getSpan()));
-                },
-                discreteValues -> {
-                    if (discreteValues.getValuesCount() <= threshold) {
-                        return Optional.empty();
-                    }
-                    return Optional.of(ValueSet.all(values.getType()));
-                },
-                allOrNone -> Optional.empty());
-        if (!simplifiedValueSet.isPresent()) {
-            return this;
-        }
-        return Domain.create(simplifiedValueSet.get(), nullAllowed);
+                allOrNone -> Optional.empty())
+                .orElse(values);
+        return Domain.create(simplifiedValueSet, nullAllowed);
     }
 
     public String toString(ConnectorSession session)

@@ -158,27 +158,6 @@ public class RecordingHiveMetastore
         this.roleGrantsCache = null;
     }
 
-    public RecordingHiveMetastore(HiveMetastore delegate, HiveMetastoreRecording recording)
-    {
-        this.delegate = requireNonNull(delegate, "delegate is null");
-        this.recording = requireNonNull(recording, "recording is null");
-        this.recordingPath = null;
-        this.replay = false;
-        this.databaseCache = null;
-        this.tableCache = null;
-        this.supportedColumnStatisticsCache = null;
-        this.tableStatisticsCache = null;
-        this.partitionStatisticsCache = null;
-        this.allTablesCache = null;
-        this.allViewsCache = null;
-        this.partitionCache = null;
-        this.partitionNamesCache = null;
-        this.partitionNamesByPartsCache = null;
-        this.partitionsByNamesCache = null;
-        this.tablePrivilegesCache = null;
-        this.roleGrantsCache = null;
-    }
-
     private static <K, V> Cache<K, V> createCache(HiveConfig hiveConfig)
     {
         if (hiveConfig.isReplay()) {
