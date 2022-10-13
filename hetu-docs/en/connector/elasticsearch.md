@@ -45,6 +45,17 @@ Defines the schema that will contain all tables defined without a qualifying sch
 
 This property is optional; the default is `default`.
 
+### `elasticsearch.pushdown.enabled`
+Whether to enable the query pushdown function
+
+The pushdown function of the Elasticsearch connector is disabled by default. You can set the parameter as follows:
+
+``` properties
+elasticsearch.pushdown.enabled=true
+#true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
+```
+NOTE: Currently pushdown is only supported as part of where clause partially such as EQUAL, AND, OR, Arithmetic operators, BETWEEN, IN.
+
 ### `elasticsearch.scroll-size`
 
 This property defines the maximum number of hits that can be returned with each Elasticsearch scroll request.

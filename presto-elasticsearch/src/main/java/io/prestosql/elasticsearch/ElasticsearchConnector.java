@@ -14,9 +14,11 @@
 package io.prestosql.elasticsearch;
 
 import io.airlift.bootstrap.LifeCycleManager;
+import io.prestosql.elasticsearch.optimization.ElasticSearchPlanOptimizerProvider;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorMetadata;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
+import io.prestosql.spi.connector.ConnectorPlanOptimizerProvider;
 import io.prestosql.spi.connector.ConnectorSplitManager;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.transaction.IsolationLevel;
@@ -35,17 +37,21 @@ public class ElasticsearchConnector
     private final ElasticsearchSplitManager splitManager;
     private final ElasticsearchPageSourceProvider pageSourceProvider;
 
+    private final ElasticSearchPlanOptimizerProvider elasticSearchPlanOptimizerProvider;
+
     @Inject
     public ElasticsearchConnector(
             LifeCycleManager lifeCycleManager,
             ElasticsearchMetadata metadata,
             ElasticsearchSplitManager splitManager,
-            ElasticsearchPageSourceProvider pageSourceProvider)
+            ElasticsearchPageSourceProvider pageSourceProvider,
+            ElasticSearchPlanOptimizerProvider elasticSearchPlanOptimizerProvider)
     {
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.splitManager = requireNonNull(splitManager, "splitManager is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
+        this.elasticSearchPlanOptimizerProvider = requireNonNull(elasticSearchPlanOptimizerProvider, "pageSourceProvider is null");
     }
 
     @Override
@@ -77,5 +83,11 @@ public class ElasticsearchConnector
     public final void shutdown()
     {
         lifeCycleManager.stop();
+    }
+
+    @Override
+    public ConnectorPlanOptimizerProvider getConnectorPlanOptimizerProvider()
+    {
+        return elasticSearchPlanOptimizerProvider;
     }
 }

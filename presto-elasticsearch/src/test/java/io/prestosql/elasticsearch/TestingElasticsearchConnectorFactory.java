@@ -20,6 +20,8 @@ import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.connector.Connector;
 import io.prestosql.spi.connector.ConnectorContext;
 import io.prestosql.spi.connector.ConnectorHandleResolver;
+import io.prestosql.spi.function.FunctionMetadataManager;
+import io.prestosql.spi.function.StandardFunctionResolution;
 import io.prestosql.spi.type.TypeManager;
 
 import java.util.Map;
@@ -57,6 +59,8 @@ class TestingElasticsearchConnectorFactory
                 binder -> {
                     binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                     binder.bind(NodeManager.class).toInstance(context.getNodeManager());
+                    binder.bind(FunctionMetadataManager.class).toInstance(context.getFunctionMetadataManager());
+                    binder.bind(StandardFunctionResolution.class).toInstance(context.getStandardFunctionResolution());
                 });
 
         Injector injector = app.strictConfig()
