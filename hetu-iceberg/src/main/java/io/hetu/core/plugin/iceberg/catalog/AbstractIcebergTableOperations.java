@@ -175,7 +175,7 @@ public abstract class AbstractIcebergTableOperations
         else {
             local = this.location.orElseThrow(() -> new IllegalStateException("Location not set"));
         }
-        return format("%s/%s/%s", location, METADATA_FOLDER_NAME, filename);
+        return format("%s/%s/%s", local, METADATA_FOLDER_NAME, filename);
     }
 
     @Override

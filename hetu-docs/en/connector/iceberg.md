@@ -30,12 +30,18 @@ These configuration properties are independent of which catalog implementation i
 Iceberg general configuration properties
 With the following content creation`etc/catalog/iceberg.properties`，please repalce`localhost:9083` with the right ip and port：
 
-| Attribute name                      | Attribute value               |           Description                         |
-|:------------------------------------|:------------------------------|:-------------------------------------|
-| connector.name                      | iceberg                       |            connector.name                  |
-| hive.metastore.uri                  | thrift://localhost:9083       |           Hive connector.uri               |
-| iceberg.file-format                 | ORC                           | Define the data storage file format for Iceberg tables. Possible values are PARQUET、ORC |
-
+| Attribute name                      | Attribute value         |necessary        |           Description                         |
+|:------------------------------------|:----------------------- |:-------|:-------------------------------------|
+| connector.name                      | iceberg                 |true       |            connector.name                  |
+| hive.metastore.uri                  | thrift://localhost:9083 |true      |           Hive connector.uri               |
+| iceberg.file-format                 | ORC                     |false      | Define the data storage file format for Iceberg tables. Possible values are PARQUET、ORC |
+|iceberg.compression-codec|ZSTD|false|The compression codec to be used when writing files. Possible values are (NONE SNAPPY LZ4 ZSTD GZIP)
+|iceberg.use-file-size-from-metadata|true|false|Read file sizes from metadata instead of file system. This property should only be set as a workaround for this issue. The problem was fixed in Iceberg version 0.11.0.
+|iceberg.max-partitions-per-writer|100|false|Maximum number of partitions handled per writer.
+|iceberg.unique-table-location|true|false|Use randomized, unique table locations.
+|iceberg.dynamic-filtering.wait-timeout|0s|false|Maximum duration to wait for completion of dynamic filters during split generation.
+|iceberg.table-statistics-enabled|true|false|Enables Table statistics. The equivalent catalog session property is for session specific use. Set to to disable statistics. Disabling statistics means that Cost based optimizations can not make smart decisions about the query plan.statistics_enabledfalse
+|iceberg.minimum-assigned-split-weight|0.05|false|A decimal value in the range (0, 1] used as a minimum for weights assigned to each split. A low value may improve performance on tables with small files. A higher value may improve performance for queries with highly skewed aggregations or joins.
 ## SQL support
 
 This connector provides read access and write access to data and metadata in Iceberg. In addition to the globally available and read operation statements, the connector supports the following features:

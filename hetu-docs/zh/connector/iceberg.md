@@ -30,11 +30,18 @@ hive.metastore.uri=thrift://localhost:9083
 Iceberg 通用配置属性
 用以下内容创建`etc/catalog/iceberg.properties`，请把`localhost:9083`替换为Hive元存储Thrift服务的正确主机和端口：
 
-| 属性名                    | 属性值                     | 描述                                   |
-|:-----------------------|:------------------------|:-------------------------------------|
-|       connector.name                 | iceberg                 | 连接名                              |
-|       hive.metastore.uri    | thrift://localhost:9083 | hive连接地址                             |
-|       iceberg.file-format              | ORC                     | 为Iceberg表定义数据存储文件格式。可能的值是PARQUET、ORC |
+| 属性名                    | 属性值                 |是否必填    | 描述                                   |
+|:-----------------------|:------------------------|:-------------|:-------------------------------------|
+|connector.name                 | iceberg   |是             | 连接名                              |
+|hive.metastore.uri    | thrift://localhost:9083|是 | hive连接地址                             |
+|iceberg.file-format              | ORC         |否            | 为Iceberg表定义数据存储文件格式。可能的值是PARQUET、ORC  |
+|iceberg.compression-codec| ZSTD|否|写入文件时要使用的压缩编解码器 可能的值是( NONE SNAPPY LZ4 ZSTD GZIP)
+|iceberg.use-file-size-from-metadata|true|否|从元数据而不是文件系统中读取文件大小。此属性应仅设置为此问题的解决方法。此问题已在冰山版本 0.11.0 中修复。
+|iceberg.max-partitions-per-writer|100|否|每个写入器处理的最大分区数。
+|iceberg.unique-table-location|true|否|使用随机的唯一表位置。
+|iceberg.dynamic-filtering.wait-timeout|0s|否|在拆分生成期间等待动态筛选器完成的最大持续时间。
+|iceberg.table-statistics-enabled|true|否|启用表统计信息。等效目录会话属性用于会话特定的用途。设置为 以禁用统计信息。禁用统计信息意味着基于开销的优化无法做出有关查询计划的明智决策。statistics_enabledfalse
+|iceberg.minimum-assigned-split-weight|0.05|否|范围 （0， 1] 中的十进制值，用作分配给每个拆分的权重的最小值。较低的值可能会提高包含小文件的表的性能。较高的值可能会提高具有高度偏斜聚合或联接的查询的性能。
 
 ## SQL 支持
 
