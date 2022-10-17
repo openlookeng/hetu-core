@@ -15,6 +15,7 @@ package io.hetu.core.plugin.dm;
 
 import io.airlift.log.Logger;
 import io.hetu.core.plugin.oracle.OracleClient;
+import io.hetu.core.plugin.oracle.OracleConfig;
 import io.hetu.core.plugin.oracle.config.RoundingMode;
 import io.hetu.core.plugin.oracle.config.UnsupportedTypeHandling;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
@@ -49,15 +50,15 @@ public class DaMengClient
      * @param connectionFactory connectionFactory
      */
     @Inject
-    public DaMengClient(BaseJdbcConfig config, DaMengConfig damengConfig,
+    public DaMengClient(BaseJdbcConfig config, OracleConfig damengConfig,
                         @StatsCollecting ConnectionFactory connectionFactory)
     {
         // the empty "" is to not use a quote to create queries
         //support both auto case trans between hetu to data source
         //and mixed cases table attributes DDL in data source side
         super(config.internalsetCaseInsensitiveNameMatching(true), damengConfig, connectionFactory);
-        this.numberDefaultScale = damengConfig.getDaMengNumberDefaultScale();
-        this.roundingMode = requireNonNull(damengConfig.getDaMengRoundingMode(), "dameng rounding mode cannot be null");
+        this.numberDefaultScale = damengConfig.getNumberDefaultScale();
+        this.roundingMode = requireNonNull(damengConfig.getRoundingMode(), "dameng rounding mode cannot be null");
         this.unsupportedTypeHandling = requireNonNull(damengConfig.getUnsupportedTypeHandling(),
                 "dameng unsupported type handling cannot be null");
     }

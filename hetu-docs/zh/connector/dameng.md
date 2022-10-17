@@ -14,7 +14,7 @@ DM连接器允许在外部DM数据库中查询和创建表。这可用于在DM�
 
 ```properties
 connector.name=dameng
-connection-url=jdbc:dm://主机:端口
+connection-url=jdbc:dm://主机:端口/SYSDBA
 connection-user=用户名
 connection-password=密码
 ```
@@ -40,6 +40,10 @@ jdbc.pushdown-enabled=true
 jdbc.pushdown-module=FULL_PUSHDOWN
 #FULL_PUSHDOWN，表示全部下推；BASE_PUSHDOWN，表示部分下推，其中部分下推是指filter/aggregation/limit/topN/project这些可以下推。
 ```
+
+- 更多配置
+  
+由于达梦数据库和Oracle同源，在实现DM连接器时，复用了Oracle连接器的部分配置，具体配置可参考[ORACLE](./oracle.md)。
 
 ## 通过openLooKeng查询DM
 

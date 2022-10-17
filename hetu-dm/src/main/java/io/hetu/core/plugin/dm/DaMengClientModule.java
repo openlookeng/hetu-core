@@ -18,6 +18,8 @@ import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
 import com.google.inject.Singleton;
+import io.hetu.core.plugin.oracle.Constants;
+import io.hetu.core.plugin.oracle.OracleConfig;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.DriverConnectionFactory;
@@ -44,9 +46,10 @@ public class DaMengClientModule
      */
     @Provides
     @Singleton
-    public static ConnectionFactory getConnectionFactory(BaseJdbcConfig config, DaMengConfig dmConfig)
+    public static ConnectionFactory getConnectionFactory(BaseJdbcConfig config, OracleConfig oracleConfig)
     {
         Properties connectionProperties = basicConnectionProperties(config);
+        connectionProperties.setProperty(Constants.ORACLE_PROPERTY_INCLUDE_SYNONYMS, String.valueOf(oracleConfig.isSynonymsEnabled()));
         Driver driver;
         try {
             driver = (Driver) Class.forName(DaMengConstants.DM_JDBC_DRIVER_CLASS_NAME).getConstructor(((Class<?>[]) null)).newInstance();
@@ -65,6 +68,6 @@ public class DaMengClientModule
     {
         binder.bind(JdbcClient.class).to(DaMengClient.class).in(Scopes.SINGLETON);
         configBinder(binder).bindConfig(BaseJdbcConfig.class);
-        configBinder(binder).bindConfig(DaMengConfig.class);
+        configBinder(binder).bindConfig(OracleConfig.class);
     }
 }

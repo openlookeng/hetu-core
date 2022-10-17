@@ -37,17 +37,13 @@ public class TestDaMengConfig
     public void testDaMengPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("dameng.number.default-scale", "2")
-                .put("dameng.number.rounding-mode", "DOWN")
                 .put("oracle.number.default-scale", "2")
                 .put("oracle.number.rounding-mode", "DOWN")
                 .put("oracle.synonyms.enabled", "true")
                 .put("unsupported-type.handling-strategy", "CONVERT_TO_VARCHAR")
                 .build();
 
-        OracleConfig expected = new DaMengConfig()
-                .setDaMengNumberDefaultScale(NUMBER_DEFAULT_SCALE)
-                .setDaMengRoundingMode(RoundingMode.DOWN)
+        OracleConfig expected = new OracleConfig()
                 .setNumberDefaultScale(NUMBER_DEFAULT_SCALE)
                 .setRoundingMode(RoundingMode.DOWN)
                 .setSynonymsEnabled(true)
@@ -62,7 +58,7 @@ public class TestDaMengConfig
     @Test
     public void testGetFunctions()
     {
-        DaMengConfig config = new DaMengConfig();
+        OracleConfig config = new OracleConfig();
         RoundingMode roundingMode = config.getRoundingMode();
         UnsupportedTypeHandling typeHandling = config.getUnsupportedTypeHandling();
         int defaultScale = config.getNumberDefaultScale();

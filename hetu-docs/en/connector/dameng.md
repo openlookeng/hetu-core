@@ -14,7 +14,7 @@ To configure the DM connector, create a catalog properties file in`etc/catalog` 
 
 ``` properties
 connector.name=dameng
-connection-url=jdbc:dm://host:port
+connection-url=jdbc:dm://host:port/SYSDBA
 connection-user=username
 connection-password=password
 ```
@@ -40,6 +40,10 @@ If you want to enable the connector all push down feature for DM connector, you 
 jdbc.pushdown-module=FULL_PUSHDOWN  
 #FULL_PUSHDOWN: All push down. BASE_PUSHDOWN: Partial push down, which indicates that filter, aggregation, limit, topN and project can be pushed down.
 ```
+
+- More configurations
+
+DM and Oracle are of the same origin, some configurations of Oracle connector are reused when implementing DM connector. Please refer to [ORACLE](./oracle.md).
 
 ## Querying DM Using openLooKeng
 
