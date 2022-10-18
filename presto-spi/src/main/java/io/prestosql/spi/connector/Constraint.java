@@ -18,6 +18,7 @@ import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static java.util.Objects.requireNonNull;
@@ -26,6 +27,13 @@ public class Constraint
 {
     private final TupleDomain<ColumnHandle> summary;
     private final Optional<Predicate<Map<ColumnHandle, NullableValue>>> predicate;
+
+    private final Optional<Set<ColumnHandle>> predicateColumns;
+
+    public Optional<Set<ColumnHandle>> getPredicateColumns()
+    {
+        return predicateColumns;
+    }
 
     public static Constraint alwaysTrue()
     {
@@ -54,6 +62,7 @@ public class Constraint
 
         this.summary = summary;
         this.predicate = predicate;
+        this.predicateColumns = null;
     }
 
     public TupleDomain<ColumnHandle> getSummary()

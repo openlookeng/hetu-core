@@ -56,6 +56,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableStatsRequest;
 import org.apache.hadoop.hive.metastore.api.TableValidWriteIds;
 import org.apache.hadoop.hive.metastore.api.ThriftHiveMetastore;
+import org.apache.hadoop.hive.metastore.api.UnlockRequest;
 import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -553,5 +554,12 @@ public class ThriftHiveMetastoreClient
         final AllocateTableWriteIdsResponse allocateTableWriteIdsResponse = client.allocate_table_write_ids(allocateTableWriteIdsRequest);
         long txnToWriteId = allocateTableWriteIdsResponse.getTxnToWriteIds().stream().filter(e -> e.getTxnId() == transactionId).collect(toImmutableList()).get(0).getWriteId();
         return txnToWriteId;
+    }
+
+    @Override
+    public void unlock(long lockId)
+            throws TException
+    {
+        client.unlock(new UnlockRequest(lockId));
     }
 }

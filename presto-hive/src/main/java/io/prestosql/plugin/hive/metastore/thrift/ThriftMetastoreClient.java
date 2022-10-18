@@ -186,4 +186,9 @@ public interface ThriftMetastoreClient
 
     ShowLocksResponse showLocks(ShowLocksRequest rqst)
             throws TException;
+
+    default void unlock(long lockId)
+            throws TException
+    {
+    }
 }

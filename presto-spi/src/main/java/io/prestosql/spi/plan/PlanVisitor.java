@@ -15,6 +15,11 @@ package io.prestosql.spi.plan;
 
 public abstract class PlanVisitor<R, C>
 {
+    public R visitTableExecute(PlanNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public abstract R visitPlan(PlanNode node, C context);
 
     public R visitAggregation(AggregationNode node, C context)

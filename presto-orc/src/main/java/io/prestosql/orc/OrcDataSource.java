@@ -44,4 +44,19 @@ public interface OrcDataSource
             throws IOException
     {
     }
+
+    default long getRetainedSize()
+    {
+        return -1L;
+    }
+
+    default Slice readTail(int length) throws IOException
+    {
+        return null;
+    }
+
+    default long getEstimatedSize()
+    {
+        return -1L;
+    }
 }

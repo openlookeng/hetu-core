@@ -37,4 +37,9 @@ public interface ConnectorPageSinkProvider
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support vacuum");
     }
+
+    default ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle)
+    {
+        throw new IllegalArgumentException("createPageSink not supported for tableExecuteHandle");
+    }
 }

@@ -26,6 +26,8 @@ import org.apache.parquet.io.PrimitiveColumnIO;
 import org.apache.parquet.schema.DecimalMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import javax.annotation.Nullable;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -263,5 +265,17 @@ public final class ParquetTypeUtils
         }
 
         return value;
+    }
+
+    @Nullable
+    public static ColumnIO lookupColumnById(GroupColumnIO groupColumnIO, int columnId)
+    {
+        for (int i = 0; i < groupColumnIO.getChildrenCount(); i++) {
+            ColumnIO child = groupColumnIO.getChild(i);
+            if (child.getType().getId().intValue() == columnId) {
+                return child;
+            }
+        }
+        return null;
     }
 }

@@ -15,8 +15,10 @@
 package io.prestosql.spi.dynamicfilter;
 
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public class HashSetDynamicFilter
         extends DynamicFilter
@@ -62,5 +64,23 @@ public class HashSetDynamicFilter
     public boolean isEmpty()
     {
         return valueSet.size() == 0;
+    }
+
+    @Override
+    public boolean isAwaitable()
+    {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<?> isBlocked()
+    {
+        return null;
+    }
+
+    @Override
+    public TupleDomain<ColumnHandle> getCurrentPredicate()
+    {
+        return null;
     }
 }

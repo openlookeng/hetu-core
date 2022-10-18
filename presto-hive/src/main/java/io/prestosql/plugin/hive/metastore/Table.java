@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -47,6 +48,7 @@ public class Table
     private final Map<String, String> parameters;
     private final Optional<String> viewOriginalText;
     private final Optional<String> viewExpandedText;
+    private final OptionalLong writeId;
 
     @JsonCreator
     public Table(
@@ -61,6 +63,7 @@ public class Table
             @JsonProperty("viewOriginalText") Optional<String> viewOriginalText,
             @JsonProperty("viewExpandedText") Optional<String> viewExpandedText)
     {
+        this.writeId = OptionalLong.empty();
         this.databaseName = requireNonNull(databaseName, "databaseName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.owner = requireNonNull(owner, "owner is null");
@@ -71,6 +74,12 @@ public class Table
         this.parameters = ImmutableMap.copyOf(requireNonNull(parameters, "parameters is null"));
         this.viewOriginalText = requireNonNull(viewOriginalText, "viewOriginalText is null");
         this.viewExpandedText = requireNonNull(viewExpandedText, "viewExpandedText is null");
+    }
+
+    @JsonProperty
+    public OptionalLong getWriteId()
+    {
+        return writeId;
     }
 
     @JsonProperty

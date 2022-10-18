@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.plugin.hive.acid.AcidTransaction;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -33,6 +34,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.plugin.hive.HiveMetadata.STORAGE_FORMAT;
 import static java.util.Objects.requireNonNull;
 
@@ -53,6 +55,7 @@ public class HiveTableHandle
     private final Optional<List<TupleDomain<HiveColumnHandle>>> disjunctCompactEffectivePredicate;
     private final boolean suitableToPush;
 //    private final RowExpression remainingPredicate; //For Complex Expression.
+    private final AcidTransaction transaction;
 
     @JsonCreator
     public HiveTableHandle(
@@ -82,6 +85,25 @@ public class HiveTableHandle
                 predicateColumns,
                 disjunctCompactEffectivePredicate,
                 suitableToPush);
+    }
+
+    @JsonIgnore
+    public Optional<HiveUpdateProcessor> getUpdateProcessor()
+    {
+        return transaction.getUpdateProcessor();
+    }
+
+    @JsonIgnore
+    public long getWriteId()
+    {
+        checkState(transaction.isAcidTransactionRunning(), "The AcidTransaction is not running");
+        return transaction.getWriteId();
+    }
+
+    @JsonIgnore
+    public boolean isInAcidTransaction()
+    {
+        return transaction.isAcidTransactionRunning();
     }
 
     public HiveTableHandle(
@@ -122,6 +144,7 @@ public class HiveTableHandle
             Optional<List<TupleDomain<HiveColumnHandle>>> disjunctCompactEffectivePredicate,
             boolean suitableToPush)
     {
+        this.transaction = null;
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.tableParameters = requireNonNull(tableParameters, "tableParameters is null").map(ImmutableMap::copyOf);
@@ -161,6 +184,13 @@ public class HiveTableHandle
         return schemaName;
     }
 
+    @JsonProperty
+    public AcidTransaction getTransaction()
+    {
+        return transaction;
+    }
+
+    @Override
     @JsonProperty
     public String getTableName()
     {

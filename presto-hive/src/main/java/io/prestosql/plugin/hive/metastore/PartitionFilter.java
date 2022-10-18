@@ -16,6 +16,7 @@ package io.prestosql.plugin.hive.metastore;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import io.prestosql.spi.predicate.TupleDomain;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -30,17 +31,33 @@ public class PartitionFilter
 {
     private final HiveTableName hiveTableName;
     private final List<String> parts;
+    private final TupleDomain<String> partitionKeysFilter;
+    private final List<String> partitionColumnNames;
 
     @JsonCreator
     public PartitionFilter(@JsonProperty("hiveTableName") HiveTableName hiveTableName, @JsonProperty("parts") List<String> parts)
     {
+        this.partitionKeysFilter = null;
+        this.partitionColumnNames = null;
         this.hiveTableName = requireNonNull(hiveTableName, "hiveTableName is null");
         this.parts = ImmutableList.copyOf(requireNonNull(parts, "parts is null"));
+    }
+
+    @JsonProperty
+    public TupleDomain<String> getPartitionKeysFilter()
+    {
+        return partitionKeysFilter;
     }
 
     public static PartitionFilter partitionFilter(String databaseName, String tableName, List<String> parts)
     {
         return new PartitionFilter(HiveTableName.hiveTableName(databaseName, tableName), parts);
+    }
+
+    @JsonProperty
+    public List<String> getPartitionColumnNames()
+    {
+        return partitionColumnNames;
     }
 
     @JsonProperty

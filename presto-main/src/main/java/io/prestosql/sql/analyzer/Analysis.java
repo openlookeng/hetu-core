@@ -13,6 +13,8 @@
  */
 package io.prestosql.sql.analyzer;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
@@ -28,10 +30,13 @@ import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.eventlistener.ColumnDetail;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.type.Type;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FieldReference;
@@ -74,6 +79,7 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.spi.resourcegroups.QueryType.EXPLAIN;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableCollection;
@@ -89,6 +95,7 @@ public class Analysis
     private final List<Expression> parameters;
     private String updateType;
     private Optional<QualifiedObjectName> target = Optional.empty();
+    private Optional<UpdateTarget> updateTarget = Optional.empty();
 
     private final Map<NodeRef<Table>, Query> namedQueries = new LinkedHashMap<>();
 
@@ -172,11 +179,15 @@ public class Analysis
     private CubeInsert cubeInsert;
     private boolean cubeOverwrite;
 
+    private Optional<TableExecuteHandle> tableExecuteHandle = Optional.empty();
     // row id field for update/delete queries
     private final Map<NodeRef<Table>, FieldReference> rowIdField = new LinkedHashMap<>();
 
     // row id handle for update/delete queries
     private final Map<NodeRef<Table>, ColumnHandle> rowIdHandle = new LinkedHashMap<>();
+
+    private Optional<Boolean> tableExecuteReadsData;
+    private final QueryType queryType;
 
     public Analysis(@Nullable Statement root, List<Expression> parameters, boolean isDescribe)
     {
@@ -185,6 +196,24 @@ public class Analysis
         this.root = root;
         this.parameters = ImmutableList.copyOf(requireNonNull(parameters, "parameters is null"));
         this.isDescribe = isDescribe;
+        this.queryType = null;
+    }
+
+    public Optional<TableExecuteHandle> getTableExecuteHandle()
+    {
+        return tableExecuteHandle;
+    }
+
+    public void setTableExecuteReadsData(boolean readsData)
+    {
+        this.tableExecuteReadsData = Optional.of(readsData);
+    }
+
+    public void setTableExecuteHandle(TableExecuteHandle tableExecuteHandle)
+    {
+        requireNonNull(tableExecuteHandle, "tableExecuteHandle is null");
+        checkState(!this.tableExecuteHandle.isPresent(), "tableExecuteHandle already set");
+        this.tableExecuteHandle = Optional.of(tableExecuteHandle);
     }
 
     public Statement getOriginalStatement()
@@ -212,10 +241,22 @@ public class Analysis
         return target.map(table -> new Output(new CatalogName(table.getCatalogName()), table.getSchemaName(), table.getObjectName()));
     }
 
+    public void setUpdateTarget(QualifiedObjectName targetName, Optional<Table> targetTable, Optional<List<OutputColumn>> targetColumns)
+    {
+        this.updateTarget = Optional.of(new UpdateTarget(targetName, targetTable, targetColumns));
+    }
+
     public void setUpdateType(String updateType, QualifiedObjectName target)
     {
         this.updateType = updateType;
         this.target = Optional.of(target);
+    }
+
+    public void setUpdateType(String updateType)
+    {
+        if (queryType != EXPLAIN) {
+            this.updateType = updateType;
+        }
     }
 
     public void resetUpdateType()
@@ -1207,6 +1248,85 @@ public class Analysis
         public int hashCode()
         {
             return Objects.hash(table, column, identity);
+        }
+    }
+
+    private static class UpdateTarget
+    {
+        private final QualifiedObjectName name;
+        private final Optional<Table> table;
+        private final Optional<List<OutputColumn>> columns;
+
+        public UpdateTarget(QualifiedObjectName name, Optional<Table> table, Optional<List<OutputColumn>> columns)
+        {
+            this.name = requireNonNull(name, "name is null");
+            this.table = requireNonNull(table, "table is null");
+            this.columns = requireNonNull(columns, "columns is null").map(ImmutableList::copyOf);
+        }
+
+        public QualifiedObjectName getName()
+        {
+            return name;
+        }
+
+        public Optional<Table> getTable()
+        {
+            return table;
+        }
+
+        public Optional<List<OutputColumn>> getColumns()
+        {
+            return columns;
+        }
+    }
+
+    public static class SourceColumn
+    {
+        private final QualifiedObjectName tableName;
+        private final String columnName;
+
+        @JsonCreator
+        public SourceColumn(@JsonProperty("tableName") QualifiedObjectName tableName, @JsonProperty("columnName") String columnName)
+        {
+            this.tableName = requireNonNull(tableName, "tableName is null");
+            this.columnName = requireNonNull(columnName, "columnName is null");
+        }
+
+        @JsonProperty
+        public QualifiedObjectName getTableName()
+        {
+            return tableName;
+        }
+
+        @JsonProperty
+        public String getColumnName()
+        {
+            return columnName;
+        }
+
+        public ColumnDetail getColumnDetail()
+        {
+            return new ColumnDetail(tableName.getCatalogName(), tableName.getSchemaName(), tableName.getObjectName(), columnName);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(tableName, columnName);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj == this) {
+                return true;
+            }
+            if ((obj == null) || (getClass() != obj.getClass())) {
+                return false;
+            }
+            SourceColumn entry = (SourceColumn) obj;
+            return Objects.equals(tableName, entry.tableName) &&
+                    Objects.equals(columnName, entry.columnName);
         }
     }
 }

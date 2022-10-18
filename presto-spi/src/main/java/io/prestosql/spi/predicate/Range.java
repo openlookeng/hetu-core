@@ -31,6 +31,8 @@ public final class Range
 {
     private final Marker low;
     private final Marker high;
+    private final boolean lowInclusive;
+    private final boolean highInclusive;
 
     @JsonCreator
     public Range(
@@ -53,6 +55,8 @@ public final class Range
         }
         this.low = low;
         this.high = high;
+        this.lowInclusive = !low.isLowerUnbounded() && !low.isUpperUnbounded();
+        this.highInclusive = !high.isUpperUnbounded() && !high.isLowerUnbounded();
     }
 
     public static Range all(Type type)
@@ -85,6 +89,26 @@ public final class Range
         return new Range(Marker.exactly(type, value), Marker.exactly(type, value));
     }
 
+    public Object getLowBoundedValue()
+    {
+        return low.getValueBlock().orElseThrow(() -> new IllegalStateException("The range is low-unbounded"));
+    }
+
+    public Object getHighBoundedValue()
+    {
+        return high.getValueBlock().orElseThrow(() -> new IllegalStateException("The range is high-unbounded"));
+    }
+
+    public boolean isLowUnbounded()
+    {
+        return !low.getValueBlock().isPresent();
+    }
+
+    public boolean isHighUnbounded()
+    {
+        return !high.getValueBlock().isPresent();
+    }
+
     public static Range range(Type type, Object low, boolean lowInclusive, Object high, boolean highInclusive)
     {
         Marker lowMarker = lowInclusive ? Marker.exactly(type, low) : Marker.above(type, low);
@@ -103,39 +127,9 @@ public final class Range
         return low;
     }
 
-    public boolean isLowInclusive()
-    {
-        return low.getBound() == Marker.Bound.EXACTLY;
-    }
-
-    public boolean isLowUnbounded()
-    {
-        return low.isLowerUnbounded();
-    }
-
-    public Object getLowBoundedValue()
-    {
-        return low.getValue();
-    }
-
     public Optional<Object> getLowValue()
     {
         return low.getValueBlock().isPresent() ? Optional.of(low.getValue()) : Optional.empty();
-    }
-
-    public boolean isHighInclusive()
-    {
-        return high.getBound() == Marker.Bound.EXACTLY;
-    }
-
-    public boolean isHighUnbounded()
-    {
-        return high.isUpperUnbounded();
-    }
-
-    public Object getHighBoundedValue()
-    {
-        return high.getValue();
     }
 
     public Optional<Object> getHighValue()
@@ -255,5 +249,15 @@ public final class Range
             buffer.append((high.getBound() == Marker.Bound.EXACTLY) ? ']' : ')');
         }
         return buffer.toString();
+    }
+
+    public boolean isLowInclusive()
+    {
+        return lowInclusive;
+    }
+
+    public boolean isHighInclusive()
+    {
+        return highInclusive;
     }
 }

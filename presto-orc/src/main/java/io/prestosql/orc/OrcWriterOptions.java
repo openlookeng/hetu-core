@@ -14,7 +14,12 @@
 package io.prestosql.orc;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -45,6 +50,12 @@ public class OrcWriterOptions
     private final DataSize maxStringStatisticsLimit;
     private final DataSize maxCompressionBufferSize;
 
+    private final WriterIdentification writerIdentification;
+    private final boolean shouldCompactMinMax;
+
+    private final Set<String> bloomFilterColumns;
+    private final double bloomFilterFpp;
+
     public OrcWriterOptions()
     {
         this(
@@ -55,6 +66,19 @@ public class OrcWriterOptions
                 DEFAULT_DICTIONARY_MAX_MEMORY,
                 DEFAULT_MAX_STRING_STATISTICS_LIMIT,
                 DEFAULT_MAX_COMPRESSION_BUFFER_SIZE);
+    }
+
+    public enum WriterIdentification
+    {
+        /**
+         * Write ORC files with a writer identification and version number that is readable by Hive 2.0.0 to 2.2.0
+         */
+        LEGACY_HIVE_COMPATIBLE,
+
+        /**
+         * Write ORC files with Trino writer identification.
+         */
+        TRINO,
     }
 
     private OrcWriterOptions(
@@ -81,6 +105,21 @@ public class OrcWriterOptions
         this.dictionaryMaxMemory = dictionaryMaxMemory;
         this.maxStringStatisticsLimit = maxStringStatisticsLimit;
         this.maxCompressionBufferSize = maxCompressionBufferSize;
+
+        this.writerIdentification = WriterIdentification.TRINO;
+        this.shouldCompactMinMax = false; /*此处false随便写的*/
+        this.bloomFilterColumns = Collections.emptySet();
+        this.bloomFilterFpp = 0d;
+    }
+
+    public boolean isShouldCompactMinMax()
+    {
+        return shouldCompactMinMax;
+    }
+
+    public WriterIdentification getWriterIdentification()
+    {
+        return writerIdentification;
     }
 
     public DataSize getStripeMinSize()
@@ -165,5 +204,183 @@ public class OrcWriterOptions
                 .add("maxStringStatisticsLimit", maxStringStatisticsLimit)
                 .add("maxCompressionBufferSize", maxCompressionBufferSize)
                 .toString();
+    }
+
+    public boolean isBloomFilterColumn(String columnName)
+    {
+        return bloomFilterColumns.contains(columnName);
+    }
+
+    public double getBloomFilterFpp()
+    {
+        return bloomFilterFpp;
+    }
+
+    public OrcWriterOptions withBloomFilterFpp(double bloomFilterFpp)
+    {
+        return builderFrom(this)
+                .setBloomFilterFpp(bloomFilterFpp)
+                .build();
+    }
+
+    public static Builder builderFrom(OrcWriterOptions options)
+    {
+        return new Builder(options);
+    }
+
+    public static final class Builder
+    {
+        private WriterIdentification writerIdentification;
+        private DataSize stripeMinSize;
+        private DataSize stripeMaxSize;
+        private int stripeMaxRowCount;
+        private int rowGroupMaxRowCount;
+        private DataSize dictionaryMaxMemory;
+        private DataSize maxStringStatisticsLimit;
+        private DataSize maxCompressionBufferSize;
+        private Set<String> bloomFilterColumns;
+        private double bloomFilterFpp;
+        private boolean shouldCompactMinMax;
+
+        private Builder(OrcWriterOptions options)
+        {
+            requireNonNull(options, "options is null");
+
+            this.writerIdentification = options.writerIdentification;
+            this.stripeMinSize = options.stripeMinSize;
+            this.stripeMaxSize = options.stripeMaxSize;
+            this.stripeMaxRowCount = options.stripeMaxRowCount;
+            this.rowGroupMaxRowCount = options.rowGroupMaxRowCount;
+            this.dictionaryMaxMemory = options.dictionaryMaxMemory;
+            this.maxStringStatisticsLimit = options.maxStringStatisticsLimit;
+            this.maxCompressionBufferSize = options.maxCompressionBufferSize;
+            this.bloomFilterColumns = null != options.bloomFilterColumns ? ImmutableSet.copyOf(options.bloomFilterColumns) : new HashSet<>();
+            this.bloomFilterFpp = options.bloomFilterFpp;
+            this.shouldCompactMinMax = options.shouldCompactMinMax;
+        }
+
+        public Builder setWriterIdentification(WriterIdentification writerIdentification)
+        {
+            this.writerIdentification = writerIdentification;
+            return this;
+        }
+
+        public Builder setStripeMinSize(DataSize stripeMinSize)
+        {
+            this.stripeMinSize = stripeMinSize;
+            return this;
+        }
+
+        public Builder setStripeMaxSize(DataSize stripeMaxSize)
+        {
+            this.stripeMaxSize = stripeMaxSize;
+            return this;
+        }
+
+        public Builder setStripeMaxRowCount(int stripeMaxRowCount)
+        {
+            this.stripeMaxRowCount = stripeMaxRowCount;
+            return this;
+        }
+
+        public Builder setRowGroupMaxRowCount(int rowGroupMaxRowCount)
+        {
+            this.rowGroupMaxRowCount = rowGroupMaxRowCount;
+            return this;
+        }
+
+        public Builder setDictionaryMaxMemory(DataSize dictionaryMaxMemory)
+        {
+            this.dictionaryMaxMemory = dictionaryMaxMemory;
+            return this;
+        }
+
+        public Builder setMaxStringStatisticsLimit(DataSize maxStringStatisticsLimit)
+        {
+            this.maxStringStatisticsLimit = maxStringStatisticsLimit;
+            return this;
+        }
+
+        public Builder setMaxCompressionBufferSize(DataSize maxCompressionBufferSize)
+        {
+            this.maxCompressionBufferSize = maxCompressionBufferSize;
+            return this;
+        }
+
+        public Builder setBloomFilterColumns(Set<String> bloomFilterColumns)
+        {
+            this.bloomFilterColumns = bloomFilterColumns;
+            return this;
+        }
+
+        public Builder setBloomFilterFpp(double bloomFilterFpp)
+        {
+            this.bloomFilterFpp = bloomFilterFpp;
+            return this;
+        }
+
+        public Builder setShouldCompactMinMax(boolean shouldCompactMinMax)
+        {
+            this.shouldCompactMinMax = shouldCompactMinMax;
+            return this;
+        }
+
+        public OrcWriterOptions build()
+        {
+            return new OrcWriterOptions(
+                    writerIdentification,
+                    stripeMinSize,
+                    stripeMaxSize,
+                    stripeMaxRowCount,
+                    rowGroupMaxRowCount,
+                    dictionaryMaxMemory,
+                    maxStringStatisticsLimit,
+                    maxCompressionBufferSize,
+                    bloomFilterColumns,
+                    bloomFilterFpp,
+                    shouldCompactMinMax);
+        }
+    }
+
+    private OrcWriterOptions(
+            WriterIdentification writerIdentification,
+            DataSize stripeMinSize,
+            DataSize stripeMaxSize,
+            int stripeMaxRowCount,
+            int rowGroupMaxRowCount,
+            DataSize dictionaryMaxMemory,
+            DataSize maxStringStatisticsLimit,
+            DataSize maxCompressionBufferSize,
+            Set<String> bloomFilterColumns,
+            double bloomFilterFpp,
+            boolean shouldCompactMinMax)
+    {
+        requireNonNull(stripeMinSize, "stripeMinSize is null");
+        requireNonNull(stripeMaxSize, "stripeMaxSize is null");
+        checkArgument(stripeMaxRowCount >= 1, "stripeMaxRowCount must be at least 1");
+        checkArgument(rowGroupMaxRowCount >= 1, "rowGroupMaxRowCount must be at least 1");
+        requireNonNull(dictionaryMaxMemory, "dictionaryMaxMemory is null");
+        requireNonNull(maxStringStatisticsLimit, "maxStringStatisticsLimit is null");
+        requireNonNull(maxCompressionBufferSize, "maxCompressionBufferSize is null");
+        requireNonNull(bloomFilterColumns, "bloomFilterColumns is null");
+
+        this.writerIdentification = requireNonNull(writerIdentification, "writerIdentification is null");
+        this.stripeMinSize = stripeMinSize;
+        this.stripeMaxSize = stripeMaxSize;
+        this.stripeMaxRowCount = stripeMaxRowCount;
+        this.rowGroupMaxRowCount = rowGroupMaxRowCount;
+        this.dictionaryMaxMemory = dictionaryMaxMemory;
+        this.maxStringStatisticsLimit = maxStringStatisticsLimit;
+        this.maxCompressionBufferSize = maxCompressionBufferSize;
+        this.bloomFilterColumns = ImmutableSet.copyOf(bloomFilterColumns);
+        this.bloomFilterFpp = bloomFilterFpp;
+        this.shouldCompactMinMax = shouldCompactMinMax;
+    }
+
+    public OrcWriterOptions withWriterIdentification(WriterIdentification writerIdentification)
+    {
+        return builderFrom(this)
+                .setWriterIdentification(writerIdentification)
+                .build();
     }
 }

@@ -18,17 +18,43 @@ import io.airlift.slice.Slice;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.BlockBuilderStatus;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Stream;
 
+import static io.prestosql.spi.type.TypeOperatorDeclaration.NO_TYPE_OPERATOR_DECLARATION;
 import static java.util.Objects.requireNonNull;
 
 public interface Type
 {
+    default TypeId getTypeId()
+    {
+        return TypeId.of(getTypeSignature().toString());
+    }
+
+    Set<ColumnHandle> set = new CopyOnWriteArraySet<>();
+
+    default void setUpdateColumnHandle(ColumnHandle columnHandle)
+    {
+        set.add(columnHandle);
+    }
+
+    default Set<ColumnHandle> getUpdateColumnHandle()
+    {
+        return set;
+    }
+
+    default void clear()
+    {
+        set.clear();
+    }
+
     /**
      * Gets the name of this type which must be case insensitive globally unique.
      * The name of a user defined type must be a legal identifier in Presto.
@@ -222,5 +248,10 @@ public interface Type
     default <T> void write(BlockBuilder<T> blockBuilder, T value)
     {
         throw new NotImplementedException();
+    }
+
+    default TypeOperatorDeclaration getTypeOperatorDeclaration(TypeOperators typeOperators)
+    {
+        return NO_TYPE_OPERATOR_DECLARATION;
     }
 }

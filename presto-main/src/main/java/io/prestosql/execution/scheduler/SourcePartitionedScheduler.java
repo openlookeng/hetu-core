@@ -27,6 +27,8 @@ import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.TableExecuteContext;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.FixedSourcePartitionedScheduler.BucketedSplitPlacementPolicy;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.heuristicindex.SplitFiltering;
@@ -99,6 +101,7 @@ public class SourcePartitionedScheduler
         FINISHED
     }
 
+    private final TableExecuteContextManager tableExecuteContextManager;
     private final SqlStageExecution stage;
     private final SplitSource splitSource;
     private final SplitPlacementPolicy splitPlacementPolicy;
@@ -123,7 +126,8 @@ public class SourcePartitionedScheduler
             int splitBatchSize,
             boolean groupedExecution,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.partitionedNode = requireNonNull(partitionedNode, "partitionedNode is null");
@@ -131,7 +135,7 @@ public class SourcePartitionedScheduler
         this.splitPlacementPolicy = requireNonNull(splitPlacementPolicy, "splitPlacementPolicy is null");
         this.session = requireNonNull(session, "session is null");
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
-
+        this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
         checkArgument(splitBatchSize > 0, "splitBatchSize must be at least one");
         this.splitBatchSize = splitBatchSize;
         this.groupedExecution = groupedExecution;
@@ -158,10 +162,11 @@ public class SourcePartitionedScheduler
             SplitPlacementPolicy splitPlacementPolicy,
             int splitBatchSize,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource,
-                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager);
+                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager, tableExecuteContextManager);
         sourcePartitionedScheduler.startLifespan(Lifespan.taskWide(), NOT_PARTITIONED);
         sourcePartitionedScheduler.noMoreLifespans();
 
@@ -208,10 +213,11 @@ public class SourcePartitionedScheduler
             int splitBatchSize,
             boolean groupedExecution,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy,
-                splitBatchSize, groupedExecution, session, heuristicIndexerManager);
+                splitBatchSize, groupedExecution, session, heuristicIndexerManager, tableExecuteContextManager);
     }
 
     @Override
@@ -431,6 +437,15 @@ public class SourcePartitionedScheduler
                     throw new IllegalStateException("At least 1 split should have been scheduled for this plan node");
                 case SPLITS_ADDED:
                     state = State.NO_MORE_SPLITS;
+
+                    Optional<List<Object>> tableExecuteSplitsInfo = splitSource.getTableExecuteSplitsInfo();
+
+                    // Here we assume that we can get non-empty tableExecuteSplitsInfo only for queries which facilitate single split source.
+                    // TODO support grouped execution
+                    tableExecuteSplitsInfo.ifPresent(info -> {
+                        TableExecuteContext tableExecuteContext = tableExecuteContextManager.getTableExecuteContextForQuery(stage.getStageId().getQueryId());
+                        tableExecuteContext.setSplitsInfo(info);
+                    });
                     splitSource.close();
                     // fall through
                 case NO_MORE_SPLITS:

@@ -17,6 +17,7 @@ package io.prestosql.spi.dynamicfilter;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.predicate.TupleDomain;
 import io.prestosql.spi.util.BloomFilter;
 
 import java.io.ByteArrayInputStream;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class BloomFilterDynamicFilter
@@ -190,5 +192,23 @@ public class BloomFilterDynamicFilter
     public BloomFilter getBloomFilterDeserialized()
     {
         return bloomFilterDeserialized;
+    }
+
+    @Override
+    public boolean isAwaitable()
+    {
+        return false;
+    }
+
+    @Override
+    public CompletableFuture<?> isBlocked()
+    {
+        return null;
+    }
+
+    @Override
+    public TupleDomain<ColumnHandle> getCurrentPredicate()
+    {
+        return null;
     }
 }

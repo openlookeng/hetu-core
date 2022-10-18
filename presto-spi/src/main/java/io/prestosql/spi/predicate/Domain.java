@@ -95,6 +95,22 @@ public final class Domain
         return new Domain(ValueSet.of(type, values.get(0), values.subList(1, values.size()).toArray()), false);
     }
 
+    public static Domain multipleValues(Type type, List<?> values, boolean nullAllowed)
+    {
+        if (values.isEmpty()) {
+            throw new IllegalArgumentException("values cannot be empty");
+        }
+        if (values.size() == 1) {
+            return singleValue(type, values.get(0), nullAllowed);
+        }
+        return new Domain(ValueSet.of(type, values.get(0), values.subList(1, values.size()).toArray()), nullAllowed);
+    }
+
+    public static Domain singleValue(Type type, Object value, boolean nullAllowed)
+    {
+        return new Domain(ValueSet.of(type, value), nullAllowed);
+    }
+
     public Type getType()
     {
         return values.getType();

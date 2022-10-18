@@ -13,10 +13,13 @@
  */
 package io.prestosql.spi.type;
 
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.connector.ConnectorSession;
 
+import static io.prestosql.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static java.lang.String.format;
 
 //
 // A time is stored as milliseconds from midnight on 1970-01-01T00:00:00 in the time zone of the session.
@@ -25,11 +28,26 @@ import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 public final class TimeType
         extends AbstractLongType
 {
+    public static final int MAX_PRECISION = 12;
     public static final TimeType TIME = new TimeType();
+
+    private static final TimeType[] TYPES = new TimeType[MAX_PRECISION + 1];
+    public static final TimeType TIME_MICROS = new TimeType();
+
+    private final int precision;
 
     private TimeType()
     {
         super(parseTypeSignature(StandardTypes.TIME));
+        this.precision = 0;
+    }
+
+    public static TimeType createTimeType(int precision)
+    {
+        if (precision < 0 || precision > MAX_PRECISION) {
+            throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, format("TIME precision must be in range [0, %s]: %s", MAX_PRECISION, precision));
+        }
+        return TYPES[precision];
     }
 
     @Override
@@ -52,5 +70,10 @@ public final class TimeType
     public int hashCode()
     {
         return getClass().hashCode();
+    }
+
+    public int getPrecision()
+    {
+        return precision;
     }
 }

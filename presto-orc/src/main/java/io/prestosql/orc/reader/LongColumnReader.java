@@ -144,4 +144,6 @@ public class LongColumnReader
 
         return filter.testLong(value);
     }
+
+    protected void maybeTransformValues(long[] values, int nextBatchSize) {}
 }

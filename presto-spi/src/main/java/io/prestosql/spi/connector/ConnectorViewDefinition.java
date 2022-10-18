@@ -33,6 +33,13 @@ public class ConnectorViewDefinition
     private final List<ViewColumn> columns;
     private final Optional<String> owner;
     private final boolean runAsInvoker;
+    private final Optional<String> comment;
+
+    @JsonProperty
+    public String getOriginalSql()
+    {
+        return originalSql;
+    }
 
     @JsonCreator
     public ConnectorViewDefinition(
@@ -58,12 +65,13 @@ public class ConnectorViewDefinition
         if (columns.isEmpty()) {
             throw new IllegalArgumentException("columns list is empty");
         }
+        this.comment = Optional.empty();
     }
 
     @JsonProperty
-    public String getOriginalSql()
+    public Optional<String> getComment()
     {
-        return originalSql;
+        return comment;
     }
 
     @JsonProperty
@@ -140,5 +148,16 @@ public class ConnectorViewDefinition
         {
             return name + " " + type;
         }
+    }
+
+    public ConnectorViewDefinition withoutOwner()
+    {
+        return new ConnectorViewDefinition(
+                originalSql,
+                catalog,
+                schema,
+                columns,
+                Optional.empty(),
+                runAsInvoker);
     }
 }

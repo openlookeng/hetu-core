@@ -21,6 +21,7 @@ import io.prestosql.metadata.OutputTableHandle;
 import io.prestosql.metadata.UpdateTableHandle;
 import io.prestosql.metadata.VacuumTableHandle;
 import io.prestosql.spi.connector.ConnectorPageSink;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
 
 import java.util.Optional;
 
@@ -35,4 +36,6 @@ public interface PageSinkProvider
     ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, UpdateTableHandle tableHandle);
 
     ConnectorPageSink createPageSink(Session session, Optional<DriverPipelineTaskId> taskId, VacuumTableHandle tableHandle);
+
+    ConnectorPageSink createPageSink(Session session, TableExecuteHandle tableHandle);
 }

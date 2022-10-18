@@ -20,7 +20,7 @@ import io.prestosql.spi.snapshot.RestorableConfig;
 
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"frame"})
+@RestorableConfig(uncapturedFields = "frame")
 public final class FramedWindowFunction
         implements Restorable
 {

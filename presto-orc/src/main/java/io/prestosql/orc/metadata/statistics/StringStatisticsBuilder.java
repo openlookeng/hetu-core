@@ -36,9 +36,35 @@ public class StringStatisticsBuilder
     private Slice maximum;
     private long sum;
 
+    private final BloomFilterBuilder bloomFilterBuilder;
+    private final boolean shouldCompactMinMax;
+
     public StringStatisticsBuilder(int stringStatisticsLimitInBytes)
     {
         this(stringStatisticsLimitInBytes, 0, null, null, 0);
+    }
+
+    public StringStatisticsBuilder(int stringStatisticsLimitInBytes, BloomFilterBuilder bloomFilterBuilder, boolean shouldCompactMinMax)
+    {
+        this(stringStatisticsLimitInBytes, 0, null, null, 0, bloomFilterBuilder, shouldCompactMinMax);
+    }
+
+    private StringStatisticsBuilder(
+            int stringStatisticsLimitInBytes,
+            long nonNullValueCount,
+            Slice minimum,
+            Slice maximum,
+            long sum,
+            BloomFilterBuilder bloomFilterBuilder,
+            boolean shouldCompactMinMax)
+    {
+        this.stringStatisticsLimitInBytes = stringStatisticsLimitInBytes;
+        this.nonNullValueCount = nonNullValueCount;
+        this.minimum = minimum;
+        this.maximum = maximum;
+        this.sum = sum;
+        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder");
+        this.shouldCompactMinMax = shouldCompactMinMax;
     }
 
     private StringStatisticsBuilder(int stringStatisticsLimitInBytes, long nonNullValueCount, Slice minimum, Slice maximum, long sum)
@@ -48,6 +74,8 @@ public class StringStatisticsBuilder
         this.minimum = minimum;
         this.maximum = maximum;
         this.sum = sum;
+        this.bloomFilterBuilder = null;
+        this.shouldCompactMinMax = false;
     }
 
     public StringStatisticsBuilder withStringStatisticsLimit(int limitInBytes)

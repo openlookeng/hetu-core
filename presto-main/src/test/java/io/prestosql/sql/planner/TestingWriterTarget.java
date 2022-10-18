@@ -14,6 +14,8 @@
 
 package io.prestosql.sql.planner;
 
+import io.prestosql.Session;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 
 public class TestingWriterTarget
@@ -23,5 +25,11 @@ public class TestingWriterTarget
     public String toString()
     {
         return "testing handle";
+    }
+
+    @Override
+    public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
+    {
+        return false;
     }
 }

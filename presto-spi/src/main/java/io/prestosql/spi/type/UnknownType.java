@@ -19,8 +19,10 @@ import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.block.ByteArrayBlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.ScalarOperator;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
 
 public final class UnknownType
         extends AbstractType
@@ -139,5 +141,11 @@ public final class UnknownType
         // However, some logic (e.g. AbstractMinMaxBy) rely on writing a default value before the null check.
         checkArgument(!value);
         blockBuilder.appendNull();
+    }
+
+    @ScalarOperator(COMPARISON_UNORDERED_LAST)
+    private static long comparisonOperator(boolean unusedLeft, boolean unusedRight)
+    {
+        throw new AssertionError("value of unknown type should all be NULL");
     }
 }

@@ -28,11 +28,25 @@ import io.prestosql.transaction.TransactionId;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 public interface AccessControl
 {
+    default void checkCanSetMaterializedViewProperties(SecurityContext context, QualifiedObjectName materializedViewName, Map<String, Optional<Object>> properties)
+    {
+        throw new UnsupportedOperationException("not yet implemented");
+    }
+
+    default void checkCanSetTableProperties(SecurityContext context, QualifiedObjectName tableName, Map<String, Optional<Object>> properties)
+    {
+    }
+
+    default void checkCanExecuteTableProcedure(SecurityContext context, QualifiedObjectName tableName, String procedureName)
+    {
+    }
+
     /**
      * Check if the principal is allowed to be the specified user.
      *

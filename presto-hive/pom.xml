@@ -19,6 +19,136 @@
     <dependencies>
         <dependency>
             <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-hazelcast</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.hazelcast</groupId>
+                    <artifactId>hazelcast</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.ivy</groupId>
+            <artifactId>ivy</artifactId>
+            <version>2.4.0</version>
+        </dependency>
+        <dependency>
+            <groupId>aopalliance</groupId>
+            <artifactId>aopalliance</artifactId>
+            <version>1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.checkerframework</groupId>-->
+<!--           <artifactId>checker-qual</artifactId>-->
+<!--            <version>2.5.2</version>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-main</artifactId>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-geospatial-toolkit</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-spi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-expressions</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>hetu-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-array</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-parser</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-matching</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-memory-context</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-parquet</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.code.findbugs</groupId>
+                    <artifactId>jsr305</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjdk.jol</groupId>
+                    <artifactId>jol-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-plugin-toolkit</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-spi</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.airlift</groupId>
+                    <artifactId>slice</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.airlift</groupId>
+                    <artifactId>aircompressor</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.code.findbugs</groupId>
+                    <artifactId>jsr305</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjdk.jol</groupId>
+                    <artifactId>jol-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.esotericsoftware</groupId>
+                    <artifactId>kryo</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.hetu.core</groupId>
             <artifactId>presto-plugin-toolkit</artifactId>
         </dependency>
 
@@ -45,6 +175,10 @@
                 <exclusion>
                     <groupId>org.apache.parquet</groupId>
                     <artifactId>parquet-encoding</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>presto-main</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -350,6 +484,36 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>
             <scope>provided</scope>
+            <!--todo-->
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+        </dependency>
+
+        <!--<dependency>
+            <groupId>com.google.errorprone</groupId>
+            <artifactId>error_prone_annotations</artifactId>
+        </dependency>-->
+
+        <dependency>
+            <groupId>com.linkedin.calcite</groupId>
+            <artifactId>calcite-core</artifactId>
+            <version>1.21.0.151</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>commons-logging</artifactId>
+                    <groupId>commons-logging</groupId>
+                </exclusion>
+            </exclusions>
+            <!---->
         </dependency>
 
         <dependency>
@@ -399,7 +563,7 @@
             <artifactId>hetu-metastore</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <scope>test</scope>
@@ -413,13 +577,23 @@
                     <artifactId>tools</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
+        </dependency>-->
 
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <artifactId>javax.servlet-api</artifactId>
+                    <groupId>javax.servlet</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>javax.ws.rs-api</artifactId>
+                    <groupId>javax.ws.rs</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -437,6 +611,12 @@
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-tests</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.hetu.core</groupId>
+                    <artifactId>hetu-hazelcast</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -534,6 +714,127 @@
             <artifactId>commons-text</artifactId>
             <version>1.3</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.linkedin.coral</groupId>
+            <artifactId>coral-common</artifactId>
+            <version>2.0.55</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.prestosql.hive</groupId>
+                    <artifactId>hive-apache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hive</groupId>
+                    <artifactId>hive-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-common</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.prestosql.hadoop</groupId>
+                    <artifactId>hadoop-apache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.trino.hadoop</groupId>
+                    <artifactId>hadoop-apache</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.sun.jersey</groupId>
+                    <artifactId>jersey-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.linkedin.calcite</groupId>
+                    <artifactId>calcite-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>avro</artifactId>
+                    <groupId>org.apache.avro</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-beanutils</artifactId>
+                    <groupId>commons-beanutils</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-collections</artifactId>
+                    <groupId>commons-collections</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-lang</artifactId>
+                    <groupId>commons-lang</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>commons-logging</artifactId>
+                    <groupId>commons-logging</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hive-shims</artifactId>
+                    <groupId>org.apache.hive</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jackson-core-asl</artifactId>
+                    <groupId>org.codehaus.jackson</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jackson-mapper-asl</artifactId>
+                    <groupId>org.codehaus.jackson</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>jaxb-api</artifactId>
+                    <groupId>javax.xml.bind</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>netty</artifactId>
+                    <groupId>io.netty</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>protobuf-java</artifactId>
+                    <groupId>com.google.protobuf</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>slf4j-log4j12</artifactId>
+                    <groupId>org.slf4j</groupId>
+                </exclusion>
+                <exclusion>
+                    <artifactId>hive-metastore</artifactId>
+                    <groupId>org.apache.hive</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.linkedin.coral</groupId>
+            <artifactId>coral-hive</artifactId>
+            <version>2.0.55</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>antlr-runtime</artifactId>
+                    <groupId>org.antlr</groupId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.linkedin.coral</groupId>
+            <artifactId>coral-trino</artifactId>
+            <version>2.0.55</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 
     <profiles>

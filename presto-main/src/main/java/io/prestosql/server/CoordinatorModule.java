@@ -86,10 +86,12 @@ import io.prestosql.execution.RevokeRolesTask;
 import io.prestosql.execution.RevokeTask;
 import io.prestosql.execution.RollbackTask;
 import io.prestosql.execution.SetPathTask;
+import io.prestosql.execution.SetPropertiesTask;
 import io.prestosql.execution.SetRoleTask;
 import io.prestosql.execution.SetSessionTask;
 import io.prestosql.execution.SplitCacheStateManager;
 import io.prestosql.execution.SqlQueryManager;
+import io.prestosql.execution.StageInfo;
 import io.prestosql.execution.StartTransactionTask;
 import io.prestosql.execution.TaskInfo;
 import io.prestosql.execution.TaskManagerConfig;
@@ -165,6 +167,7 @@ import io.prestosql.sql.tree.Revoke;
 import io.prestosql.sql.tree.RevokeRoles;
 import io.prestosql.sql.tree.Rollback;
 import io.prestosql.sql.tree.SetPath;
+import io.prestosql.sql.tree.SetProperties;
 import io.prestosql.sql.tree.SetRole;
 import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.StartTransaction;
@@ -282,6 +285,7 @@ public class CoordinatorModule
 
         // query monitor
         jsonCodecBinder(binder).bindJsonCodec(StatsAndCosts.class);
+        jsonCodecBinder(binder).bindJsonCodec(StageInfo.class);
         configBinder(binder).bindConfig(QueryMonitorConfig.class);
         binder.bind(QueryMonitor.class).in(Scopes.SINGLETON);
 
@@ -367,7 +371,7 @@ public class CoordinatorModule
 
         //split cache map
         binder.bind(SplitCacheStateManager.class).in(Scopes.SINGLETON);
-
+        jsonCodecBinder(binder).bindJsonCodec(TaskUpdateRequest.class);
         binder.bind(RemoteTaskFactory.class).to(HttpRemoteTaskFactory.class).in(Scopes.SINGLETON);
         newExporter(binder).export(RemoteTaskFactory.class).withGeneratedName();
 
@@ -443,7 +447,7 @@ public class CoordinatorModule
         bindDataDefinitionTask(binder, executionBinder, DropIndex.class, DropIndexTask.class);
         bindDataDefinitionTask(binder, executionBinder, DropCube.class, DropCubeTask.class);
         bindDataDefinitionTask(binder, executionBinder, CreateCube.class, CreateCubeTask.class);
-
+        bindDataDefinitionTask(binder, executionBinder, SetProperties.class, SetPropertiesTask.class);
         MapBinder<String, ExecutionPolicy> executionPolicyBinder = newMapBinder(binder, String.class, ExecutionPolicy.class);
         executionPolicyBinder.addBinding("all-at-once").to(AllAtOnceExecutionPolicy.class);
         executionPolicyBinder.addBinding("phased").to(PhasedExecutionPolicy.class);

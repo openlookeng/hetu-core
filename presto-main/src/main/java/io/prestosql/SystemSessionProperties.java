@@ -1751,4 +1751,9 @@ public final class SystemSessionProperties
     {
         return session.getSystemProperty(QUERY_RESOURCE_TRACKING, Boolean.class);
     }
+
+    public static boolean isDynamicScheduleForGroupedExecution(Session session)
+    {
+        return session.getSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, Boolean.class);
+    }
 }

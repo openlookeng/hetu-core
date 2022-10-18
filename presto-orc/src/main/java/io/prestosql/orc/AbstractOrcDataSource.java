@@ -48,6 +48,9 @@ public abstract class AbstractOrcDataSource
     private long readBytes;
     private final long lastModifiedTime;
 
+    private final long estimatedSize;
+    private final OrcReaderOptions options;
+
     public AbstractOrcDataSource(OrcDataSourceId id, long size, DataSize maxMergeDistance, DataSize maxBufferSize, DataSize streamBufferSize, boolean lazyReadSmallRanges, long lastModifiedTime)
     {
         this.id = requireNonNull(id, "id is null");
@@ -60,6 +63,23 @@ public abstract class AbstractOrcDataSource
         this.streamBufferSize = requireNonNull(streamBufferSize, "streamBufferSize is null");
         this.lazyReadSmallRanges = lazyReadSmallRanges;
         this.lastModifiedTime = lastModifiedTime;
+
+        this.estimatedSize = 0L;
+        this.options = null;
+    }
+
+    public AbstractOrcDataSource(OrcDataSourceId id, long estimatedSize, OrcReaderOptions options)
+    {
+        this.id = requireNonNull(id, "id is null");
+        this.estimatedSize = estimatedSize;
+        this.options = requireNonNull(options, "options is null");
+
+        this.maxMergeDistance = options.getMaxMergeDistance();
+        this.maxBufferSize = options.getMaxBufferSize();
+        this.streamBufferSize = options.getStreamBufferSize();
+        this.lazyReadSmallRanges = false;
+        this.lastModifiedTime = 0L;
+        this.size = estimatedSize;
     }
 
     protected abstract void readInternal(long position, byte[] buffer, int bufferOffset, int bufferLength)
@@ -81,6 +101,31 @@ public abstract class AbstractOrcDataSource
     public final long getReadTimeNanos()
     {
         return readTimeNanos;
+    }
+
+    @Override
+    public long getEstimatedSize()
+    {
+        return estimatedSize;
+    }
+
+    @Override
+    public Slice readTail(int length) throws IOException
+    {
+        long start = System.nanoTime();
+
+        Slice tailSlice = readTailInternal(length);
+
+        readTimeNanos += System.nanoTime() - start;
+        readBytes += tailSlice.length();
+
+        return tailSlice;
+    }
+
+    protected Slice readTailInternal(int length)
+            throws IOException
+    {
+        return readFully(estimatedSize - length, length);
     }
 
     @Override
@@ -307,6 +352,12 @@ public abstract class AbstractOrcDataSource
                     .add("diskRange", diskRange)
                     .toString();
         }
+    }
+
+    @Override
+    public long getRetainedSize()
+    {
+        return 0;
     }
 
     private class DiskOrcDataReader

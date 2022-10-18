@@ -92,6 +92,11 @@ public class LongColumnWriter
         dataStream.recordCheckpoint();
     }
 
+    protected long transformValue(long value)
+    {
+        return value;
+    }
+
     @Override
     public void writeBlock(Block block)
     {

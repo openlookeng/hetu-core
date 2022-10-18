@@ -42,6 +42,7 @@ public final class SecureObjectInputStream
         this.acceptedClasses = acceptedClasses;
     }
 
+    @Override
     protected Class<?> resolveClass(ObjectStreamClass desc)
             throws IOException, ClassNotFoundException
     {

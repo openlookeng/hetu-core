@@ -58,6 +58,28 @@ public interface ConnectorSplitManager
         return getSplits(transaction, session, table, splitSchedulingStrategy);
     }
 
+    default ConnectorSplitSource getSplits(
+            ConnectorTransactionHandle transaction,
+            ConnectorSession session,
+            ConnectorTableHandle table,
+            SplitSchedulingStrategy splitSchedulingStrategy,
+            DynamicFilter dynamicFilter,
+            Constraint constraint)
+    {
+        return getSplits(transaction, session, table, splitSchedulingStrategy, dynamicFilter);
+    }
+
+    @Deprecated
+    default ConnectorSplitSource getSplits(
+            ConnectorTransactionHandle transaction,
+            ConnectorSession session,
+            ConnectorTableHandle table,
+            SplitSchedulingStrategy splitSchedulingStrategy,
+            DynamicFilter dynamicFilter)
+    {
+        throw new UnsupportedOperationException();
+    }
+
     enum SplitSchedulingStrategy
     {
         UNGROUPED_SCHEDULING,

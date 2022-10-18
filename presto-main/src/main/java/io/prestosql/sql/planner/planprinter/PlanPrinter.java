@@ -102,6 +102,7 @@ import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -415,6 +416,20 @@ public class PlanPrinter
         public Void visitExplainAnalyze(ExplainAnalyzeNode node, Void context)
         {
             addNode(node, "ExplainAnalyze");
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitTableExecute(PlanNode node, Void context)
+        {
+            TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
+            NodeRepresentation nodeOutput = addNode(tableExecuteNode, "TableExecute");
+            for (int i = 0; i < tableExecuteNode.getColumnNames().size(); i++) {
+                String name = tableExecuteNode.getColumnNames().get(i);
+                Symbol symbol = tableExecuteNode.getColumns().get(i);
+                nodeOutput.appendDetailsLine("%s := %s", name, symbol);
+            }
+
             return processChildren(node, context);
         }
 

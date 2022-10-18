@@ -22,6 +22,7 @@ import io.prestosql.spi.block.RowBlockBuilder;
 import io.prestosql.spi.connector.ConnectorSession;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -270,5 +271,10 @@ public class RowType
         if (isNull) {
             throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "ROW comparison not supported for fields with null elements");
         }
+    }
+
+    public static RowType rowType(Field... field)
+    {
+        return from(Arrays.asList(field));
     }
 }

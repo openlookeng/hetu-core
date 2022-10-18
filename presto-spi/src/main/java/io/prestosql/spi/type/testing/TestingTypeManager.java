@@ -17,8 +17,10 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.function.OperatorType;
 import io.prestosql.spi.type.ParametricType;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeId;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeNotFoundException;
+import io.prestosql.spi.type.TypeOperators;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
 
@@ -98,5 +100,22 @@ public class TestingTypeManager
     public MethodHandle resolveOperator(OperatorType operatorType, List<? extends Type> argumentTypes)
     {
         return nativeValueGetter(argumentTypes.get(0));
+    }
+
+    @Override
+    public Type getType(TypeId id)
+    {
+        for (Type type : getTypes()) {
+            if (type.getTypeId().equals(id)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Type not found: " + id);
+    }
+
+    @Override
+    public TypeOperators getTypeOperators()
+    {
+        return new TypeOperators();
     }
 }

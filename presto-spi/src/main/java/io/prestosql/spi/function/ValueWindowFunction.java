@@ -17,7 +17,7 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 
-@RestorableConfig(uncapturedFields = {"windowIndex"})
+@RestorableConfig(uncapturedFields = "windowIndex")
 public abstract class ValueWindowFunction
         implements WindowFunction
 {

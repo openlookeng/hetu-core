@@ -92,6 +92,7 @@ import io.prestosql.metadata.ForNodeManager;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.HandleJsonModule;
 import io.prestosql.metadata.InternalNodeManager;
+import io.prestosql.metadata.MaterializedViewPropertyManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.MetadataManager;
 import io.prestosql.metadata.SchemaPropertyManager;
@@ -297,6 +298,9 @@ public class ServerMainModule
         // table properties
         binder.bind(TablePropertyManager.class).in(Scopes.SINGLETON);
 
+        // materialized view properties
+        binder.bind(MaterializedViewPropertyManager.class).in(Scopes.SINGLETON);
+
         // column properties
         binder.bind(ColumnPropertyManager.class).in(Scopes.SINGLETON);
 
@@ -344,8 +348,8 @@ public class ServerMainModule
         newExporter(binder).export(TaskExecutorResource.class).withGeneratedName();
         binder.bind(TaskManagementExecutor.class).in(Scopes.SINGLETON);
         binder.bind(SqlTaskManager.class).in(Scopes.SINGLETON);
-        binder.bind(TaskManager.class).to(Key.get(SqlTaskManager.class));
         binder.bind(TableExecuteContextManager.class).in(Scopes.SINGLETON);
+        binder.bind(TaskManager.class).to(Key.get(SqlTaskManager.class));
 
         // memory revoking scheduler
         binder.bind(MemoryRevokingScheduler.class).in(Scopes.SINGLETON);

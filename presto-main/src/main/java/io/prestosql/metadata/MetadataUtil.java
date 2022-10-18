@@ -19,6 +19,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.prestosql.Session;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -43,6 +45,7 @@ import static io.prestosql.spi.security.PrincipalType.USER;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.CATALOG_NOT_SPECIFIED;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.INVALID_SCHEMA_NAME;
 import static io.prestosql.sql.analyzer.SemanticErrorCode.SCHEMA_NOT_SPECIFIED;
+import static io.prestosql.sql.analyzer.SemanticException.semanticException;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -295,5 +298,11 @@ public final class MetadataUtil
         {
             return new ConnectorTableMetadata(tableName, columns.build(), properties.build(), comment);
         }
+    }
+
+    public static CatalogName getRequiredCatalogHandle(Metadata metadata, Session session, Node node, String catalogName)
+    {
+        return metadata.getCatalogHandle(session, catalogName)
+                .orElseThrow(() -> semanticException(StandardErrorCode.CATALOG_NOT_FOUND, node, "Catalog '%s' does not exist", catalogName));
     }
 }

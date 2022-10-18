@@ -15,7 +15,10 @@ package io.prestosql.spi.expression;
 
 import io.prestosql.spi.type.Type;
 
+import java.util.List;
+
 import static java.lang.String.format;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 public class FieldDereference
@@ -39,6 +42,12 @@ public class FieldDereference
     public int getField()
     {
         return field;
+    }
+
+    @Override
+    public List<? extends ConnectorExpression> getChildren()
+    {
+        return singletonList(target);
     }
 
     @Override

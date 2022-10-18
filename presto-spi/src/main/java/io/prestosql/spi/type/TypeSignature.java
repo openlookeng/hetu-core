@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
+import static io.prestosql.spi.type.TypeSignatureParameter.typeParameter;
 import static java.lang.Character.isDigit;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
@@ -47,6 +48,11 @@ public class TypeSignature
         SIMPLE_TYPE_WITH_SPACES.add(StandardTypes.INTERVAL_DAY_TO_SECOND);
         SIMPLE_TYPE_WITH_SPACES.add(StandardTypes.INTERVAL_YEAR_TO_MONTH);
         SIMPLE_TYPE_WITH_SPACES.add("double precision");
+    }
+
+    public static TypeSignature mapType(TypeSignature keyType, TypeSignature valueType)
+    {
+        return new TypeSignature(StandardTypes.MAP, typeParameter(keyType), typeParameter(valueType));
     }
 
     public TypeSignature(String base, TypeSignatureParameter... parameters)

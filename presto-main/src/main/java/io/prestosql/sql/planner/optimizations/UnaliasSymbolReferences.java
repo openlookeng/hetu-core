@@ -37,6 +37,7 @@ import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
+import io.prestosql.spi.plan.PlanVisitor;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.SetOperationNode;
 import io.prestosql.spi.plan.Symbol;
@@ -78,6 +79,7 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -102,6 +104,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -158,6 +161,16 @@ public class UnaliasSymbolReferences
         {
             this.types = types;
             this.determinismEvaluator = new RowExpressionDeterminismEvaluator(metadata);
+        }
+
+        @Override
+        public PlanNode visitTableExecute(PlanNode node, RewriteContext<Void> context)
+        {
+            TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
+            PlanNode source = context.rewrite(tableExecuteNode.getSource());
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
+            TableExecuteNode res = mapper.map(tableExecuteNode, source);
+            return res;
         }
 
         @Override
@@ -906,6 +919,88 @@ public class UnaliasSymbolReferences
                 }
             }
             return builder.build();
+        }
+    }
+
+    private static class Visitor
+            extends PlanVisitor<PlanAndMappings, UnaliasContext>
+    {
+        private final Metadata metadata;
+        private final Function<Map<Symbol, Symbol>, SymbolMapper> mapperProvider;
+
+        public Visitor(Metadata metadata, Function<Map<Symbol, Symbol>, SymbolMapper> mapperProvider)
+        {
+            this.metadata = requireNonNull(metadata, "metadata is null");
+            this.mapperProvider = requireNonNull(mapperProvider, "mapperProvider is null");
+        }
+
+        @Override
+        public PlanAndMappings visitPlan(PlanNode node, UnaliasContext context)
+        {
+            return null;
+        }
+
+        @Override
+        public PlanAndMappings visitTableExecute(PlanNode node, UnaliasContext context)
+        {
+            TableExecuteNode tableExecuteNode = (TableExecuteNode) node;
+            PlanAndMappings rewrittenSource = tableExecuteNode.getSource().accept(this, context);
+            Map<Symbol, Symbol> mapping = new HashMap<>(rewrittenSource.getMappings());
+            SymbolMapper mapper = symbolMapper(mapping);
+
+            TableExecuteNode rewrittenTableExecute = mapper.map(tableExecuteNode, rewrittenSource.getRoot());
+
+            return new PlanAndMappings(rewrittenTableExecute, mapping);
+        }
+
+        private SymbolMapper symbolMapper(Map<Symbol, Symbol> mappings)
+        {
+            return mapperProvider.apply(mappings);
+        }
+    }
+
+    private static class PlanAndMappings
+    {
+        private final PlanNode root;
+        private final Map<Symbol, Symbol> mappings;
+
+        public PlanAndMappings(PlanNode root, Map<Symbol, Symbol> mappings)
+        {
+            this.root = requireNonNull(root, "root is null");
+            this.mappings = ImmutableMap.copyOf(requireNonNull(mappings, "mappings is null"));
+        }
+
+        public PlanNode getRoot()
+        {
+            return root;
+        }
+
+        public Map<Symbol, Symbol> getMappings()
+        {
+            return mappings;
+        }
+    }
+
+    private static class UnaliasContext
+    {
+        // Correlation mapping is a record of how correlation symbols have been mapped in the subplan which provides them.
+        // All occurrences of correlation symbols within the correlated subquery must be remapped accordingly.
+        // In case of nested correlation, correlationMappings has required mappings for correlation symbols from all levels of nesting.
+        private final Map<Symbol, Symbol> correlationMapping;
+
+        public UnaliasContext(Map<Symbol, Symbol> correlationMapping)
+        {
+            this.correlationMapping = requireNonNull(correlationMapping, "correlationMapping is null");
+        }
+
+        public static UnaliasContext empty()
+        {
+            return new UnaliasContext(ImmutableMap.of());
+        }
+
+        public Map<Symbol, Symbol> getCorrelationMapping()
+        {
+            return correlationMapping;
         }
     }
 }

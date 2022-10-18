@@ -21,6 +21,7 @@ import io.prestosql.spi.block.BlockBuilder;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +41,9 @@ import static java.math.RoundingMode.UNNECESSARY;
 public final class Decimals
 {
     private Decimals() {}
+
+    public static final Int128 MAX_UNSCALED_DECIMAL = Int128.valueOf("99999999999999999999999999999999999999");
+    public static final Int128 MIN_UNSCALED_DECIMAL = Int128.valueOf("-99999999999999999999999999999999999999");
 
     public static final int MAX_PRECISION = 38;
     public static final int MAX_SHORT_PRECISION = 18;
@@ -165,6 +169,50 @@ public final class Decimals
         catch (ArithmeticException ae) {
             return encodeScaledValue(value.setScale(scale, HALF_UP));
         }
+    }
+
+    public static Int128 encodeInt128Value(BigDecimal value, int scale)
+    {
+        return encodeScaledValue(value, scale, UNNECESSARY);
+    }
+
+    public static Int128 encodeScaledValue(BigDecimal value, int scale, RoundingMode roundingMode)
+    {
+        if (scale < 0) {
+            throw new IllegalArgumentException("scale is negative: " + scale);
+        }
+        return valueOf(value.setScale(scale, roundingMode));
+    }
+
+    public static Int128 valueOf(BigDecimal value)
+    {
+        return valueOf(value.unscaledValue());
+    }
+
+    public static Int128 valueOf(BigInteger value)
+    {
+        Int128 result;
+        try {
+            result = Int128.valueOf(value);
+        }
+        catch (Exception e) {
+            throw new ArithmeticException("Decimal overflow");
+        }
+        throwIfOverflows(result.getHigh(), result.getLow());
+        return result;
+    }
+
+    public static void throwIfOverflows(long high, long low)
+    {
+        if (overflows(high, low)) {
+            throw new ArithmeticException("Decimal overflow");
+        }
+    }
+
+    public static boolean overflows(long high, long low)
+    {
+        return Int128.compare(high, low, MAX_UNSCALED_DECIMAL.getHigh(), MAX_UNSCALED_DECIMAL.getLow()) > 0
+                || Int128.compare(high, low, MIN_UNSCALED_DECIMAL.getHigh(), MIN_UNSCALED_DECIMAL.getLow()) < 0;
     }
 
     /**
@@ -322,5 +370,10 @@ public final class Decimals
         if (!condition) {
             throw new IllegalArgumentException();
         }
+    }
+
+    public static String toString(Int128 unscaledValue, int scale)
+    {
+        return toString(unscaledValue.toString(), scale);
     }
 }

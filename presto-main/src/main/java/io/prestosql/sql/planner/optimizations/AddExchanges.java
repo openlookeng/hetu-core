@@ -71,6 +71,7 @@ import io.prestosql.sql.planner.plan.SortNode;
 import io.prestosql.sql.planner.plan.SpatialJoinNode;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
 import io.prestosql.sql.planner.plan.TableDeleteNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableUpdateNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
@@ -582,6 +583,40 @@ public class AddExchanges
                         source.getProperties());
             }
             return rebaseAndDeriveProperties(node, source);
+        }
+
+        @Override
+        public PlanWithProperties visitTableExecute(PlanNode planNode, PreferredProperties preferredProperties)
+        {
+            TableExecuteNode node = (TableExecuteNode) planNode;
+            return visitTableWriter(node, node.getPartitioningScheme(), node.getSource(), preferredProperties, node.getTarget());
+        }
+
+        private PlanWithProperties visitTableWriter(PlanNode node, Optional<PartitioningScheme> partitioningScheme, PlanNode source, PreferredProperties preferredProperties, TableWriterNode.WriterTarget writerTarget)
+        {
+            PlanWithProperties newSource = source.accept(this, preferredProperties);
+
+            Optional<PartitioningScheme> optionalPartitioningScheme = partitioningScheme;
+
+            if (!optionalPartitioningScheme.isPresent()) {
+                if (scaleWriters && writerTarget.supportsReportingWrittenBytes(metadata, session)) {
+                    optionalPartitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(SCALED_WRITER_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
+                }
+                else if (redistributeWrites) {
+                    optionalPartitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(FIXED_ARBITRARY_DISTRIBUTION, ImmutableList.of()), newSource.getNode().getOutputSymbols()));
+                }
+            }
+
+            if (optionalPartitioningScheme.isPresent() && !newSource.getProperties().isCompatibleTablePartitioningWith(optionalPartitioningScheme.get().getPartitioning(), false, metadata, session)) {
+                newSource = withDerivedProperties(
+                        partitionedExchange(
+                                idAllocator.getNextId(),
+                                REMOTE,
+                                newSource.getNode(),
+                                optionalPartitioningScheme.get()),
+                        newSource.getProperties());
+            }
+            return rebaseAndDeriveProperties(node, newSource);
         }
 
         private Optional<PlanWithProperties> planTableScan(TableScanNode node, RowExpression predicate)

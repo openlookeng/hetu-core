@@ -55,6 +55,7 @@ public class ThriftMetastoreStats
     private final ThriftMetastoreApiStats checkLock = new ThriftMetastoreApiStats();
     private final ThriftMetastoreApiStats validWriteIds = new ThriftMetastoreApiStats();
     private final ThriftMetastoreApiStats tableWriteId = new ThriftMetastoreApiStats();
+    private final ThriftMetastoreApiStats unlock = new ThriftMetastoreApiStats();
 
     @Managed
     @Nested
@@ -313,5 +314,12 @@ public class ThriftMetastoreStats
     public ThriftMetastoreApiStats getTableWriteId()
     {
         return tableWriteId;
+    }
+
+    @Managed
+    @Nested
+    public ThriftMetastoreApiStats getUnlock()
+    {
+        return unlock;
     }
 }

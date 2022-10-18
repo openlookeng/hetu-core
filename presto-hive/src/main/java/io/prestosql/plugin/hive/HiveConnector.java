@@ -182,7 +182,7 @@ public class HiveConnector
     public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
     {
         checkConnectorSupports(READ_UNCOMMITTED, isolationLevel);
-        ConnectorTransactionHandle transaction = new HiveTransactionHandle();
+        ConnectorTransactionHandle transaction = new HiveTransactionHandle(readOnly);
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             transactionManager.put(transaction, metadataFactory.get());
         }

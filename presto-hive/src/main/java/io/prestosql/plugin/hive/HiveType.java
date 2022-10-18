@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import static io.prestosql.plugin.hive.HiveTypeTranslator.toTypeInfo;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
@@ -74,7 +75,6 @@ import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils.getTypeInfosF
 public final class HiveType
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveType.class).instanceSize();
-
     public static final HiveType HIVE_BOOLEAN = new HiveType(booleanTypeInfo);
     public static final HiveType HIVE_BYTE = new HiveType(byteTypeInfo);
     public static final HiveType HIVE_SHORT = new HiveType(shortTypeInfo);
@@ -198,10 +198,15 @@ public final class HiveType
                 .collect(toList()));
     }
 
-    private static HiveType toHiveType(TypeInfo typeInfo)
+    public static HiveType toHiveType(TypeInfo typeInfo)
     {
         requireNonNull(typeInfo, "typeInfo is null");
         return new HiveType(typeInfo);
+    }
+
+    public static HiveType toHiveType(Type type)
+    {
+        return new HiveType(toTypeInfo(type));
     }
 
     public static HiveType toHiveType(TypeTranslator typeTranslator, Type type)

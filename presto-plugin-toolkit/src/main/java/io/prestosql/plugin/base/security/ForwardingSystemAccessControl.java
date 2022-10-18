@@ -26,6 +26,7 @@ import io.prestosql.spi.type.Type;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -49,6 +50,12 @@ public abstract class ForwardingSystemAccessControl
     }
 
     protected abstract SystemAccessControl delegate();
+
+    @Override
+    public void checkCanSetTableProperties(Identity context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+    {
+        delegate().checkCanSetTableProperties(context, table, properties);
+    }
 
     @Override
     public void checkCanSetUser(Optional<Principal> principal, String userName)

@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 public class Property
@@ -43,6 +44,17 @@ public class Property
         super(location);
         this.name = requireNonNull(name, "name is null");
         this.value = requireNonNull(value, "value is null");
+    }
+
+    public Expression getNonDefaultValue()
+    {
+        checkState(!isSetToDefault(), "Cannot get non-default value of property %s since its value is set to DEFAULT", name);
+        return value;
+    }
+
+    public boolean isSetToDefault()
+    {
+        return value == null;
     }
 
     public Identifier getName()

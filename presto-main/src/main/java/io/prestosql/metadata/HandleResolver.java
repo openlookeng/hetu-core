@@ -24,6 +24,7 @@ import io.prestosql.spi.connector.ConnectorInsertTableHandle;
 import io.prestosql.spi.connector.ConnectorOutputTableHandle;
 import io.prestosql.spi.connector.ConnectorPartitioningHandle;
 import io.prestosql.spi.connector.ConnectorSplit;
+import io.prestosql.spi.connector.ConnectorTableExecuteHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.ConnectorTableLayoutHandle;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
@@ -143,6 +144,11 @@ public class HandleResolver
         return getId(transactionHandle, MaterializedHandleResolver::getTransactionHandleClass);
     }
 
+    public String getId(ConnectorTableExecuteHandle connectorTableExecuteHandle)
+    {
+        return getId(connectorTableExecuteHandle, MaterializedHandleResolver::getTableExecuteHandleClass);
+    }
+
     public Class<? extends ConnectorTableHandle> getTableHandleClass(String id)
     {
         return resolverFor(id).getTableHandleClass().orElseThrow(() -> new IllegalArgumentException("No resolver for " + id));
@@ -171,6 +177,11 @@ public class HandleResolver
     public Class<? extends ConnectorOutputTableHandle> getOutputTableHandleClass(String id)
     {
         return resolverFor(id).getOutputTableHandleClass().orElseThrow(() -> new IllegalArgumentException("No resolver for " + id));
+    }
+
+    public Class<? extends ConnectorTableExecuteHandle> getTableExecuteHandleClass(String id)
+    {
+        return resolverFor(id).getTableExecuteHandleClass().orElseThrow(() -> new IllegalArgumentException("No resolver for " + id));
     }
 
     public Class<? extends ConnectorInsertTableHandle> getInsertTableHandleClass(String id)
@@ -299,6 +310,7 @@ public class HandleResolver
         private final Optional<Class<? extends ConnectorPartitioningHandle>> partitioningHandle;
         private final Optional<Class<? extends ConnectorTransactionHandle>> transactionHandle;
         private final Optional<Class<? extends ConnectorDeleteAsInsertTableHandle>> deleteAsInsertTableHandle;
+        private final Optional<Class<? extends ConnectorTableExecuteHandle>> connectorTableExecuteHandle;
 
         public MaterializedHandleResolver(ConnectorHandleResolver resolver)
         {
@@ -314,6 +326,7 @@ public class HandleResolver
             partitioningHandle = getHandleClass(resolver::getPartitioningHandleClass);
             transactionHandle = getHandleClass(resolver::getTransactionHandleClass);
             deleteAsInsertTableHandle = getHandleClass(resolver::getDeleteAsInsertTableHandleClass);
+            connectorTableExecuteHandle = getHandleClass(resolver::getTableExecuteHandleClass);
         }
 
         private static <T> Optional<Class<? extends T>> getHandleClass(Supplier<Class<? extends T>> callable)
@@ -384,6 +397,11 @@ public class HandleResolver
         public Optional<Class<? extends ConnectorTransactionHandle>> getTransactionHandleClass()
         {
             return transactionHandle;
+        }
+
+        public Optional<Class<? extends ConnectorTableExecuteHandle>> getTableExecuteHandleClass()
+        {
+            return connectorTableExecuteHandle;
         }
 
         @Override

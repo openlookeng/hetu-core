@@ -60,6 +60,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -80,6 +82,7 @@ import static io.prestosql.plugin.hive.metastore.HiveTableName.hiveTableName;
 import static io.prestosql.plugin.hive.metastore.MetastoreUtil.makePartitionName;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.hadoop.hive.common.FileUtils.makePartName;
 
 /**
  * Hive Metastore Cache
@@ -88,6 +91,12 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 public class CachingHiveMetastore
         implements HiveMetastore
 {
+    public enum StatsRecording
+    {
+        ENABLED,
+        DISABLED
+    }
+
     private static final Logger LOG = Logger.get(CachingHiveMetastore.class);
     public static final int PASSIVE_CACHE_VERIFICATION_THRESHOLD = 300 * 1000;
     public static final int TABLE_CACHE_CLEANUP_TIME = 2000;
@@ -112,6 +121,8 @@ public class CachingHiveMetastore
     private final boolean skipCache;
     private final boolean skipTableCache;
     private final boolean dontVerifyCacheEntry;
+
+    private final LoadingCache<TablesWithParameterCacheKey, List<String>> tablesWithParameterCache;
 
     @Inject
     public CachingHiveMetastore(@ForCachingHiveMetastore HiveMetastore delegate,
@@ -271,6 +282,14 @@ public class CachingHiveMetastore
 
         configValuesCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
                 .build(asyncReloading(CacheLoader.from(this::loadConfigValue), executor));
+
+        this.tablesWithParameterCache = newCacheBuilder(expiresAfterWriteMillisDB, refreshMillsDB, maximumSize)
+                .build(asyncReloading(CacheLoader.from(this::loadTablesMatchingParameter), executor));
+    }
+
+    private List<String> loadTablesMatchingParameter(TablesWithParameterCacheKey key)
+    {
+        return delegate.getTablesWithParameter(key.getDatabaseName(), key.getParameterKey(), key.getParameterValue());
     }
 
     @Override
@@ -423,6 +442,13 @@ public class CachingHiveMetastore
         }
 
         return get(tableCache, new WithIdentity<>(identity, HiveTableName.hiveTableName(databaseName, tableName)));
+    }
+
+    @Override
+    public List<String> getTablesWithParameter(String databaseName, String parameterKey, String parameterValue)
+    {
+        TablesWithParameterCacheKey key = new TablesWithParameterCacheKey(databaseName, parameterKey, parameterValue);
+        return get(tablesWithParameterCache, key);
     }
 
     @Override
@@ -662,6 +688,17 @@ public class CachingHiveMetastore
     }
 
     @Override
+    public void dropDatabase(String databaseName, boolean deleteData)
+    {
+        try {
+            delegate.dropDatabase(databaseName, deleteData);
+        }
+        finally {
+            invalidateDatabase(databaseName);
+        }
+    }
+
+    @Override
     public void renameDatabase(HiveIdentity inputIdentity, String databaseName, String newDatabaseName)
     {
         HiveIdentity identity = inputIdentity;
@@ -672,6 +709,17 @@ public class CachingHiveMetastore
         finally {
             invalidateDatabase(databaseName);
             invalidateDatabase(newDatabaseName);
+        }
+    }
+
+    @Override
+    public void setDatabaseOwner(String databaseName, HivePrincipal principal)
+    {
+        try {
+            delegate.setDatabaseOwner(databaseName, principal);
+        }
+        finally {
+            invalidateDatabase(databaseName);
         }
     }
 
@@ -688,6 +736,17 @@ public class CachingHiveMetastore
         identity = updateIdentity(identity);
         try {
             delegate.createTable(identity, table, principalPrivileges);
+        }
+        finally {
+            invalidateTable(table.getDatabaseName(), table.getTableName());
+        }
+    }
+
+    @Override
+    public void createTable(Table table, PrincipalPrivileges principalPrivileges)
+    {
+        try {
+            delegate.createTable(table, principalPrivileges);
         }
         finally {
             invalidateTable(table.getDatabaseName(), table.getTableName());
@@ -722,6 +781,18 @@ public class CachingHiveMetastore
     }
 
     @Override
+    public void replaceTable(String databaseName, String tableName, Table newTable, PrincipalPrivileges principalPrivileges)
+    {
+        try {
+            delegate.replaceTable(databaseName, tableName, newTable, principalPrivileges);
+        }
+        finally {
+            invalidateTable(databaseName, tableName);
+            invalidateTable(newTable.getDatabaseName(), newTable.getTableName());
+        }
+    }
+
+    @Override
     public void renameTable(HiveIdentity inputIdentity, String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         HiveIdentity identity = inputIdentity;
@@ -742,6 +813,17 @@ public class CachingHiveMetastore
         identity = updateIdentity(identity);
         try {
             delegate.commentTable(identity, databaseName, tableName, comment);
+        }
+        finally {
+            invalidateTable(databaseName, tableName);
+        }
+    }
+
+    @Override
+    public void commentColumn(String databaseName, String tableName, String columnName, Optional<String> comment)
+    {
+        try {
+            delegate.commentColumn(databaseName, tableName, columnName, comment);
         }
         finally {
             invalidateTable(databaseName, tableName);
@@ -787,7 +869,7 @@ public class CachingHiveMetastore
         }
     }
 
-    protected void invalidateTable(String databaseName, String tableName)
+    public void invalidateTable(String databaseName, String tableName)
     {
         invalidateTableCache(databaseName, tableName);
         tableNamesCache.invalidate(databaseName);
@@ -1369,5 +1451,32 @@ public class CachingHiveMetastore
             WithValidation that = (WithValidation) o;
             return Objects.equals(key, that.key);
         }
+    }
+
+    public void flushPartitionCache(String schemaName, String tableName, List<String> partitionColumns, List<String> partitionValues)
+    {
+        requireNonNull(schemaName, "schemaName is null");
+        requireNonNull(tableName, "tableName is null");
+        requireNonNull(partitionColumns, "partitionColumns is null");
+        requireNonNull(partitionValues, "partitionValues is null");
+        String providedPartitionName = makePartName(partitionColumns, partitionValues);
+        invalidatePartitionCache(schemaName, tableName, partitionNameToCheck -> Stream.of(partitionNameToCheck).map(value -> value.equals(providedPartitionName)).findFirst().orElse(false));
+    }
+
+    private void invalidatePartitionCache(String databaseName, String tableName, Predicate<Optional<String>> partitionPredicate)
+    {
+        HiveTableName hiveTableName = hiveTableName(databaseName, tableName);
+
+        partitionCache.asMap().keySet().stream()
+                .filter(partitionName -> partitionName.getKey().getHiveTableName().equals(hiveTableName) &&
+                        partitionPredicate.test(partitionName.getKey().getPartitionName()))
+                .forEach(partitionCache::invalidate);
+        partitionFilterCache.asMap().keySet().stream()
+                .filter(partitionFilter -> partitionFilter.getKey().getHiveTableName().equals(hiveTableName))
+                .forEach(partitionFilterCache::invalidate);
+        partitionStatisticsCache.asMap().keySet().stream()
+                .filter(partitionName -> partitionName.getKey().getHiveTableName().equals(hiveTableName) &&
+                        partitionPredicate.test(partitionName.getKey().getPartitionName()))
+                .forEach(partitionStatisticsCache::invalidate);
     }
 }

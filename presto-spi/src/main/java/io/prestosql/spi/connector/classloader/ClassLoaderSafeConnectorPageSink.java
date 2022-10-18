@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"classLoader"})
+@RestorableConfig(uncapturedFields = "classLoader")
 public class ClassLoaderSafeConnectorPageSink
         implements ConnectorPageSink
 {

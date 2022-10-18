@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.util.SizeOf;
@@ -47,6 +48,7 @@ public class HiveColumnHandle
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(HiveColumnHandle.class).instanceSize();
 
+    public static final int UPDATE_ROW_ID_COLUMN_INDEX = -16;
     public static final int PATH_COLUMN_INDEX = -11;
     public static final String PATH_COLUMN_NAME = "$path";
     public static final HiveType PATH_HIVE_TYPE = HIVE_STRING;
@@ -80,6 +82,12 @@ public class HiveColumnHandle
     //If the column is a partitionColumn or bucketing column, then this is required
     private final boolean required;
 
+    private final String baseColumnName;
+    private final Optional<HiveColumnProjectionInfo> hiveColumnProjectionInfo;
+    private final int baseHiveColumnIndex;
+    private final HiveType baseHiveType;
+    private final Type baseType;
+
     public HiveColumnHandle(
             String name,
             HiveType hiveType,
@@ -109,12 +117,29 @@ public class HiveColumnHandle
         this.columnType = requireNonNull(columnType, "columnType is null");
         this.comment = requireNonNull(comment, "comment is null");
         this.required = required;
+
+        this.baseColumnName = null;
+        this.baseType = null;
+        this.baseHiveType = null;
+        this.baseHiveColumnIndex = 0;
+        this.hiveColumnProjectionInfo = null;
+    }
+
+    @JsonProperty
+    public Optional<HiveColumnProjectionInfo> getHiveColumnProjectionInfo()
+    {
+        return hiveColumnProjectionInfo;
     }
 
     @JsonProperty
     public String getName()
     {
         return name;
+    }
+
+    public Type getType()
+    {
+        return hiveColumnProjectionInfo.map(HiveColumnProjectionInfo::getType).orElse(baseType);
     }
 
     @Override
@@ -178,6 +203,12 @@ public class HiveColumnHandle
     public boolean isRequired()
     {
         return required;
+    }
+
+    @JsonProperty
+    public String getBaseColumnName()
+    {
+        return baseColumnName;
     }
 
     @Override

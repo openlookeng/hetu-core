@@ -37,6 +37,7 @@ import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.tree.Expression;
@@ -71,6 +72,11 @@ public class SymbolMapper
         this.types = types;
     }
 
+    public static SymbolMapper symbolMapper(Map<Symbol, Symbol> mapping)
+    {
+        return null;
+    }
+
     public void setTypes(TypeProvider types)
     {
         this.types = types;
@@ -88,6 +94,36 @@ public class SymbolMapper
             canonical = mapping.get(canonical);
         }
         return new Symbol(canonical);
+    }
+
+    public TableExecuteNode map(TableExecuteNode node, PlanNode source)
+    {
+        return map(node, source, node.getId());
+    }
+
+    public TableExecuteNode map(TableExecuteNode node, PlanNode source, PlanNodeId newId)
+    {
+        // Intentionally does not use mapAndDistinct on columns as that would remove columns
+        return new TableExecuteNode(
+                newId,
+                source,
+                node.getTarget(),
+                map(node.getRowCountSymbol()),
+                map(node.getFragmentSymbol()),
+                map(node.getColumns()),
+                node.getColumnNames(),
+                node.getPartitioningScheme().map(partitioningScheme -> map(partitioningScheme, source.getOutputSymbols())),
+                node.getPreferredPartitioningScheme().map(partitioningScheme -> map(partitioningScheme, source.getOutputSymbols())));
+    }
+
+    public PartitioningScheme map(PartitioningScheme scheme, List<Symbol> sourceLayout)
+    {
+        return new PartitioningScheme(
+                scheme.getPartitioning().translate(this::map),
+                mapAndDistinct(sourceLayout),
+                scheme.getHashColumn().map(this::map),
+                scheme.isReplicateNullsAndAny(),
+                scheme.getBucketToPartition());
     }
 
     public VariableReferenceExpression map(VariableReferenceExpression variable)

@@ -72,6 +72,8 @@ import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
 import io.prestosql.sql.planner.plan.StatisticsWriterNode;
+import io.prestosql.sql.planner.plan.TableExecuteHandle;
+import io.prestosql.sql.planner.plan.TableExecuteNode;
 import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.planner.plan.TableWriterNode.VacuumTargetReference;
@@ -101,6 +103,8 @@ import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.sql.tree.StringLiteral;
+import io.prestosql.sql.tree.Table;
+import io.prestosql.sql.tree.TableExecute;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.VacuumTable;
 import io.prestosql.type.TypeCoercion;
@@ -114,6 +118,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -127,6 +132,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
+import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -139,6 +145,8 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.ParsingUtil.createParsingOptions;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static io.prestosql.sql.planner.PlanBuilder.newPlanBuilder;
+import static io.prestosql.sql.planner.QueryPlanner.visibleFields;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.sql.planner.plan.TableWriterNode.CreateReference;
@@ -174,26 +182,26 @@ public class LogicalPlanner
     private final UniqueIdAllocator uniqueIdAllocator = new UniqueIdAllocator();
 
     public LogicalPlanner(Session session,
-            List<PlanOptimizer> planOptimizers,
-            PlanNodeIdAllocator idAllocator,
-            Metadata metadata,
-            TypeAnalyzer typeAnalyzer,
-            StatsCalculator statsCalculator,
-            CostCalculator costCalculator,
-            WarningCollector warningCollector)
+                          List<PlanOptimizer> planOptimizers,
+                          PlanNodeIdAllocator idAllocator,
+                          Metadata metadata,
+                          TypeAnalyzer typeAnalyzer,
+                          StatsCalculator statsCalculator,
+                          CostCalculator costCalculator,
+                          WarningCollector warningCollector)
     {
         this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
     }
 
     public LogicalPlanner(Session session,
-            List<PlanOptimizer> planOptimizers,
-            PlanSanityChecker planSanityChecker,
-            PlanNodeIdAllocator idAllocator,
-            Metadata metadata,
-            TypeAnalyzer typeAnalyzer,
-            StatsCalculator statsCalculator,
-            CostCalculator costCalculator,
-            WarningCollector warningCollector)
+                          List<PlanOptimizer> planOptimizers,
+                          PlanSanityChecker planSanityChecker,
+                          PlanNodeIdAllocator idAllocator,
+                          Metadata metadata,
+                          TypeAnalyzer typeAnalyzer,
+                          StatsCalculator statsCalculator,
+                          CostCalculator costCalculator,
+                          WarningCollector warningCollector)
     {
         this.session = requireNonNull(session, "session is null");
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
@@ -295,9 +303,56 @@ public class LogicalPlanner
         else if (statement instanceof Explain && ((Explain) statement).isAnalyze()) {
             return createExplainAnalyzePlan(analysis, (Explain) statement);
         }
+        else if (statement instanceof TableExecute) {
+            return createTableExecutePlan(analysis, (TableExecute) statement);
+        }
         else {
             throw new PrestoException(NOT_SUPPORTED, "Unsupported statement type " + statement.getClass().getSimpleName());
         }
+    }
+
+    private RelationPlan createTableExecutePlan(Analysis analysis, TableExecute statement)
+    {
+        Table table = statement.getTable();
+        QualifiedObjectName tableName = createQualifiedObjectName(session, statement, table.getName());
+        TableExecuteHandle executeHandle = analysis.getTableExecuteHandle().orElseThrow(() -> new NoSuchElementException("No value present"));
+
+        TableHandle tableHandle = analysis.getTableHandle(table);
+        RelationPlan tableScanPlan = createRelationPlan(analysis, table);
+        PlanBuilder sourcePlanBuilder = newPlanBuilder(tableScanPlan, analysis, ImmutableMap.of());
+        PlanNode sourcePlanRoot = sourcePlanBuilder.getRoot();
+
+        TableMetadata tableMetadata = metadata.getTableMetadata(session, tableHandle);
+        List<String> columnNames = tableMetadata.getColumns().stream()
+                .filter(column -> !column.isHidden()) // todo this filter is redundant
+                .map(ColumnMetadata::getName)
+                .collect(toImmutableList());
+
+        List<Symbol> symbols = visibleFields(tableScanPlan);
+
+        // todo extract common method to be used here and in createTableWriterPlan()
+        Optional<PartitioningScheme> partitioningScheme = Optional.empty();
+        Optional<PartitioningScheme> preferredPartitioningScheme = Optional.empty();
+        TableWriterNode.TableExecuteTarget tableExecuteTarget = new TableWriterNode.TableExecuteTarget(executeHandle, Optional.empty(), tableName.asSchemaTableName(), false);
+        verify(columnNames.size() == symbols.size(), "columnNames.size() != symbols.size(): %s and %s", columnNames, symbols);
+        TableFinishNode commitNode = new TableFinishNode(
+                idAllocator.getNextId(),
+                new TableExecuteNode(
+                        idAllocator.getNextId(),
+                        sourcePlanRoot,
+                        tableExecuteTarget,
+                        planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                        planSymbolAllocator.newSymbol("fragment", VARBINARY),
+                        symbols,
+                        columnNames,
+                        partitioningScheme,
+                        preferredPartitioningScheme),
+                tableExecuteTarget,
+                planSymbolAllocator.newSymbol("rows", BIGINT),
+                Optional.empty(),
+                Optional.empty());
+
+        return new RelationPlan(commitNode, analysis.getRootScope(), commitNode.getOutputSymbols());
     }
 
     private RelationPlan createExplainAnalyzePlan(Analysis analysis, Explain statement)
@@ -539,7 +594,7 @@ public class LogicalPlanner
                         tableLastModifiedTimeSupplier.getAsLong(),
                         rewritten != null ? ExpressionFormatter.formatExpression(rewritten, Optional.empty()) : null,
                         insertCubeStatement.isOverwrite()),
-                        predicateColumnsType);
+                predicateColumnsType);
         return new RelationPlan(cubeFinishNode, analysis.getScope(insertCubeStatement), cubeFinishNode.getOutputSymbols());
     }
 

@@ -31,10 +31,36 @@ public class GlueHiveMetastoreConfig
     private Optional<String> awsAccessKey = Optional.empty();
     private Optional<String> awsSecretKey = Optional.empty();
     private Optional<String> catalogId = Optional.empty();
+    private Optional<String> awsCredentialsProvider = Optional.empty();
+    private Optional<String> externalId = Optional.empty();
+    private Optional<String> glueEndpointUrl = Optional.empty();
 
     public Optional<String> getGlueRegion()
     {
         return glueRegion;
+    }
+
+    public Optional<String> getExternalId()
+    {
+        return externalId;
+    }
+
+    public Optional<String> getAwsCredentialsProvider()
+    {
+        return awsCredentialsProvider;
+    }
+
+    public Optional<String> getGlueEndpointUrl()
+    {
+        return glueEndpointUrl;
+    }
+
+    @Config("hive.metastore.glue.endpoint-url")
+    @ConfigDescription("Glue API endpoint URL")
+    public GlueHiveMetastoreConfig setGlueEndpointUrl(String glueEndpointUrl)
+    {
+        this.glueEndpointUrl = Optional.ofNullable(glueEndpointUrl);
+        return this;
     }
 
     @Config("hive.metastore.glue.region")

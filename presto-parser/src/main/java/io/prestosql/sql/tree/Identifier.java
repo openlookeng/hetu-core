@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
 public class Identifier
@@ -96,5 +97,13 @@ public class Identifier
     public int hashCode()
     {
         return value.hashCode();
+    }
+
+    public String getCanonicalValue()
+    {
+        if (isDelimited()) {
+            return value;
+        }
+        return value.toUpperCase(ENGLISH);
     }
 }

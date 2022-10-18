@@ -32,7 +32,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 import static io.prestosql.spi.type.UnknownType.UNKNOWN;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"hashChannels"})
+@RestorableConfig(uncapturedFields = "hashChannels")
 public class ChannelSet
         implements Restorable
 {
@@ -82,7 +82,7 @@ public class ChannelSet
         return hash.contains(position, page, hashChannels, rawHash);
     }
 
-    @RestorableConfig(uncapturedFields = {"nullBlockPage"})
+    @RestorableConfig(uncapturedFields = "nullBlockPage")
     public static class ChannelSetBuilder
             implements Restorable
     {

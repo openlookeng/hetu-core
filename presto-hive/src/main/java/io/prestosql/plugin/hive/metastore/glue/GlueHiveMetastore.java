@@ -20,6 +20,9 @@ import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
+import com.amazonaws.handlers.RequestHandler2;
+import com.amazonaws.metrics.RequestMetricCollector;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.glue.AWSGlueAsync;
@@ -108,10 +111,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.function.Function;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_PARTITION_DROPPED_DURING_QUERY;
 import static io.prestosql.plugin.hive.HiveUtil.toPartitionValues;
+import static io.prestosql.plugin.hive.aws.AwsCurrentRegionHolder.getCurrentRegionFromEC2Metadata;
 import static io.prestosql.plugin.hive.metastore.MetastoreUtil.makePartitionName;
 import static io.prestosql.plugin.hive.metastore.glue.GlueExpressionUtil.buildGlueExpression;
 import static io.prestosql.plugin.hive.metastore.thrift.ThriftMetastoreUtil.getHiveBasicStatistics;
@@ -181,8 +186,7 @@ public class GlueHiveMetastore
     private static AWSCredentialsProvider getAwsCredentialsProvider(GlueHiveMetastoreConfig config)
     {
         if (config.getAwsAccessKey().isPresent() && config.getAwsSecretKey().isPresent()) {
-            return new AWSStaticCredentialsProvider(
-                new BasicAWSCredentials(config.getAwsAccessKey().get(), config.getAwsSecretKey().get()));
+            return new AWSStaticCredentialsProvider(new BasicAWSCredentials(config.getAwsAccessKey().get(), config.getAwsSecretKey().get()));
         }
         else if (config.getIamRole().isPresent()) {
             return new STSAssumeRoleSessionCredentialsProvider
@@ -895,5 +899,37 @@ public class GlueHiveMetastore
     public boolean isImpersonationEnabled()
     {
         throw new PrestoException(NOT_SUPPORTED, "isImpersonationEnabled is not supported by Glue");
+    }
+
+    public static AWSGlueAsync createAsyncGlueClient(GlueHiveMetastoreConfig config, AWSCredentialsProvider credentialsProvider, Optional<RequestHandler2> requestHandler, RequestMetricCollector metricsCollector)
+    {
+        ClientConfiguration clientConfig = new ClientConfiguration()
+                .withMaxConnections(config.getMaxGlueConnections())
+                .withMaxErrorRetry(config.getMaxGlueConnections());
+        AWSGlueAsyncClientBuilder asyncGlueClientBuilder = AWSGlueAsyncClientBuilder.standard()
+                .withMetricsCollector(metricsCollector)
+                .withClientConfiguration(clientConfig);
+
+        ImmutableList.Builder<RequestHandler2> requestHandlers = ImmutableList.builder();
+        requestHandler.ifPresent(requestHandlers::add);
+        config.getCatalogId().ifPresent(catalogId -> requestHandlers.add(new GlueCatalogIdRequestHandler(catalogId)));
+        asyncGlueClientBuilder.setRequestHandlers(requestHandlers.build().stream().toArray(RequestHandler2[]::new));
+
+        if (config.getGlueEndpointUrl().isPresent()) {
+            checkArgument(config.getGlueRegion().isPresent(), "Glue region must be set when Glue endpoint URL is set");
+            asyncGlueClientBuilder.setEndpointConfiguration(new EndpointConfiguration(
+                    config.getGlueEndpointUrl().get(),
+                    config.getGlueRegion().get()));
+        }
+        else if (config.getGlueRegion().isPresent()) {
+            asyncGlueClientBuilder.setRegion(config.getGlueRegion().get());
+        }
+        else if (config.getPinGlueClientToCurrentRegion()) {
+            asyncGlueClientBuilder.setRegion(getCurrentRegionFromEC2Metadata().getName());
+        }
+
+        asyncGlueClientBuilder.setCredentials(credentialsProvider);
+
+        return asyncGlueClientBuilder.build();
     }
 }

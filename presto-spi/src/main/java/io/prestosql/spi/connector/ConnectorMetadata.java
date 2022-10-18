@@ -30,6 +30,7 @@ import io.prestosql.spi.type.Type;
 import javax.annotation.Nullable;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -47,6 +49,26 @@ import static java.util.stream.Collectors.toList;
 
 public interface ConnectorMetadata
 {
+    default void setMaterializedViewProperties(ConnectorSession session, SchemaTableName viewName, Map<String, Optional<Object>> properties)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting materialized view properties");
+    }
+
+    default void setTableProperties(ConnectorSession session, ConnectorTableHandle tableHandle, Map<String, Optional<Object>> properties)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting table properties");
+    }
+
+    default boolean supportsReportingWrittenBytes(ConnectorSession session, SchemaTableName schemaTableName, Map<String, Object> tableProperties)
+    {
+        return false;
+    }
+
+    default boolean supportsReportingWrittenBytes(ConnectorSession session, ConnectorTableHandle connectorTableHandle)
+    {
+        return false;
+    }
+
     /**
      * Checks if a schema exists. The connector may have schemas that exist
      * but are not enumerable via {@link #listSchemaNames}.
@@ -223,6 +245,17 @@ public interface ConnectorMetadata
         return emptyMap();
     }
 
+    default Stream<TableColumnsMetadata> streamTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
+    {
+        return listTableColumns(session, prefix).entrySet().stream()
+                .map(entry -> TableColumnsMetadata.forTable(entry.getKey(), entry.getValue()));
+    }
+
+    default void createSchema(ConnectorSession session, String schemaName, Map<String, Object> properties, PrestoPrincipal owner)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support creating schemas");
+    }
+
     /**
      * Get statistics for table for given filtering constraint.
      */
@@ -255,6 +288,11 @@ public interface ConnectorMetadata
     default void renameSchema(ConnectorSession session, String source, String target)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support renaming schemas");
+    }
+
+    default void setSchemaAuthorization(ConnectorSession session, String schemaName, PrestoPrincipal principal)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting an owner on a schema");
     }
 
     /**
@@ -397,6 +435,157 @@ public interface ConnectorMetadata
     default ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, Optional<ConnectorNewTableLayout> layout)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support creating tables with data");
+    }
+
+    default Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+            ConnectorSession session,
+            ConnectorTableHandle tableHandle,
+            String procedureName,
+            Map<String, Object> executeProperties,
+            RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return getTableHandleForExecute(session, tableHandle, procedureName, executeProperties);
+    }
+
+    @Deprecated
+    default Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+            ConnectorSession session,
+            ConnectorTableHandle tableHandle,
+            String procedureName,
+            Map<String, Object> executeProperties)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support table procedures");
+    }
+
+    default void setViewAuthorization(ConnectorSession session, SchemaTableName viewName, PrestoPrincipal principal)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting an owner on a view");
+    }
+
+    default void setTableAuthorization(ConnectorSession session, SchemaTableName tableName, PrestoPrincipal principal)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting an owner on a table");
+    }
+
+    default boolean delegateMaterializedViewRefreshToConnector(ConnectorSession session, SchemaTableName viewName)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support materialized views");
+    }
+
+    default ConnectorInsertTableHandle beginRefreshMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle, List<ConnectorTableHandle> sourceTableHandles, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginRefreshMaterializedView(session, tableHandle, sourceTableHandles);
+    }
+
+    default Optional<ConnectorOutputMetadata> finishRefreshMaterializedView(
+            ConnectorSession session,
+            ConnectorTableHandle tableHandle,
+            ConnectorInsertTableHandle insertHandle,
+            Collection<Slice> fragments,
+            Collection<ComputedStatistics> computedStatistics,
+            List<ConnectorTableHandle> sourceTableHandles)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata beginRefreshMaterializedView() is implemented without finishRefreshMaterializedView()");
+    }
+
+    default Map<SchemaTableName, ConnectorMaterializedViewDefinition> getMaterializedViews(ConnectorSession session, Optional<String> schemaName)
+    {
+        Map<SchemaTableName, ConnectorMaterializedViewDefinition> materializedViews = new HashMap<>();
+        for (SchemaTableName name : listMaterializedViews(session, schemaName)) {
+            getMaterializedView(session, name).ifPresent(view -> materializedViews.put(name, view));
+        }
+        return materializedViews;
+    }
+
+    default void renameMaterializedView(ConnectorSession session, SchemaTableName source, SchemaTableName target)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support renaming materialized views");
+    }
+
+    default MaterializedViewFreshness getMaterializedViewFreshness(ConnectorSession session, SchemaTableName name)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata getMaterializedView() is implemented without getMaterializedViewFreshness()");
+    }
+
+    default Optional<ConnectorMaterializedViewDefinition> getMaterializedView(ConnectorSession session, SchemaTableName viewName)
+    {
+        return Optional.empty();
+    }
+
+    default void setColumnComment(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle column, Optional<String> comment)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support setting column comments");
+    }
+
+    default List<SchemaTableName> listMaterializedViews(ConnectorSession session, Optional<String> schemaName)
+    {
+        return Collections.emptyList();
+    }
+
+    default Optional<CatalogSchemaTableName> redirectTable(ConnectorSession session, SchemaTableName tableName)
+    {
+        return Optional.empty();
+    }
+
+    @Deprecated
+    default ConnectorInsertTableHandle beginRefreshMaterializedView(ConnectorSession session, ConnectorTableHandle tableHandle, List<ConnectorTableHandle> sourceTableHandles)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support materialized views");
+    }
+
+    default void dropMaterializedView(ConnectorSession session, SchemaTableName viewName)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support dropping materialized views");
+    }
+
+    default void createMaterializedView(ConnectorSession session, SchemaTableName viewName, ConnectorMaterializedViewDefinition definition, boolean replace, boolean ignoreExisting)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support creating materialized views");
+    }
+
+    default TableStatistics getTableStatistics(ConnectorSession session, ConnectorTableHandle tableHandle, Constraint constraint)
+    {
+        return TableStatistics.empty();
+    }
+
+    default void renameView(ConnectorSession session, SchemaTableName source, SchemaTableName target)
+    {
+        throw new PrestoException(NOT_SUPPORTED, "This connector does not support renaming views");
+    }
+
+    default void finishTableExecute(ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle, Collection<Slice> fragments, List<Object> tableExecuteState)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata getTableHandleForExecute() is implemented without finishTableExecute()");
+    }
+
+    default BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> beginTableExecute(ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle, ConnectorTableHandle updatedSourceTableHandle)
+    {
+        throw new PrestoException(GENERIC_INTERNAL_ERROR, "ConnectorMetadata getTableHandleForExecute() is implemented without beginTableExecute()");
+    }
+
+    default Optional<ConnectorNewTableLayout> getLayoutForTableExecute(ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle)
+    {
+        return Optional.empty();
+    }
+
+    default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> columns, RetryMode retryMode)
+    {
+        if (retryMode != RetryMode.NO_RETRIES) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support query retries");
+        }
+        return beginInsert(session, tableHandle, columns);
+    }
+
+    @Deprecated
+    default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> columns)
+    {
+        return beginInsert(session, tableHandle);
     }
 
     /**
@@ -1122,5 +1311,15 @@ public interface ConnectorMetadata
     default void refreshMetadataCache()
     {
         throw new UnsupportedOperationException("This connector does not support refreshing metadata cache");
+    }
+
+    default Map<String, Object> getSchemaProperties(ConnectorSession session, CatalogSchemaName schemaName)
+    {
+        return Collections.emptyMap();
+    }
+
+    default Optional<PrestoPrincipal> getSchemaOwner(ConnectorSession session, CatalogSchemaName schemaName)
+    {
+        return Optional.empty();
     }
 }

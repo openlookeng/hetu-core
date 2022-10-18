@@ -93,8 +93,10 @@ public class ProcedureRegistry
 
         for (int i = 0; i < procedure.getArguments().size(); i++) {
             Argument argument = procedure.getArguments().get(i);
+            if (argument.getType() == null) {
+                continue;
+            }
             Type type = metadata.getType(argument.getType());
-
             Class<?> argumentType = Primitives.unwrap(parameters.get(i));
             Class<?> expectedType = getObjectType(type);
             checkArgument(expectedType.equals(argumentType),

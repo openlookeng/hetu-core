@@ -626,4 +626,14 @@ public class BloomFilter
             return h;
         }
     }
+
+    public void addDouble(double val)
+    {
+        addLong(doubleToLongBits(val));
+    }
+
+    public void addFloat(float val)
+    {
+        addDouble(val);
+    }
 }

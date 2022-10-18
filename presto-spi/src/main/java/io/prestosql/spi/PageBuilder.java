@@ -31,7 +31,7 @@ import static java.lang.String.format;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"types"})
+@RestorableConfig(uncapturedFields = "types")
 public class PageBuilder
         implements Restorable
 {

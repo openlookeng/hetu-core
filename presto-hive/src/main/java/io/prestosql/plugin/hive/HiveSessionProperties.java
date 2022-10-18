@@ -91,6 +91,8 @@ public final class HiveSessionProperties
     private static final String ORC_PUSHDOWN_DATACACHE = "orc_pushdown_data_cache_enabled";
     private static final String WRITE_PARTITION_DISTRIBUTION = "write_partition_distribution";
     private static final String METASTORE_WRITE_BATCH_SIZE = "metastore_write_batch_size";
+    private static final String LEGACY_HIVE_VIEW_TRANSLATION = "legacy_hive_view_translation";
+    private static final String TIMESTAMP_PRECISION = "timestamp_precision";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -659,5 +661,15 @@ public final class HiveSessionProperties
     public static boolean isOrcPushdownDataCacheEnabled(ConnectorSession session)
     {
         return session.getProperty(ORC_PUSHDOWN_DATACACHE, Boolean.class);
+    }
+
+    public static boolean isLegacyHiveViewTranslation(ConnectorSession session)
+    {
+        return session.getProperty(LEGACY_HIVE_VIEW_TRANSLATION, Boolean.class);
+    }
+
+    public static HiveTimestampPrecision getTimestampPrecision(ConnectorSession session)
+    {
+        return session.getProperty(TIMESTAMP_PRECISION, HiveTimestampPrecision.class);
     }
 }

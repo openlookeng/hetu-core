@@ -22,6 +22,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
+import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.execution.scheduler.ScheduleResult.BlockedReason;
 import io.prestosql.execution.scheduler.group.DynamicLifespanScheduler;
 import io.prestosql.execution.scheduler.group.FixedLifespanScheduler;
@@ -77,13 +78,15 @@ public class FixedSourcePartitionedScheduler
             NodeSelector nodeSelector,
             List<ConnectorPartitionHandle> partitionHandles,
             Session session,
-            HeuristicIndexerManager heuristicIndexerManager)
+            HeuristicIndexerManager heuristicIndexerManager,
+            TableExecuteContextManager tableExecuteContextManager)
     {
         requireNonNull(stage, "stage is null");
         requireNonNull(splitSources, "splitSources is null");
         requireNonNull(bucketNodeMap, "bucketNodeMap is null");
         checkArgument(!requireNonNull(nodes, "nodes is null").isEmpty(), "nodes is empty");
         requireNonNull(partitionHandles, "partitionHandles is null");
+        requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
 
         this.stage = stage;
         this.nodes = ImmutableList.copyOf(nodes);
@@ -120,7 +123,8 @@ public class FixedSourcePartitionedScheduler
                     Math.max(splitBatchSize / concurrentLifespans, 1),
                     groupedExecutionForScanNode,
                     session,
-                    heuristicIndexerManager);
+                    heuristicIndexerManager,
+                    tableExecuteContextManager);
 
             if (stageExecutionDescriptor.isStageGroupedExecution() && !groupedExecutionForScanNode) {
                 sourceScheduler = new AsGroupedSourceScheduler(sourceScheduler);

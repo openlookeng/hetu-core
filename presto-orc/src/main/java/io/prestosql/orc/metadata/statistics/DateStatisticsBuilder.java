@@ -27,6 +27,18 @@ public class DateStatisticsBuilder
     private int minimum = Integer.MAX_VALUE;
     private int maximum = Integer.MIN_VALUE;
 
+    private final BloomFilterBuilder bloomFilterBuilder;
+
+    public DateStatisticsBuilder(BloomFilterBuilder bloomFilterBuilder)
+    {
+        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder is nulll");
+    }
+
+    public DateStatisticsBuilder()
+    {
+        this.bloomFilterBuilder = null;
+    }
+
     @Override
     public void addValue(long value)
     {

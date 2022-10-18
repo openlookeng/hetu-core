@@ -18,29 +18,19 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.airlift.json.ObjectMapperProvider;
-import io.airlift.log.Logger;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.TestingBlockEncodingSerde;
 import io.prestosql.spi.block.TestingBlockJsonSerde;
 import io.prestosql.spi.type.TestingTypeDeserializer;
 import io.prestosql.spi.type.TestingTypeManager;
 import io.prestosql.spi.type.Type;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import java.util.Collections;
-import java.util.Optional;
 
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.DecimalType.createDecimalType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
-import static io.prestosql.spi.type.IntegerType.INTEGER;
-import static io.prestosql.spi.type.SmallintType.SMALLINT;
-import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -48,8 +38,6 @@ import static org.testng.Assert.fail;
 
 public class TestSortedRangeSet
 {
-    private static final Logger LOGGER = Logger.get(TestSortedRangeSet.class);
-
     @Test
     public void testEmptySet()
     {
@@ -183,7 +171,6 @@ public class TestSortedRangeSet
             fail();
         }
         catch (IllegalStateException e) {
-            LOGGER.error("TestSortedRangeSet#testGetSingleValue error : %s", e.getMessage());
         }
     }
 
@@ -195,7 +182,6 @@ public class TestSortedRangeSet
             fail();
         }
         catch (IllegalStateException e) {
-            LOGGER.error("TestSortedRangeSet#testSpan error : %s", e.getMessage());
         }
 
         assertEquals(SortedRangeSet.all(BIGINT).getSpan(), Range.all(BIGINT));
@@ -449,122 +435,6 @@ public class TestSortedRangeSet
 
         set = SortedRangeSet.of(Range.equal(BOOLEAN, true), Range.equal(BOOLEAN, false));
         assertEquals(set, mapper.readValue(mapper.writeValueAsString(set), SortedRangeSet.class));
-    }
-
-    @DataProvider
-    public Object[][] denseTypes()
-    {
-        return new Object[][] {{BIGINT}, {INTEGER}, {SMALLINT}, {TINYINT}, {createDecimalType(2)}};
-    }
-
-    @Test(dataProvider = "denseTypes")
-    public void testExpandRangesForDenseType(Type type)
-    {
-        assertThat(ValueSet.ofRanges(Range.equal(type, 1L))
-                .tryExpandRanges(0))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.none(type)
-                .tryExpandRanges(0))
-                .isEqualTo(Optional.of(ImmutableList.of()));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, true))
-                .tryExpandRanges(10))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L, 5L)));
-
-        assertThat(ValueSet.of(type, 1L, 2L, 3L, 4L, 5L)
-                .tryExpandRanges(10))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L, 5L)));
-
-        type.getRange().ifPresent(range -> {
-            long min = (long) range.getMin();
-
-            assertThat(ValueSet.ofRanges(Range.range(type, min, true, min + 3, true))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(min, min + 1, min + 2, min + 3)));
-            assertThat(ValueSet.ofRanges(Range.lessThan(type, min + 4))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(min, min + 1, min + 2, min + 3)));
-            assertThat(ValueSet.ofRanges(Range.lessThanOrEqual(type, min + 3))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(min, min + 1, min + 2, min + 3)));
-
-            long max = (long) range.getMax();
-
-            assertThat(ValueSet.ofRanges(Range.range(type, max - 3, true, max, true))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(max - 3, max - 2, max - 1, max)));
-            assertThat(ValueSet.ofRanges(Range.greaterThan(type, max - 4))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(max - 3, max - 2, max - 1, max)));
-            assertThat(ValueSet.ofRanges(Range.greaterThanOrEqual(type, max - 3))
-                    .tryExpandRanges(10))
-                    .isEqualTo(Optional.of(ImmutableList.of(max - 3, max - 2, max - 1, max)));
-        });
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, true))
-                .tryExpandRanges(10))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L, 5L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, true))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L, 5L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 6L, true))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 6L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L, 5L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, false, 5L, true))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(2L, 3L, 4L, 5L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(1L, 2L, 3L, 4L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, false, 5L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(2L, 3L, 4L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, false, 2L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(Collections.emptyList()));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, false, 3L, false))
-                .tryExpandRanges(5))
-                .isEqualTo(Optional.of(ImmutableList.of(2L)));
-
-        assertThat(ValueSet.ofRanges(Range.range(type, 1L, true, 5L, true))
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.of(type, 1L, 2L, 3L, 4L, 5L)
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.ofRanges(Range.greaterThan(type, 1L))
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.ofRanges(Range.greaterThanOrEqual(type, 1L))
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.ofRanges(Range.lessThan(type, 1L))
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
-
-        assertThat(ValueSet.ofRanges(Range.lessThanOrEqual(type, 1L))
-                .tryExpandRanges(3))
-                .isEqualTo(Optional.empty());
     }
 
     private void assertUnion(SortedRangeSet first, SortedRangeSet second, SortedRangeSet expected)

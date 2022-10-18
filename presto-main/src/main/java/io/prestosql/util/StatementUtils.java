@@ -57,6 +57,7 @@ import io.prestosql.sql.tree.Revoke;
 import io.prestosql.sql.tree.RevokeRoles;
 import io.prestosql.sql.tree.Rollback;
 import io.prestosql.sql.tree.SetPath;
+import io.prestosql.sql.tree.SetProperties;
 import io.prestosql.sql.tree.SetRole;
 import io.prestosql.sql.tree.SetSession;
 import io.prestosql.sql.tree.ShowCache;
@@ -77,6 +78,7 @@ import io.prestosql.sql.tree.ShowTables;
 import io.prestosql.sql.tree.ShowViews;
 import io.prestosql.sql.tree.StartTransaction;
 import io.prestosql.sql.tree.Statement;
+import io.prestosql.sql.tree.TableExecute;
 import io.prestosql.sql.tree.Update;
 import io.prestosql.sql.tree.UpdateIndex;
 import io.prestosql.sql.tree.Use;
@@ -162,7 +164,8 @@ public final class StatementUtils
         builder.put(Prepare.class, QueryType.DATA_DEFINITION);
         builder.put(Deallocate.class, QueryType.DATA_DEFINITION);
         builder.put(SetPath.class, QueryType.DATA_DEFINITION);
-
+        builder.put(TableExecute.class, QueryType.ALTER_TABLE_EXECUTE);
+        builder.put(SetProperties.class, QueryType.DATA_DEFINITION);
         builder.put(VacuumTable.class, QueryType.VACUUM);
         STATEMENT_QUERY_TYPES = builder.build();
     }

@@ -21,6 +21,8 @@ import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.analyzer.Analysis;
 import io.prestosql.sql.tree.Expression;
+import io.prestosql.sql.tree.LambdaArgumentDeclaration;
+import io.prestosql.sql.tree.NodeRef;
 
 import java.util.Map;
 
@@ -40,6 +42,13 @@ class PlanBuilder
 
         this.translations = translations;
         this.root = root;
+    }
+
+    public static PlanBuilder newPlanBuilder(RelationPlan plan, Analysis analysis, Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaArguments)
+    {
+        return new PlanBuilder(
+                new TranslationMap(plan, analysis, lambdaArguments),
+                plan.getRoot());
     }
 
     public TranslationMap copyTranslations()

@@ -36,7 +36,7 @@ import static java.lang.String.format;
 import static java.lang.System.arraycopy;
 import static java.util.Objects.requireNonNull;
 
-@RestorableConfig(uncapturedFields = {"mapType"})
+@RestorableConfig(uncapturedFields = "mapType")
 public class MapBlockBuilder<T>
         extends AbstractMapBlock<T>
         implements BlockBuilder<Block<T>>

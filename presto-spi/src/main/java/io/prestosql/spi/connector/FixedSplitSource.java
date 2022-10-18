@@ -16,17 +16,22 @@ package io.prestosql.spi.connector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.completedFuture;
+import static java.util.stream.StreamSupport.stream;
 
 public class FixedSplitSource
         implements ConnectorSplitSource
 {
     private final List<ConnectorSplit> splits;
     private int offset;
+
+    private final Optional<List<Object>> tableExecuteSplitsInfo;
 
     public FixedSplitSource(Iterable<? extends ConnectorSplit> splits)
     {
@@ -36,6 +41,20 @@ public class FixedSplitSource
             splitsList.add(split);
         }
         this.splits = Collections.unmodifiableList(splitsList);
+        this.tableExecuteSplitsInfo = null;
+    }
+
+    public FixedSplitSource(Iterable<? extends ConnectorSplit> splits, List<Object> tableExecuteSplitsInfo)
+    {
+        this(splits, Optional.of(tableExecuteSplitsInfo));
+    }
+
+    private FixedSplitSource(Iterable<? extends ConnectorSplit> splits, Optional<List<Object>> tableExecuteSplitsInfo)
+    {
+        requireNonNull(splits, "splits is null");
+        requireNonNull(tableExecuteSplitsInfo, "tableExecuteSplitsInfo is null");
+        this.splits = stream(splits.spliterator(), false).collect(Collectors.collectingAndThen(Collectors.toList(), x -> Collections.unmodifiableList(x)));
+        this.tableExecuteSplitsInfo = requireNonNull(tableExecuteSplitsInfo, "tableExecuteSplitsInfo is null").map(item -> Collections.unmodifiableList(item));
     }
 
     @SuppressWarnings("ObjectEquality")

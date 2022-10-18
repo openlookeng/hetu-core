@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.plugin.base.security.TableAccessControlRule.TablePrivilege;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorAccessControl;
+import io.prestosql.spi.connector.ConnectorSecurityContext;
 import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.security.AccessDeniedException;
@@ -31,6 +32,7 @@ import javax.inject.Inject;
 
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -59,6 +61,7 @@ import static io.prestosql.spi.security.AccessDeniedException.denyRenameSchema;
 import static io.prestosql.spi.security.AccessDeniedException.denyRenameTable;
 import static io.prestosql.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
 import static io.prestosql.spi.security.AccessDeniedException.denySelectTable;
+import static io.prestosql.spi.security.AccessDeniedException.denySetTableProperties;
 import static io.prestosql.spi.security.AccessDeniedException.denyUpdateTable;
 
 public class FileBasedAccessControl
@@ -152,6 +155,14 @@ public class FileBasedAccessControl
     {
         if (!checkTablePermission(identity, tableName, OWNERSHIP)) {
             denyRenameTable(tableName.toString(), newTableName.toString());
+        }
+    }
+
+    @Override
+    public void checkCanSetTableProperties(ConnectorSecurityContext context, SchemaTableName tableName, Map<String, Optional<Object>> properties)
+    {
+        if (!checkTablePermission(context.getIdentity(), tableName, OWNERSHIP)) {
+            denySetTableProperties(tableName.toString());
         }
     }
 

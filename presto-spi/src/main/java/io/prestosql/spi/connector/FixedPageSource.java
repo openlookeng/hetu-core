@@ -46,6 +46,12 @@ public class FixedPageSource
     }
 
     @Override
+    public long getMemoryUsage()
+    {
+        return memoryUsageBytes;
+    }
+
+    @Override
     public long getCompletedBytes()
     {
         return completedBytes;
