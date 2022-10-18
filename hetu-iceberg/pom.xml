@@ -643,7 +643,7 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>hetu-mongodb</artifactId>
-            <version>1.8.0-SNAPSHOT</version>
+            <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
