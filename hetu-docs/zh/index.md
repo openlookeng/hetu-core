@@ -73,6 +73,7 @@ headless: true
     - [CarbonData]({{< relref "./docs/connector/carbondata.md" >}})
     - [ClickHouse]({{< relref "./docs/connector/clickhouse.md" >}})
     - [数据中心]({{< relref "./docs/connector/datacenter.md" >}})
+    - [达梦数据库]({{< relref "./docs/connector/dameng.md" >}})
     - [Elasticsearch]({{< relref "./docs/connector/elasticsearch.md" >}})
     - [Greenplum]({{< relref "./docs/connector/greenplum.md" >}})
     - [Hana]({{< relref "./docs/connector/hana.md" >}})
