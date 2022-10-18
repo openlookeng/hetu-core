@@ -161,6 +161,7 @@
         <module>hetu-mariadb</module>
         <module>hetu-singledata</module>
         <module>hetu-iceberg</module>
+        <module>hetu-dm</module>
     </modules>
 
     <dependencyManagement>

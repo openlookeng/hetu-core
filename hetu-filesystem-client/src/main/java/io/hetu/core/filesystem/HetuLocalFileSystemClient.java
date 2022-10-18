@@ -20,7 +20,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.AccessDeniedException;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -162,9 +161,7 @@ public class HetuLocalFileSystemClient
             throws IOException
     {
         // Need inline check to pass security check
-        if (!path.toAbsolutePath().startsWith(root)) {
-            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
-        }
+        validate(path);
         return Files.newInputStream(path);
     }
 
@@ -173,9 +170,7 @@ public class HetuLocalFileSystemClient
             throws IOException
     {
         // Need inline check to pass security check
-        if (!path.toAbsolutePath().startsWith(root)) {
-            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
-        }
+        validate(path);
         return Files.newOutputStream(path, options);
     }
 

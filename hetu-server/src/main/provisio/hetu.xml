@@ -287,6 +287,12 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/dm">
+        <artifact id="${project.groupId}:hetu-dm:zip:${project.version}">
+            <unpack/>
+        </artifact>
+    </artifactSet>
+
     <artifactSet to="plugin/hive-functions">
         <artifact id="${project.groupId}:hetu-hive-functions:zip:${project.version}">
             <unpack />
