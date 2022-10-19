@@ -355,6 +355,18 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::suspend);
     }
 
+    public List<TaskStatus> getTaskStatuses()
+    {
+        return getAllTasks().stream()
+                .map(RemoteTask::getTaskStatus)
+                .collect(toImmutableList());
+    }
+
+    public boolean isAnyTaskBlocked()
+    {
+        return getTaskStatuses().stream().anyMatch(TaskStatus::isOutputBufferOverutilized);
+    }
+
     public synchronized void resume()
     {
         stateMachine.transitionToRunning();

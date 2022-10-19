@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.scheduler;
+package io.prestosql.execution.scheduler.policy;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -67,7 +67,7 @@ public class AllAtOnceExecutionSchedule
     }
 
     @Override
-    public Set<SqlStageExecution> getStagesToSchedule()
+    public StagesScheduleResult getStagesToSchedule()
     {
         for (Iterator<SqlStageExecution> iterator = schedulingStages.iterator(); iterator.hasNext(); ) {
             StageState state = iterator.next().getState();
@@ -75,7 +75,7 @@ public class AllAtOnceExecutionSchedule
                 iterator.remove();
             }
         }
-        return schedulingStages;
+        return new StagesScheduleResult(schedulingStages);
     }
 
     @Override

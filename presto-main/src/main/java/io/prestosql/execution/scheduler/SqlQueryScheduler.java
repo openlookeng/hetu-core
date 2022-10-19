@@ -57,6 +57,9 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
+import io.prestosql.execution.scheduler.policy.ExecutionPolicy;
+import io.prestosql.execution.scheduler.policy.ExecutionSchedule;
+import io.prestosql.execution.scheduler.policy.StagesScheduleResult;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
@@ -1030,7 +1033,8 @@ public class SqlQueryScheduler
             ExecutionSchedule executionSchedule = executionPolicy.createExecutionSchedule(stages.values());
             while (!executionSchedule.isFinished()) {
                 List<ListenableFuture<?>> blockedStages = new ArrayList<>();
-                for (SqlStageExecution stage : executionSchedule.getStagesToSchedule()) {
+                StagesScheduleResult stagesScheduleResult = executionSchedule.getStagesToSchedule();
+                for (SqlStageExecution stage : stagesScheduleResult.getStagesToSchedule()) {
                     if (isReuseTableScanEnabled(session) && !SqlStageExecution.getReuseTableScanMappingIdStatus(stage.getStateMachine())) {
                         continue;
                     }
@@ -1111,6 +1115,11 @@ public class SqlQueryScheduler
 
                 // wait for a state change and then schedule again
                 if (!blockedStages.isEmpty()) {
+                    ImmutableList.Builder<ListenableFuture<?>> futures = ImmutableList.builder();
+                    futures.addAll(blockedStages);
+                    // allow for schedule to resume scheduling (e.g. when some active stage completes
+                    // and dependent stages can be started)
+                    stagesScheduleResult.getRescheduleFuture().ifPresent(futures::add);
                     try (TimeStat.BlockTimer timer = schedulerStats.getSleepTime().time()) {
                         tryGetFutureValue(whenAnyComplete(blockedStages), 1, SECONDS);
                     }
