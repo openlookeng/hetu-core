@@ -99,6 +99,7 @@ public final class SystemSessionProperties
     public static final String REORDER_JOINS = "reorder_joins";
     public static final String JOIN_REORDERING_STRATEGY = "join_reordering_strategy";
     public static final String MAX_REORDERED_JOINS = "max_reordered_joins";
+    public static final String JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR = "join_multi_clause_independence_factor";
     public static final String SKIP_REORDERING_THRESHOLD = "skip_reordering_threshold";
     public static final String INITIAL_SPLITS_PER_NODE = "initial_splits_per_node";
     public static final String SPLIT_CONCURRENCY_ADJUSTMENT_INTERVAL = "split_concurrency_adjustment_interval";
@@ -134,6 +135,7 @@ public final class SystemSessionProperties
     public static final String IGNORE_STATS_CALCULATOR_FAILURES = "ignore_stats_calculator_failures";
     public static final String MAX_DRIVERS_PER_TASK = "max_drivers_per_task";
     public static final String DEFAULT_FILTER_FACTOR_ENABLED = "default_filter_factor_enabled";
+    public static final String FILTER_CONJUNCTION_INDEPENDENCE_FACTOR = "filter_conjunction_independence_factor";
     public static final String UNWRAP_CASTS = "unwrap_casts";
     public static final String SKIP_REDUNDANT_SORT = "skip_redundant_sort";
     public static final String PREDICATE_PUSHDOWN_USE_TABLE_PROPERTIES = "predicate_pushdown_use_table_properties";
@@ -474,6 +476,15 @@ public final class SystemSessionProperties
                         },
                         value -> value),
                 new PropertyMetadata<>(
+                        JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR,
+                        "Scales the strength of independence assumption for selectivity estimates of multi-clause joins",
+                        DOUBLE,
+                        Double.class,
+                        featuresConfig.getJoinMultiClauseIndependenceFactor(),
+                        false,
+                        value -> validateDoubleRange(value, JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, 0.0, 1.0),
+                        value -> value),
+                new PropertyMetadata<>(
                         SKIP_REORDERING_THRESHOLD,
                         "Skip reordering joins if the number of joins in the logical plan is greater than this threshold",
                         BIGINT,
@@ -674,6 +685,15 @@ public final class SystemSessionProperties
                         "use a default filter factor for unknown filters in a filter node",
                         featuresConfig.isDefaultFilterFactorEnabled(),
                         false),
+                new PropertyMetadata<>(
+                        FILTER_CONJUNCTION_INDEPENDENCE_FACTOR,
+                        "Scales the strength of independence assumption for selectivity estimates of the conjunction of multiple filters",
+                        DOUBLE,
+                        Double.class,
+                        featuresConfig.getFilterConjunctionIndependenceFactor(),
+                        false,
+                        value -> validateDoubleRange(value, FILTER_CONJUNCTION_INDEPENDENCE_FACTOR, 0.0, 1.0),
+                        value -> value),
                 booleanProperty(
                         ENABLE_CROSS_REGION_DYNAMIC_FILTER,
                         "Enable cross region dynamic filtering",
@@ -1755,5 +1775,15 @@ public final class SystemSessionProperties
     public static boolean isDynamicScheduleForGroupedExecution(Session session)
     {
         return session.getSystemProperty(DYNAMIC_SCHEDULE_FOR_GROUPED_EXECUTION, Boolean.class);
+    }
+
+    public static double getJoinMultiClauseIndependenceFactor(Session session)
+    {
+        return session.getSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, Double.class);
+    }
+
+    public static double getFilterConjunctionIndependenceFactor(Session session)
+    {
+        return session.getSystemProperty(FILTER_CONJUNCTION_INDEPENDENCE_FACTOR, Double.class);
     }
 }

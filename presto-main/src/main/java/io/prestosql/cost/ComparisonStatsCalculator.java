@@ -22,7 +22,7 @@ import java.util.OptionalDouble;
 
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.cost.SymbolStatsEstimate.buildFrom;
-import static io.prestosql.util.MoreMath.firstNonNaN;
+import static io.prestosql.util.MoreMath.averageExcludingNaNs;
 import static io.prestosql.util.MoreMath.max;
 import static io.prestosql.util.MoreMath.min;
 import static java.lang.Double.MAX_VALUE;
@@ -262,16 +262,5 @@ public final class ComparisonStatsCalculator
         leftExpressionSymbol.ifPresent(symbol -> result.addSymbolStatistics(symbol, leftNullsFiltered));
         rightExpressionSymbol.ifPresent(symbol -> result.addSymbolStatistics(symbol, rightNullsFiltered));
         return result.build();
-    }
-
-    private static double averageExcludingNaNs(double first, double second)
-    {
-        if (isNaN(first) && isNaN(second)) {
-            return NaN;
-        }
-        if (!isNaN(first) && !isNaN(second)) {
-            return (first + second) / 2;
-        }
-        return firstNonNaN(first, second);
     }
 }
