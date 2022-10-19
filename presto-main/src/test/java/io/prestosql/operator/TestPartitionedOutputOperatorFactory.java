@@ -15,7 +15,8 @@ package io.prestosql.operator;
 
 import io.airlift.units.DataSize;
 import io.prestosql.execution.buffer.OutputBuffer;
-import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputOperatorFactory;
+import io.prestosql.operator.output.PartitionedOutputOperator.PartitionedOutputOperatorFactory;
+import io.prestosql.operator.output.PositionsAppenderFactory;
 import io.prestosql.spi.plan.PlanNodeId;
 import org.testng.annotations.Test;
 
@@ -32,6 +33,7 @@ public class TestPartitionedOutputOperatorFactory
     @Test
     public void testDuplicate()
     {
+        PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
         OutputBuffer outputBuffer = mock(OutputBuffer.class);
         PartitionedOutputOperatorFactory factory1 = new PartitionedOutputOperatorFactory(
                 1,
@@ -44,7 +46,8 @@ public class TestPartitionedOutputOperatorFactory
                 false,
                 OptionalInt.empty(),
                 outputBuffer,
-                DataSize.succinctBytes(1));
+                DataSize.succinctBytes(1),
+                positionsAppenderFactory);
         OperatorFactory factory2 = factory1.duplicate();
         OperatorFactory factory3 = factory1.duplicate();
         OperatorFactory factory4 = factory2.duplicate();
