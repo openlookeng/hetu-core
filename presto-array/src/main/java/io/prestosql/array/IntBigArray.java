@@ -190,11 +190,11 @@ public final class IntBigArray
         this.segments = myState.segments;
     }
 
-    private static class IntBigArrayState
+    public static class IntBigArrayState
             implements Serializable
     {
-        private int[][] array;
-        private int capacity;
-        private int segments;
+        public int[][] array;
+        public int capacity;
+        public int segments;
     }
 }

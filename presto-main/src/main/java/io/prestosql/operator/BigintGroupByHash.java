@@ -29,9 +29,11 @@ import io.prestosql.type.BigintOperators;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INSUFFICIENT_RESOURCES;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.type.TypeUtils.NULL_HASH_CODE;
@@ -51,8 +53,8 @@ public class BigintGroupByHash
     private int mask;
 
     // the hash table from values to groupIds
-    private LongBigArray values;
-    private IntBigArray groupIds;
+    private long[] values;
+    private int[] groupIds;
 
     // reverse index from the groupId back to the value
     private final LongBigArray valuesByGroupId;
@@ -74,10 +76,9 @@ public class BigintGroupByHash
 
         maxFill = calculateMaxFill(hashCapacity);
         mask = hashCapacity - 1;
-        values = new LongBigArray();
-        values.ensureCapacity(hashCapacity);
-        groupIds = new IntBigArray(-1);
-        groupIds.ensureCapacity(hashCapacity);
+        values = new long[hashCapacity];
+        groupIds = new int[hashCapacity];
+        Arrays.fill(groupIds, -1);
 
         valuesByGroupId = new LongBigArray();
         valuesByGroupId.ensureCapacity(hashCapacity);
@@ -103,8 +104,8 @@ public class BigintGroupByHash
     public long getEstimatedSize()
     {
         return INSTANCE_SIZE +
-                groupIds.sizeOf() +
-                values.sizeOf() +
+                sizeOf(groupIds) +
+                sizeOf(values) +
                 valuesByGroupId.sizeOf() +
                 preallocatedMemoryInBytes;
     }
@@ -167,15 +168,15 @@ public class BigintGroupByHash
         }
 
         long value = BIGINT.getLong(block, position);
-        long hashPosition = getHashPosition(value, mask);
+        int hashPosition = getHashPosition(value, mask);
 
         // look for an empty slot or a slot containing this key
         while (true) {
-            int groupId = groupIds.get(hashPosition);
+            int groupId = groupIds[hashPosition];
             if (groupId == -1) {
                 return false;
             }
-            if (value == values.get(hashPosition)) {
+            if (value == values[hashPosition]) {
                 return true;
             }
 
@@ -213,16 +214,16 @@ public class BigintGroupByHash
         }
 
         long value = BIGINT.getLong(block, position);
-        long hashPosition = getHashPosition(value, mask);
+        int hashPosition = getHashPosition(value, mask);
 
         // look for an empty slot or a slot containing this key
         while (true) {
-            int groupId = groupIds.get(hashPosition);
+            int groupId = groupIds[hashPosition];
             if (groupId == -1) {
                 break;
             }
 
-            if (value == values.get(hashPosition)) {
+            if (value == values[hashPosition]) {
                 return groupId;
             }
 
@@ -234,14 +235,14 @@ public class BigintGroupByHash
         return addNewGroup(hashPosition, value);
     }
 
-    private int addNewGroup(long hashPosition, long value)
+    private int addNewGroup(int hashPosition, long value)
     {
         // record group id in hash
         int groupId = nextGroupId++;
 
-        values.set(hashPosition, value);
+        values[hashPosition] = value;
         valuesByGroupId.set(groupId, value);
-        groupIds.set(hashPosition, groupId);
+        groupIds[hashPosition] = groupId;
 
         // increase capacity, if necessary
         if (needMoreCapacity()) {
@@ -271,10 +272,9 @@ public class BigintGroupByHash
         expectedHashCollisions += estimateNumberOfHashCollisions(getGroupCount(), hashCapacity);
 
         int newMask = newCapacity - 1;
-        LongBigArray newValues = new LongBigArray();
-        newValues.ensureCapacity(newCapacity);
-        IntBigArray newGroupIds = new IntBigArray(-1);
-        newGroupIds.ensureCapacity(newCapacity);
+        long[] newValues = new long[newCapacity];
+        int[] newGroupIds = new int[newCapacity];
+        Arrays.fill(newGroupIds, -1);
 
         for (int groupId = 0; groupId < nextGroupId; groupId++) {
             if (groupId == nullGroupId) {
@@ -283,15 +283,15 @@ public class BigintGroupByHash
             long value = valuesByGroupId.get(groupId);
 
             // find an empty slot for the address
-            long hashPosition = getHashPosition(value, newMask);
-            while (newGroupIds.get(hashPosition) != -1) {
+            int hashPosition = getHashPosition(value, newMask);
+            while (newGroupIds[hashPosition] != -1) {
                 hashPosition = (hashPosition + 1) & newMask;
                 hashCollisions++;
             }
 
             // record the mapping
-            newValues.set(hashPosition, value);
-            newGroupIds.set(hashPosition, groupId);
+            newValues[hashPosition] = value;
+            newGroupIds[hashPosition] = groupId;
         }
 
         mask = newMask;
@@ -304,9 +304,9 @@ public class BigintGroupByHash
         return true;
     }
 
-    private static long getHashPosition(long rawHash, int mask)
+    private static int getHashPosition(long rawHash, int mask)
     {
-        return murmurHash3(rawHash) & mask;
+        return (int) (murmurHash3(rawHash) & mask);
     }
 
     @Override
@@ -316,8 +316,8 @@ public class BigintGroupByHash
         myState.hashCapacity = hashCapacity;
         myState.maxFill = maxFill;
         myState.mask = mask;
-        myState.values = values.capture(serdeProvider);
-        myState.groupIds = groupIds.capture(serdeProvider);
+        myState.values = captureLong();
+        myState.groupIds = captureInt();
         myState.nullGroupId = nullGroupId;
         myState.valuesByGroupId = valuesByGroupId.capture(serdeProvider);
         myState.nextGroupId = nextGroupId;
@@ -328,6 +328,44 @@ public class BigintGroupByHash
         return myState;
     }
 
+    private Object captureLong()
+    {
+        LongBigArray.LongBigArrayState myState = new LongBigArray.LongBigArrayState();
+        long[] capturedArray = new long[this.values.length];
+        for (int i = 0; i < this.values.length; i++) {
+            capturedArray[i] = this.values[i];
+        }
+        myState.array[0] = capturedArray;
+        myState.capacity = this.hashCapacity;
+        return myState;
+    }
+
+    private Object captureInt()
+    {
+        IntBigArray.IntBigArrayState myState = new IntBigArray.IntBigArrayState();
+        int[] capturedArray = new int[this.groupIds.length];
+        for (int i = 0; i < this.values.length; i++) {
+            capturedArray[i] = this.groupIds[i];
+        }
+        myState.array[0] = capturedArray;
+        myState.capacity = this.hashCapacity;
+        return myState;
+    }
+
+    private void restoreLong(Object state)
+    {
+        LongBigArray.LongBigArrayState myState = (LongBigArray.LongBigArrayState) state;
+        this.values = myState.array[0];
+        this.hashCapacity = myState.capacity;
+    }
+
+    private void restoreInt(Object state)
+    {
+        IntBigArray.IntBigArrayState myState = (IntBigArray.IntBigArrayState) state;
+        this.groupIds = myState.array[0];
+        this.hashCapacity = myState.capacity;
+    }
+
     @Override
     public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
     {
@@ -335,8 +373,8 @@ public class BigintGroupByHash
         this.hashCapacity = myState.hashCapacity;
         this.maxFill = myState.maxFill;
         this.mask = myState.mask;
-        this.values.restore(myState.values, serdeProvider);
-        this.groupIds.restore(myState.groupIds, serdeProvider);
+        restoreLong(myState.values);
+        restoreInt(myState.groupIds);
         this.nullGroupId = myState.nullGroupId;
         this.valuesByGroupId.restore(myState.valuesByGroupId, serdeProvider);
         this.nextGroupId = myState.nextGroupId;
