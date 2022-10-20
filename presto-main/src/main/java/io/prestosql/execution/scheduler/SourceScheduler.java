@@ -15,13 +15,17 @@
 package io.prestosql.execution.scheduler;
 
 import io.prestosql.execution.Lifespan;
+import io.prestosql.execution.RemoteTask;
 import io.prestosql.spi.connector.ConnectorPartitionHandle;
 import io.prestosql.spi.plan.PlanNodeId;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SourceScheduler
 {
+    Optional<RemoteTask> start();
+
     ScheduleResult schedule();
 
     default ScheduleResult schedule(int maxSplitGroupSize)

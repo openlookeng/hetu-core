@@ -429,7 +429,8 @@ public class BroadcastOutputBuffer
             if (outputBuffers.isNoMoreBufferIds()) {
                 // verify all created buffers have been declared
                 SetView<OutputBufferId> undeclaredCreatedBuffers = Sets.difference(buffers.keySet(), outputBuffers.getBuffers().keySet());
-                checkState(undeclaredCreatedBuffers.isEmpty(), "Final output buffers does not contain all created buffer ids: %s", undeclaredCreatedBuffers);
+                checkState(undeclaredCreatedBuffers.isEmpty(), "Final output buffers does not contain all created buffer ids: %s [buffers: %s] [outputBuffers: %s] ", undeclaredCreatedBuffers,
+                        buffers.keySet(), outputBuffers.getBuffers().keySet());
             }
         }
 

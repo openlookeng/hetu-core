@@ -15,10 +15,10 @@ package io.prestosql.execution.scheduler;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
@@ -36,6 +36,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.split.SplitSource;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,11 +48,9 @@ import java.util.function.Supplier;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static io.prestosql.execution.scheduler.SourcePartitionedScheduler.newSourcePartitionedSchedulerAsSourceScheduler;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
-import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 public class FixedSourcePartitionedScheduler
@@ -63,8 +62,10 @@ public class FixedSourcePartitionedScheduler
     private final List<InternalNode> nodes;
     private final List<SourceScheduler> sourceSchedulers;
     private final List<ConnectorPartitionHandle> partitionHandles;
-    private boolean scheduledTasks;
+    private final Map<InternalNode, RemoteTask> scheduledTasks;
     private final Optional<LifespanScheduler> groupedLifespanScheduler;
+    private final PartitionIdAllocator partitionIdAllocator;
+    private final DynamicFilterService dynamicFilterService;
 
     public FixedSourcePartitionedScheduler(
             SqlStageExecution stage,
@@ -79,7 +80,8 @@ public class FixedSourcePartitionedScheduler
             List<ConnectorPartitionHandle> partitionHandles,
             Session session,
             HeuristicIndexerManager heuristicIndexerManager,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            DynamicFilterService dynamicFilterService)
     {
         requireNonNull(stage, "stage is null");
         requireNonNull(splitSources, "splitSources is null");
@@ -110,6 +112,8 @@ public class FixedSourcePartitionedScheduler
         }
 
         boolean firstPlanNode = true;
+        partitionIdAllocator = new PartitionIdAllocator();
+        scheduledTasks = new HashMap<>();
         Optional<LifespanScheduler> groupedLifespanSchedulerOptional = Optional.empty();
         for (PlanNodeId planNodeId : schedulingOrder) {
             SplitSource splitSource = splitSources.get(planNodeId);
@@ -124,7 +128,10 @@ public class FixedSourcePartitionedScheduler
                     groupedExecutionForScanNode,
                     session,
                     heuristicIndexerManager,
-                    tableExecuteContextManager);
+                    tableExecuteContextManager,
+                    partitionIdAllocator,
+                    scheduledTasks,
+                    dynamicFilterService);
 
             if (stageExecutionDescriptor.isStageGroupedExecution() && !groupedExecutionForScanNode) {
                 sourceScheduler = new AsGroupedSourceScheduler(sourceScheduler);
@@ -161,6 +168,7 @@ public class FixedSourcePartitionedScheduler
         }
         this.groupedLifespanScheduler = groupedLifespanSchedulerOptional;
         this.sourceSchedulers = sourceSchedulerArrayList;
+        this.dynamicFilterService = dynamicFilterService;
     }
 
     private ConnectorPartitionHandle partitionHandleFor(Lifespan lifespan)
@@ -182,15 +190,17 @@ public class FixedSourcePartitionedScheduler
     {
         // schedule a task on every node in the distribution
         List<RemoteTask> newTasks = ImmutableList.of();
-        if (!scheduledTasks) {
+        if (scheduledTasks.isEmpty()) {
             OptionalInt totalPartitions = OptionalInt.of(nodes.size());
-            newTasks = Streams.mapWithIndex(
-                    nodes.stream(),
-                    (node, id) -> stage.scheduleTask(node, toIntExact(id), totalPartitions))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .collect(toImmutableList());
-            scheduledTasks = true;
+            ImmutableList.Builder<RemoteTask> newTasksBuilder = ImmutableList.builder();
+            for (InternalNode node : nodes) {
+                Optional<RemoteTask> task = stage.scheduleTask(node, partitionIdAllocator.getNextId(), totalPartitions);
+                if (task.isPresent()) {
+                    scheduledTasks.put(node, task.get());
+                    newTasksBuilder.add(task.get());
+                }
+            }
+            newTasks = newTasksBuilder.build();
         }
 
         boolean allBlocked = true;
@@ -321,6 +331,12 @@ public class FixedSourcePartitionedScheduler
         {
             this.sourceScheduler = requireNonNull(sourceScheduler, "sourceScheduler is null");
             pendingCompleted = new ArrayList<>();
+        }
+
+        @Override
+        public Optional<RemoteTask> start()
+        {
+            return sourceScheduler.start();
         }
 
         @Override

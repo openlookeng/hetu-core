@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.execution.RemoteTask;
 import io.prestosql.execution.SqlStageExecution;
@@ -54,6 +55,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -117,6 +119,9 @@ public class SourcePartitionedScheduler
 
     private SettableFuture<?> whenFinishedOrNewLifespanAdded = SettableFuture.create();
     private int throttledSplitsCount;
+    private PartitionIdAllocator partitionIdAllocator;
+    private final Map<InternalNode, RemoteTask> scheduledTasks;
+    private final DynamicFilterService dynamicFilterService;
 
     private SourcePartitionedScheduler(
             SqlStageExecution stage,
@@ -127,7 +132,10 @@ public class SourcePartitionedScheduler
             boolean groupedExecution,
             Session session,
             HeuristicIndexerManager heuristicIndexerManager,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            PartitionIdAllocator partitionIdAllocator,
+            Map<InternalNode, RemoteTask> scheduledTasks,
+            DynamicFilterService dynamicFilterService)
     {
         this.stage = requireNonNull(stage, "stage is null");
         this.partitionedNode = requireNonNull(partitionedNode, "partitionedNode is null");
@@ -140,6 +148,9 @@ public class SourcePartitionedScheduler
         this.splitBatchSize = splitBatchSize;
         this.groupedExecution = groupedExecution;
         this.throttledSplitsCount = 0;
+        this.partitionIdAllocator = partitionIdAllocator;
+        this.scheduledTasks = scheduledTasks;
+        this.dynamicFilterService = dynamicFilterService;
     }
 
     @Override
@@ -163,15 +174,22 @@ public class SourcePartitionedScheduler
             int splitBatchSize,
             Session session,
             HeuristicIndexerManager heuristicIndexerManager,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            DynamicFilterService dynamicFilterService)
     {
         SourcePartitionedScheduler sourcePartitionedScheduler = new SourcePartitionedScheduler(stage, partitionedNode, splitSource,
-                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager, tableExecuteContextManager);
+                splitPlacementPolicy, splitBatchSize, false, session, heuristicIndexerManager, tableExecuteContextManager, new PartitionIdAllocator(), new HashMap<>(), dynamicFilterService);
         sourcePartitionedScheduler.startLifespan(Lifespan.taskWide(), NOT_PARTITIONED);
         sourcePartitionedScheduler.noMoreLifespans();
 
         return new StageScheduler()
         {
+            @Override
+            public Optional<RemoteTask> start()
+            {
+                return sourcePartitionedScheduler.start();
+            }
+
             @Override
             public ScheduleResult schedule()
             {
@@ -214,10 +232,13 @@ public class SourcePartitionedScheduler
             boolean groupedExecution,
             Session session,
             HeuristicIndexerManager heuristicIndexerManager,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            PartitionIdAllocator partitionIdAllocator,
+            Map<InternalNode, RemoteTask> scheduledTasks,
+            DynamicFilterService dynamicFilterService)
     {
         return new SourcePartitionedScheduler(stage, partitionedNode, splitSource, splitPlacementPolicy,
-                splitBatchSize, groupedExecution, session, heuristicIndexerManager, tableExecuteContextManager);
+                splitBatchSize, groupedExecution, session, heuristicIndexerManager, tableExecuteContextManager, partitionIdAllocator, scheduledTasks, dynamicFilterService);
     }
 
     @Override
@@ -239,6 +260,37 @@ public class SourcePartitionedScheduler
         // and the listener should stop waiting.
         whenFinishedOrNewLifespanAdded.set(null);
         whenFinishedOrNewLifespanAdded = SettableFuture.create();
+    }
+
+    @Override
+    public Optional<RemoteTask> start()
+    {
+        // Avoid deadlocks by immediately scheduling a task for collecting dynamic filters because:
+        // * there can be task in other stage blocked waiting for the dynamic filters, or
+        // * connector split source for this stage might be blocked waiting the dynamic filters.
+        if (dynamicFilterService.isCollectingTaskNeeded(stage.getStageId().getQueryId(), stage.getFragment())) {
+            stage.beginScheduling();
+            return createTaskOnRandomNode();
+        }
+        else {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<RemoteTask> createTaskOnRandomNode()
+    {
+        checkState(scheduledTasks.isEmpty(), "Stage task is already scheduled on node");
+        List<InternalNode> allNodes = splitPlacementPolicy.allNodes();
+        checkState(allNodes.size() > 0, "No nodes available");
+        InternalNode node = allNodes.get(ThreadLocalRandom.current().nextInt(0, allNodes.size()));
+        return scheduleTask(node, ImmutableMultimap.of());
+    }
+
+    private Optional<RemoteTask> scheduleTask(InternalNode node, Multimap<PlanNodeId, Split> initialSplits)
+    {
+        Optional<RemoteTask> remoteTask = stage.scheduleTask(node, partitionIdAllocator.getNextId(), initialSplits);
+        remoteTask.ifPresent(task -> scheduledTasks.put(node, task));
+        return remoteTask;
     }
 
     @Override
@@ -573,7 +625,8 @@ public class SourcePartitionedScheduler
             newTasks.addAll(stage.scheduleSplits(
                     node,
                     splits,
-                    noMoreSplits.build()));
+                    noMoreSplits.build(),
+                    partitionIdAllocator));
         }
         return newTasks.build();
     }
@@ -590,7 +643,7 @@ public class SourcePartitionedScheduler
         Set<InternalNode> scheduledNodes = stage.getScheduledNodes();
         Set<RemoteTask> newTasks = splitPlacementPolicy.allNodes().stream()
                 .filter(node -> !scheduledNodes.contains(node))
-                .flatMap(node -> stage.scheduleSplits(node, ImmutableMultimap.of(), ImmutableMultimap.of()).stream())
+                .flatMap(node -> stage.scheduleSplits(node, ImmutableMultimap.of(), ImmutableMultimap.of(), partitionIdAllocator).stream())
                 .collect(toImmutableSet());
 
         // notify listeners that we have scheduled all tasks so they can set no more buffers or exchange splits

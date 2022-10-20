@@ -14,14 +14,17 @@
  */
 package io.prestosql.dynamicfilter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 import io.prestosql.Session;
+import io.prestosql.execution.SqlQueryExecution;
 import io.prestosql.execution.StageStateMachine;
 import io.prestosql.execution.TaskId;
 import io.prestosql.metadata.InternalNode;
+import io.prestosql.operator.JoinUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -42,6 +45,9 @@ import io.prestosql.spi.statestore.StateSet;
 import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
+import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.SubPlan;
+import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DynamicFilterUtils;
@@ -74,6 +80,10 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.collect.Sets.difference;
+import static com.google.common.collect.Sets.intersection;
+import static com.google.common.collect.Sets.union;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -84,6 +94,9 @@ import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.GLOBAL;
 import static io.prestosql.spi.dynamicfilter.DynamicFilter.Type.LOCAL;
 import static io.prestosql.spi.statestore.StateCollection.Type.MAP;
 import static io.prestosql.spi.statestore.StateCollection.Type.SET;
+import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
+import static io.prestosql.sql.planner.ExpressionExtractor.extractExpressions;
+import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
 import static io.prestosql.utils.DynamicFilterUtils.createKey;
 import static io.prestosql.utils.DynamicFilterUtils.findFilterNodeInStage;
 import static io.prestosql.utils.DynamicFilterUtils.getDynamicFilterDataType;
@@ -101,6 +114,7 @@ public class DynamicFilterService
     private final Map<String, CopyOnWriteArraySet<TaskId>> dynamicFiltersToTask = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, DynamicFilter>> cachedDynamicFilters = new HashMap<>();
     private final List<String> finishedQuery = Collections.synchronizedList(new ArrayList<>());
+    private List<QueryId> registeredQueries = new ArrayList<>();
 
     private final StateStoreProvider stateStoreProvider;
 
@@ -247,6 +261,7 @@ public class DynamicFilterService
                 dynamicFilters.remove(queryId);
 
                 cachedDynamicFilters.remove(queryId);
+                registeredQueries.remove(queryId);
                 handledQuery.add(queryId);
             }
             finishedQuery.removeAll(handledQuery);
@@ -505,6 +520,110 @@ public class DynamicFilterService
         else {
             return new DynamicFilterRegistryInfo(symbol, LOCAL, session, Optional.empty());
         }
+    }
+
+    public void registerQuery(SqlQueryExecution sqlQueryExecution, SubPlan fragmentedPlan)
+    {
+        PlanNode queryPlan = sqlQueryExecution.getQueryPlan().getRoot();
+        Set<String> dynamicFilters = getProducedDynamicFilters(queryPlan);
+
+        if (!dynamicFilters.isEmpty()) {
+            registeredQueries.add(sqlQueryExecution.getQueryId());
+        }
+    }
+
+    /**
+     * Dynamic filters are collected in same stage as the join operator in pipelined execution. This can result in deadlock
+     * for source stage joins and connectors that wait for dynamic filters before generating splits
+     * (probe splits might be blocked on dynamic filters which require at least one probe task in order to be collected).
+     * To overcome this issue an initial task is created for source stages running broadcast join operator.
+     * This task allows for dynamic filters collection without any probe side splits being scheduled.
+     */
+    public boolean isCollectingTaskNeeded(QueryId queryId, PlanFragment plan)
+    {
+        if (!registeredQueries.contains(queryId)) {
+            // query has been removed or not registered (e.g. dynamic filtering is disabled)
+            return false;
+        }
+
+        // dynamic filters are collected by additional task only for non-fixed source stage
+        return plan.getPartitioning().equals(SOURCE_DISTRIBUTION) && !getLazyDynamicFilters(plan).isEmpty();
+    }
+
+    public boolean isStageSchedulingNeededToCollectDynamicFilters(QueryId queryId, PlanFragment plan)
+    {
+        if (!registeredQueries.contains(queryId)) {
+            // query has been removed or not registered (e.g. dynamic filtering is disabled)
+            return false;
+        }
+
+        // stage scheduling is not needed to collect dynamic filters for non-fixed source stage, because
+        // for such stage collecting task is created
+        return !plan.getPartitioning().equals(SOURCE_DISTRIBUTION) && !getLazyDynamicFilters(plan).isEmpty();
+    }
+
+    private static Set<String> getLazyDynamicFilters(PlanFragment plan)
+    {
+        // To prevent deadlock dynamic filter can be lazy only when:
+        // 1. it's consumed by different stage from where it's produced
+        // 2. or it's produced by replicated join in source stage. In such case an extra
+        //    task is created that will collect dynamic filter and prevent deadlock.
+        Set<String> interStageDynamicFilters = difference(getProducedDynamicFilters(plan.getRoot()), getConsumedDynamicFilters(plan.getRoot()));
+        return ImmutableSet.copyOf(union(interStageDynamicFilters, getSourceStageInnerLazyDynamicFilters(plan)));
+    }
+
+    @VisibleForTesting
+    static Set<String> getSourceStageInnerLazyDynamicFilters(PlanFragment plan)
+    {
+        if (!plan.getPartitioning().equals(SOURCE_DISTRIBUTION)) {
+            // Only non-fixed source stages can have (replicated) lazy dynamic filters that are
+            // produced and consumed within stage. This is because for such stages an extra
+            // dynamic filtering collecting task can be added.
+            return ImmutableSet.of();
+        }
+
+        PlanNode planNode = plan.getRoot();
+        Set<String> innerStageDynamicFilters = intersection(getProducedDynamicFilters(planNode), getConsumedDynamicFilters(planNode));
+        Set<String> replicatedDynamicFilters = getReplicatedDynamicFilters(planNode);
+        return ImmutableSet.copyOf(intersection(innerStageDynamicFilters, replicatedDynamicFilters));
+    }
+
+    private static Set<String> getReplicatedDynamicFilters(PlanNode planNode)
+    {
+        return PlanNodeSearcher.searchFrom(planNode)
+                .whereIsInstanceOfAny(JoinNode.class, SemiJoinNode.class)
+                .findAll().stream()
+                .filter(JoinUtils::isBuildSideReplicated)
+                .flatMap(node -> getDynamicFiltersProducedInPlanNode(node).stream())
+                .collect(toImmutableSet());
+    }
+
+    private static Set<String> getProducedDynamicFilters(PlanNode planNode)
+    {
+        return PlanNodeSearcher.searchFrom(planNode)
+                .whereIsInstanceOfAny(JoinNode.class, SemiJoinNode.class)
+                .findAll().stream()
+                .flatMap(node -> getDynamicFiltersProducedInPlanNode(node).stream())
+                .collect(toImmutableSet());
+    }
+
+    private static Set<String> getConsumedDynamicFilters(PlanNode planNode)
+    {
+        return extractExpressions(planNode).stream()
+                .flatMap(expression -> extractDynamicFilters(expression).getDynamicConjuncts().stream())
+                .map(DynamicFilters.Descriptor::getId)
+                .collect(toImmutableSet());
+    }
+
+    private static Set<String> getDynamicFiltersProducedInPlanNode(PlanNode planNode)
+    {
+        if (planNode instanceof JoinNode) {
+            return ((JoinNode) planNode).getDynamicFilters().keySet();
+        }
+        if (planNode instanceof SemiJoinNode) {
+            return ((SemiJoinNode) planNode).getDynamicFilterId().map(ImmutableSet::of).orElse(ImmutableSet.of());
+        }
+        throw new IllegalStateException("getDynamicFiltersProducedInPlanNode called with neither JoinNode nor SemiJoinNode");
     }
 
     private static class DynamicFilterRegistryInfo
