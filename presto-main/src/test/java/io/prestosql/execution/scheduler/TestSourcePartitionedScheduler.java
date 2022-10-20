@@ -339,7 +339,8 @@ public class TestSourcePartitionedScheduler
                     Iterables.getOnlyElement(plan.getSplitSources().keySet()),
                     Iterables.getOnlyElement(plan.getSplitSources().values()),
                     new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(CONNECTOR_ID, false, null), stage::getAllTasks),
-                    2, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager());
+                    2, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager(),
+                    new DynamicFilterService(new LocalStateStoreProvider(new SeedStoreManager(new FileSystemClientManager()))));
             scheduler.schedule();
         }).hasErrorCode(NO_NODES_AVAILABLE);
     }
@@ -477,7 +478,8 @@ public class TestSourcePartitionedScheduler
         SplitSource splitSource = Iterables.getOnlyElement(plan.getSplitSources().values());
         SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeScheduler.createNodeSelector(splitSource.getCatalogName(), false, null), stage::getAllTasks);
         return newSourcePartitionedSchedulerAsStageScheduler(stage, sourceNode, splitSource,
-                placementPolicy, splitBatchSize, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager());
+                placementPolicy, splitBatchSize, session, new HeuristicIndexerManager(new FileSystemClientManager(), new HetuMetaStoreManager()), new TableExecuteContextManager(),
+                new DynamicFilterService(new LocalStateStoreProvider(new SeedStoreManager(new FileSystemClientManager()))));
     }
 
     private static StageExecutionPlan createPlan(ConnectorSplitSource splitSource)

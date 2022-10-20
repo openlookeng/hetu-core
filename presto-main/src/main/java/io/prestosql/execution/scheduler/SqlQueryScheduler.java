@@ -57,6 +57,9 @@ import io.prestosql.execution.TaskId;
 import io.prestosql.execution.TaskStatus;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
+import io.prestosql.execution.scheduler.policy.ExecutionPolicy;
+import io.prestosql.execution.scheduler.policy.ExecutionSchedule;
+import io.prestosql.execution.scheduler.policy.StagesScheduleResult;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.InternalNode;
@@ -676,7 +679,7 @@ public class SqlQueryScheduler
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());
 
             stageSchedulers.put(stageId, newSourcePartitionedSchedulerAsStageScheduler(stageExecution, planNodeId, splitSource,
-                    placementPolicy, splitBatchSize, session, heuristicIndexerManager, tableExecuteContextManager));
+                    placementPolicy, splitBatchSize, session, heuristicIndexerManager, tableExecuteContextManager, dynamicFilterService));
 
             bucketToPartition = Optional.of(new int[1]);
         }
@@ -759,7 +762,8 @@ public class SqlQueryScheduler
                         connectorPartitionHandles,
                         session,
                         heuristicIndexerManager,
-                        tableExecuteContextManager));
+                        tableExecuteContextManager,
+                        dynamicFilterService));
             }
             else {
                 // all sources are remote
@@ -1028,9 +1032,12 @@ public class SqlQueryScheduler
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryStateMachine.getQueryId())) {
             Set<StageId> completedStages = new HashSet<>();
             ExecutionSchedule executionSchedule = executionPolicy.createExecutionSchedule(stages.values());
+            stageSchedulers.values().stream().map(stageScheduler -> stageScheduler.start()).filter(Optional::isPresent)
+                    .forEach(task -> stageLinkages.get(task.get().getTaskId().getStageId()).processScheduleResults(stages.get(task.get().getTaskId().getStageId()).getState(), ImmutableSet.of(task.get())));
             while (!executionSchedule.isFinished()) {
                 List<ListenableFuture<?>> blockedStages = new ArrayList<>();
-                for (SqlStageExecution stage : executionSchedule.getStagesToSchedule()) {
+                StagesScheduleResult stagesScheduleResult = executionSchedule.getStagesToSchedule();
+                for (SqlStageExecution stage : stagesScheduleResult.getStagesToSchedule()) {
                     if (isReuseTableScanEnabled(session) && !SqlStageExecution.getReuseTableScanMappingIdStatus(stage.getStateMachine())) {
                         continue;
                     }
@@ -1111,6 +1118,11 @@ public class SqlQueryScheduler
 
                 // wait for a state change and then schedule again
                 if (!blockedStages.isEmpty()) {
+                    ImmutableList.Builder<ListenableFuture<?>> futures = ImmutableList.builder();
+                    futures.addAll(blockedStages);
+                    // allow for schedule to resume scheduling (e.g. when some active stage completes
+                    // and dependent stages can be started)
+                    stagesScheduleResult.getRescheduleFuture().ifPresent(futures::add);
                     try (TimeStat.BlockTimer timer = schedulerStats.getSleepTime().time()) {
                         tryGetFutureValue(whenAnyComplete(blockedStages), 1, SECONDS);
                     }

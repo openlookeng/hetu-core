@@ -11,15 +11,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.scheduler;
-
-import io.prestosql.execution.SqlStageExecution;
-
-import java.util.Set;
+package io.prestosql.execution.scheduler.policy;
 
 public interface ExecutionSchedule
 {
-    Set<SqlStageExecution> getStagesToSchedule();
+    StagesScheduleResult getStagesToSchedule();
 
     boolean isFinished();
 }

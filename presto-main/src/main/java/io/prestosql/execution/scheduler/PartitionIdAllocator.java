@@ -13,16 +13,14 @@
  */
 package io.prestosql.execution.scheduler;
 
-import io.prestosql.execution.SqlStageExecution;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import java.util.Collection;
-
-public class AllAtOnceExecutionPolicy
-        implements ExecutionPolicy
+public class PartitionIdAllocator
 {
-    @Override
-    public ExecutionSchedule createExecutionSchedule(Collection<SqlStageExecution> stages)
+    private final AtomicInteger nextId = new AtomicInteger();
+
+    public int getNextId()
     {
-        return new AllAtOnceExecutionSchedule(stages);
+        return nextId.getAndIncrement();
     }
 }

@@ -336,11 +336,6 @@ public class RemoveUnsupportedDynamicFilters
                     }
                 }
 
-                // If no predicate at all, the selectivity will be high
-                if (node instanceof TableScanNode && ((TableScanNode) buildSideTableScanNode.get()).getEnforcedConstraint().isAll()) {
-                    return true;
-                }
-
                 Estimate totalRowCount = metadata.getTableStatistics(session, ((TableScanNode) buildSideTableScanNode.get()).getTable(), Constraint.alwaysTrue(), true).getRowCount();
                 PlanNodeStatsEstimate filteredStats = statsProvider.getStats(node);
 

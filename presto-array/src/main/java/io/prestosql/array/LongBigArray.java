@@ -182,11 +182,11 @@ public final class LongBigArray
         this.segments = myState.segments;
     }
 
-    private static class LongBigArrayState
+    public static class LongBigArrayState
             implements Serializable
     {
-        private long[][] array;
-        private int capacity;
-        private int segments;
+        public long[][] array;
+        public int capacity;
+        public int segments;
     }
 }

@@ -11,38 +11,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.operator;
+package io.prestosql.execution.scheduler.policy;
 
-import javax.annotation.Nullable;
+import io.prestosql.execution.SqlStageExecution;
 
-import static java.util.Objects.requireNonNull;
+import java.util.Collection;
 
-public final class CompletedWork<T>
-        implements Work<T>
+public class AllAtOnceExecutionPolicy
+        implements ExecutionPolicy
 {
-    @Nullable
-    private final T result;
-
-    public CompletedWork()
-    {
-        result = null;
-    }
-
-    public CompletedWork(T value)
-    {
-        this.result = requireNonNull(value);
-    }
-
     @Override
-    public boolean process()
+    public ExecutionSchedule createExecutionSchedule(Collection<SqlStageExecution> stages)
     {
-        return true;
-    }
-
-    @Nullable
-    @Override
-    public T getResult()
-    {
-        return result;
+        return new AllAtOnceExecutionSchedule(stages);
     }
 }

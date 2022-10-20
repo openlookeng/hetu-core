@@ -106,12 +106,15 @@ public class PruneCTENodes
         @Override
         public PlanNode visitJoin(JoinNode node, RewriteContext<Expression> context)
         {
+            Integer left = getChildCTERefNum(node.getLeft());
+            Integer right = getChildCTERefNum(node.getRight());
             if (pruneCTEWithCrossJoin && node.isCrossJoin()) {
-                Integer left = getChildCTERefNum(node.getLeft());
-                Integer right = getChildCTERefNum(node.getRight());
                 if (left != null && right != null && left.equals(right)) {
                     cTEWithCrossJoinList.add(left);
                 }
+            }
+            if (left != null && right != null && left.equals(right)) {
+                cteToPrune.add(left);
             }
             return context.defaultRewrite(node, context.get());
         }
@@ -160,7 +163,7 @@ public class PruneCTENodes
                 cteUsageMap.merge(commonCTERefNum, 1, Integer::sum);
             }
             else {
-                if (cteUsageMap.get(commonCTERefNum) == 1 || cteToPrune.contains(commonCTERefNum)) {
+                if (cteUsageMap.get(commonCTERefNum) == 1 || (cteToPrune.contains(commonCTERefNum) && cteUsageMap.get(commonCTERefNum) > 3)) {
                     node = (CTEScanNode) visitPlan(node, context);
                     return node.getSource();
                 }
