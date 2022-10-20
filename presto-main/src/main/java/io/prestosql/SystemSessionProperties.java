@@ -203,6 +203,10 @@ public final class SystemSessionProperties
     public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY_GROWTH_FACTOR = "fault_tolerant_execution_task_memory_growth_factor";
     public static final String FAULT_TOLERANT_EXECUTION_TASK_MEMORY_ESTIMATION_QUANTILE = "fault_tolerant_execution_task_memory_estimation_quantile";
 
+    public static final String ADAPTIVE_PARTIAL_AGGREGATION_ENABLED = "adaptive_partial_aggregation_enabled";
+    public static final String ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS = "adaptive_partial_aggregation_min_rows";
+    public static final String ADAPTIVE_PARTIAL_AGGREGATION_UNIQUE_ROWS_RATIO_THRESHOLD = "adaptive_partial_aggregation_unique_rows_ratio_threshold";
+
     public static final String RETRY_POLICY = "retry_policy";
 
     public static final String EXCHANGE_FILESYSTEM_BASE_DIRECTORY = "exchange_filesystem_base_directory";
@@ -1018,6 +1022,21 @@ public final class SystemSessionProperties
                         QUERY_RESOURCE_TRACKING,
                         "Query tracking feature enabled for current session",
                         queryManagerConfig.isQueryResourceTracking(),
+                        false),
+                booleanProperty(
+                        ADAPTIVE_PARTIAL_AGGREGATION_ENABLED,
+                        "When enabled, partial aggregation might be adaptively turned off when it does not provide any performance gain",
+                        featuresConfig.isAdaptivePartialAggregationEnabled(),
+                        false),
+                longProperty(
+                        ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS,
+                        "Minimum number of processed rows before partial aggregation might be adaptively turned off",
+                        featuresConfig.getAdaptivePartialAggregationMinRows(),
+                        false),
+                doubleProperty(
+                        ADAPTIVE_PARTIAL_AGGREGATION_UNIQUE_ROWS_RATIO_THRESHOLD,
+                        "Ratio between aggregation output and input rows above which partial aggregation might be adaptively turned off",
+                        featuresConfig.getAdaptivePartialAggregationUniqueRowsRatioThreshold(),
                         false));
     }
 
@@ -1785,5 +1804,20 @@ public final class SystemSessionProperties
     public static double getFilterConjunctionIndependenceFactor(Session session)
     {
         return session.getSystemProperty(FILTER_CONJUNCTION_INDEPENDENCE_FACTOR, Double.class);
+    }
+
+    public static boolean isAdaptivePartialAggregationEnabled(Session session)
+    {
+        return session.getSystemProperty(ADAPTIVE_PARTIAL_AGGREGATION_ENABLED, Boolean.class);
+    }
+
+    public static long getAdaptivePartialAggregationMinRows(Session session)
+    {
+        return session.getSystemProperty(ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS, Long.class);
+    }
+
+    public static double getAdaptivePartialAggregationUniqueRowsRatioThreshold(Session session)
+    {
+        return session.getSystemProperty(ADAPTIVE_PARTIAL_AGGREGATION_UNIQUE_ROWS_RATIO_THRESHOLD, Double.class);
     }
 }

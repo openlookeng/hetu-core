@@ -21,6 +21,7 @@ import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemorySortAggregationBuilder;
 import io.prestosql.operator.aggregation.builder.SpillableHashAggregationBuilder;
+import io.prestosql.operator.aggregation.partial.PartialAggregationController;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -56,11 +57,11 @@ public class SortAggregationOperator
                                               Optional<Integer> groupIdChannel, int expectedGroups,
                                               Optional<DataSize> maxPartialMemory, boolean spillEnabled,
                                               DataSize unspillMemoryLimit, SpillerFactory spillerFactory,
-                                              JoinCompiler joinCompiler, boolean useSystemMemory, boolean isFinalizedValuePresent)
+                                              JoinCompiler joinCompiler, boolean useSystemMemory, boolean isFinalizedValuePresent, Optional<PartialAggregationController> partialAggregationController)
         {
             super(operatorId, planNodeId, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
                     accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
-                    unspillMemoryLimit, spillerFactory, joinCompiler, useSystemMemory);
+                    unspillMemoryLimit, spillerFactory, joinCompiler, useSystemMemory, partialAggregationController);
             this.isFinalizedValuePresent = isFinalizedValuePresent;
         }
 
@@ -83,7 +84,8 @@ public class SortAggregationOperator
                 SpillerFactory spillerFactory,
                 JoinCompiler joinCompiler,
                 boolean useSystemMemory,
-                boolean isFinalizedValuePresent)
+                boolean isFinalizedValuePresent,
+                Optional<PartialAggregationController> partialAggregationController)
         {
             super(
                     operatorId,
@@ -103,7 +105,8 @@ public class SortAggregationOperator
                     memoryLimitForMergeWithMemory,
                     spillerFactory,
                     joinCompiler,
-                    useSystemMemory);
+                    useSystemMemory,
+                    partialAggregationController);
             this.isFinalizedValuePresent = isFinalizedValuePresent;
         }
 
@@ -131,7 +134,8 @@ public class SortAggregationOperator
                     spillerFactory,
                     joinCompiler,
                     useSystemMemory,
-                    isFinalizedValuePresent);
+                    isFinalizedValuePresent,
+                    partialAggregationController);
             return sortAggregationOperator;
         }
 
@@ -157,7 +161,8 @@ public class SortAggregationOperator
                     spillerFactory,
                     joinCompiler,
                     useSystemMemory,
-                    isFinalizedValuePresent);
+                    isFinalizedValuePresent,
+                    partialAggregationController.map(PartialAggregationController::duplicate));
         }
 
         @Override
@@ -178,11 +183,11 @@ public class SortAggregationOperator
                                    Optional<DataSize> maxPartialMemory, boolean spillEnabled,
                                    DataSize memoryLimitForMerge, DataSize memoryLimitForMergeWithMemory,
                                    SpillerFactory spillerFactory, JoinCompiler joinCompiler, boolean useSystemMemory,
-                                   boolean isFinalizedValuePresent)
+                                   boolean isFinalizedValuePresent, Optional<PartialAggregationController> partialAggregationController)
     {
         super(operatorContext, groupByTypes, groupByChannels, globalAggregationGroupIds, step, produceDefaultOutput,
                 accumulatorFactories, hashChannel, groupIdChannel, expectedGroups, maxPartialMemory, spillEnabled,
-                memoryLimitForMerge, memoryLimitForMergeWithMemory, spillerFactory, joinCompiler, useSystemMemory);
+                memoryLimitForMerge, memoryLimitForMergeWithMemory, spillerFactory, joinCompiler, useSystemMemory, partialAggregationController);
         this.isFinalizedValuePresent = isFinalizedValuePresent;
     }
 
