@@ -162,7 +162,9 @@ public class TestFeaturesConfig
                 .setRevocableMemorySelectionThreshold(new DataSize(512, MEGABYTE))
                 .setAdaptivePartialAggregationEnabled(true)
                 .setAdaptivePartialAggregationMinRows(100_000)
-                .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.8));
+                .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.8)
+                .setFilterConjunctionIndependenceFactor(0.75)
+                .setJoinMultiClauseIndependenceFactor(0.25));
     }
 
     @Test
@@ -275,6 +277,8 @@ public class TestFeaturesConfig
                 .put("adaptive-partial-aggregation.enabled", "false")
                 .put("adaptive-partial-aggregation.min-rows", "1")
                 .put("adaptive-partial-aggregation.unique-rows-ratio-threshold", "0.99")
+                .put("optimizer.filter-conjunction-independence-factor", "0.99")
+                .put("optimizer.join-multi-clause-independence-factor", "0.99")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -384,7 +388,9 @@ public class TestFeaturesConfig
                 .setRevocableMemorySelectionThreshold(new DataSize(500, MEGABYTE))
                 .setAdaptivePartialAggregationEnabled(false)
                 .setAdaptivePartialAggregationMinRows(1)
-                .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.99);
+                .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.99)
+                .setFilterConjunctionIndependenceFactor(0.99)
+                .setJoinMultiClauseIndependenceFactor(0.99);
 
         assertFullMapping(properties, expected);
     }

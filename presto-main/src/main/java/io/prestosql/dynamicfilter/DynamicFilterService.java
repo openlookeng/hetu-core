@@ -527,9 +527,9 @@ public class DynamicFilterService
     public void registerQuery(SqlQueryExecution sqlQueryExecution, SubPlan fragmentedPlan)
     {
         PlanNode queryPlan = sqlQueryExecution.getQueryPlan().getRoot();
-        Set<String> dynamicFilters = getProducedDynamicFilters(queryPlan);
+        Set<String> producedDynamicFilters = getProducedDynamicFilters(queryPlan);
 
-        if (!dynamicFilters.isEmpty()) {
+        if (!producedDynamicFilters.isEmpty()) {
             registeredQueries.add(sqlQueryExecution.getQueryId());
         }
     }

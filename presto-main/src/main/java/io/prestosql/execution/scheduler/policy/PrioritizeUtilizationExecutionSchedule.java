@@ -124,9 +124,9 @@ public class PrioritizeUtilizationExecutionSchedule
     {
         // obtain reschedule future before actual scheduling, so that state change
         // notifications from previously started stages are not lost
-        Optional<ListenableFuture<?>> rescheduleFuture = getRescheduleFuture();
+        Optional<ListenableFuture<?>> oldRescheduleFuture = getRescheduleFuture();
         schedule();
-        return new StagesScheduleResult(activeStages, rescheduleFuture);
+        return new StagesScheduleResult(activeStages, oldRescheduleFuture);
     }
 
     @Override
@@ -246,13 +246,13 @@ public class PrioritizeUtilizationExecutionSchedule
 
     private void notifyReschedule()
     {
-        SettableFuture<?> rescheduleFuture;
+        SettableFuture<?> currentRescheduleFuture;
         synchronized (this) {
-            rescheduleFuture = this.rescheduleFuture;
+            currentRescheduleFuture = this.rescheduleFuture;
             this.rescheduleFuture = SettableFuture.create();
         }
         // notify listeners outside the critical section
-        rescheduleFuture.set(null);
+        currentRescheduleFuture.set(null);
     }
 
     private boolean isStageCompleted(SqlStageExecution stage)

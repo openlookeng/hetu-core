@@ -222,12 +222,12 @@ public class PagePartitioner
     {
         IntArrayList[] partitionedPositions = partitionPositions(page);
 
-        PositionsAppender[] positionsAppenders = getAppenders(page);
+        PositionsAppender[] newPositionsAppenders = getAppenders(page);
 
         for (int i = 0; i < partitionFunction.getPartitionCount(); i++) {
             IntArrayList partitionPositions = partitionedPositions[i];
             if (!partitionPositions.isEmpty()) {
-                appendToOutputPartition(pageBuilders[i], page, partitionPositions, positionsAppenders);
+                appendToOutputPartition(pageBuilders[i], page, partitionPositions, newPositionsAppenders);
                 partitionPositions.clear();
             }
         }

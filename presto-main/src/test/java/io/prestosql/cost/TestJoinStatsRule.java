@@ -18,15 +18,19 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.iterative.rule.test.PlanBuilder;
 import io.prestosql.sql.tree.ComparisonExpression;
 import io.prestosql.sql.tree.LongLiteral;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
+import java.util.function.Function;
 
+import static io.prestosql.SystemSessionProperties.JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR;
 import static io.prestosql.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static io.prestosql.cost.PlanNodeStatsAssertion.assertThat;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
@@ -38,6 +42,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.sql.planner.SymbolUtils.toSymbolReference;
 import static io.prestosql.sql.relational.OriginalExpressionUtils.castToRowExpression;
+import static io.prestosql.testing.TestingSession.testSessionBuilder;
 import static java.lang.Double.NaN;
 import static org.testng.Assert.assertEquals;
 
@@ -116,23 +121,24 @@ public class TestJoinStatsRule
     @Test
     public void testStatsForInnerJoinWithRepeatedClause()
     {
-        double innerJoinRowCount = LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT / LEFT_JOIN_COLUMN_NDV * LEFT_JOIN_COLUMN_NON_NULLS * RIGHT_JOIN_COLUMN_NON_NULLS // driver join clause
-                * UNKNOWN_FILTER_COEFFICIENT; // auxiliary join clause
+        double clauseSelectivity = 1.0 / LEFT_JOIN_COLUMN_NDV * LEFT_JOIN_COLUMN_NON_NULLS * RIGHT_JOIN_COLUMN_NON_NULLS;
+        double innerJoinRowCount = LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT * clauseSelectivity * Math.pow(clauseSelectivity, 0.5);
         PlanNodeStatsEstimate innerJoinStats = planNodeStats(innerJoinRowCount,
                 symbolStatistics(LEFT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 LEFT_OTHER_COLUMN_STATS, RIGHT_OTHER_COLUMN_STATS);
 
-        tester().assertStatsFor(pb -> {
-            Symbol leftJoinColumnSymbol = pb.symbol(LEFT_JOIN_COLUMN, BIGINT);
-            Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
-            Symbol leftOtherColumnSymbol = pb.symbol(LEFT_OTHER_COLUMN, BIGINT);
-            Symbol rightOtherColumnSymbol = pb.symbol(RIGHT_OTHER_COLUMN, DOUBLE);
-            return pb
-                    .join(INNER, pb.values(leftJoinColumnSymbol, leftOtherColumnSymbol),
+        tester().assertStatsFor(
+                testSessionBuilder().setSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, "0.5").build(),
+                pb -> {
+                    Symbol leftJoinColumnSymbol = pb.symbol(LEFT_JOIN_COLUMN, BIGINT);
+                    Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
+                    Symbol leftOtherColumnSymbol = pb.symbol(LEFT_OTHER_COLUMN, BIGINT);
+                    Symbol rightOtherColumnSymbol = pb.symbol(RIGHT_OTHER_COLUMN, DOUBLE);
+                    return pb.join(INNER, pb.values(leftJoinColumnSymbol, leftOtherColumnSymbol),
                             pb.values(rightJoinColumnSymbol, rightOtherColumnSymbol),
                             new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol));
-        }).withSourceStats(0, LEFT_STATS)
+                }).withSourceStats(0, LEFT_STATS)
                 .withSourceStats(1, RIGHT_STATS)
                 .check(stats -> stats.equalTo(innerJoinStats));
     }
@@ -140,55 +146,72 @@ public class TestJoinStatsRule
     @Test
     public void testStatsForInnerJoinWithTwoEquiClauses()
     {
-        double innerJoinRowCount =
-                LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT / LEFT_JOIN_COLUMN_2_NDV * LEFT_JOIN_COLUMN_2_NON_NULLS * RIGHT_JOIN_COLUMN_2_NON_NULLS // driver join clause
-                        * UNKNOWN_FILTER_COEFFICIENT; // auxiliary join clause
-        PlanNodeStatsEstimate innerJoinStats = planNodeStats(innerJoinRowCount,
+        double crossJoinRowCount = LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT;
+        PlanNodeStatsEstimate innerJoinStats = planNodeStats(crossJoinRowCount,
                 symbolStatistics(LEFT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 symbolStatistics(LEFT_JOIN_COLUMN_2, 100.0, 200.0, 0.0, RIGHT_JOIN_COLUMN_2_NDV),
                 symbolStatistics(RIGHT_JOIN_COLUMN_2, 100.0, 200.0, 0.0, RIGHT_JOIN_COLUMN_2_NDV));
 
-        tester().assertStatsFor(pb -> {
+        Function<PlanBuilder, PlanNode> planProvider = pb -> {
             Symbol leftJoinColumnSymbol = pb.symbol(LEFT_JOIN_COLUMN, BIGINT);
             Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
             Symbol leftJoinColumnSymbol2 = pb.symbol(LEFT_JOIN_COLUMN_2, BIGINT);
             Symbol rightJoinColumnSymbol2 = pb.symbol(RIGHT_JOIN_COLUMN_2, DOUBLE);
-            return pb
-                    .join(INNER, pb.values(leftJoinColumnSymbol, leftJoinColumnSymbol2),
-                            pb.values(rightJoinColumnSymbol, rightJoinColumnSymbol2),
-                            new EquiJoinClause(leftJoinColumnSymbol2, rightJoinColumnSymbol2), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol));
-        }).withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
+            return pb.join(INNER,
+                    pb.values(leftJoinColumnSymbol, leftJoinColumnSymbol2),
+                    pb.values(rightJoinColumnSymbol, rightJoinColumnSymbol2),
+                    new EquiJoinClause(leftJoinColumnSymbol2, rightJoinColumnSymbol2), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol));
+        };
+
+        // LEFT_JOIN_COLUMN_2 = RIGHT_JOIN_COLUMN_2 is the more selective clause
+        double firstClauseSelectivity = 1.0 / LEFT_JOIN_COLUMN_2_NDV * LEFT_JOIN_COLUMN_2_NON_NULLS * RIGHT_JOIN_COLUMN_2_NON_NULLS;
+        tester().assertStatsFor(testSessionBuilder().setSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, "0").build(), planProvider)
+                .withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
                 .withSourceStats(1, planNodeStats(RIGHT_ROWS_COUNT, RIGHT_JOIN_COLUMN_STATS, RIGHT_JOIN_COLUMN_2_STATS))
-                .check(stats -> stats.equalTo(innerJoinStats));
+                .check(stats -> stats.equalTo(innerJoinStats.mapOutputRowCount(rowCount -> rowCount * firstClauseSelectivity)));
+
+        double secondClauseSelectivity = 1.0 / LEFT_JOIN_COLUMN_NDV * LEFT_JOIN_COLUMN_NON_NULLS * RIGHT_JOIN_COLUMN_NON_NULLS;
+        tester().assertStatsFor(testSessionBuilder().setSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, "1").build(), planProvider)
+                .withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
+                .withSourceStats(1, planNodeStats(RIGHT_ROWS_COUNT, RIGHT_JOIN_COLUMN_STATS, RIGHT_JOIN_COLUMN_2_STATS))
+                .check(stats -> stats.equalTo(innerJoinStats.mapOutputRowCount(rowCount -> rowCount * firstClauseSelectivity * secondClauseSelectivity)));
+
+        tester().assertStatsFor(testSessionBuilder().setSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, "0.5").build(), planProvider)
+                .withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
+                .withSourceStats(1, planNodeStats(RIGHT_ROWS_COUNT, RIGHT_JOIN_COLUMN_STATS, RIGHT_JOIN_COLUMN_2_STATS))
+                .check(stats -> stats.equalTo(innerJoinStats.mapOutputRowCount(
+                        rowCount -> rowCount * firstClauseSelectivity * Math.pow(secondClauseSelectivity, 0.5))));
     }
 
     @Test
     public void testStatsForInnerJoinWithTwoEquiClausesAndNonEqualityFunction()
     {
-        double innerJoinRowCount =
-                LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT / LEFT_JOIN_COLUMN_2_NDV * LEFT_JOIN_COLUMN_2_NON_NULLS * RIGHT_JOIN_COLUMN_2_NON_NULLS // driver join clause
-                        * UNKNOWN_FILTER_COEFFICIENT // auxiliary join clause
-                        * 0.3333333333; // LEFT_JOIN_COLUMN < 10 non equality filter
+        double firstClauseSelectivity = 1.0 / LEFT_JOIN_COLUMN_2_NDV * LEFT_JOIN_COLUMN_2_NON_NULLS * RIGHT_JOIN_COLUMN_2_NON_NULLS;
+        double secondClauseSelectivity = 1.0 / LEFT_JOIN_COLUMN_NDV * LEFT_JOIN_COLUMN_NON_NULLS * RIGHT_JOIN_COLUMN_NON_NULLS;
+        double innerJoinRowCount = LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT * firstClauseSelectivity
+                * Math.pow(secondClauseSelectivity, 0.5)
+                * 0.3333333333; // LEFT_JOIN_COLUMN < 10 non equality filter
         PlanNodeStatsEstimate innerJoinStats = planNodeStats(innerJoinRowCount,
                 symbolStatistics(LEFT_JOIN_COLUMN, 5.0, 10.0, 0.0, RIGHT_JOIN_COLUMN_NDV * 0.3333333333),
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 symbolStatistics(LEFT_JOIN_COLUMN_2, 100.0, 200.0, 0.0, RIGHT_JOIN_COLUMN_2_NDV),
                 symbolStatistics(RIGHT_JOIN_COLUMN_2, 100.0, 200.0, 0.0, RIGHT_JOIN_COLUMN_2_NDV));
 
-        tester().assertStatsFor(pb -> {
-            Symbol leftJoinColumnSymbol = pb.symbol(LEFT_JOIN_COLUMN, BIGINT);
-            Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
-            Symbol leftJoinColumnSymbol2 = pb.symbol(LEFT_JOIN_COLUMN_2, BIGINT);
-            Symbol rightJoinColumnSymbol2 = pb.symbol(RIGHT_JOIN_COLUMN_2, DOUBLE);
-            ComparisonExpression leftJoinColumnLessThanTen = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, toSymbolReference(leftJoinColumnSymbol), new LongLiteral("10"));
-            return pb
-                    .join(INNER, pb.values(leftJoinColumnSymbol, leftJoinColumnSymbol2),
-                            pb.values(rightJoinColumnSymbol, rightJoinColumnSymbol2),
-                            ImmutableList.of(new EquiJoinClause(leftJoinColumnSymbol2, rightJoinColumnSymbol2), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol)),
-                            ImmutableList.of(leftJoinColumnSymbol, leftJoinColumnSymbol2, rightJoinColumnSymbol, rightJoinColumnSymbol2),
-                            Optional.of(castToRowExpression(leftJoinColumnLessThanTen)));
-        }).withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
+        tester().assertStatsFor(
+                        testSessionBuilder().setSystemProperty(JOIN_MULTI_CLAUSE_INDEPENDENCE_FACTOR, "0.5").build(),
+            pb -> {
+                Symbol leftJoinColumnSymbol = pb.symbol(LEFT_JOIN_COLUMN, BIGINT);
+                Symbol rightJoinColumnSymbol = pb.symbol(RIGHT_JOIN_COLUMN, DOUBLE);
+                Symbol leftJoinColumnSymbol2 = pb.symbol(LEFT_JOIN_COLUMN_2, BIGINT);
+                Symbol rightJoinColumnSymbol2 = pb.symbol(RIGHT_JOIN_COLUMN_2, DOUBLE);
+                ComparisonExpression leftJoinColumnLessThanTen = new ComparisonExpression(ComparisonExpression.Operator.LESS_THAN, toSymbolReference(leftJoinColumnSymbol), new LongLiteral("10"));
+                return pb.join(INNER, pb.values(leftJoinColumnSymbol, leftJoinColumnSymbol2),
+                       pb.values(rightJoinColumnSymbol, rightJoinColumnSymbol2),
+                       ImmutableList.of(new EquiJoinClause(leftJoinColumnSymbol2, rightJoinColumnSymbol2), new EquiJoinClause(leftJoinColumnSymbol, rightJoinColumnSymbol)),
+                       ImmutableList.of(leftJoinColumnSymbol, leftJoinColumnSymbol2, rightJoinColumnSymbol, rightJoinColumnSymbol2),
+                       Optional.of(castToRowExpression(leftJoinColumnLessThanTen)));
+                }).withSourceStats(0, planNodeStats(LEFT_ROWS_COUNT, LEFT_JOIN_COLUMN_STATS, LEFT_JOIN_COLUMN_2_STATS))
                 .withSourceStats(1, planNodeStats(RIGHT_ROWS_COUNT, RIGHT_JOIN_COLUMN_STATS, RIGHT_JOIN_COLUMN_2_STATS))
                 .check(stats -> stats.equalTo(innerJoinStats));
     }

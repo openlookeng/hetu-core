@@ -153,13 +153,13 @@ public class BloomFilter
             }
             BloomFilter bloomFilter = new BloomFilter(bits, localNumHashFunctions);
             try {
-                long min = dataInputStream.readLong();
-                long max = dataInputStream.readLong();
-                bloomFilter.min = min;
-                bloomFilter.max = max;
+                long localMin = dataInputStream.readLong();
+                long localMax = dataInputStream.readLong();
+                bloomFilter.min = localMin;
+                bloomFilter.max = localMax;
             }
             catch (EOFException e) {
-                //nothing to read
+                dataInputStream.close();
             }
 
             return bloomFilter;

@@ -215,16 +215,16 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         checkArgument(orDomains != null, "orDomain map cannot be null");
 
         // sort stripes by file position
-        List<StripeInfo> stripeInfos = new ArrayList<>();
+        List<StripeInfo> sortedStripeInfos = new ArrayList<>();
         for (int i = 0; i < fileStripes.size(); i++) {
             Optional<StripeStatistics> stats = Optional.empty();
             // ignore all stripe stats if too few or too many
             if (stripeStats.size() == fileStripes.size()) {
                 stats = stripeStats.get(i);
             }
-            stripeInfos.add(new StripeInfo(fileStripes.get(i), stats));
+            sortedStripeInfos.add(new StripeInfo(fileStripes.get(i), stats));
         }
-        stripeInfos.sort(comparingLong(info -> info.getStripe().getOffset()));
+        sortedStripeInfos.sort(comparingLong(info -> info.getStripe().getOffset()));
 
         // assumptions made about the index:
         // 1. they are all bitmap indexes
@@ -262,8 +262,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         ImmutableList.Builder<Long> localStripeFilePositions = ImmutableList.builder();
         if (!fileStats.isPresent() || predicate.matches(numberOfRows, fileStats.get())) {
             // select stripes that start within the specified split
-            for (int i = 0; i < stripeInfos.size(); i++) {
-                StripeInfo info = stripeInfos.get(i);
+            for (int i = 0; i < sortedStripeInfos.size(); i++) {
+                StripeInfo info = sortedStripeInfos.get(i);
                 StripeInformation stripe = info.getStripe();
                 if (splitContainsStripe(splitOffset, splitLength, stripe)
                         && isStripeIncluded(stripe, info.getStats(), predicate)
@@ -277,7 +277,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
         this.totalRowCount = localTotalRowCount;
         this.stripes = localStripes.build();
-        this.stripeInfos = stripeInfos;
+        this.stripeInfos = sortedStripeInfos;
         this.stripeFilePositions = localStripeFilePositions.build();
 
         OrcDataSource localOrcDataSource = inputOrcDataSource;
@@ -285,7 +285,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         this.orcDataSource = localOrcDataSource;
         this.splitLength = splitLength;
 
-        this.fileRowCount = stripeInfos.stream()
+        this.fileRowCount = sortedStripeInfos.stream()
                 .map(StripeInfo::getStripe)
                 .mapToLong(StripeInformation::getNumberOfRows)
                 .sum();
