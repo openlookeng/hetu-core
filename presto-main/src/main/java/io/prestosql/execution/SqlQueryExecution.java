@@ -606,6 +606,7 @@ public class SqlQueryExecution
                 plan = analyzeQuery();
 
                 try {
+                    registerDynamicFilteringQuery(plan);
                     handleCrossRegionDynamicFilter(plan);
                 }
                 catch (Throwable e) {
@@ -942,6 +943,20 @@ public class SqlQueryExecution
         }
 
         return connectors.build();
+    }
+
+    private synchronized void registerDynamicFilteringQuery(PlanRoot plan)
+    {
+        if (!isEnableDynamicFiltering(stateMachine.getSession())) {
+            return;
+        }
+
+        if (isDone()) {
+            // query has finished or was cancelled asynchronously
+            return;
+        }
+
+        dynamicFilterService.registerQuery(this, plan.getRoot());
     }
 
     private void planDistribution(PlanRoot plan)

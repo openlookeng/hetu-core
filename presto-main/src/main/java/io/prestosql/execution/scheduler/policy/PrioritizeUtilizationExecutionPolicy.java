@@ -14,16 +14,29 @@
  */
 package io.prestosql.execution.scheduler.policy;
 
+import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.SqlStageExecution;
 
+import javax.inject.Inject;
+
 import java.util.Collection;
+
+import static java.util.Objects.requireNonNull;
 
 public class PrioritizeUtilizationExecutionPolicy
         implements ExecutionPolicy
 {
+    private final DynamicFilterService dynamicFilterService;
+
+    @Inject
+    public PrioritizeUtilizationExecutionPolicy(DynamicFilterService dynamicFilterService)
+    {
+        this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
+    }
+
     @Override
     public ExecutionSchedule createExecutionSchedule(Collection<SqlStageExecution> stages)
     {
-        return PrioritizeUtilizationExecutionSchedule.forStages(stages);
+        return PrioritizeUtilizationExecutionSchedule.forStages(stages, dynamicFilterService);
     }
 }

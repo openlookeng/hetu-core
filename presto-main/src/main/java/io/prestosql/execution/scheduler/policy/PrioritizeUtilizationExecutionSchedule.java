@@ -16,10 +16,14 @@ package io.prestosql.execution.scheduler.policy;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageState;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -38,6 +42,7 @@ import org.jgrapht.graph.DefaultDirectedGraph;
 
 import javax.annotation.concurrent.GuardedBy;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,6 +52,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -54,9 +60,10 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.prestosql.execution.StageState.FINISHED;
+import static io.prestosql.execution.StageState.PENDING;
 import static io.prestosql.execution.StageState.RUNNING;
 import static io.prestosql.execution.StageState.SCHEDULED;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
 import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
@@ -76,40 +83,40 @@ public class PrioritizeUtilizationExecutionSchedule
      */
     private final DirectedGraph<PlanFragmentId, FragmentsEdge> fragmentTopology;
     private final Map<PlanFragmentId, SqlStageExecution> stagesByFragmentId;
+    private Ordering<PlanFragmentId> fragmentOrdering;
+    private final List<PlanFragmentId> sortedFragments = new ArrayList<>();
     private final Set<SqlStageExecution> activeStages = new HashSet<>();
+    private final DynamicFilterService dynamicFilterService;
 
     @GuardedBy("this")
     private SettableFuture<?> rescheduleFuture = SettableFuture.create();
 
-    public static PrioritizeUtilizationExecutionSchedule forStages(Collection<SqlStageExecution> stages)
+    public static PrioritizeUtilizationExecutionSchedule forStages(Collection<SqlStageExecution> stages, DynamicFilterService dynamicFilterService)
     {
-        PrioritizeUtilizationExecutionSchedule schedule = new PrioritizeUtilizationExecutionSchedule(stages);
+        PrioritizeUtilizationExecutionSchedule schedule = new PrioritizeUtilizationExecutionSchedule(stages, dynamicFilterService);
         schedule.init(stages);
         return schedule;
     }
 
-    private PrioritizeUtilizationExecutionSchedule(Collection<SqlStageExecution> stages)
+    private PrioritizeUtilizationExecutionSchedule(Collection<SqlStageExecution> stages, DynamicFilterService dynamicFilterService)
     {
         fragmentDependency = new DefaultDirectedGraph<>(new FragmentsEdgeFactory());
         fragmentTopology = new DefaultDirectedGraph<>(new FragmentsEdgeFactory());
         stagesByFragmentId = stages.stream()
                 .collect(toImmutableMap(stage -> stage.getFragment().getId(), identity()));
+        this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
     }
 
     private void init(Collection<SqlStageExecution> stages)
     {
-        extractDependenciesAndReturnNonLazyFragments(
-                stages.stream()
-                        .map(SqlStageExecution::getFragment)
-                        .collect(toImmutableList())).stream()
-                // start non-lazy stages
-                .map(stagesByFragmentId::get)
-                .forEach(this::selectForExecution);
+        ImmutableSet.Builder<PlanFragmentId> fragmentsToExecute = ImmutableSet.builder();
+        fragmentsToExecute.addAll(extractDependenciesAndReturnNonLazyFragments(stages));
         // start stages without any dependencies
         fragmentDependency.vertexSet().stream()
                 .filter(fragmentId -> fragmentDependency.inDegreeOf(fragmentId) == 0)
-                .map(stagesByFragmentId::get)
-                .forEach(this::selectForExecution);
+                .forEach(fragmentsToExecute::add);
+        fragmentOrdering = Ordering.explicit(sortedFragments);
+        selectForExecution(fragmentsToExecute.build());
     }
 
     @Override
@@ -138,8 +145,10 @@ public class PrioritizeUtilizationExecutionSchedule
     @VisibleForTesting
     void schedule()
     {
-        removeCompletedStages();
-        unblockStagesWithFullOutputBuffer();
+        ImmutableSet.Builder<PlanFragmentId> fragmentsToExecute = new ImmutableSet.Builder<>();
+        fragmentsToExecute.addAll(removeCompletedStages());
+        fragmentsToExecute.addAll(unblockStagesWithFullOutputBuffer());
+        selectForExecution(fragmentsToExecute.build());
     }
 
     @VisibleForTesting
@@ -154,31 +163,34 @@ public class PrioritizeUtilizationExecutionSchedule
         return activeStages;
     }
 
-    private void removeCompletedStages()
+    private Set<PlanFragmentId> removeCompletedStages()
     {
         Set<SqlStageExecution> completedStages = activeStages.stream()
                 .filter(this::isStageCompleted)
                 .collect(toImmutableSet());
         // remove completed stages outside of Java stream to prevent concurrent modification
-        completedStages.forEach(this::removeCompletedStage);
+        return completedStages.stream()
+                .flatMap(stage -> removeCompletedStage(stage).stream())
+                .collect(toImmutableSet());
     }
 
-    private void removeCompletedStage(SqlStageExecution stage)
+    private Set<PlanFragmentId> removeCompletedStage(SqlStageExecution stage)
     {
         // start all stages that depend on completed stage
         PlanFragmentId fragmentId = stage.getFragment().getId();
-        fragmentDependency.outgoingEdgesOf(fragmentId).stream()
+        Set<PlanFragmentId> fragmentsToExecute = fragmentDependency.outgoingEdgesOf(fragmentId).stream()
                 .map(FragmentsEdge::getTarget)
                 // filter stages that depend on completed stage only
                 .filter(dependentFragmentId -> fragmentDependency.inDegreeOf(dependentFragmentId) == 1)
-                .map(stagesByFragmentId::get)
-                .forEach(this::selectForExecution);
+                .collect(toImmutableSet());
         fragmentDependency.removeVertex(fragmentId);
         fragmentTopology.removeVertex(fragmentId);
         activeStages.remove(stage);
+
+        return fragmentsToExecute;
     }
 
-    private void unblockStagesWithFullOutputBuffer()
+    private Set<PlanFragmentId> unblockStagesWithFullOutputBuffer()
     {
         // find stages that are blocked on full task output buffer
         Set<PlanFragmentId> blockedFragments = activeStages.stream()
@@ -186,15 +198,41 @@ public class PrioritizeUtilizationExecutionSchedule
                 .map(stage -> stage.getFragment().getId())
                 .collect(toImmutableSet());
         // start immediate downstream stages so that data can be consumed
-        blockedFragments.stream()
+        Set<PlanFragmentId> immediateDownStreamFragments = blockedFragments.stream()
                 .flatMap(fragmentId -> fragmentTopology.outgoingEdgesOf(fragmentId).stream())
                 .map(FragmentsEdge::getTarget)
+                .collect(Collectors.toSet());
+        Set<PlanFragmentId> dependentDownStreamFragments = blockedFragments.stream()
+                .flatMap(fragmentId -> fragmentDependency.outgoingEdgesOf(fragmentId).stream())
+                .map(FragmentsEdge::getTarget)
+                .collect(Collectors.toSet());
+        Set<PlanFragmentId> fragmentsToExecute = new HashSet<>();
+        if (immediateDownStreamFragments.isEmpty()) {
+            fragmentsToExecute.addAll(dependentDownStreamFragments);
+        }
+        else {
+            fragmentsToExecute.addAll(immediateDownStreamFragments);
+        }
+        return fragmentsToExecute;
+    }
+
+    private void selectForExecution(Set<PlanFragmentId> fragmentIds)
+    {
+        requireNonNull(fragmentOrdering, "fragmentOrdering is null");
+        fragmentIds.stream()
+                .sorted(fragmentOrdering)
                 .map(stagesByFragmentId::get)
                 .forEach(this::selectForExecution);
     }
 
     private void selectForExecution(SqlStageExecution stage)
     {
+        if (isStageCompleted(stage)) {
+            // don't start completed stages (can happen when non-lazy stage is selected for
+            // execution and stage is started immediately even with dependencies)
+            return;
+        }
+
         if (fragmentDependency.outDegreeOf(stage.getFragment().getId()) > 0) {
             // if there are any dependent stages then reschedule when stage is completed
             stage.addStateChangeListener(state -> {
@@ -220,16 +258,26 @@ public class PrioritizeUtilizationExecutionSchedule
     private boolean isStageCompleted(SqlStageExecution stage)
     {
         StageState state = stage.getState();
-        return state == SCHEDULED || state == RUNNING || state == FINISHED || state.isDone();
+        return state == SCHEDULED || state == RUNNING || state == PENDING || state.isDone();
     }
 
-    private Set<PlanFragmentId> extractDependenciesAndReturnNonLazyFragments(Collection<PlanFragment> fragments)
+    private Set<PlanFragmentId> extractDependenciesAndReturnNonLazyFragments(Collection<SqlStageExecution> stages)
     {
+        if (stages.isEmpty()) {
+            return ImmutableSet.of();
+        }
+
+        QueryId queryId = stages.stream()
+                .map(stage -> stage.getStageId().getQueryId())
+                .findAny().orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, ""));
+        Collection<PlanFragment> fragments = stages.stream()
+                .map(SqlStageExecution::getFragment)
+                .collect(toImmutableList());
         // Build a graph where the plan fragments are vertexes and the edges represent
         // a before -> after relationship. Destination fragment should be started only
         // when source fragment is completed. For example, a join hash build has an edge
         // to the join probe.
-        Visitor visitor = new Visitor(fragments);
+        Visitor visitor = new Visitor(queryId, fragments);
         visitor.processAllFragments();
 
         // Make sure there are no strongly connected components as it would mean circular dependency between stages
@@ -242,12 +290,14 @@ public class PrioritizeUtilizationExecutionSchedule
     private class Visitor
             extends InternalPlanVisitor<FragmentSubGraph, PlanFragmentId>
     {
+        private final QueryId queryId;
         private final Map<PlanFragmentId, PlanFragment> fragments;
         private final ImmutableSet.Builder<PlanFragmentId> nonLazyFragments = ImmutableSet.builder();
         private final Map<PlanFragmentId, FragmentSubGraph> fragmentSubGraphs = new HashMap<>();
 
-        public Visitor(Collection<PlanFragment> fragments)
+        public Visitor(QueryId queryId, Collection<PlanFragment> fragments)
         {
+            this.queryId = queryId;
             this.fragments = requireNonNull(fragments, "fragments is null").stream()
                     .collect(toImmutableMap(PlanFragment::getId, identity()));
         }
@@ -274,6 +324,7 @@ public class PrioritizeUtilizationExecutionSchedule
 
             FragmentSubGraph subGraph = processFragment(fragments.get(planFragmentId));
             verify(fragmentSubGraphs.put(planFragmentId, subGraph) == null, "fragment %s was already processed", planFragmentId);
+            sortedFragments.add(planFragmentId);
             return subGraph;
         }
 
@@ -353,7 +404,7 @@ public class PrioritizeUtilizationExecutionSchedule
             addDependencyEdges(buildSubGraph.getUpstreamFragments(), probeSubGraph.getLazyUpstreamFragments());
 
             boolean currentFragmentLazy = probeSubGraph.isCurrentFragmentLazy() && buildSubGraph.isCurrentFragmentLazy();
-            if (replicated && currentFragmentLazy) {
+            if (replicated && currentFragmentLazy && !dynamicFilterService.isStageSchedulingNeededToCollectDynamicFilters(queryId, fragments.get(currentFragmentId))) {
                 // Do not start join stage (which can also be a source stage with table scans)
                 // for replicated join until build source stage enters FLUSHING state.
                 // Broadcast join limit for CBO is set in such a way that build source data should
