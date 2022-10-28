@@ -38,6 +38,7 @@ import io.prestosql.orc.metadata.StripeFooter;
 import io.prestosql.orc.metadata.StripeInformation;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.HashableBloomFilter;
+import io.prestosql.orc.metadata.statistics.StripeStatistics;
 import io.prestosql.orc.stream.InputStreamSource;
 import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.OrcChunkLoader;
@@ -123,9 +124,13 @@ public class StripeReader
         this.orcCacheProperties = requireNonNull(orcCacheProperties, "OrcCacheProperties is null");
     }
 
-    public Stripe readStripe(StripeInformation stripe, AggregatedMemoryContext systemMemoryUsage)
+    public Stripe readStripe(StripeInformation stripe, AggregatedMemoryContext systemMemoryUsage, Optional<StripeStatistics> stats)
             throws IOException
     {
+        if (stats.isPresent() && predicate.getDynamicFilterPredicate().isPresent() && !predicate.getDynamicFilterPredicate().get().matches(stripe.getNumberOfRows(), stats.get().getColumnStatistics())) {
+            systemMemoryUsage.close();
+            return null;
+        }
         // read the stripe footer
         OrcStripeFooterCacheKey cacheKey = new OrcStripeFooterCacheKey();
         cacheKey.setOrcDataSourceId(new OrcDataSourceIdWithTimeStamp(orcDataSource.getId(), orcDataSource.getLastModifiedTime()));

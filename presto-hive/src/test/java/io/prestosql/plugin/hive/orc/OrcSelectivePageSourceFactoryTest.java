@@ -111,7 +111,7 @@ public class OrcSelectivePageSourceFactoryTest
         final Optional<? extends ConnectorPageSource> result = orcSelectivePageSourceFactoryUnderTest.createPageSource(
                 configuration, session, path, 0L, 0L, 0L, schema, columns, prefilledValues,
                 Arrays.asList(0), domainPredicate, additionPredicates, deleteDeltaLocations, Optional.of(0L), indexes,
-                false, columnMappings, coercers, 0L);
+                false, columnMappings, coercers, 0L, Optional.empty());
 
         // Verify the results
     }
@@ -176,7 +176,7 @@ public class OrcSelectivePageSourceFactoryTest
                 Arrays.asList(1), domainPredicate, hiveStorageTimeZone, typeManager, maxMergeDistance, maxBufferSize,
                 streamBufferSize, tinyStripeThreshold, maxReadBlockSize, false, false, stats, deleteDeltaLocations,
                 Optional.of(1L), indexes, orcCacheStore, orcCacheProperties, disjunctDomains, Arrays.asList(1),
-                columnMappings, coercers, 1L);
+                columnMappings, coercers, 1L, Optional.empty());
 
         // Verify the results
     }

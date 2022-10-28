@@ -115,7 +115,7 @@ public class TestHashAggregationOperator
     private static final InternalAggregationFunction COUNT = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
             new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE, BIGINT.getTypeSignature()));
     private static final InternalAggregationFunction LONG_MIN = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(
-            new Signature(QualifiedObjectName.valueOfDefaultFunction("min"), AGGREGATE, BIGINT.getTypeSignature()));
+            new Signature(QualifiedObjectName.valueOfDefaultFunction("min"), AGGREGATE, BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
 
     private static final int MAX_BLOCK_SIZE_IN_BYTES = 64 * 1024;
 
@@ -983,7 +983,7 @@ public class TestHashAggregationOperator
         assertEquals(driverContext.getMemoryUsage(), 0);
     }
 
-    @Test(dataProvider = "hashEnabled")
+    @Test
     public void testAdaptivePartialAggregation()
     {
         List<Integer> hashChannels = Ints.asList(0);
@@ -1017,7 +1017,7 @@ public class TestHashAggregationOperator
                 .addBlocksPage(createLongsBlock(0, 1, 2, 3, 4, 5, 6, 7, 8), createLongsBlock(0, 1, 2, 3, 4, 5, 6, 7, 8)) // the last position was aggregated
                 .addBlocksPage(createRLEBlock(1, 10), createRLEBlock(1, 10)) // we are expecting second page with raw values
                 .build();
-        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT), createDriverContext(), operator1Input, operator1Expected);
+        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT, BIGINT), createDriverContext(), operator1Input, operator1Expected);
 
         // the first operator flush disables partial aggregation
         assertTrue(partialAggregationController.isPartialAggregationDisabled());
@@ -1031,7 +1031,7 @@ public class TestHashAggregationOperator
                 .addBlocksPage(createRLEBlock(2, 10), createRLEBlock(2, 10))
                 .build();
 
-        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT), createDriverContext(), operator2Input, operator2Expected);
+        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT, BIGINT), createDriverContext(), operator2Input, operator2Expected);
     }
 
     @Test
@@ -1065,7 +1065,7 @@ public class TestHashAggregationOperator
         List<Page> operator1Expected = rowPagesBuilder(BIGINT, BIGINT)
                 .addSequencePage(10, 0, 0) // we are expecting second page to be squashed with the first
                 .build();
-        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT), createDriverContext(), operator1Input, operator1Expected);
+        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT, BIGINT), createDriverContext(), operator1Input, operator1Expected);
 
         // the first operator flush disables partial aggregation
         assertTrue(partialAggregationController.isPartialAggregationDisabled());
@@ -1080,7 +1080,7 @@ public class TestHashAggregationOperator
                 .addBlocksPage(createRLEBlock(2, 10), createRLEBlock(2, 10))
                 .build();
 
-        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT), createDriverContext(), operator2Input, operator2Expected);
+        OperatorAssertion.assertOperatorEquals(operatorFactory, ImmutableList.of(BIGINT, BIGINT), createDriverContext(), operator2Input, operator2Expected);
     }
 
     private DriverContext createDriverContext()

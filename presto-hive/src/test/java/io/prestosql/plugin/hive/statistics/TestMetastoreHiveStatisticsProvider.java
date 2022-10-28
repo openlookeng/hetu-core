@@ -495,7 +495,7 @@ public class TestMetastoreHiveStatisticsProvider
     private static void assertConvertPartitionValueToDouble(Type type, String value, double expected)
     {
         Object prestoValue = parsePartitionValue(format("p=%s", value), value, type).getValue();
-        assertEquals(convertPartitionValueToDouble(type, prestoValue), expected);
+        assertEquals(convertPartitionValueToDouble(type, prestoValue).getAsDouble(), expected);
     }
 
     @Test

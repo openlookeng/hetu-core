@@ -105,4 +105,28 @@ public class CombinedDynamicFilter
     {
         return null;
     }
+
+    @Override
+    public boolean hasMinMaxStats()
+    {
+        List<DynamicFilter> filters = getFilters();
+        for (DynamicFilter filter : filters) {
+            if (!filter.hasMinMaxStats()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean isRangeOverlaps(Long statsMin, Long statsMax)
+    {
+        List<DynamicFilter> filters = getFilters();
+        for (DynamicFilter filter : filters) {
+            if (!(((Long) filter.getMin()).compareTo(statsMax) <= 0 && statsMin.compareTo((Long) filter.getMax()) <= 0)) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

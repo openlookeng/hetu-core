@@ -24,6 +24,7 @@ import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.LongInputStream;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.type.Type;
 import org.openjdk.jol.info.ClassLayout;
 
@@ -82,12 +83,19 @@ public class LongSelectiveColumnReader
         nullsAllowed = this.filter == null || this.filter.testNull();
     }
 
+    @Override
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
+            throws IOException
+    {
+        return read(offset, positions, positionCount, filter, null);
+    }
+
     // Read values as per the given position. Below are input.
     // offset: Starting offset to read data.
     // positions: Array of position from which data to be read;
     // positionCount: Number of position in the positions array.
     @Override
-    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
+    public int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter, List<DynamicFilter> dynamicFilters)
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -145,7 +153,7 @@ public class LongSelectiveColumnReader
                 }
                 else {
                     long value = dataStream.next();
-                    if (this.filter == null || this.filter.testLong(value)) {
+                    if ((this.filter == null || this.filter.testLong(value)) && (dynamicFilters == null || dynamicFilters.stream().anyMatch(df -> df.contains(value)))) {
                         if (outputRequired) {
                             values[outputPositionCount] = value;
                             if (nullsAllowed && presentStream != null) {

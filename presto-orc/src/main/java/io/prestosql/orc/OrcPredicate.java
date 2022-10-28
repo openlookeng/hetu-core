@@ -16,6 +16,8 @@ package io.prestosql.orc;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 
+import java.util.Optional;
+
 public interface OrcPredicate
 {
     OrcPredicate TRUE = (numberOfRows, statisticsByColumnIndex) -> true;
@@ -28,4 +30,13 @@ public interface OrcPredicate
      * @param allColumnStatistics column statistics
      */
     boolean matches(long numberOfRows, ColumnMetadata<ColumnStatistics> allColumnStatistics);
+
+    default Optional<OrcPredicate> getDynamicFilterPredicate()
+    {
+        return Optional.empty();
+    }
+
+    default void setDynamicFilterPredicate(Optional<OrcPredicate> dfPredicate)
+    {
+    }
 }

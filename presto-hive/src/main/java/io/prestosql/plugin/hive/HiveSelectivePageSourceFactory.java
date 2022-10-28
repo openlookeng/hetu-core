@@ -16,6 +16,7 @@ package io.prestosql.plugin.hive;
 import io.prestosql.plugin.hive.coercions.HiveCoercer;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.TupleDomain;
 import org.apache.hadoop.conf.Configuration;
@@ -47,5 +48,6 @@ public interface HiveSelectivePageSourceFactory
             boolean splitCacheable,
             List<HivePageSourceProvider.ColumnMapping> columnMappings,
             Map<Integer, HiveCoercer> coercers,
-            long dataSourceLastModifiedTime);
+            long dataSourceLastModifiedTime,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier);
 }

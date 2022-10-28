@@ -480,7 +480,6 @@ public class ScanFilterAndProjectOperator
 
             Page page = pageSource.getNextPage();
             pageSourceMemoryContext.setBytes(pageSource.getSystemMemoryUsage());
-
             if (page == null) {
                 if (pageSource.isFinished()) {
                     return ProcessState.finished();

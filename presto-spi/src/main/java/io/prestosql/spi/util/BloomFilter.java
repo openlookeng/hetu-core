@@ -22,6 +22,7 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -66,6 +67,19 @@ public class BloomFilter
     private final BitSet bitSet;
     private final int numHashFunctions;
     private int numBits;
+
+    private Object min;
+    private Object max;
+
+    public Object getMin()
+    {
+        return min;
+    }
+
+    public Object getMax()
+    {
+        return max;
+    }
 
     public BloomFilter(long expectedEntries, double fpp)
     {
@@ -137,7 +151,18 @@ public class BloomFilter
             for (int i = 0; i < localNumBits; i++) {
                 bits[i] = dataInputStream.readLong();
             }
-            return new BloomFilter(bits, localNumHashFunctions);
+            BloomFilter bloomFilter = new BloomFilter(bits, localNumHashFunctions);
+            try {
+                long min = dataInputStream.readLong();
+                long max = dataInputStream.readLong();
+                bloomFilter.min = min;
+                bloomFilter.max = max;
+            }
+            catch (EOFException e) {
+                //nothing to read
+            }
+
+            return bloomFilter;
         }
         catch (IOException e) {
             throw new IOException("Failed to deserialize BloomFilter, numHashFunctions: "
@@ -168,6 +193,10 @@ public class BloomFilter
             throw new IllegalArgumentException("BloomFilter to merge must have same number of hash functions");
         }
 
+        if (this.min instanceof Long && that.min instanceof Long) {
+            this.min = Math.min((Long) this.min, (Long) that.min);
+            this.max = Math.max((Long) this.max, (Long) that.max);
+        }
         bitSet.merge(that.bitSet);
         this.numBits = (int) bitSet.bitSize();
     }
@@ -223,6 +252,8 @@ public class BloomFilter
 
     public void add(long val)
     {
+        setMinMaxStats(val);
+
         addHash(getLongHash(val));
     }
 
@@ -234,7 +265,20 @@ public class BloomFilter
 
     public void addLong(long val)
     {
+        setMinMaxStats(val);
         addHash(getLongHash(val));
+    }
+
+    private void setMinMaxStats(long val)
+    {
+        if (this.min == null) {
+            this.min = Long.valueOf(val);
+            this.max = Long.valueOf(val);
+        }
+        else {
+            this.min = Math.min((Long) this.min, val);
+            this.max = Math.max((Long) this.max, val);
+        }
     }
 
     public void add(double val)
@@ -358,6 +402,10 @@ public class BloomFilter
         dataOutputStream.writeInt(bits.length);
         for (int i = 0; i < bits.length; i++) {
             dataOutputStream.writeLong(bits[i]);
+        }
+        if (null != min && min instanceof Long) {
+            dataOutputStream.writeLong((Long) min);
+            dataOutputStream.writeLong((Long) max);
         }
     }
 

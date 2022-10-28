@@ -30,6 +30,7 @@ import io.prestosql.memory.context.AggregatedMemoryContext;
 import io.prestosql.orc.metadata.ColumnEncoding;
 import io.prestosql.orc.metadata.ColumnMetadata;
 import io.prestosql.orc.metadata.MetadataReader;
+import io.prestosql.orc.metadata.OrcColumnId;
 import io.prestosql.orc.metadata.OrcType;
 import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.orc.metadata.StripeInformation;
@@ -43,6 +44,9 @@ import io.prestosql.orc.stream.InputStreamSources;
 import io.prestosql.orc.stream.StreamSourceMeta;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.Index;
 import io.prestosql.spi.heuristicindex.IndexLookUpException;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
@@ -63,6 +67,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -104,6 +109,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     protected boolean pageMetadataEnabled;
 
     protected final List<StripeInformation> stripes;
+
     private final StripeReader stripeReader;
     protected int currentStripe = -1;
     private AggregatedMemoryContext currentStripeSystemMemoryContext;
@@ -129,7 +135,18 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     protected final Optional<OrcWriteValidation.StatisticsValidation> stripeStatisticsValidation;
     protected final Optional<OrcWriteValidation.StatisticsValidation> fileStatisticsValidation;
 
+    protected OrcPredicate predicate;
+
+    protected List<OrcColumn> readColumns;
+
+    protected final List<StripeInfo> stripeInfos;
+
     Map<StripeInformation, PeekingIterator<Integer>> stripeMatchingRows = new HashMap<>();
+
+    public OrcPredicate getPredicate()
+    {
+        return predicate;
+    }
 
     public AbstractOrcRecordReader(
             List<OrcColumn> readColumns,
@@ -178,6 +195,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         requireNonNull(systemMemoryUsage, "systemMemoryUsage is null");
         requireNonNull(exceptionTransform, "exceptionTransform is null");
 
+        this.readColumns = readColumns;
         this.writeValidation = requireNonNull(writeValidation, "writeValidation is null");
         this.writeChecksumBuilder = writeValidation.map(validation -> createWriteChecksumBuilder(orcTypes, readTypes));
         this.rowGroupStatisticsValidation = writeValidation.map(validation -> validation.createWriteStatisticsBuilder(orcTypes, readTypes));
@@ -189,6 +207,8 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         this.maxBlockBytes = requireNonNull(maxBlockSize, "maxBlockSize is null").toBytes();
 
         this.pageMetadataEnabled = pageMetadataEnabled;
+
+        this.predicate = predicate;
 
         // it is possible that old versions of orc use 0 to mean there are no row groups
         checkArgument(rowsInRowGroup > 0, "rowsInRowGroup must be greater than zero");
@@ -257,6 +277,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
         this.totalRowCount = localTotalRowCount;
         this.stripes = localStripes.build();
+        this.stripeInfos = stripeInfos;
         this.stripeFilePositions = localStripeFilePositions.build();
 
         OrcDataSource localOrcDataSource = inputOrcDataSource;
@@ -460,10 +481,11 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
             OrcPredicate predicate)
     {
         // if there are no stats, include the column
-        return stripeStats
+        Boolean filterResult = stripeStats
                 .map(StripeStatistics::getColumnStatistics)
                 .map(columnStats -> predicate.matches(stripe.getNumberOfRows(), columnStats))
                 .orElse(true);
+        return filterResult;
     }
 
     @VisibleForTesting
@@ -646,7 +668,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         StripeInformation stripeInformation = stripes.get(currentStripe);
         validateWriteStripe(stripeInformation.getNumberOfRows());
 
-        Stripe stripe = stripeReader.readStripe(stripeInformation, currentStripeSystemMemoryContext);
+        Stripe stripe = stripeReader.readStripe(stripeInformation, currentStripeSystemMemoryContext, stripeInfos.get(currentStripe).getStats());
         if (stripe != null) {
             // Give readers access to dictionary streams
             InputStreamSources dictionaryStreamSources = stripe.getDictionaryStreamSources();
@@ -789,6 +811,48 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
     long getSystemMemoryUsage()
     {
         return systemMemoryUsage.getBytes();
+    }
+
+    public void setDynamicFilter(Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+    {
+        if (predicate.getDynamicFilterPredicate().isPresent()) {
+            return;
+        }
+        //construct DF predicate
+        List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
+        DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder dfPredicateBuilder = DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder.builder();
+        if (null != readColumns && !readColumns.isEmpty()) {
+            for (OrcColumn readColumn : readColumns) {
+                addDynamicFilterPredicate(readColumn.getColumnId(), readColumn.getColumnName(), dynamicFilterSupplier, dfPredicateBuilder);
+            }
+        }
+        predicate.setDynamicFilterPredicate(dfPredicateBuilder.build());
+    }
+
+    private static void addDynamicFilterPredicate(OrcColumnId orcColumnId, String column,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
+            DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder dfPredicateBuilder)
+    {
+        if (dynamicFilterSupplier.isPresent()) {
+            List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
+            if (null != dynamicFilters && !dynamicFilters.isEmpty()) {
+                List<DynamicFilter> colDynamicFilterList = new ArrayList<>();
+                for (Map<ColumnHandle, DynamicFilter> filtersMap : dynamicFilters) {
+                    Set<Map.Entry<ColumnHandle, DynamicFilter>> entries = filtersMap.entrySet();
+                    for (Map.Entry<ColumnHandle, DynamicFilter> entry : entries) {
+                        if (entry.getKey().getColumnName().equalsIgnoreCase(column)) {
+                            DynamicFilter dynamicFilter = entry.getValue();
+                            if (null != dynamicFilter) {
+                                colDynamicFilterList.add(dynamicFilter);
+                            }
+                        }
+                    }
+                }
+                if (!colDynamicFilterList.isEmpty()) {
+                    dfPredicateBuilder.addColumn(orcColumnId, colDynamicFilterList);
+                }
+            }
+        }
     }
 
     private static class StripeInfo

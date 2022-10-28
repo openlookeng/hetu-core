@@ -23,12 +23,14 @@ import io.prestosql.plugin.hive.HivePageSourceProvider.ColumnMapping;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_BAD_DATA;
@@ -158,5 +160,11 @@ public class OrcSelectivePageSource
                 throwable.addSuppressed(e);
             }
         }
+    }
+
+    @Override
+    public void setDynamicFilter(Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+    {
+        recordReader.setDynamicFilter(dynamicFilterSupplier);
     }
 }

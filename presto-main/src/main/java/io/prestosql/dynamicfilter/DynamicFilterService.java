@@ -211,6 +211,8 @@ public class DynamicFilterService
                         Set mergedSet = mergeHashSets(results);
                         mergedFilter = DynamicFilterFactory.create(filterKey, null, mergedSet, filterType, dfFilter, Optional.empty());
 
+                        mergedFilter.setMinMax();
+
                         if (filterType == GLOBAL) {
                             mergedDynamicFilters.put(filterKey, mergedSet);
                         }

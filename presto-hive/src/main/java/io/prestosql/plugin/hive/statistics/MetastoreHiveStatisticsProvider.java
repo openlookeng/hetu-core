@@ -48,7 +48,6 @@ import io.prestosql.spi.statistics.Estimate;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
-import io.prestosql.spi.type.Int128;
 import io.prestosql.spi.type.Type;
 
 import java.math.BigDecimal;
@@ -57,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,11 +82,8 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.Chars.isCharType;
 import static io.prestosql.spi.type.DateType.DATE;
-import static io.prestosql.spi.type.DecimalConversions.longDecimalToDouble;
-import static io.prestosql.spi.type.DecimalConversions.shortDecimalToDouble;
 import static io.prestosql.spi.type.Decimals.isLongDecimal;
 import static io.prestosql.spi.type.Decimals.isShortDecimal;
-import static io.prestosql.spi.type.Decimals.longTenToNth;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
@@ -123,6 +120,8 @@ public class MetastoreHiveStatisticsProvider
     MetastoreHiveStatisticsProvider(PartitionsStatisticsProvider statisticsProvider)
     {
         this.statisticsProvider = requireNonNull(statisticsProvider, "statisticsProvider is null");
+        this.samplePartitionCache = new HashMap<>();
+        this.statsCache = new HashMap<>();
     }
 
     private static Map<String, PartitionStatistics> getPartitionsStatistics(ConnectorSession session, SemiTransactionalHiveMetastore metastore, SchemaTableName schemaTableName, List<HivePartition> hivePartitions, Table table)
@@ -721,10 +720,13 @@ public class MetastoreHiveStatisticsProvider
         }
         if (type instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) type;
-            if (decimalType.isShort()) {
-                return OptionalDouble.of(shortDecimalToDouble((long) value, longTenToNth(decimalType.getScale())));
+            if (isShortDecimal(decimalType)) {
+                return OptionalDouble.of(parseDouble(Decimals.toString((Long) value, decimalType.getScale())));
             }
-            return OptionalDouble.of(longDecimalToDouble((Int128) value, decimalType.getScale()));
+            if (isLongDecimal(decimalType)) {
+                return OptionalDouble.of(parseDouble(Decimals.toString((Slice) value, decimalType.getScale())));
+            }
+            throw new IllegalArgumentException("Unexpected decimal type: " + decimalType);
         }
         if (type == DATE) {
             return OptionalDouble.of((long) value);
@@ -895,7 +897,6 @@ public class MetastoreHiveStatisticsProvider
                 || type.equals(REAL)
                 || type.equals(DOUBLE)
                 || type.equals(DATE)
-                || type.equals(BOOLEAN)
                 || type instanceof DecimalType;
     }
 

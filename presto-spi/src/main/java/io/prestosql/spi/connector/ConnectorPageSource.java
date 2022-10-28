@@ -14,10 +14,12 @@
 package io.prestosql.spi.connector;
 
 import io.prestosql.spi.Page;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.metrics.Metrics;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 
@@ -101,5 +103,10 @@ public interface ConnectorPageSource
     default Metrics getMetrics()
     {
         return Metrics.EMPTY;
+    }
+
+    default void setDynamicFilter(Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+    {
+        return;
     }
 }

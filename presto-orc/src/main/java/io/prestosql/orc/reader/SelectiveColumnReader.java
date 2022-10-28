@@ -15,6 +15,7 @@ package io.prestosql.orc.reader;
 
 import io.prestosql.orc.TupleDomainFilter;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 
 import java.io.IOException;
 import java.util.BitSet;
@@ -44,6 +45,12 @@ public interface SelectiveColumnReader<T>
      **/
     int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter)
             throws IOException;
+
+    default int read(int offset, int[] positions, int positionCount, TupleDomainFilter filter, List<DynamicFilter> dynamicFilters)
+            throws IOException
+    {
+        return read(offset, positions, positionCount, filter);
+    }
 
     /**
      ** @return an array of positions that passed the filter during most recent read(); the return

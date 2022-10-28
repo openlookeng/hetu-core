@@ -17,6 +17,7 @@ package io.prestosql.spi.dynamicfilter;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.predicate.TupleDomain;
 
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -32,6 +33,23 @@ public class HashSetDynamicFilter
         this.columnHandle = columnHandle;
         this.filterId = filterId;
         this.type = type;
+    }
+
+    @Override
+    public void setMinMax()
+    {
+        setMinMax(this.valueSet);
+    }
+
+    private void setMinMax(Set valueSet)
+    {
+        if (null != valueSet && !valueSet.isEmpty()) {
+            Object value = valueSet.iterator().next();
+            if (value instanceof Long) {
+                this.min = Collections.min(valueSet);
+                this.max = Collections.max(valueSet);
+            }
+        }
     }
 
     public Set getSetValues()
@@ -56,7 +74,7 @@ public class HashSetDynamicFilter
     {
         DynamicFilter clone = new HashSetDynamicFilter(filterId, columnHandle, valueSet, type);
         clone.setMax(max);
-        clone.setMax(min);
+        clone.setMin(min);
         return clone;
     }
 
