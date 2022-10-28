@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.scheduler;
+package io.prestosql.execution.scheduler.policy;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -78,14 +78,14 @@ public class PhasedExecutionSchedule
     }
 
     @Override
-    public Set<SqlStageExecution> getStagesToSchedule()
+    public StagesScheduleResult getStagesToSchedule()
     {
         removeCompletedStages();
         addPhasesIfNecessary();
         if (isFinished()) {
-            return ImmutableSet.of();
+            return new StagesScheduleResult(ImmutableSet.of());
         }
-        return activeSources;
+        return new StagesScheduleResult(activeSources);
     }
 
     private void removeCompletedStages()

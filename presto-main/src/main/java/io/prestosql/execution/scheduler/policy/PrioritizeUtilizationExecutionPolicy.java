@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -11,18 +12,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.execution.scheduler;
+package io.prestosql.execution.scheduler.policy;
 
 import io.prestosql.execution.SqlStageExecution;
 
 import java.util.Collection;
 
-public class AllAtOnceExecutionPolicy
+public class PrioritizeUtilizationExecutionPolicy
         implements ExecutionPolicy
 {
     @Override
     public ExecutionSchedule createExecutionSchedule(Collection<SqlStageExecution> stages)
     {
-        return new AllAtOnceExecutionSchedule(stages);
+        return PrioritizeUtilizationExecutionSchedule.forStages(stages);
     }
 }
