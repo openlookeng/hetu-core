@@ -15,9 +15,9 @@ package io.prestosql.operator;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputInfo;
 import io.prestosql.operator.TableWriterOperator.TableWriterInfo;
 import io.prestosql.operator.exchange.LocalExchangeBufferInfo;
+import io.prestosql.operator.output.PartitionedOutputOperator.PartitionedOutputInfo;
 
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,

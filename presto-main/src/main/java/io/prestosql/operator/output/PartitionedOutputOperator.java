@@ -11,27 +11,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.operator;
+package io.prestosql.operator.output;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
-import io.hetu.core.transport.execution.buffer.PagesSerde;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
-import io.prestosql.exchange.FileSystemExchangeConfig.DirectSerialisationType;
 import io.prestosql.execution.buffer.OutputBuffer;
 import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.operator.DriverContext;
+import io.prestosql.operator.Operator;
+import io.prestosql.operator.OperatorContext;
+import io.prestosql.operator.OperatorFactory;
+import io.prestosql.operator.OperatorInfo;
+import io.prestosql.operator.OutputFactory;
+import io.prestosql.operator.PartitionFunction;
+import io.prestosql.operator.SinkOperator;
+import io.prestosql.operator.TaskContext;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.block.Block;
-import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.MarkerPage;
-import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 import io.prestosql.util.Mergeable;
@@ -42,16 +45,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.prestosql.execution.buffer.PageSplitterUtil.splitPage;
-import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
-import static java.lang.Math.max;
-import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
 @RestorableConfig(uncapturedFields = {"pagePreprocessor", "snapshotState"})
@@ -68,6 +65,7 @@ public class PartitionedOutputOperator
         private final boolean replicatesAnyRow;
         private final OptionalInt nullChannel;
         private final DataSize maxMemory;
+        private final PositionsAppenderFactory positionsAppenderFactory;
 
         public PartitionedOutputFactory(
                 PartitionFunction partitionFunction,
@@ -76,7 +74,8 @@ public class PartitionedOutputOperator
                 boolean replicatesAnyRow,
                 OptionalInt nullChannel,
                 OutputBuffer outputBuffer,
-                DataSize maxMemory)
+                DataSize maxMemory,
+                PositionsAppenderFactory positionsAppenderFactory)
         {
             this.partitionFunction = requireNonNull(partitionFunction, "partitionFunction is null");
             this.partitionChannels = requireNonNull(partitionChannels, "partitionChannels is null");
@@ -85,6 +84,7 @@ public class PartitionedOutputOperator
             this.nullChannel = requireNonNull(nullChannel, "nullChannel is null");
             this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
             this.maxMemory = requireNonNull(maxMemory, "maxMemory is null");
+            this.positionsAppenderFactory = requireNonNull(positionsAppenderFactory, "positionsAppenderFactory is null");
         }
 
         @Override
@@ -107,7 +107,8 @@ public class PartitionedOutputOperator
                     replicatesAnyRow,
                     nullChannel,
                     outputBuffer,
-                    maxMemory);
+                    maxMemory,
+                    positionsAppenderFactory);
         }
     }
 
@@ -125,6 +126,7 @@ public class PartitionedOutputOperator
         private final OptionalInt nullChannel;
         private final OutputBuffer outputBuffer;
         private final DataSize maxMemory;
+        private final PositionsAppenderFactory positionsAppenderFactory;
         // Snapshot: When a factory is duplicated, factory instances share the same OutputBuffer.
         // All these factory instances now share this duplicateCount, so only the last factory that receives "noMoreOperators"
         // (the one that decrements the count to 0) should inform OutputBuffer about "setNoMoreInputChannels".
@@ -141,7 +143,8 @@ public class PartitionedOutputOperator
                 boolean replicatesAnyRow,
                 OptionalInt nullChannel,
                 OutputBuffer outputBuffer,
-                DataSize maxMemory)
+                DataSize maxMemory,
+                PositionsAppenderFactory positionsAppenderFactory)
         {
             this(
                     operatorId,
@@ -155,7 +158,8 @@ public class PartitionedOutputOperator
                     nullChannel,
                     outputBuffer,
                     maxMemory,
-                    new AtomicInteger(1));
+                    new AtomicInteger(1),
+                    positionsAppenderFactory);
         }
 
         private PartitionedOutputOperatorFactory(
@@ -170,7 +174,8 @@ public class PartitionedOutputOperator
                 OptionalInt nullChannel,
                 OutputBuffer outputBuffer,
                 DataSize maxMemory,
-                AtomicInteger duplicateCount)
+                AtomicInteger duplicateCount,
+                PositionsAppenderFactory positionsAppenderFactory)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -184,6 +189,7 @@ public class PartitionedOutputOperator
             this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
             this.maxMemory = requireNonNull(maxMemory, "maxMemory is null");
             this.duplicateCount = requireNonNull(duplicateCount, "duplicateCount is null");
+            this.positionsAppenderFactory = requireNonNull(positionsAppenderFactory, "positionsAppenderFactory is null");
         }
 
         @Override
@@ -203,7 +209,8 @@ public class PartitionedOutputOperator
                     replicatesAnyRow,
                     nullChannel,
                     outputBuffer,
-                    maxMemory);
+                    maxMemory,
+                    positionsAppenderFactory);
         }
 
         @Override
@@ -231,7 +238,8 @@ public class PartitionedOutputOperator
                     nullChannel,
                     outputBuffer,
                     maxMemory,
-                    duplicateCount);
+                    duplicateCount,
+                    positionsAppenderFactory);
         }
     }
 
@@ -255,7 +263,8 @@ public class PartitionedOutputOperator
             boolean replicatesAnyRow,
             OptionalInt nullChannel,
             OutputBuffer outputBuffer,
-            DataSize maxMemory)
+            DataSize maxMemory,
+            PositionsAppenderFactory positionsAppenderFactory)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
@@ -269,7 +278,8 @@ public class PartitionedOutputOperator
                 outputBuffer,
                 operatorContext,
                 sourceTypes,
-                maxMemory);
+                maxMemory,
+                positionsAppenderFactory);
 
         operatorContext.setInfoSupplier(this::getInfo);
         this.systemMemoryContext = operatorContext.newLocalSystemMemoryContext(PartitionedOutputOperator.class.getSimpleName());
@@ -364,200 +374,6 @@ public class PartitionedOutputOperator
 
         // We also add partitionsInitialRetainedSize as an approximation of the object overhead of the partitions.
         systemMemoryContext.setBytes(partitionsSizeInBytes + partitionsInitialRetainedSize);
-    }
-
-    @RestorableConfig(stateClassName = "PagePartitionerState", uncapturedFields = {"outputBuffer", "sourceTypes", "partitionFunction", "partitionChannels",
-            "partitionConstants", "operatorContext", "pageBuilders"})
-    private static class PagePartitioner
-            implements Restorable
-    {
-        private final String id;
-        //shared field
-        private final OutputBuffer outputBuffer;
-        private final List<Type> sourceTypes;
-        private final PartitionFunction partitionFunction;
-        private final List<Integer> partitionChannels;
-        private final List<Optional<Block>> partitionConstants;
-        private final PageBuilder[] pageBuilders;
-        private final boolean replicatesAnyRow;
-        private final OptionalInt nullChannel; // when present, send the position to every partition if this channel is null.
-        private final AtomicLong rowsAdded = new AtomicLong();
-        private final AtomicLong pagesAdded = new AtomicLong();
-        private boolean hasAnyRowBeenReplicated;
-        private final OperatorContext operatorContext;
-
-        public PagePartitioner(
-                String id,
-                PartitionFunction partitionFunction,
-                List<Integer> partitionChannels,
-                List<Optional<NullableValue>> partitionConstants,
-                boolean replicatesAnyRow,
-                OptionalInt nullChannel,
-                OutputBuffer outputBuffer,
-                OperatorContext operatorContext,
-                List<Type> sourceTypes,
-                DataSize maxMemory)
-        {
-            this.id = id;
-            this.partitionFunction = requireNonNull(partitionFunction, "partitionFunction is null");
-            this.partitionChannels = requireNonNull(partitionChannels, "partitionChannels is null");
-            this.partitionConstants = requireNonNull(partitionConstants, "partitionConstants is null").stream()
-                    .map(constant -> constant.map(NullableValue::asBlock))
-                    .collect(toImmutableList());
-            this.replicatesAnyRow = replicatesAnyRow;
-            this.nullChannel = requireNonNull(nullChannel, "nullChannel is null");
-            this.outputBuffer = requireNonNull(outputBuffer, "outputBuffer is null");
-            this.sourceTypes = requireNonNull(sourceTypes, "sourceTypes is null");
-            this.operatorContext = requireNonNull(operatorContext, "serde is null");
-
-            int partitionCount = partitionFunction.getPartitionCount();
-            int pageSize = min(DEFAULT_MAX_PAGE_SIZE_IN_BYTES, ((int) maxMemory.toBytes()) / partitionCount);
-            pageSize = max(1, pageSize);
-
-            this.pageBuilders = new PageBuilder[partitionCount];
-            for (int i = 0; i < partitionCount; i++) {
-                pageBuilders[i] = PageBuilder.withMaxPageSize(pageSize, sourceTypes);
-            }
-        }
-
-        public ListenableFuture<?> isFull()
-        {
-            return outputBuffer.isFull();
-        }
-
-        public long getSizeInBytes()
-        {
-            // We use a foreach loop instead of streams
-            // as it has much better performance.
-            long sizeInBytes = 0;
-            for (PageBuilder pageBuilder : pageBuilders) {
-                sizeInBytes += pageBuilder.getSizeInBytes();
-            }
-            return sizeInBytes;
-        }
-
-        /**
-         * This method can be expensive for complex types.
-         */
-        public long getRetainedSizeInBytes()
-        {
-            long sizeInBytes = 0;
-            for (PageBuilder pageBuilder : pageBuilders) {
-                sizeInBytes += pageBuilder.getRetainedSizeInBytes();
-            }
-            return sizeInBytes;
-        }
-
-        public PartitionedOutputInfo getInfo()
-        {
-            return new PartitionedOutputInfo(rowsAdded.get(), pagesAdded.get(), outputBuffer.getPeakMemoryUsage());
-        }
-
-        public void partitionPage(Page page)
-        {
-            requireNonNull(page, "page is null");
-
-            Page partitionFunctionArgs = getPartitionFunctionArguments(page);
-            for (int position = 0; position < page.getPositionCount(); position++) {
-                boolean shouldReplicate = (replicatesAnyRow && !hasAnyRowBeenReplicated) ||
-                        nullChannel.isPresent() && page.getBlock(nullChannel.getAsInt()).isNull(position);
-                if (shouldReplicate) {
-                    for (PageBuilder pageBuilder : pageBuilders) {
-                        appendRow(pageBuilder, page, position);
-                    }
-                    hasAnyRowBeenReplicated = true;
-                }
-                else {
-                    int partition = partitionFunction.getPartition(partitionFunctionArgs, position);
-                    appendRow(pageBuilders[partition], page, position);
-                }
-            }
-            flush(false);
-        }
-
-        private Page getPartitionFunctionArguments(Page page)
-        {
-            Block[] blocks = new Block[partitionChannels.size()];
-            for (int i = 0; i < blocks.length; i++) {
-                Optional<Block> partitionConstant = partitionConstants.get(i);
-                if (partitionConstant.isPresent()) {
-                    blocks[i] = new RunLengthEncodedBlock(partitionConstant.get(), page.getPositionCount());
-                }
-                else {
-                    blocks[i] = page.getBlock(partitionChannels.get(i));
-                }
-            }
-            return new Page(page.getPositionCount(), blocks);
-        }
-
-        private void appendRow(PageBuilder pageBuilder, Page page, int position)
-        {
-            pageBuilder.declarePosition();
-
-            for (int channel = 0; channel < sourceTypes.size(); channel++) {
-                Type type = sourceTypes.get(channel);
-                type.appendTo(page.getBlock(channel), position, pageBuilder.getBlockBuilder(channel));
-            }
-        }
-
-        public void flush(boolean force)
-        {
-            // add all full pages to output buffer
-            for (int partition = 0; partition < pageBuilders.length; partition++) {
-                PageBuilder partitionPageBuilder = pageBuilders[partition];
-                if (!partitionPageBuilder.isEmpty() && (force || partitionPageBuilder.isFull())) {
-                    Page pagePartition = partitionPageBuilder.build();
-                    partitionPageBuilder.reset();
-
-                    DirectSerialisationType serialisationType = outputBuffer.getExchangeDirectSerialisationType();
-                    if (outputBuffer.isSpoolingOutputBuffer() && serialisationType != DirectSerialisationType.OFF) {
-                        PagesSerde directSerde = (serialisationType == DirectSerialisationType.JAVA) ? operatorContext.getDriverContext().getJavaSerde() : operatorContext.getDriverContext().getKryoSerde();
-                        List<Page> pages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
-                        outputBuffer.enqueuePages(partition, pages, id, directSerde);
-                    }
-                    else {
-                        List<SerializedPage> serializedPages = splitPage(pagePartition, DEFAULT_MAX_PAGE_SIZE_IN_BYTES).stream()
-                                .map(page -> operatorContext.getDriverContext().getSerde().serialize(page))
-                                .collect(toImmutableList());
-
-                        outputBuffer.enqueue(partition, serializedPages, id);
-                    }
-                    pagesAdded.incrementAndGet();
-                    rowsAdded.addAndGet(pagePartition.getPositionCount());
-                }
-            }
-        }
-
-        @Override
-        public Object capture(BlockEncodingSerdeProvider serdeProvider)
-        {
-            PagePartitionerState myState = new PagePartitionerState();
-            // This was just flushed, so page builders must be empty
-            for (int i = 0; i < pageBuilders.length; i++) {
-                checkState(pageBuilders[i].isEmpty());
-            }
-            myState.rowsAdded = rowsAdded.get();
-            myState.pagesAdded = pagesAdded.get();
-            myState.hasAnyRowBeenReplicated = hasAnyRowBeenReplicated;
-            return myState;
-        }
-
-        @Override
-        public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
-        {
-            PagePartitionerState myState = (PagePartitionerState) state;
-            this.rowsAdded.set(myState.rowsAdded);
-            this.pagesAdded.set(myState.pagesAdded);
-            this.hasAnyRowBeenReplicated = myState.hasAnyRowBeenReplicated;
-        }
-
-        private static class PagePartitionerState
-                implements Serializable
-        {
-            private long rowsAdded;
-            private long pagesAdded;
-            private boolean hasAnyRowBeenReplicated;
-        }
     }
 
     public static class PartitionedOutputInfo

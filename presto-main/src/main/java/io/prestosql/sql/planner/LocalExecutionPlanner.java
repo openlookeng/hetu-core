@@ -83,7 +83,6 @@ import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.PagesSpatialIndexFactory;
 import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.PartitionedLookupSourceFactory;
-import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputFactory;
 import io.prestosql.operator.PipelineExecutionStrategy;
 import io.prestosql.operator.RowNumberOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
@@ -126,6 +125,8 @@ import io.prestosql.operator.index.IndexBuildDriverFactoryProvider;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.operator.index.IndexLookupSourceFactory;
 import io.prestosql.operator.index.IndexSourceOperator;
+import io.prestosql.operator.output.PartitionedOutputOperator.PartitionedOutputFactory;
+import io.prestosql.operator.output.PositionsAppenderFactory;
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.operator.window.FrameInfo;
@@ -381,6 +382,7 @@ public class LocalExecutionPlanner
     protected final TaskManagerConfig taskManagerConfig;
     private final ExchangeManagerRegistry exchangeManagerRegistry;
     protected final TableExecuteContextManager tableExecuteContextManager;
+    private final PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
 
     public Metadata getMetadata()
     {
@@ -682,7 +684,8 @@ public class LocalExecutionPlanner
                         partitioningScheme.isReplicateNullsAndAny(),
                         nullChannel,
                         outputBuffer,
-                        maxPagePartitioningBufferSize),
+                        maxPagePartitioningBufferSize,
+                        positionsAppenderFactory),
                 feederCTEId,
                 feederCTEParentId,
                 cteCtx);

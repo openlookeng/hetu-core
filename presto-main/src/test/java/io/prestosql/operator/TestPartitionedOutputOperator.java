@@ -20,6 +20,8 @@ import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.execution.TaskId;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
+import io.prestosql.operator.output.PartitionedOutputOperator;
+import io.prestosql.operator.output.PositionsAppenderFactory;
 import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -154,6 +156,7 @@ public class TestPartitionedOutputOperator
 
     private PartitionedOutputOperator createPartitionedOutputOperator(RecoveryUtils recoveryUtils, PartitionedOutputBuffer buffer)
     {
+        PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
         PartitionFunction partitionFunction = new LocalPartitionGenerator(new InterpretedHashGenerator(ImmutableList.of(BIGINT), new int[] {0}), PARTITION_COUNT);
         PartitionedOutputOperator.PartitionedOutputFactory operatorFactory = new PartitionedOutputOperator.PartitionedOutputFactory(
                 partitionFunction,
@@ -162,7 +165,8 @@ public class TestPartitionedOutputOperator
                 false,
                 OptionalInt.empty(),
                 buffer,
-                new DataSize(1, GIGABYTE));
+                new DataSize(1, GIGABYTE),
+                positionsAppenderFactory);
         TaskContext taskContext = createTaskContext(recoveryUtils);
         return (PartitionedOutputOperator) operatorFactory
                 .createOutputOperator(0, new PlanNodeId("plan-node-0"), TYPES, Function.identity(), taskContext)
