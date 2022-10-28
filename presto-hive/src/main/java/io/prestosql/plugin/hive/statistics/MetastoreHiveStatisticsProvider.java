@@ -37,6 +37,7 @@ import io.prestosql.plugin.hive.metastore.IntegerStatistics;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.SchemaTableName;
@@ -47,6 +48,7 @@ import io.prestosql.spi.statistics.Estimate;
 import io.prestosql.spi.statistics.TableStatistics;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Decimals;
+import io.prestosql.spi.type.Int128;
 import io.prestosql.spi.type.Type;
 
 import java.math.BigDecimal;
@@ -62,9 +64,11 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.stream.DoubleStream;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -75,10 +79,14 @@ import static io.prestosql.plugin.hive.HiveSessionProperties.getPartitionStatist
 import static io.prestosql.plugin.hive.HiveSessionProperties.isIgnoreCorruptedStatistics;
 import static io.prestosql.plugin.hive.HiveSessionProperties.isStatisticsEnabled;
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.Chars.isCharType;
 import static io.prestosql.spi.type.DateType.DATE;
+import static io.prestosql.spi.type.DecimalConversions.longDecimalToDouble;
+import static io.prestosql.spi.type.DecimalConversions.shortDecimalToDouble;
 import static io.prestosql.spi.type.Decimals.isLongDecimal;
 import static io.prestosql.spi.type.Decimals.isShortDecimal;
+import static io.prestosql.spi.type.Decimals.longTenToNth;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
@@ -89,6 +97,7 @@ import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Double.parseDouble;
 import static java.lang.Float.intBitsToFloat;
+import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -662,11 +671,7 @@ public class MetastoreHiveStatisticsProvider
     @VisibleForTesting
     static Optional<DoubleRange> calculateRangeForPartitioningKey(HiveColumnHandle column, Type type, List<HivePartition> partitions)
     {
-        if (!isRangeSupported(type)) {
-            return Optional.empty();
-        }
-
-        List<Double> values = partitions.stream()
+        List<OptionalDouble> convertedValues = partitions.stream()
                 .map(HivePartition::getKeys)
                 .map(keys -> keys.get(column))
                 .filter(value -> !value.isNull())
@@ -674,51 +679,58 @@ public class MetastoreHiveStatisticsProvider
                 .map(value -> convertPartitionValueToDouble(type, value))
                 .collect(toImmutableList());
 
-        if (values.isEmpty()) {
+        if (convertedValues.stream().noneMatch(OptionalDouble::isPresent)) {
+            return Optional.empty();
+        }
+        double[] values = convertedValues.stream()
+                .peek(convertedValue -> checkState(convertedValue.isPresent(), "convertedValue is missing"))
+                .mapToDouble(OptionalDouble::getAsDouble)
+                .toArray();
+        verify(values.length != 0, "No values");
+
+        if (DoubleStream.of(values).anyMatch(Double::isNaN)) {
             return Optional.empty();
         }
 
-        double min = values.get(0);
-        double max = values.get(0);
-
-        for (Double value : values) {
-            if (value > max) {
-                max = value;
-            }
-            if (value < min) {
-                min = value;
-            }
-        }
-
+        double min = DoubleStream.of(values).min().orElseThrow(() -> new PrestoException(StandardErrorCode.GENERIC_USER_ERROR, ""));
+        double max = DoubleStream.of(values).max().orElseThrow(() -> new PrestoException(StandardErrorCode.GENERIC_USER_ERROR, ""));
         return Optional.of(new DoubleRange(min, max));
     }
 
     @VisibleForTesting
-    static double convertPartitionValueToDouble(Type type, Object value)
+    static OptionalDouble convertPartitionValueToDouble(Type type, Object value)
     {
-        if (type.equals(BIGINT) || type.equals(INTEGER) || type.equals(SMALLINT) || type.equals(TINYINT)) {
-            return (Long) value;
+        requireNonNull(type, "type is null");
+        requireNonNull(value, "value is null");
+
+        if (!isRangeSupported(type)) {
+            return OptionalDouble.empty();
         }
-        if (type.equals(DOUBLE)) {
-            return (Double) value;
+
+        if (type == BOOLEAN) {
+            return OptionalDouble.of((boolean) value ? 1 : 0);
         }
-        if (type.equals(REAL)) {
-            return intBitsToFloat(((Long) value).intValue());
+        if (type == TINYINT || type == SMALLINT || type == INTEGER || type == BIGINT) {
+            return OptionalDouble.of((long) value);
+        }
+        if (type == REAL) {
+            return OptionalDouble.of(intBitsToFloat(toIntExact((Long) value)));
+        }
+        if (type == DOUBLE) {
+            return OptionalDouble.of((double) value);
         }
         if (type instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) type;
-            if (isShortDecimal(decimalType)) {
-                return parseDouble(Decimals.toString((Long) value, decimalType.getScale()));
+            if (decimalType.isShort()) {
+                return OptionalDouble.of(shortDecimalToDouble((long) value, longTenToNth(decimalType.getScale())));
             }
-            if (isLongDecimal(decimalType)) {
-                return parseDouble(Decimals.toString((Slice) value, decimalType.getScale()));
-            }
-            throw new IllegalArgumentException("Unexpected decimal type: " + decimalType);
+            return OptionalDouble.of(longDecimalToDouble((Int128) value, decimalType.getScale()));
         }
-        if (type.equals(DATE)) {
-            return (Long) value;
+        if (type == DATE) {
+            return OptionalDouble.of((long) value);
         }
-        throw new IllegalArgumentException("Unexpected type: " + type);
+
+        return OptionalDouble.empty();
     }
 
     @VisibleForTesting
@@ -883,6 +895,7 @@ public class MetastoreHiveStatisticsProvider
                 || type.equals(REAL)
                 || type.equals(DOUBLE)
                 || type.equals(DATE)
+                || type.equals(BOOLEAN)
                 || type instanceof DecimalType;
     }
 
