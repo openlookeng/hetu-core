@@ -344,6 +344,24 @@ ALTER TABLE ordersg SET PROPERTIES partitioning = ARRAY[<existing partition colu
 You can use SHOW CREATE TABLE Ordersg to display the current values of the TABLE properties.
 
 
+### openLooKeng to Iceberg type mapping
+| openLooKeng type                   | Iceberg type
+|:-----------------------|:------------------------
+|BOOLEAN               | BOOLEAN
+|INTEGER               | INT
+|BIGINT               | LONG
+|REAL               | FLOAT
+|DOUBLE               | DOUBLE
+|DECIMAL(p,s)               | DECIMAL(p,s)
+|DATE               | DATE
+|TIME               | TIME
+|TIMESTAMP               | TIMESTAMP
+|TIMESTAMP WITH TIME ZONE               | TIMESTAMPTZ
+|VARCHAR               | STRING
+|VARBINARY               | BINARY
+|ROW(...)            |STRUCT(...)
+|ARRAY(e)            |LIST(e)
+|MAP(k,v)           |MAP(k,v)
 
 
 

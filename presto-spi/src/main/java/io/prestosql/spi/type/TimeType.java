@@ -32,6 +32,13 @@ public final class TimeType
     public static final TimeType TIME = new TimeType();
 
     private static final TimeType[] TYPES = new TimeType[MAX_PRECISION + 1];
+
+    static {
+        for (int precision = 0; precision <= MAX_PRECISION; precision++) {
+            TYPES[precision] = new TimeType(precision);
+        }
+    }
+
     public static final TimeType TIME_MICROS = new TimeType();
 
     private final int precision;
@@ -40,6 +47,12 @@ public final class TimeType
     {
         super(parseTypeSignature(StandardTypes.TIME));
         this.precision = 0;
+    }
+
+    private TimeType(int precision)
+    {
+        super(new TypeSignature(StandardTypes.TIME));
+        this.precision = precision;
     }
 
     public static TimeType createTimeType(int precision)

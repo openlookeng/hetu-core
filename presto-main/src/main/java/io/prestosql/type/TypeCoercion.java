@@ -21,6 +21,9 @@ import io.prestosql.spi.type.LikePatternType;
 import io.prestosql.spi.type.MapType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.StandardTypes;
+import io.prestosql.spi.type.TimeType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import io.prestosql.spi.type.TypeSignatureParameter;
@@ -45,9 +48,12 @@ import static io.prestosql.spi.type.LikePatternType.LIKE_PATTERN;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.RowType.Field;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimeType.createTimeType;
 import static io.prestosql.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
+import static io.prestosql.spi.type.TimestampType.createTimestampType;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
+import static io.prestosql.spi.type.TimestampWithTimeZoneType.createTimestampWithTimeZoneType;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.type.CodePointsType.CODE_POINTS;
@@ -227,6 +233,12 @@ public final class TypeCoercion
         return typeCompatibility.isCoercible();
     }
 
+    public boolean isCompatible(Type fromType, Type toType)
+    {
+        TypeCompatibility typeCompatibility = compatibility(fromType, toType);
+        return typeCompatibility.isCompatible();
+    }
+
     public boolean canCoerceWithCast(Type fromType, Type toType)
     {
         String sourceTypeName = fromType.getTypeSignature().getBase();
@@ -321,7 +333,18 @@ public final class TypeCoercion
             if (fromTypeBaseName.equals(StandardTypes.ROW)) {
                 return typeCompatibilityForRow((RowType) fromType, (RowType) toType);
             }
-
+            if (fromTypeBaseName.equals(StandardTypes.TIMESTAMP)) {
+                Type commonSuperType = createTimestampType(Math.max(((TimestampType) fromType).getPrecision(), ((TimestampType) toType).getPrecision()));
+                return TypeCompatibility.compatible(commonSuperType, commonSuperType.getTypeId().equals(toType.getTypeId()));
+            }
+            if (fromTypeBaseName.equals(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)) {
+                Type commonSuperType = createTimestampWithTimeZoneType(Math.max(((TimestampWithTimeZoneType) fromType).getPrecision(), ((TimestampWithTimeZoneType) toType).getPrecision()));
+                return TypeCompatibility.compatible(commonSuperType, commonSuperType.getTypeId().equals(toType.getTypeId()));
+            }
+            if (fromTypeBaseName.equals(StandardTypes.TIME)) {
+                Type commonSuperType = createTimeType(Math.max(((TimeType) fromType).getPrecision(), ((TimeType) toType).getPrecision()));
+                return TypeCompatibility.compatible(commonSuperType, commonSuperType.getTypeId().equals(toType.getTypeId()));
+            }
             if (isCovariantParametrizedType(fromType)) {
                 return typeCompatibilityForCovariantParametrizedType(fromType, toType);
             }

@@ -11,7 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.iceberg.parquet;
 
 import org.apache.iceberg.Schema;
@@ -40,9 +39,8 @@ import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.FIXED_LE
 import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.FLOAT;
 import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT32;
 import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64;
-
-public class TypeToMessageType
-{
+@SuppressWarnings("checkstyle:all")
+public class TypeToMessageType {
     public static final int DECIMAL_INT32_MAX_DIGITS = 9;
     public static final int DECIMAL_INT64_MAX_DIGITS = 18;
     private static final LogicalTypeAnnotation STRING = LogicalTypeAnnotation.stringType();
@@ -54,8 +52,7 @@ public class TypeToMessageType
     private static final LogicalTypeAnnotation TIMESTAMPTZ_MICROS = LogicalTypeAnnotation
             .timestampType(true /* adjusted to UTC */, TimeUnit.MICROS);
 
-    public MessageType convert(Schema schema, String name)
-    {
+    public MessageType convert(Schema schema, String name) {
         Types.MessageTypeBuilder builder = Types.buildMessage();
 
         for (NestedField field : schema.columns()) {
@@ -65,8 +62,7 @@ public class TypeToMessageType
         return builder.named(AvroSchemaUtil.makeCompatibleName(name));
     }
 
-    public GroupType struct(StructType struct, Type.Repetition repetition, int id, String name)
-    {
+    public GroupType struct(StructType struct, Type.Repetition repetition, int id, String name) {
         Types.GroupBuilder<GroupType> builder = Types.buildGroup(repetition);
 
         for (NestedField field : struct.fields()) {
@@ -76,8 +72,7 @@ public class TypeToMessageType
         return builder.id(id).named(AvroSchemaUtil.makeCompatibleName(name));
     }
 
-    public Type field(NestedField field)
-    {
+    public Type field(NestedField field) {
         Type.Repetition repetition = field.isOptional() ?
                 Type.Repetition.OPTIONAL : Type.Repetition.REQUIRED;
         int id = field.fieldId();
@@ -85,24 +80,21 @@ public class TypeToMessageType
 
         if (field.type().isPrimitiveType()) {
             return primitive(field.type().asPrimitiveType(), repetition, id, name);
-        }
-        else {
+
+        } else {
             NestedType nested = field.type().asNestedType();
             if (nested.isStructType()) {
                 return struct(nested.asStructType(), repetition, id, name);
-            }
-            else if (nested.isMapType()) {
+            } else if (nested.isMapType()) {
                 return map(nested.asMapType(), repetition, id, name);
-            }
-            else if (nested.isListType()) {
+            } else if (nested.isListType()) {
                 return list(nested.asListType(), repetition, id, name);
             }
             throw new UnsupportedOperationException("Can't convert unknown type: " + nested);
         }
     }
 
-    public GroupType list(ListType list, Type.Repetition repetition, int id, String name)
-    {
+    public GroupType list(ListType list, Type.Repetition repetition, int id, String name) {
         NestedField elementField = list.fields().get(0);
         return Types.list(repetition)
                 .element(field(elementField))
@@ -110,8 +102,7 @@ public class TypeToMessageType
                 .named(AvroSchemaUtil.makeCompatibleName(name));
     }
 
-    public GroupType map(MapType map, Type.Repetition repetition, int id, String name)
-    {
+    public GroupType map(MapType map, Type.Repetition repetition, int id, String name) {
         NestedField keyField = map.fields().get(0);
         NestedField valueField = map.fields().get(1);
         return Types.map(repetition)
@@ -121,8 +112,7 @@ public class TypeToMessageType
                 .named(AvroSchemaUtil.makeCompatibleName(name));
     }
 
-    public Type primitive(PrimitiveType primitive, Type.Repetition repetition, int id, String originalName)
-    {
+    public Type primitive(PrimitiveType primitive, Type.Repetition repetition, int id, String originalName) {
         String name = AvroSchemaUtil.makeCompatibleName(originalName);
         switch (primitive.typeId()) {
             case BOOLEAN:
@@ -142,8 +132,7 @@ public class TypeToMessageType
             case TIMESTAMP:
                 if (((TimestampType) primitive).shouldAdjustToUTC()) {
                     return Types.primitive(INT64, repetition).as(TIMESTAMPTZ_MICROS).id(id).named(name);
-                }
-                else {
+                } else {
                     return Types.primitive(INT64, repetition).as(TIMESTAMP_MICROS).id(id).named(name);
                 }
             case STRING:
@@ -166,15 +155,15 @@ public class TypeToMessageType
                             .as(decimalAnnotation(decimal.precision(), decimal.scale()))
                             .id(id)
                             .named(name);
-                }
-                else if (decimal.precision() <= DECIMAL_INT64_MAX_DIGITS) {
+
+                } else if (decimal.precision() <= DECIMAL_INT64_MAX_DIGITS) {
                     // store as a long
                     return Types.primitive(INT64, repetition)
                             .as(decimalAnnotation(decimal.precision(), decimal.scale()))
                             .id(id)
                             .named(name);
-                }
-                else {
+
+                } else {
                     // store as a fixed-length array
                     int minLength = TypeUtil.decimalRequiredBytes(decimal.precision());
                     return Types.primitive(FIXED_LEN_BYTE_ARRAY, repetition).length(minLength)
@@ -182,17 +171,12 @@ public class TypeToMessageType
                             .id(id)
                             .named(name);
                 }
-
-            case UUID:
-                return Types.primitive(FIXED_LEN_BYTE_ARRAY, repetition).length(16).id(id).named(name);
-
             default:
                 throw new UnsupportedOperationException("Unsupported type for Parquet: " + primitive);
         }
     }
 
-    private static LogicalTypeAnnotation decimalAnnotation(int precision, int scale)
-    {
+    private static LogicalTypeAnnotation decimalAnnotation(int precision, int scale) {
         return LogicalTypeAnnotation.decimalType(scale, precision);
     }
 }

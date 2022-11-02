@@ -35,6 +35,8 @@ import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.values.ValuesReader;
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridDecoder;
 import org.apache.parquet.io.ParquetDecodingException;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.PrimitiveType;
 import org.joda.time.DateTimeZone;
 
 import java.io.ByteArrayInputStream;
@@ -83,12 +85,25 @@ public abstract class PrimitiveColumnReader
 
     public static PrimitiveColumnReader createReader(RichColumnDescriptor descriptor, DateTimeZone timeZone)
     {
+        PrimitiveType primitiveType = descriptor.getPrimitiveType();
         switch (descriptor.getType()) {
             case BOOLEAN:
                 return new BooleanColumnReader(descriptor);
             case INT32:
                 return createDecimalColumnReader(descriptor).orElse(new IntColumnReader(descriptor));
             case INT64:
+                if (primitiveType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation &&
+                        ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) primitiveType.getLogicalTypeAnnotation()).getUnit() == LogicalTypeAnnotation.TimeUnit.MICROS) {
+                    return new TimeMicrosColumnReader(descriptor);
+                }
+                if (primitiveType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation &&
+                        ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) primitiveType.getLogicalTypeAnnotation()).getUnit() == LogicalTypeAnnotation.TimeUnit.MICROS) {
+                    return new TimestampMicrosColumnReader(descriptor);
+                }
+                if (primitiveType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation &&
+                        ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) primitiveType.getLogicalTypeAnnotation()).getUnit() == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                    return new Int64TimestampMillisColumnReader(descriptor);
+                }
                 return createDecimalColumnReader(descriptor).orElse(new LongColumnReader(descriptor));
             case INT96:
                 return new TimestampColumnReader(descriptor, timeZone);
@@ -99,8 +114,13 @@ public abstract class PrimitiveColumnReader
             case BINARY:
                 return createDecimalColumnReader(descriptor).orElse(new BinaryColumnReader(descriptor));
             case FIXED_LEN_BYTE_ARRAY:
-                return createDecimalColumnReader(descriptor)
-                        .orElseThrow(() -> new PrestoException(NOT_SUPPORTED, " type FIXED_LEN_BYTE_ARRAY supported as DECIMAL; got " + descriptor.getPrimitiveType().getOriginalType()));
+                if (descriptor.getPrimitiveType().getLogicalTypeAnnotation() == null) {
+                    return new UuidColumnReader(descriptor);
+                }
+                else {
+                    return createDecimalColumnReader(descriptor)
+                            .orElseThrow(() -> new PrestoException(NOT_SUPPORTED, " type FIXED_LEN_BYTE_ARRAY supported as DECIMAL; got " + descriptor.getPrimitiveType().getOriginalType()));
+                }
             default:
                 throw new PrestoException(NOT_SUPPORTED, "Unsupported parquet type: " + descriptor.getType());
         }

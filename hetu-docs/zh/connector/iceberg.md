@@ -349,6 +349,24 @@ ALTER TABLE ordersg SET PROPERTIES partitioning = ARRAY[<existing partition colu
 
 可以使用SHOW CREATE TABLE ordersg 显示表属性的当前值。
 
+### openLooKeng 与 Iceberg type 转换
+| openLooKeng 类型                   | Iceberg 类型
+|:-----------------------|:------------------------
+|BOOLEAN               | BOOLEAN
+|INTEGER               | INT
+|BIGINT               | LONG
+|REAL               | FLOAT
+|DOUBLE               | DOUBLE
+|DECIMAL(p,s)               | DECIMAL(p,s)
+|DATE               | DATE
+|TIME               | TIME
+|TIMESTAMP               | TIMESTAMP
+|TIMESTAMP WITH TIME ZONE               | TIMESTAMPTZ
+|VARCHAR               | STRING
+|VARBINARY               | BINARY
+|ROW(...)            |STRUCT(...)
+|ARRAY(e)            |LIST(e)
+|MAP(k,v)           |MAP(k,v)
 
 
 

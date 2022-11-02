@@ -19,6 +19,7 @@ import org.apache.parquet.schema.PrimitiveType;
 
 import static io.prestosql.spi.type.DateTimeEncoding.unpackMillisUtc;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
+import static io.prestosql.spi.type.Timestamps.MICROSECONDS_PER_MILLISECOND;
 
 public class TimestampTzMillisValueWriter
         extends PrimitiveValueWriter
@@ -33,7 +34,7 @@ public class TimestampTzMillisValueWriter
     {
         for (int i = 0; i < block.getPositionCount(); i++) {
             if (!block.isNull(i)) {
-                long millis = unpackMillisUtc(TIMESTAMP_TZ_MILLIS.getLong(block, i));
+                long millis = unpackMillisUtc(TIMESTAMP_TZ_MILLIS.getLong(block, i)) * MICROSECONDS_PER_MILLISECOND;
                 getValueWriter().writeLong(millis);
                 getStatistics().updateStats(millis);
             }
