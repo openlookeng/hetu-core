@@ -61,10 +61,10 @@ public class TestAddExchangesPlans
 {
     public TestAddExchangesPlans()
     {
-        super(TestAddExchangesPlans::createQueryRunner);
+        super();
     }
 
-    private static LocalQueryRunner createQueryRunner()
+    protected LocalQueryRunner createQueryRunner()
     {
         Session session = testSessionBuilder()
                 .setCatalog("tpch")

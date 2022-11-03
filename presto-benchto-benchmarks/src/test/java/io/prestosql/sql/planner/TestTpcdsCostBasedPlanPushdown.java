@@ -28,6 +28,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.testing.LocalQueryRunner;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -56,69 +57,81 @@ public class TestTpcdsCostBasedPlanPushdown
      * large amount of data.
      */
 
+    public static final String TPCDS_METADATA_DIR = "/hive_metadata/unpartitioned_tpcds";
+
     public TestTpcdsCostBasedPlanPushdown()
     {
-        super(() -> {
-            String catalog = "hive";
-            Session.SessionBuilder sessionBuilder = testSessionBuilder()
-                    .setCatalog(catalog)
-                    .setSchema("default")
-                    .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
-                    .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
-                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
-                    .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false");
+        super(true, false);
+    }
 
-            LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
-            queryRunner.createCatalog("tpcds", new TpcdsConnectorFactory(1), ImmutableMap.of());
+    @Override
+    protected LocalQueryRunner createQueryRunner()
+    {
+        String catalog = "hive";
+        Session.SessionBuilder sessionBuilder = testSessionBuilder()
+                .setCatalog(catalog)
+                .setSchema("default")
+                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name())
+                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false");
 
-            // add hive
-            File hiveDir = new File(createTempDirectory("TestTpcdsCostBasedPlanPushdown").toFile(), "hive_data");
-            HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-            metastore.createDatabase(
-                    new HiveIdentity(SESSION),
-                    Database.builder()
-                            .setDatabaseName("default")
-                            .setOwnerName("public")
-                            .setOwnerType(PrincipalType.ROLE)
-                            .build());
+        LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
+        queryRunner.createCatalog("tpcds", new TpcdsConnectorFactory(1), ImmutableMap.of());
 
-            HiveConnectorFactory hiveConnectorFactory = new HiveConnectorFactory(
-                    "hive",
-                    HiveConnector.class.getClassLoader(),
-                    Optional.of(metastore));
+        // add hive
+        File hiveDir = null;
+        try {
+            hiveDir = new File(createTempDirectory("TestTpcdsCostBasedPlanPushdown").toFile(), "hive_data");
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
+        metastore.createDatabase(
+                new HiveIdentity(SESSION),
+                Database.builder()
+                        .setDatabaseName("default")
+                        .setOwnerName("public")
+                        .setOwnerType(PrincipalType.ROLE)
+                        .build());
 
-            Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
-                    .put("hive.orc-predicate-pushdown-enabled", "true")
-                    .build();
+        HiveConnectorFactory hiveConnectorFactory = new HiveConnectorFactory(
+                "hive",
+                HiveConnector.class.getClassLoader(),
+                Optional.of(metastore));
 
-            queryRunner.createCatalog(catalog, hiveConnectorFactory, hiveCatalogConfig);
+        Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
+                .put("hive.orc-predicate-pushdown-enabled", "true")
+                .build();
 
-            queryRunner.execute("create  table call_center with (format='orc') as select * from tpcds.tiny.call_center");
-            queryRunner.execute("create  table catalog_page with (format='orc') as select * from tpcds.tiny.catalog_page");
-            queryRunner.execute("create  table catalog_returns with (format='orc') as select * from tpcds.tiny.catalog_returns");
-            queryRunner.execute("create  table catalog_sales with (format='orc') as select * from tpcds.tiny.catalog_sales");
-            queryRunner.execute("create  table customer with (format='orc') as select * from tpcds.tiny.customer");
-            queryRunner.execute("create  table customer_address with (format='orc') as select * from tpcds.tiny.customer_address");
-            queryRunner.execute("create  table customer_demographics with (format='orc') as select * from tpcds.tiny.customer_demographics");
-            queryRunner.execute("create  table date_dim with (format='orc') as select * from tpcds.tiny.date_dim");
-            queryRunner.execute("create  table household_demographics with (format='orc') as select * from tpcds.tiny.household_demographics");
-            queryRunner.execute("create  table income_band with (format='orc') as select * from tpcds.tiny.income_band");
-            queryRunner.execute("create  table inventory with (format='orc') as select * from tpcds.tiny.inventory");
-            queryRunner.execute("create  table item with (format='orc') as select * from tpcds.tiny.item");
-            queryRunner.execute("create  table promotion with (format='orc') as select * from tpcds.tiny.promotion");
-            queryRunner.execute("create  table reason with (format='orc') as select * from tpcds.tiny.reason");
-            queryRunner.execute("create  table ship_mode with (format='orc') as select * from tpcds.tiny.ship_mode");
-            queryRunner.execute("create  table store with (format='orc') as select * from tpcds.tiny.store");
-            queryRunner.execute("create  table store_returns with (format='orc') as select * from tpcds.tiny.store_returns");
-            queryRunner.execute("create  table store_sales with (format='orc') as select * from tpcds.tiny.store_sales");
-            queryRunner.execute("create  table time_dim with (format='orc') as select * from tpcds.tiny.time_dim");
-            queryRunner.execute("create  table warehouse with (format='orc') as select * from tpcds.tiny.warehouse");
-            queryRunner.execute("create  table web_page with (format='orc') as select * from tpcds.tiny.web_page");
-            queryRunner.execute("create  table web_returns with (format='orc') as select * from tpcds.tiny.web_returns");
-            queryRunner.execute("create  table web_sales with (format='orc') as select * from tpcds.tiny.web_sales");
-            queryRunner.execute("create  table web_site with (format='orc') as select * from tpcds.tiny.web_site");
-            return queryRunner;
-        }, true, false);
+        queryRunner.createCatalog(catalog, hiveConnectorFactory, hiveCatalogConfig);
+
+        queryRunner.execute("create  table call_center with (format='orc') as select * from tpcds.tiny.call_center");
+        queryRunner.execute("create  table catalog_page with (format='orc') as select * from tpcds.tiny.catalog_page");
+        queryRunner.execute("create  table catalog_returns with (format='orc') as select * from tpcds.tiny.catalog_returns");
+        queryRunner.execute("create  table catalog_sales with (format='orc') as select * from tpcds.tiny.catalog_sales");
+        queryRunner.execute("create  table customer with (format='orc') as select * from tpcds.tiny.customer");
+        queryRunner.execute("create  table customer_address with (format='orc') as select * from tpcds.tiny.customer_address");
+        queryRunner.execute("create  table customer_demographics with (format='orc') as select * from tpcds.tiny.customer_demographics");
+        queryRunner.execute("create  table date_dim with (format='orc') as select * from tpcds.tiny.date_dim");
+        queryRunner.execute("create  table household_demographics with (format='orc') as select * from tpcds.tiny.household_demographics");
+        queryRunner.execute("create  table income_band with (format='orc') as select * from tpcds.tiny.income_band");
+        queryRunner.execute("create  table inventory with (format='orc') as select * from tpcds.tiny.inventory");
+        queryRunner.execute("create  table item with (format='orc') as select * from tpcds.tiny.item");
+        queryRunner.execute("create  table promotion with (format='orc') as select * from tpcds.tiny.promotion");
+        queryRunner.execute("create  table reason with (format='orc') as select * from tpcds.tiny.reason");
+        queryRunner.execute("create  table ship_mode with (format='orc') as select * from tpcds.tiny.ship_mode");
+        queryRunner.execute("create  table store with (format='orc') as select * from tpcds.tiny.store");
+        queryRunner.execute("create  table store_returns with (format='orc') as select * from tpcds.tiny.store_returns");
+        queryRunner.execute("create  table store_sales with (format='orc') as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table time_dim with (format='orc') as select * from tpcds.tiny.time_dim");
+        queryRunner.execute("create  table warehouse with (format='orc') as select * from tpcds.tiny.warehouse");
+        queryRunner.execute("create  table web_page with (format='orc') as select * from tpcds.tiny.web_page");
+        queryRunner.execute("create  table web_returns with (format='orc') as select * from tpcds.tiny.web_returns");
+        queryRunner.execute("create  table web_sales with (format='orc') as select * from tpcds.tiny.web_sales");
+        queryRunner.execute("create  table web_site with (format='orc') as select * from tpcds.tiny.web_site");
+        return queryRunner;
     }
 
     @Override
@@ -134,6 +147,18 @@ public class TestTpcdsCostBasedPlanPushdown
                     return Stream.of(queryId);
                 })
                 .map(queryId -> format("/sql/presto/tpcds/%s.sql", queryId));
+    }
+
+    @Override
+    protected String getMetadataDir()
+    {
+        return TPCDS_METADATA_DIR;
+    }
+
+    @Override
+    protected boolean isPartitioned()
+    {
+        return false;
     }
 
     @SuppressWarnings("unused")

@@ -2,23 +2,24 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         cross join:
             join (LEFT, REPLICATED):
-                join (INNER, REPLICATED):
-                    final hashaggregation over (ca_state, wr_returning_customer_sk)
-                        local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["ca_state", "wr_returning_customer_sk"])
-                                partial hashaggregation over (ca_state, wr_returning_customer_sk)
-                                    join (INNER, PARTITIONED):
-                                        remote exchange (REPARTITION, HASH, ["wr_returning_addr_sk"])
-                                            join (INNER, REPLICATED):
-                                                scan web_returns
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan date_dim
-                                        local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["ca_address_sk"])
-                                                scan customer_address
+                join (INNER, PARTITIONED):
+                    remote exchange (REPARTITION, HASH, ["wr_returning_customer_sk"])
+                        final hashaggregation over (ca_state, wr_returning_customer_sk)
+                            local exchange (GATHER, SINGLE, [])
+                                remote exchange (REPARTITION, HASH, ["ca_state", "wr_returning_customer_sk"])
+                                    partial hashaggregation over (ca_state, wr_returning_customer_sk)
+                                        join (INNER, PARTITIONED):
+                                            remote exchange (REPARTITION, HASH, ["wr_returning_addr_sk"])
+                                                join (INNER, REPLICATED):
+                                                    scan web_returns
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            scan date_dim
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPARTITION, HASH, ["ca_address_sk"])
+                                                    scan customer_address
                     local exchange (GATHER, SINGLE, [])
-                        remote exchange (REPLICATE, BROADCAST, [])
+                        remote exchange (REPARTITION, HASH, ["c_customer_sk"])
                             join (INNER, REPLICATED):
                                 scan customer
                                 local exchange (GATHER, SINGLE, [])
@@ -26,23 +27,23 @@ local exchange (GATHER, SINGLE, [])
                                         scan customer_address
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPLICATE, BROADCAST, [])
-                        final hashaggregation over (ca_state_84)
+                        final hashaggregation over (ca_state_90)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["ca_state_84"])
-                                    partial hashaggregation over (ca_state_84)
-                                        final hashaggregation over (ca_state_84, wr_returning_customer_sk_31)
+                                remote exchange (REPARTITION, HASH, ["ca_state_90"])
+                                    partial hashaggregation over (ca_state_90)
+                                        final hashaggregation over (ca_state_90, wr_returning_customer_sk_35)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["ca_state_84", "wr_returning_customer_sk_31"])
-                                                    partial hashaggregation over (ca_state_84, wr_returning_customer_sk_31)
+                                                remote exchange (REPARTITION, HASH, ["ca_state_90", "wr_returning_customer_sk_35"])
+                                                    partial hashaggregation over (ca_state_90, wr_returning_customer_sk_35)
                                                         join (INNER, PARTITIONED):
-                                                            remote exchange (REPARTITION, HASH, ["wr_returning_addr_sk_34"])
+                                                            remote exchange (REPARTITION, HASH, ["wr_returning_addr_sk_38"])
                                                                 join (INNER, REPLICATED):
                                                                     scan web_returns
                                                                     local exchange (GATHER, SINGLE, [])
                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                             scan date_dim
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_76"])
+                                                                remote exchange (REPARTITION, HASH, ["ca_address_sk_82"])
                                                                     scan customer_address
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPLICATE, BROADCAST, [])

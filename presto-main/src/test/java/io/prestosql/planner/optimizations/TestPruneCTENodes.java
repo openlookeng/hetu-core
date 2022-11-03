@@ -41,10 +41,10 @@ public class TestPruneCTENodes
 {
     public TestPruneCTENodes()
     {
-        super(TestPruneCTENodes::createQueryRunner);
+        super();
     }
 
-    private static LocalQueryRunner createQueryRunner()
+    protected LocalQueryRunner createQueryRunner()
     {
         Session session = testSessionBuilder()
                 .setCatalog("tpch")

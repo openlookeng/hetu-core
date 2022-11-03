@@ -5,35 +5,34 @@ local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["r_reason_desc"])
                     partial hashaggregation over (r_reason_desc)
                         join (INNER, PARTITIONED):
-                            remote exchange (REPARTITION, HASH, ["wr_reason_sk"])
-                                join (INNER, REPLICATED):
-                                    scan customer_demographics
-                                    local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPLICATE, BROADCAST, [])
-                                            join (INNER, REPLICATED):
-                                                scan customer_demographics
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                        join (INNER, REPLICATED):
-                                                            join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ws_sold_date_sk"])
-                                                                    join (INNER, PARTITIONED):
-                                                                        remote exchange (REPARTITION, HASH, ["ws_item_sk", "ws_order_number"])
-                                                                            scan web_sales
-                                                                        local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["wr_item_sk", "wr_order_number"])
-                                                                                join (INNER, PARTITIONED):
-                                                                                    remote exchange (REPARTITION, HASH, ["wr_refunded_addr_sk"])
-                                                                                        scan web_returns
-                                                                                    local exchange (GATHER, SINGLE, [])
-                                                                                        remote exchange (REPARTITION, HASH, ["ca_address_sk"])
-                                                                                            scan customer_address (pushdown = true)
-                                                                local exchange (GATHER, SINGLE, [])
-                                                                    remote exchange (REPARTITION, HASH, ["d_date_sk"])
-                                                                        scan date_dim (pushdown = true)
-                                                            local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPLICATE, BROADCAST, [])
-                                                                    scan web_page
+                            remote exchange (REPARTITION, HASH, ["r_reason_sk"])
+                                scan reason
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["r_reason_sk"])
-                                    scan reason
+                                remote exchange (REPARTITION, HASH, ["wr_reason_sk"])
+                                    join (INNER, REPLICATED):
+                                        scan date_dim (pushdown = true)
+                                        local exchange (GATHER, SINGLE, [])
+                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                join (INNER, REPLICATED):
+                                                    scan customer_demographics
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            join (INNER, REPLICATED):
+                                                                scan customer_demographics
+                                                                local exchange (GATHER, SINGLE, [])
+                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                        join (INNER, REPLICATED):
+                                                                            join (INNER, PARTITIONED):
+                                                                                remote exchange (REPARTITION, HASH, ["ws_item_sk", "ws_order_number"])
+                                                                                    scan web_sales
+                                                                                local exchange (GATHER, SINGLE, [])
+                                                                                    remote exchange (REPARTITION, HASH, ["wr_item_sk", "wr_order_number"])
+                                                                                        join (INNER, PARTITIONED):
+                                                                                            remote exchange (REPARTITION, HASH, ["wr_refunded_addr_sk"])
+                                                                                                scan web_returns
+                                                                                            local exchange (GATHER, SINGLE, [])
+                                                                                                remote exchange (REPARTITION, HASH, ["ca_address_sk"])
+                                                                                                    scan customer_address (pushdown = true)
+                                                                            local exchange (GATHER, SINGLE, [])
+                                                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                                                    scan web_page

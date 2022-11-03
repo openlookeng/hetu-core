@@ -1,40 +1,40 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final hashaggregation over (d_qoy_150, d_year_149, expr_147, expr_148, i_category_151)
-            local exchange (REPARTITION, HASH, ["d_qoy_150", "d_year_149", "expr_147", "expr_148", "i_category_151"])
+        final hashaggregation over (d_qoy_158, d_year_157, expr_155, expr_156, i_category_159)
+            local exchange (REPARTITION, HASH, ["d_qoy_158", "d_year_157", "expr_155", "expr_156", "i_category_159"])
                 local exchange (REPARTITION, ROUND_ROBIN, [])
-                    remote exchange (REPARTITION, HASH, ["cast", "d_qoy", "d_year", "expr_186", "i_category"])
-                        partial hashaggregation over (cast, d_qoy, d_year, expr_186, i_category)
+                    remote exchange (REPARTITION, HASH, ["cast", "d_qoy", "d_year", "expr_194", "i_category"])
+                        partial hashaggregation over (cast, d_qoy, d_year, expr_194, i_category)
                             join (INNER, REPLICATED):
                                 join (INNER, REPLICATED):
                                     scan store_sales
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPLICATE, BROADCAST, [])
-                                            scan item
+                                            scan date_dim
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPLICATE, BROADCAST, [])
-                                        scan date_dim
-                    remote exchange (REPARTITION, HASH, ["cast_191", "d_qoy_43", "d_year_39", "expr_192", "i_category_23"])
-                        partial hashaggregation over (cast_191, d_qoy_43, d_year_39, expr_192, i_category_23)
+                                        scan item
+                    remote exchange (REPARTITION, HASH, ["cast_199", "d_qoy_47", "d_year_43", "expr_200", "i_category_26"])
+                        partial hashaggregation over (cast_199, d_qoy_47, d_year_43, expr_200, i_category_26)
                             join (INNER, PARTITIONED):
-                                remote exchange (REPARTITION, HASH, ["ws_sold_date_sk"])
-                                    join (INNER, PARTITIONED):
-                                        remote exchange (REPARTITION, HASH, ["ws_item_sk"])
-                                            scan web_sales
-                                        local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["i_item_sk_11"])
-                                                scan item
+                                remote exchange (REPARTITION, HASH, ["i_item_sk_14"])
+                                    scan item
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["d_date_sk_33"])
-                                        scan date_dim
-                remote exchange (REPARTITION, HASH, ["d_qoy_117", "d_year_113", "expr_135", "expr_142", "i_category_97"])
-                    partial hashaggregation over (d_qoy_117, d_year_113, expr_135, expr_142, i_category_97)
+                                    remote exchange (REPARTITION, HASH, ["ws_item_sk"])
+                                        join (INNER, PARTITIONED):
+                                            remote exchange (REPARTITION, HASH, ["ws_sold_date_sk"])
+                                                scan web_sales
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPARTITION, HASH, ["d_date_sk_37"])
+                                                    scan date_dim
+                remote exchange (REPARTITION, HASH, ["d_qoy_124", "d_year_120", "expr_143", "expr_150", "i_category_103"])
+                    partial hashaggregation over (d_qoy_124, d_year_120, expr_143, expr_150, i_category_103)
                         join (INNER, REPLICATED):
                             join (INNER, REPLICATED):
                                 scan catalog_sales
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPLICATE, BROADCAST, [])
-                                        scan item
+                                        scan date_dim
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPLICATE, BROADCAST, [])
-                                    scan date_dim
+                                    scan item

@@ -67,6 +67,23 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-hive</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-hive</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-spi</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -11,22 +11,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive.metastore;
+package io.prestosql.plugin.hive.metastore.recording;
 
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.json.JsonCodec;
+import io.airlift.json.JsonCodecFactory;
+import io.airlift.json.ObjectMapperProvider;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.HiveBasicStatistics;
 import io.prestosql.plugin.hive.HiveBucketProperty;
-import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.PartitionStatistics;
+import io.prestosql.plugin.hive.RecordingMetastoreConfig;
 import io.prestosql.plugin.hive.authentication.HiveIdentity;
+import io.prestosql.plugin.hive.metastore.Column;
+import io.prestosql.plugin.hive.metastore.Database;
+import io.prestosql.plugin.hive.metastore.HiveColumnStatistics;
+import io.prestosql.plugin.hive.metastore.HiveMetastore;
+import io.prestosql.plugin.hive.metastore.HivePrincipal;
+import io.prestosql.plugin.hive.metastore.HivePrivilegeInfo;
+import io.prestosql.plugin.hive.metastore.IntegerStatistics;
+import io.prestosql.plugin.hive.metastore.Partition;
+import io.prestosql.plugin.hive.metastore.RecordingHiveMetastore;
+import io.prestosql.plugin.hive.metastore.SortingColumn;
+import io.prestosql.plugin.hive.metastore.Storage;
+import io.prestosql.plugin.hive.metastore.StorageFormat;
+import io.prestosql.plugin.hive.metastore.Table;
+import io.prestosql.plugin.hive.metastore.UnimplementedHiveMetastore;
+import io.prestosql.plugin.hive.util.HiveBlockEncodingSerde;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.block.TestingBlockJsonSerde;
 import io.prestosql.spi.security.PrestoPrincipal;
 import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.spi.security.RoleGrant;
 import io.prestosql.spi.statistics.ColumnStatisticType;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import org.testng.annotations.Test;
 
@@ -44,8 +67,14 @@ import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_
 import static io.prestosql.spi.security.PrincipalType.USER;
 import static io.prestosql.spi.statistics.ColumnStatisticType.MAX_VALUE;
 import static io.prestosql.spi.statistics.ColumnStatisticType.MIN_VALUE;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static io.prestosql.testing.TestingConnectorSession.SESSION;
+import static java.util.Locale.ENGLISH;
 import static org.testng.Assert.assertEquals;
 
 public class TestRecordingHiveMetastore
@@ -107,21 +136,36 @@ public class TestRecordingHiveMetastore
     public void testRecordingHiveMetastore()
             throws IOException
     {
-        HiveConfig recordingHiveConfig = new HiveConfig()
-                .setRecordingPath(File.createTempFile("recording_test", "json").getCanonicalPath())
+        RecordingMetastoreConfig recordingConfig = new RecordingMetastoreConfig()
+                .setRecordingPath(File.createTempFile("recording_test", "json").getAbsolutePath())
                 .setRecordingDuration(new Duration(10, TimeUnit.MINUTES));
-
-        RecordingHiveMetastore recordingHiveMetastore = new RecordingHiveMetastore(new TestingHiveMetastore(), recordingHiveConfig);
+        JsonCodec<HiveMetastoreRecording.Recording> jsonCodec = createJsonCodec();
+        HiveMetastoreRecording recording = new HiveMetastoreRecording(recordingConfig, jsonCodec);
+        RecordingHiveMetastore recordingHiveMetastore = new RecordingHiveMetastore(new TestingHiveMetastore(), recording);
         validateMetadata(recordingHiveMetastore);
         recordingHiveMetastore.dropDatabase(HIVE_CONTEXT, "other_database");
-        recordingHiveMetastore.writeRecording();
+        recording.writeRecording();
 
-        HiveConfig replayingHiveConfig = recordingHiveConfig
+        RecordingMetastoreConfig replayingConfig = recordingConfig
                 .setReplay(true);
 
-        recordingHiveMetastore = new RecordingHiveMetastore(new UnimplementedHiveMetastore(), replayingHiveConfig);
-        recordingHiveMetastore.loadRecording();
+        recording = new HiveMetastoreRecording(replayingConfig, jsonCodec);
+        recordingHiveMetastore = new RecordingHiveMetastore(new UnimplementedHiveMetastore(), recording);
+        recording.loadRecording();
         validateMetadata(recordingHiveMetastore);
+    }
+
+    public static JsonCodec<HiveMetastoreRecording.Recording> createJsonCodec()
+    {
+        ObjectMapperProvider objectMapperProvider = new ObjectMapperProvider();
+        TypeDeserializer typeDeserializer = new TypeDeserializer();
+        objectMapperProvider.setJsonDeserializers(
+                ImmutableMap.of(
+                        Block.class, new TestingBlockJsonSerde.Deserializer(new HiveBlockEncodingSerde()),
+                        Type.class, typeDeserializer));
+        objectMapperProvider.setJsonSerializers(ImmutableMap.of(Block.class, new TestingBlockJsonSerde.Serializer(new HiveBlockEncodingSerde())));
+        JsonCodec<HiveMetastoreRecording.Recording> jsonCodec = new JsonCodecFactory(objectMapperProvider).jsonCodec(HiveMetastoreRecording.Recording.class);
+        return jsonCodec;
     }
 
     private void validateMetadata(HiveMetastore hiveMetastore)
@@ -141,6 +185,32 @@ public class TestRecordingHiveMetastore
         assertEquals(hiveMetastore.listTablePrivileges("database", "table", new HivePrincipal(USER, "user")), ImmutableSet.of(PRIVILEGE_INFO));
         assertEquals(hiveMetastore.listRoles(), ImmutableSet.of("role"));
         assertEquals(hiveMetastore.listRoleGrants(new HivePrincipal(USER, "user")), ImmutableSet.of(ROLE_GRANT));
+    }
+
+    private static class TypeDeserializer
+            extends FromStringDeserializer<Type>
+    {
+        private final Map<String, Type> types = ImmutableMap.of(
+                StandardTypes.BOOLEAN, BOOLEAN,
+                StandardTypes.BIGINT, BIGINT,
+                StandardTypes.INTEGER, INTEGER,
+                StandardTypes.DOUBLE, DOUBLE,
+                StandardTypes.VARCHAR, createUnboundedVarcharType());
+
+        public TypeDeserializer()
+        {
+            super(Type.class);
+        }
+
+        @Override
+        protected Type _deserialize(String value, DeserializationContext context)
+        {
+            Type type = types.get(value.toLowerCase(ENGLISH));
+            if (type == null) {
+                throw new IllegalArgumentException(String.valueOf("Unknown type " + value));
+            }
+            return type;
+        }
     }
 
     private static class TestingHiveMetastore
