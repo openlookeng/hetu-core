@@ -117,7 +117,8 @@ public class TestDynamicFilter
                         join(INNER, ImmutableList.of(equiJoinClause("ORDERS_OK", "LINEITEM_OK")),
                                 Optional.empty(),
                                 project(
-                                        tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))),
+                                        node(FilterNode.class,
+                                                tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey")))),
                                 exchange(
                                         project(
                                                 node(FilterNode.class,
@@ -267,8 +268,8 @@ public class TestDynamicFilter
                                 join(INNER, ImmutableList.of(equiJoinClause("LINEITEM_OK", "ORDERS_OK")),
                                         project(node(FilterNode.class,
                                                 tableScan("lineitem", ImmutableMap.of("LINEITEM_OK", "orderkey")))),
-                                        exchange(project(
-                                                tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey"))))),
+                                        exchange(project(node(FilterNode.class,
+                                                tableScan("orders", ImmutableMap.of("ORDERS_OK", "orderkey")))))),
                                 exchange(
                                         project(tableScan("part", ImmutableMap.of("PART_PK", "partkey")))))));
     }

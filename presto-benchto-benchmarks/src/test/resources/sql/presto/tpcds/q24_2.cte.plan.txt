@@ -28,7 +28,8 @@ remote exchange (GATHER, SINGLE, [])
                                                                                                     scan store
                                                                                 local exchange (GATHER, SINGLE, [])
                                                                                     remote exchange (REPARTITION, HASH, ["sr_item_sk", "sr_ticket_number"])
-                                                                                        scan store_returns
+                                                                                        Filter
+                                                                                            scan store_returns
                                                                         local exchange (GATHER, SINGLE, [])
                                                                             remote exchange (REPARTITION, HASH, ["c_customer_sk"])
                                                                                 scan customer
@@ -66,7 +67,8 @@ remote exchange (GATHER, SINGLE, [])
                                                                                                         scan store
                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                         remote exchange (REPARTITION, HASH, ["sr_item_sk_88", "sr_ticket_number_95"])
-                                                                                            scan store_returns
+                                                                                            Filter
+                                                                                                scan store_returns
                                                                             local exchange (GATHER, SINGLE, [])
                                                                                 remote exchange (REPARTITION, HASH, ["c_customer_sk_160"])
                                                                                     scan customer

@@ -344,10 +344,6 @@ public class RemoveUnsupportedDynamicFilters
                     if (filteredStats.getOutputRowCount() > getDynamicFilteringMaxSize(session)) {
                         return true;
                     }
-
-                    // If selectivity too low, no need to create Dynamic Filter
-                    double selectivity = filteredStats.getOutputRowCount() / totalRowCount.getValue();
-                    return selectivity > DEFAULT_GENERATE_SELECTIVITY_THRESHOLD;
                 }
             }
 

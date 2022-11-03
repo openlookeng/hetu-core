@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.spi.plan.CTEScanNode;
+import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -151,7 +152,7 @@ public class TestAddExchangesPlans
                 anyTree(
                         join(INNER, ImmutableList.of(equiJoinClause("nationkey", "regionkey")), Optional.empty(), Optional.of(REPLICATED), Optional.of(false),
                                 anyNot(ExchangeNode.class,
-                                        tableScan("nation", ImmutableMap.of("nationkey", "nationkey"))),
+                                        node(FilterNode.class, tableScan("nation", ImmutableMap.of("nationkey", "nationkey")))),
                                 anyTree(
                                         exchange(REMOTE, REPLICATE,
                                                 anyTree(
