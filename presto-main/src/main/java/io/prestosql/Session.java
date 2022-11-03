@@ -49,8 +49,10 @@ import java.util.stream.Collectors;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
 import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
 import static io.prestosql.SystemSessionProperties.RETRY_POLICY;
+import static io.prestosql.SystemSessionProperties.REUSE_TABLE_SCAN;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
@@ -133,7 +135,7 @@ public final class Session
         requireNonNull(systemProperties, "systemProperties is null");
         if (Boolean.parseBoolean(systemProperties.get(RECOVERY_ENABLED))
                 || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))
-                    || "TASK".equals(systemProperties.get(RETRY_POLICY))) {
+                    || "TASK".equalsIgnoreCase(systemProperties.get(RETRY_POLICY))) {
             // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
             this.systemProperties = new HashMap<>(systemProperties);
         }
@@ -574,9 +576,14 @@ public final class Session
         return new SessionBuilder(session);
     }
 
-    public void disableTaskRetry()
+    public void disableCTEReuse()
     {
-        systemProperties.put(RETRY_POLICY, "NONE");
+        systemProperties.put(CTE_REUSE_ENABLED, "false");
+    }
+
+    public void disableReuseTableScan()
+    {
+        systemProperties.put(REUSE_TABLE_SCAN, "false");
     }
 
     public static class SessionBuilder
