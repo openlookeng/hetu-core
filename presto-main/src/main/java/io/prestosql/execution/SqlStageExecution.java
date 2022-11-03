@@ -31,6 +31,7 @@ import io.prestosql.exchange.ExchangeSinkHandle;
 import io.prestosql.exchange.ExchangeSinkInstanceHandle;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
+import io.prestosql.execution.scheduler.PartitionIdAllocator;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.metadata.InternalNode;
@@ -355,6 +356,18 @@ public final class SqlStageExecution
         getAllTasks().forEach(RemoteTask::suspend);
     }
 
+    public List<TaskStatus> getTaskStatuses()
+    {
+        return getAllTasks().stream()
+                .map(RemoteTask::getTaskStatus)
+                .collect(toImmutableList());
+    }
+
+    public boolean isAnyTaskBlocked()
+    {
+        return getTaskStatuses().stream().anyMatch(TaskStatus::isOutputBufferOverutilized);
+    }
+
     public synchronized void resume()
     {
         stateMachine.transitionToRunning();
@@ -571,7 +584,18 @@ public final class SqlStageExecution
         return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageId(), partition, 0), generateInstanceId(), ImmutableMultimap.of(), totalPartitions));
     }
 
-    public synchronized Set<RemoteTask> scheduleSplits(InternalNode node, Multimap<PlanNodeId, Split> splits, Multimap<PlanNodeId, Lifespan> noMoreSplitsNotification)
+    public synchronized Optional<RemoteTask> scheduleTask(InternalNode node, int partition, Multimap<PlanNodeId, Split> initialSplits)
+    {
+        requireNonNull(node, "node is null");
+
+        if (stateMachine.getState().isDone()) {
+            return Optional.empty();
+        }
+        checkState(!splitsScheduled.get(), "scheduleTask can not be called once splits have been scheduled");
+        return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageId(), partition, 0), generateInstanceId(), initialSplits, OptionalInt.empty()));
+    }
+
+    public synchronized Set<RemoteTask> scheduleSplits(InternalNode node, Multimap<PlanNodeId, Split> splits, Multimap<PlanNodeId, Lifespan> noMoreSplitsNotification, PartitionIdAllocator partitionIdAllocator)
     {
         requireNonNull(node, "node is null");
         requireNonNull(splits, "splits is null");
@@ -589,7 +613,7 @@ public final class SqlStageExecution
         if (remoteTasks == null) {
             // The output buffer depends on the task id starting from 0 and being sequential, since each
             // task is assigned a private buffer based on task id.
-            TaskId taskId = new TaskId(stateMachine.getStageId(), nextTaskId.getAndIncrement(), 0);
+            TaskId taskId = new TaskId(stateMachine.getStageId(), partitionIdAllocator.getNextId(), 0);
             String instanceId = generateInstanceId();
             task = scheduleTask(node, taskId, instanceId, splits, OptionalInt.empty());
             newTasks.add(task);

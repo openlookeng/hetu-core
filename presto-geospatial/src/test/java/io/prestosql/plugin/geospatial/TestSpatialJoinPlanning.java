@@ -66,11 +66,10 @@ public class TestSpatialJoinPlanning
 
     public TestSpatialJoinPlanning()
     {
-        super(() -> createQueryRunner());
+        super();
     }
 
-    private static LocalQueryRunner createQueryRunner()
-            throws IOException
+    protected LocalQueryRunner createQueryRunner()
     {
         LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder()
                 .setCatalog("memory")
@@ -81,16 +80,37 @@ public class TestSpatialJoinPlanning
         queryRunner.installPlugin(new GeoPlugin());
         queryRunner.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
 
-        TempFolder folder = new TempFolder().create();
+        TempFolder folder = null;
+        try {
+            folder = new TempFolder().create();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
         Runtime.getRuntime().addShutdownHook(new Thread(folder::close));
         HashMap<String, String> metastoreConfig = new HashMap<>();
         metastoreConfig.put("hetu.metastore.type", "hetufilesystem");
         metastoreConfig.put("hetu.metastore.hetufilesystem.profile-name", "default");
-        metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+        try {
+            metastoreConfig.put("hetu.metastore.hetufilesystem.path", folder.newFolder("metastore").getAbsolutePath());
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
         metastoreConfig.put("hetu.metastore.cache.type", "local");
-        queryRunner.loadMetastore(metastoreConfig);
-        queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
-                ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+        try {
+            queryRunner.loadMetastore(metastoreConfig);
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            queryRunner.createCatalog("memory", new MemoryConnectorFactory(),
+                    ImmutableMap.of("memory.spill-path", folder.newFolder("memory-connector").getAbsolutePath()));
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
 
         queryRunner.execute(format("CREATE TABLE kdb_tree AS SELECT '%s' AS v", KDB_TREE_JSON));
         queryRunner.execute("CREATE TABLE points (lng, lat, name) AS (VALUES (2.1e0, 2.1e0, 'x'))");

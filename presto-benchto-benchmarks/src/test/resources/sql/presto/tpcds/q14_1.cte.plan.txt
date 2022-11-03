@@ -1,9 +1,9 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final hashaggregation over (channel$gid, groupid, i_brand_id$gid_1634, i_category_id$gid_1636, i_class_id$gid_1635)
-            local exchange (REPARTITION, HASH, ["channel$gid", "groupid", "i_brand_id$gid_1634", "i_category_id$gid_1636", "i_class_id$gid_1635"])
-                remote exchange (REPARTITION, HASH, ["channel$gid", "groupid", "i_brand_id$gid_1634", "i_category_id$gid_1636", "i_class_id$gid_1635"])
-                    partial hashaggregation over (channel$gid, groupid, i_brand_id$gid_1634, i_category_id$gid_1636, i_class_id$gid_1635)
+        final hashaggregation over (channel$gid, groupid, i_brand_id$gid_1690, i_category_id$gid_1692, i_class_id$gid_1691)
+            local exchange (REPARTITION, HASH, ["channel$gid", "groupid", "i_brand_id$gid_1690", "i_category_id$gid_1692", "i_class_id$gid_1691"])
+                remote exchange (REPARTITION, HASH, ["channel$gid", "groupid", "i_brand_id$gid_1690", "i_category_id$gid_1692", "i_class_id$gid_1691"])
+                    partial hashaggregation over (channel$gid, groupid, i_brand_id$gid_1690, i_category_id$gid_1692, i_class_id$gid_1691)
                         local exchange (REPARTITION, ROUND_ROBIN, [])
                             Filter
                                 cross join:
@@ -27,14 +27,14 @@ local exchange (GATHER, SINGLE, [])
                                                                             Filter
                                                                                 scan item
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_1"])
+                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_3"])
                                                                     cte cross_items
                                                                         join (INNER, PARTITIONED):
                                                                             Filter
-                                                                                final hashaggregation over (expr_207, expr_208, expr_209)
-                                                                                    local exchange (REPARTITION, HASH, ["expr_207", "expr_208", "expr_209"])
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_53", "i_category_id_57", "i_class_id_55"])
-                                                                                            partial hashaggregation over (i_brand_id_53, i_category_id_57, i_class_id_55)
+                                                                                final hashaggregation over (expr_219, expr_220, expr_221)
+                                                                                    local exchange (REPARTITION, HASH, ["expr_219", "expr_220", "expr_221"])
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_57", "i_category_id_61", "i_class_id_59"])
+                                                                                            partial hashaggregation over (i_brand_id_57, i_category_id_61, i_class_id_59)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -46,8 +46,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_105", "i_category_id_109", "i_class_id_107"])
-                                                                                            partial hashaggregation over (i_brand_id_105, i_category_id_109, i_class_id_107)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_112", "i_category_id_116", "i_class_id_114"])
+                                                                                            partial hashaggregation over (i_brand_id_112, i_category_id_116, i_class_id_114)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -59,8 +59,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_161", "i_category_id_165", "i_class_id_163"])
-                                                                                            partial hashaggregation over (i_brand_id_161, i_category_id_165, i_class_id_163)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_171", "i_category_id_175", "i_class_id_173"])
+                                                                                            partial hashaggregation over (i_brand_id_171, i_category_id_175, i_class_id_173)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -73,7 +73,7 @@ local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
                                                                             local exchange (GATHER, SINGLE, [])
-                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_8", "i_category_id_12", "i_class_id_10"])
+                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_10", "i_category_id_14", "i_class_id_12"])
                                                                                     scan item
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPLICATE, BROADCAST, [])
@@ -109,13 +109,13 @@ local exchange (GATHER, SINGLE, [])
                                                                                         scan date_dim
                             Filter
                                 cross join:
-                                    final hashaggregation over (i_brand_id_474, i_category_id_478, i_class_id_476)
+                                    final hashaggregation over (i_brand_id_493, i_category_id_497, i_class_id_495)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["i_brand_id_474", "i_category_id_478", "i_class_id_476"])
-                                                partial hashaggregation over (i_brand_id_474, i_category_id_478, i_class_id_476)
+                                            remote exchange (REPARTITION, HASH, ["i_brand_id_493", "i_category_id_497", "i_class_id_495"])
+                                                partial hashaggregation over (i_brand_id_493, i_category_id_497, i_class_id_495)
                                                     Filter
                                                         semijoin (PARTITIONED):
-                                                            remote exchange (REPARTITION, HASH, ["cs_item_sk_448"])
+                                                            remote exchange (REPARTITION, HASH, ["cs_item_sk_466"])
                                                                 join (INNER, REPLICATED):
                                                                     join (INNER, REPLICATED):
                                                                         Filter
@@ -129,14 +129,14 @@ local exchange (GATHER, SINGLE, [])
                                                                             Filter
                                                                                 scan item
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_518"])
+                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_539"])
                                                                     cte cross_items
                                                                         join (INNER, PARTITIONED):
                                                                             Filter
-                                                                                final hashaggregation over (expr_793, expr_794, expr_795)
-                                                                                    local exchange (REPARTITION, HASH, ["expr_793", "expr_794", "expr_795"])
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_570", "i_category_id_574", "i_class_id_572"])
-                                                                                            partial hashaggregation over (i_brand_id_570, i_category_id_574, i_class_id_572)
+                                                                                final hashaggregation over (expr_824, expr_825, expr_826)
+                                                                                    local exchange (REPARTITION, HASH, ["expr_824", "expr_825", "expr_826"])
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_593", "i_category_id_597", "i_class_id_595"])
+                                                                                            partial hashaggregation over (i_brand_id_593, i_category_id_597, i_class_id_595)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -148,8 +148,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_657", "i_category_id_661", "i_class_id_659"])
-                                                                                            partial hashaggregation over (i_brand_id_657, i_category_id_661, i_class_id_659)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_683", "i_category_id_687", "i_class_id_685"])
+                                                                                            partial hashaggregation over (i_brand_id_683, i_category_id_687, i_class_id_685)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -161,8 +161,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_747", "i_category_id_751", "i_class_id_749"])
-                                                                                            partial hashaggregation over (i_brand_id_747, i_category_id_751, i_class_id_749)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_776", "i_category_id_780", "i_class_id_778"])
+                                                                                            partial hashaggregation over (i_brand_id_776, i_category_id_780, i_class_id_778)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -175,7 +175,7 @@ local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
                                                                             local exchange (GATHER, SINGLE, [])
-                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_525", "i_category_id_529", "i_class_id_527"])
+                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_546", "i_category_id_550", "i_class_id_548"])
                                                                                     scan item
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPLICATE, BROADCAST, [])
@@ -211,13 +211,13 @@ local exchange (GATHER, SINGLE, [])
                                                                                         scan date_dim
                             Filter
                                 cross join:
-                                    final hashaggregation over (i_brand_id_1067, i_category_id_1071, i_class_id_1069)
+                                    final hashaggregation over (i_brand_id_1105, i_category_id_1109, i_class_id_1107)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["i_brand_id_1067", "i_category_id_1071", "i_class_id_1069"])
-                                                partial hashaggregation over (i_brand_id_1067, i_category_id_1071, i_class_id_1069)
+                                            remote exchange (REPARTITION, HASH, ["i_brand_id_1105", "i_category_id_1109", "i_class_id_1107"])
+                                                partial hashaggregation over (i_brand_id_1105, i_category_id_1109, i_class_id_1107)
                                                     Filter
                                                         semijoin (PARTITIONED):
-                                                            remote exchange (REPARTITION, HASH, ["ws_item_sk_1029"])
+                                                            remote exchange (REPARTITION, HASH, ["ws_item_sk_1066"])
                                                                 join (INNER, REPLICATED):
                                                                     join (INNER, REPLICATED):
                                                                         Filter
@@ -231,14 +231,14 @@ local exchange (GATHER, SINGLE, [])
                                                                             Filter
                                                                                 scan item
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_1111"])
+                                                                remote exchange (REPARTITION, HASH, ["i_item_sk_1151"])
                                                                     cte cross_items
                                                                         join (INNER, PARTITIONED):
                                                                             Filter
-                                                                                final hashaggregation over (expr_1386, expr_1387, expr_1388)
-                                                                                    local exchange (REPARTITION, HASH, ["expr_1386", "expr_1387", "expr_1388"])
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1163", "i_category_id_1167", "i_class_id_1165"])
-                                                                                            partial hashaggregation over (i_brand_id_1163, i_category_id_1167, i_class_id_1165)
+                                                                                final hashaggregation over (expr_1436, expr_1437, expr_1438)
+                                                                                    local exchange (REPARTITION, HASH, ["expr_1436", "expr_1437", "expr_1438"])
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1205", "i_category_id_1209", "i_class_id_1207"])
+                                                                                            partial hashaggregation over (i_brand_id_1205, i_category_id_1209, i_class_id_1207)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -250,8 +250,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1250", "i_category_id_1254", "i_class_id_1252"])
-                                                                                            partial hashaggregation over (i_brand_id_1250, i_category_id_1254, i_class_id_1252)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1295", "i_category_id_1299", "i_class_id_1297"])
+                                                                                            partial hashaggregation over (i_brand_id_1295, i_category_id_1299, i_class_id_1297)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -263,8 +263,8 @@ local exchange (GATHER, SINGLE, [])
                                                                                                     local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
-                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1340", "i_category_id_1344", "i_class_id_1342"])
-                                                                                            partial hashaggregation over (i_brand_id_1340, i_category_id_1344, i_class_id_1342)
+                                                                                        remote exchange (REPARTITION, HASH, ["i_brand_id_1388", "i_category_id_1392", "i_class_id_1390"])
+                                                                                            partial hashaggregation over (i_brand_id_1388, i_category_id_1392, i_class_id_1390)
                                                                                                 join (INNER, REPLICATED):
                                                                                                     join (INNER, REPLICATED):
                                                                                                         Filter
@@ -277,7 +277,7 @@ local exchange (GATHER, SINGLE, [])
                                                                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                                                                             scan item
                                                                             local exchange (GATHER, SINGLE, [])
-                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_1118", "i_category_id_1122", "i_class_id_1120"])
+                                                                                remote exchange (REPARTITION, HASH, ["i_brand_id_1158", "i_category_id_1162", "i_class_id_1160"])
                                                                                     scan item
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPLICATE, BROADCAST, [])

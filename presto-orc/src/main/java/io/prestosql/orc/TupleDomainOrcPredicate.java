@@ -71,23 +71,31 @@ public class TupleDomainOrcPredicate
 
     private final int domainCompactionThreshold;
 
+    private Optional<OrcPredicate> dynamicFilterPredicate;
+
     public static TupleDomainOrcPredicateBuilder builder()
     {
         return new TupleDomainOrcPredicateBuilder();
     }
 
     private TupleDomainOrcPredicate(List<ColumnDomain> columnDomains, List<ColumnDomain> orColumns, boolean orcBloomFiltersEnabled,
-                                    Set<Integer> missingColumns, int domainCompactionThreshold)
+            Set<Integer> missingColumns, int domainCompactionThreshold, Optional<OrcPredicate> dynamicFilterPredicate)
     {
         this.columnDomains = ImmutableList.copyOf(requireNonNull(columnDomains, "columnDomains is null"));
         this.orColumnDomains = ImmutableList.copyOf(orColumns);
         this.orcBloomFiltersEnabled = orcBloomFiltersEnabled;
         this.missingColumns = missingColumns;
         this.domainCompactionThreshold = domainCompactionThreshold;
+        this.dynamicFilterPredicate = dynamicFilterPredicate;
     }
 
     @Override
     public boolean matches(long numberOfRows, ColumnMetadata<ColumnStatistics> allColumnStatistics)
+    {
+        return matchesInner(numberOfRows, allColumnStatistics) && (dynamicFilterPredicate.isPresent() ? dynamicFilterPredicate.get().matches(numberOfRows, allColumnStatistics) : true);
+    }
+
+    private boolean matchesInner(long numberOfRows, ColumnMetadata<ColumnStatistics> allColumnStatistics)
     {
         boolean found = orColumnDomains.size() == 0;
         for (ColumnDomain column : columnDomains) {
@@ -279,6 +287,8 @@ public class TupleDomainOrcPredicate
 
         private int domainCompactionThreshold;
 
+        private Optional<OrcPredicate> dynamicFilterPredicate = Optional.empty();
+
         public TupleDomainOrcPredicateBuilder addColumn(OrcColumnId columnId, Domain domain)
         {
             requireNonNull(domain, "domain is null");
@@ -311,9 +321,15 @@ public class TupleDomainOrcPredicate
             return this;
         }
 
+        public TupleDomainOrcPredicateBuilder setDynamicFilterPredicate(Optional<OrcPredicate> dynamicFilterPredicate)
+        {
+            this.dynamicFilterPredicate = dynamicFilterPredicate;
+            return this;
+        }
+
         public TupleDomainOrcPredicate build()
         {
-            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled, missingColumns, domainCompactionThreshold);
+            return new TupleDomainOrcPredicate(columns, orColumns, bloomFiltersEnabled, missingColumns, domainCompactionThreshold, dynamicFilterPredicate);
         }
     }
 
@@ -399,5 +415,17 @@ public class TupleDomainOrcPredicate
                 .add("orColumnDomains", orColumnDomains)
                 .add("orcBloomFilterEnabled", orcBloomFiltersEnabled)
                 .toString();
+    }
+
+    @Override
+    public Optional<OrcPredicate> getDynamicFilterPredicate()
+    {
+        return dynamicFilterPredicate;
+    }
+
+    @Override
+    public void setDynamicFilterPredicate(Optional<OrcPredicate> dfPredicate)
+    {
+        this.dynamicFilterPredicate = dfPredicate;
     }
 }

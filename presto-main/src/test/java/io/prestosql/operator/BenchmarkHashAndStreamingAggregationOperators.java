@@ -180,7 +180,8 @@ public class BenchmarkHashAndStreamingAggregationOperators
                     succinctBytes(Integer.MAX_VALUE),
                     spillerFactory,
                     joinCompiler,
-                    false);
+                    false,
+                    Optional.empty());
         }
 
         private static void repeatToStringBlock(String value, int count, BlockBuilder blockBuilder)

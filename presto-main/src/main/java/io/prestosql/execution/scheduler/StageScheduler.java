@@ -13,11 +13,28 @@
  */
 package io.prestosql.execution.scheduler;
 
+import io.prestosql.execution.RemoteTask;
+
 import java.io.Closeable;
+import java.util.Optional;
 
 public interface StageScheduler
         extends Closeable
 {
+    /**
+     * Called by the query scheduler when the scheduling process begins.
+     * This method is called before the ExecutionSchedule takes a decision
+     * to schedule a stage but after the query scheduling has been fully initialized.
+     * Within this method the scheduler may decide to schedule tasks that
+     * are necessary for query execution to make progress.
+     * For example the scheduler may decide to schedule a task without
+     * assigning any splits to unblock dynamic filter collection.
+     */
+    default Optional<RemoteTask> start()
+    {
+        return Optional.empty();
+    }
+
     /**
      * Schedules as much work as possible without blocking.
      * The schedule results is a hint to the query scheduler if and

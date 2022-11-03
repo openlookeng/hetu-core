@@ -20,13 +20,13 @@ local exchange (GATHER, SINGLE, [])
                         remote exchange (REPLICATE, BROADCAST, [])
                             scan store
             local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["s_store_id_179", "subtract"])
+                remote exchange (REPARTITION, HASH, ["s_store_id_184", "subtract"])
                     join (INNER, REPLICATED):
                         join (INNER, REPLICATED):
-                            final hashaggregation over (d_week_seq_109, ss_store_sk_89)
+                            final hashaggregation over (d_week_seq_113, ss_store_sk_92)
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["d_week_seq_109", "ss_store_sk_89"])
-                                        partial hashaggregation over (d_week_seq_109, ss_store_sk_89)
+                                    remote exchange (REPARTITION, HASH, ["d_week_seq_113", "ss_store_sk_92"])
+                                        partial hashaggregation over (d_week_seq_113, ss_store_sk_92)
                                             join (INNER, REPLICATED):
                                                 scan store_sales
                                                 local exchange (GATHER, SINGLE, [])

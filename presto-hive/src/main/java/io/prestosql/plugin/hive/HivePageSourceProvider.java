@@ -394,7 +394,8 @@ public class HivePageSourceProvider
                     splitCacheable,
                     columnMappings,
                     coercers,
-                    dataSourceLastModifiedTime);
+                    dataSourceLastModifiedTime,
+                    dynamicFilterSupplier);
             if (pageSource.isPresent()) {
                 return new HivePageSource(
                                 columnMappings,

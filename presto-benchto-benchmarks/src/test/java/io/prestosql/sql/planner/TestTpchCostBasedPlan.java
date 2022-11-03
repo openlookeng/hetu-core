@@ -17,7 +17,6 @@ package io.prestosql.sql.planner;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session.SessionBuilder;
 import io.prestosql.plugin.tpch.ColumnNaming;
-import io.prestosql.plugin.tpch.TpchConnectorFactory;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.testing.LocalQueryRunner;
@@ -46,25 +45,31 @@ public class TestTpchCostBasedPlan
      * large amount of data.
      */
 
+    public static final String TPCDS_METADATA_DIR = "/hive_metadata/unpartitioned_tpch";
+
     public TestTpchCostBasedPlan()
     {
-        super(() -> {
-            String catalog = "local";
-            SessionBuilder sessionBuilder = testSessionBuilder()
-                    .setCatalog(catalog)
-                    .setSchema("sf3000.0")
-                    .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
-                    .setSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, "true")
-                    .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
-                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
+        super(false, false);
+    }
 
-            LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
-            queryRunner.createCatalog(
-                    catalog,
-                    new TpchConnectorFactory(1, false, false),
-                    ImmutableMap.of(TPCH_COLUMN_NAMING_PROPERTY, ColumnNaming.SIMPLIFIED.name()));
-            return queryRunner;
-        }, false, false);
+    @Override
+    protected LocalQueryRunner createQueryRunner()
+    {
+        String catalog = "local";
+        SessionBuilder sessionBuilder = testSessionBuilder()
+                .setCatalog(catalog)
+                .setSchema(getSchema())
+                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
+                .setSystemProperty(PUSH_TABLE_THROUGH_SUBQUERY, "false")
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
+
+        LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
+        queryRunner.createCatalog(
+                catalog,
+                createConnectorFactory(),
+                ImmutableMap.of());
+        return queryRunner;
     }
 
     @Override
@@ -80,6 +85,18 @@ public class TestTpchCostBasedPlan
                     return Stream.of(queryId);
                 })
                 .map(queryId -> format("/sql/presto/tpch/%s.sql", queryId));
+    }
+
+    @Override
+    protected String getMetadataDir()
+    {
+        return TPCDS_METADATA_DIR;
+    }
+
+    @Override
+    protected boolean isPartitioned()
+    {
+        return false;
     }
 
     @SuppressWarnings("unused")

@@ -16,7 +16,6 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
-import io.prestosql.plugin.tpcds.TpcdsConnectorFactory;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
 import io.prestosql.testing.LocalQueryRunner;
@@ -42,25 +41,42 @@ public class TestTpcdsCostBasedPlan
      * of the expected plans, but any such change should be verified on an actual cluster with
      * large amount of data.
      */
+    public static final String TPCDS_METADATA_DIR = "/hive_metadata/unpartitioned_tpcds";
 
     public TestTpcdsCostBasedPlan()
     {
-        super(() -> {
-            String catalog = "local";
-            Session.SessionBuilder sessionBuilder = testSessionBuilder()
-                    .setCatalog(catalog)
-                    .setSchema("sf3000.0")
-                    .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
-                    .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
-                    .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
+        super(false, false);
+    }
 
-            LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
-            queryRunner.createCatalog(
-                    catalog,
-                    new TpcdsConnectorFactory(1),
-                    ImmutableMap.of());
-            return queryRunner;
-        }, false, false);
+    @Override
+    protected LocalQueryRunner createQueryRunner()
+    {
+        String catalog = "local";
+        Session.SessionBuilder sessionBuilder = testSessionBuilder()
+                .setCatalog(catalog)
+                .setSchema(getSchema())
+                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.AUTOMATIC.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.AUTOMATIC.name());
+
+        LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
+        queryRunner.createCatalog(
+                catalog,
+                createConnectorFactory(),
+                ImmutableMap.of());
+        return queryRunner;
+    }
+
+    @Override
+    protected String getMetadataDir()
+    {
+        return TPCDS_METADATA_DIR;
+    }
+
+    @Override
+    protected boolean isPartitioned()
+    {
+        return false;
     }
 
     @Override

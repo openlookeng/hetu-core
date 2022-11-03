@@ -191,6 +191,19 @@ public abstract class DynamicFilter
         this.max = max;
     }
 
+    public boolean hasMinMaxStats()
+    {
+        if (null != min && null != max) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isRangeOverlaps(Long statsMin, Long statsMax)
+    {
+        return ((Long) min).compareTo(statsMax) <= 0 && statsMin.compareTo((Long) max) <= 0;
+    }
+
     @Override
     public int hashCode()
     {
@@ -216,4 +229,8 @@ public abstract class DynamicFilter
     public abstract CompletableFuture<?> isBlocked();
 
     public abstract TupleDomain<ColumnHandle> getCurrentPredicate();
+
+    public void setMinMax()
+    {
+    }
 }

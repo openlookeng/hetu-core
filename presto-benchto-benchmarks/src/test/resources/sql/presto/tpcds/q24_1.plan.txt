@@ -8,60 +8,60 @@ remote exchange (GATHER, SINGLE, [])
                             local exchange (GATHER, SINGLE, [])
                                 remote exchange (REPARTITION, HASH, ["c_first_name", "c_last_name", "ca_state", "i_color", "i_current_price", "i_manager_id", "i_size", "i_units", "s_state", "s_store_name"])
                                     partial hashaggregation over (c_first_name, c_last_name, ca_state, i_color, i_current_price, i_manager_id, i_size, i_units, s_state, s_store_name)
-                                        join (INNER, REPLICATED):
-                                            join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk"])
-                                                    join (INNER, PARTITIONED):
-                                                        remote exchange (REPARTITION, HASH, ["sr_item_sk", "sr_ticket_number"])
-                                                            scan store_returns
-                                                        local exchange (GATHER, SINGLE, [])
-                                                            remote exchange (REPARTITION, HASH, ["ss_item_sk", "ss_ticket_number"])
-                                                                join (INNER, REPLICATED):
-                                                                    scan store_sales
-                                                                    local exchange (GATHER, SINGLE, [])
-                                                                        remote exchange (REPLICATE, BROADCAST, [])
-                                                                            scan item
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk"])
-                                                        scan customer
+                                        join (INNER, PARTITIONED):
+                                            remote exchange (REPARTITION, HASH, ["ca_zip", "upper"])
+                                                scan customer_address
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                remote exchange (REPARTITION, HASH, ["c_birth_country", "s_zip"])
                                                     join (INNER, REPLICATED):
-                                                        scan customer_address
+                                                        scan customer
                                                         local exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                                scan store
+                                                                join (INNER, PARTITIONED):
+                                                                    remote exchange (REPARTITION, HASH, ["sr_item_sk", "sr_ticket_number"])
+                                                                        scan store_returns
+                                                                    local exchange (GATHER, SINGLE, [])
+                                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk", "ss_ticket_number"])
+                                                                            join (INNER, REPLICATED):
+                                                                                join (INNER, REPLICATED):
+                                                                                    scan store_sales
+                                                                                    local exchange (GATHER, SINGLE, [])
+                                                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                                                            scan item
+                                                                                local exchange (GATHER, SINGLE, [])
+                                                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                                                        scan store
         local exchange (GATHER, SINGLE, [])
             remote exchange (REPLICATE, BROADCAST, [])
                 final hashaggregation over ()
                     local exchange (GATHER, SINGLE, [])
                         remote exchange (GATHER, SINGLE, [])
                             partial hashaggregation over ()
-                                final hashaggregation over (c_first_name_159, c_last_name_160, ca_state_177, i_color_146, i_current_price_134, i_manager_id_149, i_size_144, i_units_147, s_state_124, s_store_name_105)
+                                final hashaggregation over (c_first_name_168, c_last_name_169, ca_state_187, i_color_154, i_current_price_142, i_manager_id_157, i_size_152, i_units_155, s_state_131, s_store_name_112)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["c_first_name_159", "c_last_name_160", "ca_state_177", "i_color_146", "i_current_price_134", "i_manager_id_149", "i_size_144", "i_units_147", "s_state_124", "s_store_name_105"])
-                                            partial hashaggregation over (c_first_name_159, c_last_name_160, ca_state_177, i_color_146, i_current_price_134, i_manager_id_149, i_size_144, i_units_147, s_state_124, s_store_name_105)
+                                        remote exchange (REPARTITION, HASH, ["c_first_name_168", "c_last_name_169", "ca_state_187", "i_color_154", "i_current_price_142", "i_manager_id_157", "i_size_152", "i_units_155", "s_state_131", "s_store_name_112"])
+                                            partial hashaggregation over (c_first_name_168, c_last_name_169, ca_state_187, i_color_154, i_current_price_142, i_manager_id_157, i_size_152, i_units_155, s_state_131, s_store_name_112)
                                                 join (INNER, PARTITIONED):
-                                                    remote exchange (REPARTITION, HASH, ["c_birth_country_165", "s_zip_125"])
+                                                    remote exchange (REPARTITION, HASH, ["c_birth_country_174", "s_zip_132"])
                                                         join (INNER, REPLICATED):
                                                             join (INNER, PARTITIONED):
-                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_60"])
+                                                                remote exchange (REPARTITION, HASH, ["ss_customer_sk_65"])
                                                                     join (INNER, PARTITIONED):
-                                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_59", "ss_ticket_number_66"])
+                                                                        remote exchange (REPARTITION, HASH, ["ss_item_sk_64", "ss_ticket_number_71"])
                                                                             join (INNER, REPLICATED):
                                                                                 scan store_sales
                                                                                 local exchange (GATHER, SINGLE, [])
                                                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                                                         scan store
                                                                         local exchange (GATHER, SINGLE, [])
-                                                                            remote exchange (REPARTITION, HASH, ["sr_item_sk_82", "sr_ticket_number_89"])
+                                                                            remote exchange (REPARTITION, HASH, ["sr_item_sk_88", "sr_ticket_number_95"])
                                                                                 scan store_returns
                                                                 local exchange (GATHER, SINGLE, [])
-                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk_151"])
+                                                                    remote exchange (REPARTITION, HASH, ["c_customer_sk_160"])
                                                                         scan customer
                                                             local exchange (GATHER, SINGLE, [])
                                                                 remote exchange (REPLICATE, BROADCAST, [])
                                                                     scan item
                                                     local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPARTITION, HASH, ["ca_zip_178", "upper_248"])
+                                                        remote exchange (REPARTITION, HASH, ["ca_zip_188", "upper_259"])
                                                             scan customer_address

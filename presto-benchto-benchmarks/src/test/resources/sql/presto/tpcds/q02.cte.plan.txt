@@ -4,14 +4,14 @@ remote exchange (GATHER, SINGLE, [])
             join (INNER, PARTITIONED):
                 remote exchange (REPARTITION, HASH, ["d_week_seq"])
                     join (INNER, REPLICATED):
-                        remote exchange (REPARTITION, HASH, ["d_week_seq", "sum", "sum_21", "sum_22", "sum_23", "sum_24", "sum_25", "sum_26"])
+                        remote exchange (REPARTITION, HASH, ["d_week_seq", "sum", "sum_23", "sum_24", "sum_25", "sum_26", "sum_27", "sum_28"])
                             cte wswscs
                                 final hashaggregation over (d_week_seq)
                                     local exchange (GATHER, SINGLE, [])
                                         remote exchange (REPARTITION, HASH, ["d_week_seq"])
                                             partial hashaggregation over (d_week_seq)
                                                 join (INNER, REPLICATED):
-                                                    remote exchange (REPARTITION, HASH, ["sales_price_8", "sold_date_sk_7"])
+                                                    remote exchange (REPARTITION, HASH, ["sales_price_9", "sold_date_sk_8"])
                                                         cte wscs
                                                             remote exchange (REPARTITION, ROUND_ROBIN, [])
                                                                 Filter
@@ -29,14 +29,14 @@ remote exchange (GATHER, SINGLE, [])
                 local exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["subtract"])
                         join (INNER, REPLICATED):
-                            remote exchange (REPARTITION, HASH, ["d_week_seq_176", "sum_209", "sum_210", "sum_211", "sum_212", "sum_213", "sum_214", "sum_215"])
+                            remote exchange (REPARTITION, HASH, ["d_week_seq_181", "sum_215", "sum_216", "sum_217", "sum_218", "sum_219", "sum_220", "sum_221"])
                                 cte wswscs
-                                    final hashaggregation over (d_week_seq_176)
+                                    final hashaggregation over (d_week_seq_181)
                                         local exchange (GATHER, SINGLE, [])
-                                            remote exchange (REPARTITION, HASH, ["d_week_seq_176"])
-                                                partial hashaggregation over (d_week_seq_176)
+                                            remote exchange (REPARTITION, HASH, ["d_week_seq_181"])
+                                                partial hashaggregation over (d_week_seq_181)
                                                     join (INNER, REPLICATED):
-                                                        remote exchange (REPARTITION, HASH, ["sales_price_167", "sold_date_sk_166"])
+                                                        remote exchange (REPARTITION, HASH, ["sales_price_172", "sold_date_sk_171"])
                                                             cte wscs
                                                                 remote exchange (REPARTITION, ROUND_ROBIN, [])
                                                                     Filter

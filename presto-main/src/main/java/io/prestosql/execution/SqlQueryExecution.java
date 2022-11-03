@@ -34,7 +34,6 @@ import io.prestosql.execution.QueryPreparer.PreparedQuery;
 import io.prestosql.execution.StateMachine.StateChangeListener;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.OutputBuffers.OutputBufferId;
-import io.prestosql.execution.scheduler.ExecutionPolicy;
 import io.prestosql.execution.scheduler.NodeAllocatorService;
 import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.scheduler.PartitionMemoryEstimatorFactory;
@@ -43,6 +42,7 @@ import io.prestosql.execution.scheduler.SqlQueryScheduler;
 import io.prestosql.execution.scheduler.TaskDescriptorStorage;
 import io.prestosql.execution.scheduler.TaskExecutionStats;
 import io.prestosql.execution.scheduler.TaskSourceFactory;
+import io.prestosql.execution.scheduler.policy.ExecutionPolicy;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.failuredetector.FailureDetector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
@@ -606,6 +606,7 @@ public class SqlQueryExecution
                 plan = analyzeQuery();
 
                 try {
+                    registerDynamicFilteringQuery(plan);
                     handleCrossRegionDynamicFilter(plan);
                 }
                 catch (Throwable e) {
@@ -942,6 +943,20 @@ public class SqlQueryExecution
         }
 
         return connectors.build();
+    }
+
+    private synchronized void registerDynamicFilteringQuery(PlanRoot plan)
+    {
+        if (!isEnableDynamicFiltering(stateMachine.getSession())) {
+            return;
+        }
+
+        if (isDone()) {
+            // query has finished or was cancelled asynchronously
+            return;
+        }
+
+        dynamicFilterService.registerQuery(this, plan.getRoot());
     }
 
     private void planDistribution(PlanRoot plan)

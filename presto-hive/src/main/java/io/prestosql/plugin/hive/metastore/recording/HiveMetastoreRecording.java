@@ -72,9 +72,9 @@ public class HiveMetastoreRecording
     private final NonEvictableCache<String, Set<ColumnStatisticType>> supportedColumnStatisticsCache;
     private final NonEvictableCache<HiveTableName, PartitionStatistics> tableStatisticsCache;
     private final NonEvictableCache<Set<HivePartitionName>, Map<String, PartitionStatistics>> partitionStatisticsCache;
-    private final NonEvictableCache<String, List<String>> allTablesCache;
+    private final NonEvictableCache<String, Optional<List<String>>> allTablesCache;
     private final NonEvictableCache<TablesWithParameterCacheKey, List<String>> tablesWithParameterCache;
-    private final NonEvictableCache<String, List<String>> allViewsCache;
+    private final NonEvictableCache<String, Optional<List<String>>> allViewsCache;
     private final NonEvictableCache<HivePartitionName, Optional<Partition>> partitionCache;
     private final NonEvictableCache<HiveTableName, Optional<List<String>>> partitionNamesCache;
     private final NonEvictableCache<PartitionFilter, Optional<List<String>>> partitionNamesByPartsCache;
@@ -180,7 +180,7 @@ public class HiveMetastoreRecording
         return loadValue(partitionStatisticsCache, partitionNames, valueSupplier);
     }
 
-    public List<String> getAllTables(String databaseName, Supplier<List<String>> valueSupplier)
+    public Optional<List<String>> getAllTables(String databaseName, Supplier<Optional<List<String>>> valueSupplier)
     {
         return loadValue(allTablesCache, databaseName, valueSupplier);
     }
@@ -190,7 +190,7 @@ public class HiveMetastoreRecording
         return loadValue(tablesWithParameterCache, tablesWithParameterCacheKey, valueSupplier);
     }
 
-    public List<String> getAllViews(String databaseName, Supplier<List<String>> valueSupplier)
+    public Optional<List<String>> getAllViews(String databaseName, Supplier<Optional<List<String>>> valueSupplier)
     {
         return loadValue(allViewsCache, databaseName, valueSupplier);
     }
@@ -203,6 +203,11 @@ public class HiveMetastoreRecording
     public Optional<List<String>> getPartitionNamesByFilter(PartitionFilter partitionFilter, Supplier<Optional<List<String>>> valueSupplier)
     {
         return loadValue(partitionNamesByPartsCache, partitionFilter, valueSupplier);
+    }
+
+    public Optional<List<String>> getPartitionNames(HiveTableName hiveTableName, Supplier<Optional<List<String>>> valueSupplier)
+    {
+        return loadValue(partitionNamesCache, hiveTableName, valueSupplier);
     }
 
     public Map<String, Optional<Partition>> getPartitionsByNames(Set<HivePartitionName> partitionNames, Supplier<Map<String, Optional<Partition>>> valueSupplier)
@@ -311,9 +316,9 @@ public class HiveMetastoreRecording
         private final List<Pair<String, Set<ColumnStatisticType>>> supportedColumnStatistics;
         private final List<Pair<HiveTableName, PartitionStatistics>> tableStatistics;
         private final List<Pair<Set<HivePartitionName>, Map<String, PartitionStatistics>>> partitionStatistics;
-        private final List<Pair<String, List<String>>> allTables;
+        private final List<Pair<String, Optional<List<String>>>> allTables;
         private final List<Pair<TablesWithParameterCacheKey, List<String>>> tablesWithParameter;
-        private final List<Pair<String, List<String>>> allViews;
+        private final List<Pair<String, Optional<List<String>>>> allViews;
         private final List<Pair<HivePartitionName, Optional<Partition>>> partitions;
         private final List<Pair<HiveTableName, Optional<List<String>>>> partitionNames;
         private final List<Pair<PartitionFilter, Optional<List<String>>>> partitionNamesByParts;
@@ -331,9 +336,9 @@ public class HiveMetastoreRecording
                 @JsonProperty("supportedColumnStatistics") List<Pair<String, Set<ColumnStatisticType>>> supportedColumnStatistics,
                 @JsonProperty("tableStatistics") List<Pair<HiveTableName, PartitionStatistics>> tableStatistics,
                 @JsonProperty("partitionStatistics") List<Pair<Set<HivePartitionName>, Map<String, PartitionStatistics>>> partitionStatistics,
-                @JsonProperty("allTables") List<Pair<String, List<String>>> allTables,
+                @JsonProperty("allTables") List<Pair<String, Optional<List<String>>>> allTables,
                 @JsonProperty("tablesWithParameter") List<Pair<TablesWithParameterCacheKey, List<String>>> tablesWithParameter,
-                @JsonProperty("allViews") List<Pair<String, List<String>>> allViews,
+                @JsonProperty("allViews") List<Pair<String, Optional<List<String>>>> allViews,
                 @JsonProperty("partitions") List<Pair<HivePartitionName, Optional<Partition>>> partitions,
                 @JsonProperty("partitionNames") List<Pair<HiveTableName, Optional<List<String>>>> partitionNames,
                 @JsonProperty("partitionNamesByParts") List<Pair<PartitionFilter, Optional<List<String>>>> partitionNamesByParts,
@@ -410,13 +415,13 @@ public class HiveMetastoreRecording
         }
 
         @JsonProperty
-        public List<Pair<String, List<String>>> getAllTables()
+        public List<Pair<String, Optional<List<String>>>> getAllTables()
         {
             return allTables;
         }
 
         @JsonProperty
-        public List<Pair<String, List<String>>> getAllViews()
+        public List<Pair<String, Optional<List<String>>>> getAllViews()
         {
             return allViews;
         }

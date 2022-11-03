@@ -83,7 +83,6 @@ import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.PagesSpatialIndexFactory;
 import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.PartitionedLookupSourceFactory;
-import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputFactory;
 import io.prestosql.operator.PipelineExecutionStrategy;
 import io.prestosql.operator.RowNumberOperator;
 import io.prestosql.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
@@ -114,6 +113,7 @@ import io.prestosql.operator.WorkProcessorPipelineSourceOperator;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.operator.aggregation.InternalAggregationFunction;
 import io.prestosql.operator.aggregation.LambdaProvider;
+import io.prestosql.operator.aggregation.partial.PartialAggregationController;
 import io.prestosql.operator.dynamicfilter.CrossRegionDynamicFilterOperator;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.operator.exchange.LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory;
@@ -126,6 +126,8 @@ import io.prestosql.operator.index.IndexBuildDriverFactoryProvider;
 import io.prestosql.operator.index.IndexJoinLookupStats;
 import io.prestosql.operator.index.IndexLookupSourceFactory;
 import io.prestosql.operator.index.IndexSourceOperator;
+import io.prestosql.operator.output.PartitionedOutputOperator.PartitionedOutputFactory;
+import io.prestosql.operator.output.PositionsAppenderFactory;
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.operator.window.FrameInfo;
@@ -261,6 +263,8 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Range.closedOpen;
 import static io.airlift.concurrent.MoreFutures.addSuccessCallback;
 import static io.airlift.units.DataSize.Unit.BYTE;
+import static io.prestosql.SystemSessionProperties.getAdaptivePartialAggregationMinRows;
+import static io.prestosql.SystemSessionProperties.getAdaptivePartialAggregationUniqueRowsRatioThreshold;
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
 import static io.prestosql.SystemSessionProperties.getCteMaxPrefetchQueueSize;
 import static io.prestosql.SystemSessionProperties.getCteMaxQueueSize;
@@ -272,6 +276,7 @@ import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputP
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
 import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
+import static io.prestosql.SystemSessionProperties.isAdaptivePartialAggregationEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
@@ -381,6 +386,7 @@ public class LocalExecutionPlanner
     protected final TaskManagerConfig taskManagerConfig;
     private final ExchangeManagerRegistry exchangeManagerRegistry;
     protected final TableExecuteContextManager tableExecuteContextManager;
+    private final PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
 
     public Metadata getMetadata()
     {
@@ -682,7 +688,8 @@ public class LocalExecutionPlanner
                         partitioningScheme.isReplicateNullsAndAny(),
                         nullChannel,
                         outputBuffer,
-                        maxPagePartitioningBufferSize),
+                        maxPagePartitioningBufferSize,
+                        positionsAppenderFactory),
                 feederCTEId,
                 feederCTEParentId,
                 cteCtx);
@@ -3631,7 +3638,8 @@ public class LocalExecutionPlanner
                         unspillMemoryLimit,
                         spillerFactory,
                         joinCompiler,
-                        useSystemMemory);
+                        useSystemMemory,
+                        createPartialAggregationController(step, session));
             }
         }
 
@@ -3683,7 +3691,8 @@ public class LocalExecutionPlanner
                     spillerFactory,
                     joinCompiler,
                     useSystemMemory,
-                    finalizeSymbol.isPresent() ? true : false);
+                    finalizeSymbol.isPresent() ? true : false,
+                    createPartialAggregationController(step, session));
         }
 
         private Optional<Integer> getOutputMappingAndGroupIdChannel(Map<Symbol, Aggregation> aggregations,
@@ -3733,6 +3742,15 @@ public class LocalExecutionPlanner
             }
             return groupIdChannel;
         }
+    }
+
+    private static Optional<PartialAggregationController> createPartialAggregationController(AggregationNode.Step step, Session session)
+    {
+        return step.isOutputPartial() && isAdaptivePartialAggregationEnabled(session) ?
+                Optional.of(new PartialAggregationController(
+                        getAdaptivePartialAggregationMinRows(session),
+                        getAdaptivePartialAggregationUniqueRowsRatioThreshold(session))) :
+                Optional.empty();
     }
 
     private static TableFinisher createTableFinisher(Session session, TableFinishNode node, Metadata metadata)

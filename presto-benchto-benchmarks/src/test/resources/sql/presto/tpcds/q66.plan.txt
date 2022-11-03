@@ -1,8 +1,8 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        final hashaggregation over (concat_242, d_year_243, w_city_238, w_country_241, w_county_239, w_state_240, w_warehouse_name_236, w_warehouse_sq_ft_237)
-            local exchange (REPARTITION, HASH, ["concat_242", "d_year_243", "w_city_238", "w_country_241", "w_county_239", "w_state_240", "w_warehouse_name_236", "w_warehouse_sq_ft_237"])
-                partial hashaggregation over (concat_463, d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
+        final hashaggregation over (concat_251, d_year_252, w_city_247, w_country_250, w_county_248, w_state_249, w_warehouse_name_245, w_warehouse_sq_ft_246)
+            local exchange (REPARTITION, HASH, ["concat_251", "d_year_252", "w_city_247", "w_country_250", "w_county_248", "w_state_249", "w_warehouse_name_245", "w_warehouse_sq_ft_246"])
+                partial hashaggregation over (concat_472, d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
                     final hashaggregation over (d_year, w_city, w_country, w_county, w_state, w_warehouse_name, w_warehouse_sq_ft)
                         local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["d_year", "w_city", "w_country", "w_county", "w_state", "w_warehouse_name", "w_warehouse_sq_ft"])
@@ -17,18 +17,18 @@ local exchange (GATHER, SINGLE, [])
                                                             scan ship_mode
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan time_dim
+                                                        scan date_dim
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan date_dim
+                                                    scan time_dim
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan warehouse
-                partial hashaggregation over (concat_506, d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
-                    final hashaggregation over (d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
+                partial hashaggregation over (concat_515, d_year_110, w_city_97, w_country_101, w_county_98, w_state_99, w_warehouse_name_91, w_warehouse_sq_ft_92)
+                    final hashaggregation over (d_year_110, w_city_97, w_country_101, w_county_98, w_state_99, w_warehouse_name_91, w_warehouse_sq_ft_92)
                         local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["d_year_104", "w_city_92", "w_country_96", "w_county_93", "w_state_94", "w_warehouse_name_86", "w_warehouse_sq_ft_87"])
-                                partial hashaggregation over (d_year_104, w_city_92, w_country_96, w_county_93, w_state_94, w_warehouse_name_86, w_warehouse_sq_ft_87)
+                            remote exchange (REPARTITION, HASH, ["d_year_110", "w_city_97", "w_country_101", "w_county_98", "w_state_99", "w_warehouse_name_91", "w_warehouse_sq_ft_92"])
+                                partial hashaggregation over (d_year_110, w_city_97, w_country_101, w_county_98, w_state_99, w_warehouse_name_91, w_warehouse_sq_ft_92)
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
@@ -39,10 +39,10 @@ local exchange (GATHER, SINGLE, [])
                                                             scan ship_mode
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan time_dim
+                                                        scan date_dim
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan date_dim
+                                                    scan time_dim
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan warehouse

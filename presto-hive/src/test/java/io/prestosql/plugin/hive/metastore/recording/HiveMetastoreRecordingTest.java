@@ -198,9 +198,9 @@ public class HiveMetastoreRecordingTest
     public void testGetAllTables()
     {
         assertEquals(Arrays.asList("value"),
-                hiveMetastoreRecordingUnderTest.getAllTables("databaseName", () -> Arrays.asList("value")));
+                hiveMetastoreRecordingUnderTest.getAllTables("databaseName", () -> Optional.of(Arrays.asList("value"))));
         assertEquals(Collections.emptyList(),
-                hiveMetastoreRecordingUnderTest.getAllTables("databaseName", () -> Arrays.asList("value")));
+                hiveMetastoreRecordingUnderTest.getAllTables("databaseName", () -> Optional.of(Arrays.asList("value"))));
     }
 
     @Test
@@ -222,9 +222,9 @@ public class HiveMetastoreRecordingTest
     public void testGetAllViews()
     {
         assertEquals(Arrays.asList("value"),
-                hiveMetastoreRecordingUnderTest.getAllViews("databaseName", () -> Arrays.asList("value")));
+                hiveMetastoreRecordingUnderTest.getAllViews("databaseName", () -> Optional.of(Arrays.asList("value"))));
         assertEquals(Collections.emptyList(),
-                hiveMetastoreRecordingUnderTest.getAllViews("databaseName", () -> Arrays.asList("value")));
+                hiveMetastoreRecordingUnderTest.getAllViews("databaseName", () -> Optional.of(Arrays.asList("value"))));
     }
 
     @Test

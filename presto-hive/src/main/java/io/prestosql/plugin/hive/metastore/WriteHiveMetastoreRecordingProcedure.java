@@ -15,6 +15,7 @@ package io.prestosql.plugin.hive.metastore;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.RateLimiter;
+import io.prestosql.plugin.hive.metastore.recording.HiveMetastoreRecording;
 import io.prestosql.spi.procedure.Procedure;
 
 import javax.inject.Inject;
@@ -34,12 +35,12 @@ public class WriteHiveMetastoreRecordingProcedure
             "writeHiveMetastoreRecording");
 
     private final RateLimiter rateLimiter = RateLimiter.create(0.2);
-    private final RecordingHiveMetastore recordingHiveMetastore;
+    private final HiveMetastoreRecording hiveMetastoreRecording;
 
     @Inject
-    public WriteHiveMetastoreRecordingProcedure(RecordingHiveMetastore recordingHiveMetastore)
+    public WriteHiveMetastoreRecordingProcedure(HiveMetastoreRecording hiveMetastoreRecording)
     {
-        this.recordingHiveMetastore = requireNonNull(recordingHiveMetastore, "recordingHiveMetastore is null");
+        this.hiveMetastoreRecording = requireNonNull(hiveMetastoreRecording, "recordingHiveMetastore is null");
     }
 
     @Override
@@ -57,7 +58,7 @@ public class WriteHiveMetastoreRecordingProcedure
         try {
             // limit rate of recording dumps to prevent IO and Presto saturation
             rateLimiter.acquire();
-            recordingHiveMetastore.writeRecording();
+            hiveMetastoreRecording.writeRecording();
         }
         catch (IOException ex) {
             throw new RuntimeException(ex);

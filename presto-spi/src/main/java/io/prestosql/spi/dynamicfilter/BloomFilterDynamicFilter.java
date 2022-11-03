@@ -45,6 +45,15 @@ public class BloomFilterDynamicFilter
         this.bloomFilterSerialized = bloomFilterSerialized;
         this.type = type;
         bloomFilterDeserialized = deserializeBloomFilter(bloomFilterSerialized);
+        setMinMax(bloomFilterDeserialized);
+    }
+
+    private void setMinMax(BloomFilter bloomFilterDeserialized)
+    {
+        if (null != bloomFilterDeserialized) {
+            this.min = bloomFilterDeserialized.getMin();
+            this.max = bloomFilterDeserialized.getMax();
+        }
     }
 
     public BloomFilterDynamicFilter(String filterId, ColumnHandle columnHandle, BloomFilter bloomFilterDeserialized, Type type)
@@ -59,6 +68,7 @@ public class BloomFilterDynamicFilter
         this.columnHandle = columnHandle;
         this.bloomFilterSerialized = bloomFilterSerialized;
         this.bloomFilterDeserialized = bloomFilterDeserialized;
+        setMinMax(bloomFilterDeserialized);
     }
 
     public static BloomFilterDynamicFilter fromHashSetDynamicFilter(HashSetDynamicFilter hashSetDynamicFilter)
@@ -153,7 +163,7 @@ public class BloomFilterDynamicFilter
     {
         DynamicFilter clone = new BloomFilterDynamicFilter(filterId, columnHandle, bloomFilterDeserialized, bloomFilterSerialized, type);
         clone.setMax(max);
-        clone.setMax(min);
+        clone.setMin(min);
         return clone;
     }
 

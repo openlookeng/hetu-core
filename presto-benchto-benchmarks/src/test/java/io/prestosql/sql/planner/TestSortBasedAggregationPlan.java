@@ -26,6 +26,7 @@ import io.prestosql.spi.security.PrincipalType;
 import io.prestosql.testing.LocalQueryRunner;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -47,112 +48,124 @@ public class TestSortBasedAggregationPlan
      * large amount of data.
      */
 
+    public static final String TPCDS_METADATA_DIR = "/hive_metadata/unpartitioned_tpcds";
+
     public TestSortBasedAggregationPlan()
     {
-        super(() -> {
-            String catalog = "hive";
-            Session.SessionBuilder sessionBuilder = testSessionBuilder()
-                    .setCatalog(catalog)
-                    .setSchema("default")
-                    .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
-                    .setSystemProperty(SORT_BASED_AGGREGATION_ENABLED, "true");
+        super(false, false, false, true);
+    }
 
-            LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
+    @Override
+    protected LocalQueryRunner createQueryRunner()
+    {
+        String catalog = "hive";
+        Session.SessionBuilder sessionBuilder = testSessionBuilder()
+                .setCatalog(catalog)
+                .setSchema("default")
+                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
+                .setSystemProperty(SORT_BASED_AGGREGATION_ENABLED, "true");
 
-            // add hive
-            File hiveDir = new File(createTempDirectory("TestSortBasedAggregation").toFile(), "hive_data");
-            HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
-            metastore.createDatabase(
-                    new HiveIdentity(SESSION),
-                    Database.builder()
-                            .setDatabaseName("default")
-                            .setOwnerName("public")
-                            .setOwnerType(PrincipalType.ROLE)
-                            .build());
+        LocalQueryRunner queryRunner = LocalQueryRunner.queryRunnerWithFakeNodeCountForStats(sessionBuilder.build(), 8);
 
-            HiveConnectorFactory hiveConnectorFactory = new HiveConnectorFactory(
-                    "hive",
-                    HiveConnector.class.getClassLoader(),
-                    Optional.of(metastore));
+        // add hive
+        File hiveDir = null;
+        try {
+            hiveDir = new File(createTempDirectory("TestSortBasedAggregation").toFile(), "hive_data");
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        HiveMetastore metastore = createTestingFileHiveMetastore(hiveDir);
+        metastore.createDatabase(
+                new HiveIdentity(SESSION),
+                Database.builder()
+                        .setDatabaseName("default")
+                        .setOwnerName("public")
+                        .setOwnerType(PrincipalType.ROLE)
+                        .build());
 
-            Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
-                    .put("hive.orc-predicate-pushdown-enabled", "false")
-                    .put("hive.max-partitions-per-writers", "9999")
-                    .build();
+        HiveConnectorFactory hiveConnectorFactory = new HiveConnectorFactory(
+                "hive",
+                HiveConnector.class.getClassLoader(),
+                Optional.of(metastore));
 
-            queryRunner.createCatalog(catalog, hiveConnectorFactory, hiveCatalogConfig);
-            queryRunner.createCatalog("tpcds", new TpcdsConnectorFactory(1), ImmutableMap.of());
+        Map<String, String> hiveCatalogConfig = ImmutableMap.<String, String>builder()
+                .put("hive.orc-predicate-pushdown-enabled", "false")
+                .put("hive.max-partitions-per-writers", "9999")
+                .build();
 
-            queryRunner.execute("create  table item with (format='orc') as select * from tpcds.tiny.item");
-            queryRunner.execute("create  table store_returns with (transactional = false, format='orc', bucketed_by=array['sr_customer_sk'], " +
-                    "bucket_count=1, sorted_by = ARRAY['sr_customer_sk','sr_item_sk']) as select * from tpcds.tiny.store_returns");
+        queryRunner.createCatalog(catalog, hiveConnectorFactory, hiveCatalogConfig);
+        queryRunner.createCatalog("tpcds", new TpcdsConnectorFactory(1), ImmutableMap.of());
 
-            queryRunner.execute("create  table store_sales_customer_item with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_customer_sk'], bucket_count = 1," +
-                    "sorted_by = ARRAY['ss_customer_sk', 'ss_item_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table item with (format='orc') as select * from tpcds.tiny.item");
+        queryRunner.execute("create  table store_returns with (transactional = false, format='orc', bucketed_by=array['sr_customer_sk'], " +
+                "bucket_count=1, sorted_by = ARRAY['sr_customer_sk','sr_item_sk']) as select * from tpcds.tiny.store_returns");
 
-            queryRunner.execute("create  table store_sales_item_customer with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_item_sk', 'ss_customer_sk'], bucket_count = 3," +
-                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_customer_item with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_customer_sk'], bucket_count = 1," +
+                "sorted_by = ARRAY['ss_customer_sk', 'ss_item_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create  table store_sales_item_customer_solddate with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_item_sk'], bucket_count = 1," +
-                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_item_customer with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_item_sk', 'ss_customer_sk'], bucket_count = 3," +
+                "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr1_buckCount4 with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_item_sk'], bucket_count = 4," +
-                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_item_customer_solddate with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_item_sk'], bucket_count = 1," +
+                "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount3 with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_item_sk' , 'ss_customer_sk'], bucket_count = 3," +
-                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr1_buckCount4 with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_item_sk'], bucket_count = 4," +
+                "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder with (transactional = false, format='orc'," +
-                    " bucketed_by=array['ss_customer_sk', 'ss_item_sk'], bucket_count = 1," +
-                    "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount3 with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_item_sk' , 'ss_customer_sk'], bucket_count = 3," +
+                "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create  table SortWithColNameEndWithInt(data_100 , data_101, data_102 )  with (transactional = false, format='orc'," +
-                    " bucketed_by=array['data_102', 'data_101'], bucket_count = 1," +
-                    "sorted_by = ARRAY['data_102', 'data_101']) as select  ss_customer_sk, ss_sold_date_sk, ss_item_sk from tpcds.tiny.store_sales");
+        queryRunner.execute("create  table store_sales_item_customer_solddate_buckArr2_buckCount1_wrngOrder with (transactional = false, format='orc'," +
+                " bucketed_by=array['ss_customer_sk', 'ss_item_sk'], bucket_count = 1," +
+                "sorted_by = ARRAY['ss_item_sk', 'ss_customer_sk', 'ss_sold_date_sk']) as select * from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create table web_returns_partition_bucketCount1 with (" +
-                    "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
-                    "partitioned_by = ARRAY['wr_net_loss'], " +
-                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
-                    "as select * from tpcds.tiny.web_returns limit 500");
+        queryRunner.execute("create  table SortWithColNameEndWithInt(data_100 , data_101, data_102 )  with (transactional = false, format='orc'," +
+                " bucketed_by=array['data_102', 'data_101'], bucket_count = 1," +
+                "sorted_by = ARRAY['data_102', 'data_101']) as select  ss_customer_sk, ss_sold_date_sk, ss_item_sk from tpcds.tiny.store_sales");
 
-            queryRunner.execute("create table web_returns_partition_bucketCount32 with (" +
-                    "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
-                    "partitioned_by = ARRAY['wr_net_loss'], " +
-                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
-                    "as select * from tpcds.tiny.web_returns limit 1000");
+        queryRunner.execute("create table web_returns_partition_bucketCount1 with (" +
+                "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
+                "partitioned_by = ARRAY['wr_net_loss'], " +
+                "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
+                "as select * from tpcds.tiny.web_returns limit 500");
 
-            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk with (" +
-                    "transactional = false, format='orc', " +
-                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
-                    "as select * from tpcds.tiny.web_returns limit 500");
+        queryRunner.execute("create table web_returns_partition_bucketCount32 with (" +
+                "bucketed_by=array['wr_return_quantity'], bucket_count = 1, " +
+                "partitioned_by = ARRAY['wr_net_loss'], " +
+                "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk']) " +
+                "as select * from tpcds.tiny.web_returns limit 1000");
 
-            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8 with (" +
-                    "transactional = false, format='orc', " +
-                    "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
-                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
-                    "as select * from tpcds.tiny.web_returns limit 500");
+        queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk with (" +
+                "transactional = false, format='orc', " +
+                "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                "as select * from tpcds.tiny.web_returns limit 500");
 
-            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8_sort with (" +
-                    "transactional = false, format='orc', " +
-                    "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
-                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss'], " +
-                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'])" +
-                    "as select * from tpcds.tiny.web_returns limit 500");
+        queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8 with (" +
+                "transactional = false, format='orc', " +
+                "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                "as select * from tpcds.tiny.web_returns limit 500");
 
-            queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket1_sort with (" +
-                    "transactional = false, format='orc', " +
-                    "bucket_count = 1, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
-                    "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
-                    "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
-                    "as select * from tpcds.tiny.web_returns limit 500");
-            return queryRunner;
-        }, false, false, false, true);
+        queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket8_sort with (" +
+                "transactional = false, format='orc', " +
+                "bucket_count = 8, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss'], " +
+                "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'])" +
+                "as select * from tpcds.tiny.web_returns limit 500");
+
+        queryRunner.execute("create table web_returns_partiotion_netloss_returneddatesk_bucket1_sort with (" +
+                "transactional = false, format='orc', " +
+                "bucket_count = 1, bucketed_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                "sorted_by = ARRAY['wr_return_quantity','wr_returned_time_sk'], " +
+                "partitioned_by = ARRAY['wr_account_credit', 'wr_net_loss']) " +
+                "as select * from tpcds.tiny.web_returns limit 500");
+        return queryRunner;
     }
 
     @Override
@@ -169,6 +182,18 @@ public class TestSortBasedAggregationPlan
                     return Stream.of(queryId);
                 })
                 .map(queryId -> format("/sql/presto/queries/%s.sql", queryId));
+    }
+
+    @Override
+    protected String getMetadataDir()
+    {
+        return TPCDS_METADATA_DIR;
+    }
+
+    @Override
+    protected boolean isPartitioned()
+    {
+        return false;
     }
 
     @SuppressWarnings("unused")

@@ -19,8 +19,10 @@ import io.prestosql.execution.buffer.OutputBufferStateMachine;
 import io.prestosql.execution.buffer.OutputBuffers;
 import io.prestosql.execution.buffer.PartitionedOutputBuffer;
 import io.prestosql.memory.context.SimpleLocalMemoryContext;
-import io.prestosql.operator.PartitionedOutputOperator.PartitionedOutputFactory;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
+import io.prestosql.operator.output.PartitionedOutputOperator;
+import io.prestosql.operator.output.PartitionedOutputOperator.PartitionedOutputFactory;
+import io.prestosql.operator.output.PositionsAppenderFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.BlockBuilder;
@@ -75,6 +77,8 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 @BenchmarkMode(Mode.AverageTime)
 public class BenchmarkPartitionedOutputOperator
 {
+    private static final PositionsAppenderFactory POSITIONS_APPENDER_FACTORY = new PositionsAppenderFactory();
+
     @Benchmark
     public void addPage(BenchmarkData data)
     {
@@ -126,7 +130,8 @@ public class BenchmarkPartitionedOutputOperator
                     false,
                     OptionalInt.empty(),
                     buffer,
-                    new DataSize(1, GIGABYTE));
+                    new DataSize(1, GIGABYTE),
+                    POSITIONS_APPENDER_FACTORY);
             TaskContext taskContext = createTaskContext();
             return (PartitionedOutputOperator) operatorFactory
                     .createOutputOperator(0, new PlanNodeId("plan-node-0"), TYPES, Function.identity(), taskContext)

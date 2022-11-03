@@ -14,11 +14,14 @@
 package io.prestosql.cost;
 
 import com.google.common.base.VerifyException;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ListMultimap;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.function.FunctionMetadata;
 import io.prestosql.spi.function.OperatorType;
@@ -58,6 +61,7 @@ import io.prestosql.sql.tree.Node;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.NotExpression;
 import io.prestosql.sql.tree.SymbolReference;
+import io.prestosql.util.DisjointSet;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -66,16 +70,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.Set;
+import java.util.stream.IntStream;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.SystemSessionProperties.getFilterConjunctionIndependenceFactor;
 import static io.prestosql.cost.ComparisonStatsCalculator.estimateExpressionToExpressionComparison;
 import static io.prestosql.cost.ComparisonStatsCalculator.estimateExpressionToLiteralComparison;
 import static io.prestosql.cost.PlanNodeStatsEstimateMath.addStatsAndSumDistinctValues;
 import static io.prestosql.cost.PlanNodeStatsEstimateMath.capStats;
+import static io.prestosql.cost.PlanNodeStatsEstimateMath.estimateCorrelatedConjunctionRowCount;
+import static io.prestosql.cost.PlanNodeStatsEstimateMath.intersectCorrelatedStats;
 import static io.prestosql.cost.PlanNodeStatsEstimateMath.subtractSubsetStats;
 import static io.prestosql.cost.StatsUtil.toStatsRepresentation;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.relation.SpecialForm.Form.IS_NULL;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.sql.DynamicFilters.isDynamicFilter;
@@ -83,6 +94,7 @@ import static io.prestosql.sql.ExpressionUtils.and;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SymbolUtils.from;
+import static io.prestosql.sql.planner.SymbolsExtractor.extractUnique;
 import static io.prestosql.sql.relational.Expressions.call;
 import static io.prestosql.sql.relational.Expressions.constantNull;
 import static io.prestosql.sql.tree.ComparisonExpression.Operator.EQUAL;
@@ -210,7 +222,14 @@ public class FilterStatsCalculator
         @Override
         public PlanNodeStatsEstimate process(Node node, @Nullable Void context)
         {
-            return normalizer.normalize(super.process(node, context), types);
+            PlanNodeStatsEstimate output;
+            if (input.getOutputRowCount() == 0 || input.isOutputRowCountUnknown()) {
+                output = input;
+            }
+            else {
+                output = super.process(node, context);
+            }
+            return normalizer.normalize(output, types);
         }
 
         @Override
@@ -233,12 +252,67 @@ public class FilterStatsCalculator
         {
             switch (node.getOperator()) {
                 case AND:
-                    return estimateLogicalAnd(node.getLeft(), node.getRight());
+                    return estimateLogicalAnd(ImmutableList.of(node.getLeft(), node.getRight()));
                 case OR:
                     return estimateLogicalOr(node.getLeft(), node.getRight());
                 default:
                     throw new IllegalArgumentException("Unexpected binary operator: " + node.getOperator());
             }
+        }
+
+        private PlanNodeStatsEstimate estimateLogicalAnd(List<Expression> terms)
+        {
+            double filterConjunctionIndependenceFactor = getFilterConjunctionIndependenceFactor(session);
+            List<PlanNodeStatsEstimate> estimates = estimateCorrelatedExpressions(terms, filterConjunctionIndependenceFactor);
+            double outputRowCount = estimateCorrelatedConjunctionRowCount(
+                    input,
+                    estimates,
+                    filterConjunctionIndependenceFactor);
+            if (isNaN(outputRowCount)) {
+                return PlanNodeStatsEstimate.unknown();
+            }
+            return normalizer.normalize(new PlanNodeStatsEstimate(outputRowCount, intersectCorrelatedStats(estimates)), types);
+        }
+
+        /**
+         * There can be multiple predicate expressions for the same symbol, e.g. x > 0 AND x <= 1, x BETWEEN 1 AND 10.
+         * We attempt to detect such cases in extractCorrelatedGroups and calculate a combined estimate for each
+         * such group of expressions. This is done so that we don't apply the above scaling factors when combining estimates
+         * from conjunction of multiple predicates on the same symbol and underestimate the output.
+         **/
+        private List<PlanNodeStatsEstimate> estimateCorrelatedExpressions(List<Expression> terms, double filterConjunctionIndependenceFactor)
+        {
+            List<List<Expression>> extractedCorrelatedGroups = extractCorrelatedGroups(terms, filterConjunctionIndependenceFactor);
+            ImmutableList.Builder<PlanNodeStatsEstimate> estimatesBuilder = ImmutableList.builderWithExpectedSize(extractedCorrelatedGroups.size());
+            boolean hasUnestimatedTerm = false;
+            for (List<Expression> correlatedExpressions : extractedCorrelatedGroups) {
+                PlanNodeStatsEstimate combinedEstimate = PlanNodeStatsEstimate.unknown();
+                for (Expression expression : correlatedExpressions) {
+                    PlanNodeStatsEstimate estimate;
+                    // combinedEstimate is unknown until the 1st known estimated term
+                    if (combinedEstimate.isOutputRowCountUnknown()) {
+                        estimate = process(expression);
+                    }
+                    else {
+                        estimate = new FilterExpressionStatsCalculatingVisitor(combinedEstimate, session, types)
+                                .process(expression);
+                    }
+
+                    if (estimate.isOutputRowCountUnknown()) {
+                        hasUnestimatedTerm = true;
+                    }
+                    else {
+                        // update combinedEstimate only when the term estimate is known so that all the known estimates
+                        // can be applied progressively through FilterExpressionStatsCalculatingVisitor calls.
+                        combinedEstimate = estimate;
+                    }
+                }
+                estimatesBuilder.add(combinedEstimate);
+            }
+            if (hasUnestimatedTerm) {
+                estimatesBuilder.add(PlanNodeStatsEstimate.unknown());
+            }
+            return estimatesBuilder.build();
         }
 
         private PlanNodeStatsEstimate estimateLogicalAnd(Expression left, Expression right)
@@ -934,5 +1008,54 @@ public class FilterStatsCalculator
             }
             return scalarStatsCalculator.calculate(expression, input, session, layout);
         }
+    }
+
+    private static List<List<Expression>> extractCorrelatedGroups(List<Expression> terms, double filterConjunctionIndependenceFactor)
+    {
+        if (filterConjunctionIndependenceFactor == 1) {
+            // Allows the filters to be estimated as if there is no correlation between any of the terms
+            return ImmutableList.of(terms);
+        }
+
+        ListMultimap<Expression, Symbol> expressionUniqueSymbols = ArrayListMultimap.create();
+        terms.forEach(expression -> expressionUniqueSymbols.putAll(expression, extractUnique(expression)));
+        // Partition symbols into disjoint sets such that the symbols belonging to different disjoint sets
+        // do not appear together in any expression.
+        DisjointSet<Symbol> symbolsPartitioner = new DisjointSet<>();
+        for (Expression term : terms) {
+            List<Symbol> expressionSymbols = expressionUniqueSymbols.get(term);
+            if (expressionSymbols.isEmpty()) {
+                continue;
+            }
+            // Ensure that symbol is added to DisjointSet when there is only one symbol in the list
+            symbolsPartitioner.find(expressionSymbols.get(0));
+            for (int i = 1; i < expressionSymbols.size(); i++) {
+                symbolsPartitioner.findAndUnion(expressionSymbols.get(0), expressionSymbols.get(i));
+            }
+        }
+
+        // Use disjoint sets of symbols to partition the given list of expressions
+        List<Set<Symbol>> symbolPartitions = ImmutableList.copyOf(symbolsPartitioner.getEquivalentClasses());
+        checkState(symbolPartitions.size() <= terms.size(), "symbolPartitions size exceeds number of expressions");
+        ListMultimap<Integer, Expression> expressionPartitions = ArrayListMultimap.create();
+        for (Expression term : terms) {
+            List<Symbol> expressionSymbols = expressionUniqueSymbols.get(term);
+            int expressionPartitionId;
+            if (expressionSymbols.isEmpty()) {
+                expressionPartitionId = symbolPartitions.size(); // For expressions with no symbols
+            }
+            else {
+                Symbol symbol = expressionSymbols.get(0); // Lookup any symbol to find the partition id
+                expressionPartitionId = IntStream.range(0, symbolPartitions.size())
+                        .filter(partition -> symbolPartitions.get(partition).contains(symbol))
+                        .findFirst()
+                        .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Requested symbol not found"));
+            }
+            expressionPartitions.put(expressionPartitionId, term);
+        }
+
+        return expressionPartitions.keySet().stream()
+                .map(expressionPartitions::get)
+                .collect(toImmutableList());
     }
 }

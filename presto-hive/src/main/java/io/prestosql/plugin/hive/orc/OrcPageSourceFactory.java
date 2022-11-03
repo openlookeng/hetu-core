@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.AggregatedMemoryContext;
+import io.prestosql.orc.DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder;
 import io.prestosql.orc.OrcCacheProperties;
 import io.prestosql.orc.OrcCacheStore;
 import io.prestosql.orc.OrcColumn;
@@ -32,6 +33,7 @@ import io.prestosql.orc.OrcReader;
 import io.prestosql.orc.OrcRecordReader;
 import io.prestosql.orc.TupleDomainOrcPredicate;
 import io.prestosql.orc.TupleDomainOrcPredicate.TupleDomainOrcPredicateBuilder;
+import io.prestosql.orc.metadata.OrcColumnId;
 import io.prestosql.orc.metadata.OrcType.OrcTypeKind;
 import io.prestosql.plugin.hive.DeleteDeltaLocations;
 import io.prestosql.plugin.hive.FileFormatDataSourceStats;
@@ -43,9 +45,11 @@ import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.heuristicindex.SplitMetadata;
@@ -367,6 +371,9 @@ public class OrcPageSourceFactory
                     .setDomainCompactionThreshold(domainCompactionThreshold);
             Map<HiveColumnHandle, Domain> effectivePredicateDomains = effectivePredicate.getDomains()
                     .orElseThrow(() -> new IllegalArgumentException("Effective predicate is none"));
+
+            DynamicFilterOrcPredicateBuilder dfPredicateBuilder = DynamicFilterOrcPredicateBuilder.builder();
+
             for (HiveColumnHandle column : columns) {
                 OrcColumn orcColumn = null;
                 if (useOrcColumnNames || isFullAcid) {
@@ -387,6 +394,8 @@ public class OrcPageSourceFactory
                     if (domain != null) {
                         predicateBuilder.addColumn(orcColumn.getColumnId(), domain);
                     }
+                    //build the dynamic filter predicate
+                    addDynamicFilterPredicate(orcColumn.getColumnId(), column, dynamicFilters, dfPredicateBuilder);
                 }
                 else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME)) {
                     HiveType hiveType = column.getHiveType();
@@ -403,6 +412,8 @@ public class OrcPageSourceFactory
                     columnAdaptations.add(ColumnAdaptation.nullColumn(readType));
                 }
             }
+
+            predicateBuilder.setDynamicFilterPredicate(dfPredicateBuilder.build());
 
             Map<String, Domain> domains = effectivePredicate.getDomains().get().entrySet().stream().collect(toMap(e -> e.getKey().getName(), Map.Entry::getValue));
             OrcRecordReader recordReader = reader.createRecordReader(
@@ -461,6 +472,27 @@ public class OrcPageSourceFactory
                 throw new PrestoException(HIVE_MISSING_DATA, message, e);
             }
             throw new PrestoException(HIVE_CANNOT_OPEN_SPLIT, message, e);
+        }
+    }
+
+    private static void addDynamicFilterPredicate(OrcColumnId orcColumnId, HiveColumnHandle column,
+            Optional<DynamicFilterSupplier> dynamicFilterSupplier,
+            DynamicFilterOrcPredicateBuilder dfPredicateBuilder)
+    {
+        if (dynamicFilterSupplier.isPresent()) {
+            List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
+            if (null != dynamicFilters && !dynamicFilters.isEmpty()) {
+                List<DynamicFilter> colDynamicFilterList = new ArrayList<>();
+                for (Map<ColumnHandle, DynamicFilter> filtersMap : dynamicFilters) {
+                    DynamicFilter dynamicFilter = filtersMap.get(column);
+                    if (null != dynamicFilter) {
+                        colDynamicFilterList.add(dynamicFilter);
+                    }
+                }
+                if (!colDynamicFilterList.isEmpty()) {
+                    dfPredicateBuilder.addColumn(orcColumnId, colDynamicFilterList);
+                }
+            }
         }
     }
 

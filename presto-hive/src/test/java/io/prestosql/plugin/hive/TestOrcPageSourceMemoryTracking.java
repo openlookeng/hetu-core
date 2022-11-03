@@ -399,7 +399,7 @@ public class TestOrcPageSourceMemoryTracking
             assertFalse(operator.isFinished());
             Page page = operator.getOutput();
             assertNotNull(page);
-            assertBetweenInclusive(driverContext.getSystemMemoryUsage(), 90_000L, 499_999L);
+            assertBetweenInclusive(driverContext.getSystemMemoryUsage(), 90_000L, 799_999L);
             totalRows += page.getPositionCount();
         }
 

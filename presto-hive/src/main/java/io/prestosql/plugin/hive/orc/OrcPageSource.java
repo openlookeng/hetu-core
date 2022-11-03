@@ -29,6 +29,7 @@ import io.prestosql.spi.block.LazyBlockLoader;
 import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.dynamicfilter.DynamicFilterSupplier;
 import io.prestosql.spi.type.Type;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 
@@ -184,6 +185,12 @@ public class OrcPageSource
                 throwable.addSuppressed(e);
             }
         }
+    }
+
+    @Override
+    public void setDynamicFilter(Optional<DynamicFilterSupplier> dynamicFilterSupplier)
+    {
+        recordReader.setDynamicFilter(dynamicFilterSupplier);
     }
 
     public interface ColumnAdaptation

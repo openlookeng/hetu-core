@@ -31,6 +31,11 @@ public interface ColumnHandle
         throw new NotImplementedException();
     }
 
+    default String getTypeName()
+    {
+        throw new NotImplementedException();
+    }
+
     /**
      * Whether the column represents a partitionColumn?
      *

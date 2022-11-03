@@ -21,6 +21,7 @@ import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.aggregation.Accumulator;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
 import io.prestosql.operator.aggregation.builder.AggregationBuilder;
+import io.prestosql.operator.aggregation.partial.PartialAggregationController;
 import io.prestosql.operator.scalar.CombineHashFunction;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
@@ -39,6 +40,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder.toTypes;
 import static io.prestosql.sql.planner.optimizations.HashGenerationOptimizer.INITIAL_HASH_VALUE;
 import static io.prestosql.type.TypeUtils.NULL_HASH_CODE;
@@ -74,6 +76,7 @@ public class GroupAggregationOperator
         protected final SpillerFactory spillerFactory;
         protected final JoinCompiler joinCompiler;
         protected final boolean useSystemMemory;
+        protected final Optional<PartialAggregationController> partialAggregationController;
 
         protected boolean closed;
 
@@ -94,7 +97,8 @@ public class GroupAggregationOperator
                 DataSize unspillMemoryLimit,
                 SpillerFactory spillerFactory,
                 JoinCompiler joinCompiler,
-                boolean useSystemMemory)
+                boolean useSystemMemory,
+                Optional<PartialAggregationController> partialAggregationController)
         {
             this(operatorId,
                     planNodeId,
@@ -113,7 +117,8 @@ public class GroupAggregationOperator
                     DataSize.succinctBytes((long) (unspillMemoryLimit.toBytes() * MERGE_WITH_MEMORY_RATIO)),
                     spillerFactory,
                     joinCompiler,
-                    useSystemMemory);
+                    useSystemMemory,
+                    partialAggregationController);
         }
 
         public GroupAggregationOperatorFactory(
@@ -134,7 +139,8 @@ public class GroupAggregationOperator
                 DataSize memoryLimitForMergeWithMemory,
                 SpillerFactory spillerFactory,
                 JoinCompiler joinCompiler,
-                boolean useSystemMemory)
+                boolean useSystemMemory,
+                Optional<PartialAggregationController> partialAggregationController)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -154,6 +160,7 @@ public class GroupAggregationOperator
             this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
             this.joinCompiler = requireNonNull(joinCompiler, "joinCompiler is null");
             this.useSystemMemory = useSystemMemory;
+            this.partialAggregationController = requireNonNull(partialAggregationController, "partialAggregationController is null");
         }
 
         @Override
@@ -177,6 +184,7 @@ public class GroupAggregationOperator
 
     protected static final int pageFinalizeLocation = 2;
     protected final OperatorContext operatorContext;
+    protected final Optional<PartialAggregationController> partialAggregationController;
     protected final SingleInputSnapshotState snapshotState;
     protected final List<Type> groupByTypes;
     protected final List<Integer> groupByChannels;
@@ -206,6 +214,8 @@ public class GroupAggregationOperator
 
     // for yield when memory is not available
     protected Work<?> unfinishedWork;
+    protected long numberOfInputRowsProcessed;
+    protected long numberOfUniqueRowsProduced;
 
     public GroupAggregationOperator(
             OperatorContext operatorContext,
@@ -224,12 +234,15 @@ public class GroupAggregationOperator
             DataSize memoryLimitForMergeWithMemory,
             SpillerFactory spillerFactory,
             JoinCompiler joinCompiler,
-            boolean useSystemMemory)
+            boolean useSystemMemory,
+            Optional<PartialAggregationController> partialAggregationController)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.partialAggregationController = requireNonNull(partialAggregationController, "partialAggregationControl is null");
         requireNonNull(step, "step is null");
         requireNonNull(accumulatorFactories, "accumulatorFactories is null");
         requireNonNull(operatorContext, "operatorContext is null");
+        checkArgument(!partialAggregationController.isPresent() || step.isOutputPartial(), "partialAggregationController should be present only for partial aggregation");
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
 
         this.groupByTypes = ImmutableList.copyOf(groupByTypes);

@@ -211,6 +211,11 @@ public class HiveColumnHandle
         return baseColumnName;
     }
 
+    public String getTypeName()
+    {
+        return typeName.getBase();
+    }
+
     @Override
     public int hashCode()
     {

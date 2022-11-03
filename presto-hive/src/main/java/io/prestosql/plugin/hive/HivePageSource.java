@@ -188,6 +188,8 @@ public class HivePageSource
                     close();
                     return null;
                 }
+
+                delegate.setDynamicFilter(dynamicFilterSupplier);
             }
             else {
                 dynamicFilters = ImmutableList.of();

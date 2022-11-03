@@ -18,8 +18,14 @@ import com.google.common.base.Strings;
 import com.google.common.base.VerifyException;
 import com.google.common.io.Resources;
 import io.prestosql.plugin.hive.HiveTableHandle;
+import io.prestosql.plugin.hive.RecordingMetastoreConfig;
+import io.prestosql.plugin.hive.TestingHiveConnectorFactory;
+import io.prestosql.plugin.hive.metastore.RecordingHiveMetastore;
+import io.prestosql.plugin.hive.metastore.UnimplementedHiveMetastore;
+import io.prestosql.plugin.hive.metastore.recording.HiveMetastoreRecording;
 import io.prestosql.plugin.tpcds.TpcdsTableHandle;
 import io.prestosql.plugin.tpch.TpchTableHandle;
+import io.prestosql.spi.connector.ConnectorFactory;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
@@ -30,20 +36,26 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
+import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.MoreCollectors.onlyElement;
 import static com.google.common.io.Files.createParentDirs;
 import static com.google.common.io.Files.write;
 import static com.google.common.io.Resources.getResource;
+import static io.prestosql.plugin.hive.metastore.recording.TestRecordingHiveMetastore.createJsonCodec;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_CONSUMER;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_PRODUCER;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
@@ -64,27 +76,27 @@ public abstract class AbstractCostBasedPlanTest
     private final boolean reuseExchange;
     private final boolean sortAggregator;
 
-    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse)
+    public AbstractCostBasedPlanTest(boolean pushdown, boolean cteReuse)
     {
-        super(supplier);
+        super();
         this.pushdown = pushdown;
         this.cteReuse = cteReuse;
         this.reuseExchange = false;
         this.sortAggregator = false;
     }
 
-    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse, boolean reuseExchange)
+    public AbstractCostBasedPlanTest(boolean pushdown, boolean cteReuse, boolean reuseExchange)
     {
-        super(supplier);
+        super();
         this.pushdown = pushdown;
         this.cteReuse = cteReuse;
         this.reuseExchange = reuseExchange;
         this.sortAggregator = false;
     }
 
-    public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier, boolean pushdown, boolean cteReuse, boolean reuseExchange, boolean sortAggregator)
+    public AbstractCostBasedPlanTest(boolean pushdown, boolean cteReuse, boolean reuseExchange, boolean sortAggregator)
     {
-        super(supplier);
+        super();
         this.pushdown = pushdown;
         this.cteReuse = cteReuse;
         this.reuseExchange = reuseExchange;
@@ -93,11 +105,60 @@ public abstract class AbstractCostBasedPlanTest
 
     protected abstract Stream<String> getQueryResourcePaths();
 
+    protected abstract String getMetadataDir();
+
+    protected abstract boolean isPartitioned();
+
+    protected abstract LocalQueryRunner createQueryRunner();
+
     @DataProvider
     public Object[][] getQueriesDataProvider()
     {
         return getQueryResourcePaths()
                 .collect(toDataProvider());
+    }
+
+    protected ConnectorFactory createConnectorFactory()
+    {
+        RecordingMetastoreConfig recordingConfig = new RecordingMetastoreConfig()
+                .setRecordingPath(getRecordingPath())
+                .setReplay(true);
+        try {
+            // The RecordingHiveMetastore loads the metadata files generated through HiveMetadataRecorder
+            // which essentially helps to generate the optimal query plans for validation purposes. These files
+            // contains all the metadata including statistics.
+            RecordingHiveMetastore metastore = new RecordingHiveMetastore(
+                    new UnimplementedHiveMetastore(),
+                    new HiveMetastoreRecording(recordingConfig, createJsonCodec()));
+            return new TestingHiveConnectorFactory(metastore);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    protected String getSchema()
+    {
+        String fileName = Paths.get(getRecordingPath()).getFileName().toString();
+        return fileName.split("\\.")[0];
+    }
+
+    private String getRecordingPath()
+    {
+        URL resource = getClass().getResource(getMetadataDir());
+        if (resource == null) {
+            throw new RuntimeException("Hive metadata directory doesn't exist: " + getMetadataDir());
+        }
+
+        File[] files = new File(resource.getPath()).listFiles();
+        if (files == null) {
+            throw new RuntimeException("Hive metadata recording file doesn't exist in directory: " + getMetadataDir());
+        }
+
+        return Arrays.stream(files)
+                .filter(f -> !f.isDirectory())
+                .collect(onlyElement())
+                .getPath();
     }
 
     @Test(dataProvider = "getQueriesDataProvider")

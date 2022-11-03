@@ -48,7 +48,7 @@ import static java.util.stream.Collectors.toList;
 
 public class BasePlanTest
 {
-    private final LocalQueryRunnerSupplier queryRunnerSupplier;
+    private final Map<String, String> sessionProperties;
     private LocalQueryRunner queryRunner;
 
     public BasePlanTest()
@@ -58,15 +58,10 @@ public class BasePlanTest
 
     public BasePlanTest(Map<String, String> sessionProperties)
     {
-        this.queryRunnerSupplier = () -> createQueryRunner(sessionProperties);
+        this.sessionProperties = requireNonNull(sessionProperties, "sessionProperties is null");
     }
 
-    public BasePlanTest(LocalQueryRunnerSupplier supplier)
-    {
-        this.queryRunnerSupplier = requireNonNull(supplier, "queryRunnerSupplier is null");
-    }
-
-    private static LocalQueryRunner createQueryRunner(Map<String, String> sessionProperties)
+    protected LocalQueryRunner createQueryRunner()
     {
         Session.SessionBuilder sessionBuilder = testSessionBuilder()
                 .setCatalog("local")
@@ -87,7 +82,7 @@ public class BasePlanTest
     public final void initPlanTest()
             throws IOException
     {
-        queryRunner = queryRunnerSupplier.get();
+        queryRunner = createQueryRunner();
     }
 
     @AfterClass(alwaysRun = true)

@@ -33,6 +33,7 @@ import io.prestosql.orc.reader.SelectiveColumnReaders;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.type.Type;
@@ -219,6 +220,7 @@ public class OrcSelectiveRecordReader
      *  III) Fields without filters
      *  Finally compose the block/page with the matching records.
      */
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     public Page getNextPage()
             throws IOException
     {
@@ -346,6 +348,18 @@ public class OrcSelectiveRecordReader
         validateWritePageChecksum(page);
 
         return page;
+    }
+
+    private List<DynamicFilter> getColDynamicFilters(Integer columnIdx)
+    {
+        if (predicate instanceof TupleDomainOrcPredicate) {
+            Optional<OrcPredicate> dynamicFilterPredicate = ((TupleDomainOrcPredicate) predicate).getDynamicFilterPredicate();
+            if (dynamicFilterPredicate.isPresent()) {
+                DynamicFilterOrcPredicate dfPredicate = (DynamicFilterOrcPredicate) dynamicFilterPredicate.get();
+                return dfPredicate.getColumnDynamicFilters(columnIdx);
+            }
+        }
+        return null;
     }
 
     private int[] initializePositions(int batchSize)

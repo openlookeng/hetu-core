@@ -30,6 +30,7 @@ import io.prestosql.operator.aggregation.multimapagg.MultimapAggGroupImplementat
 import javax.validation.constraints.AssertTrue;
 import javax.validation.constraints.DecimalMax;
 import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
@@ -184,6 +185,13 @@ public class FeaturesConfig
     private boolean skipNonApplicableRulesEnabled;
     private boolean prioritizeLargerSpiltsMemoryRevoke = true;
     private DataSize revocableMemorySelectionThreshold = new DataSize(512, MEGABYTE);
+    private double joinMultiClauseIndependenceFactor = 0.25;
+    private double filterConjunctionIndependenceFactor = 0.75;
+
+    // adaptive partial aggregation
+    private boolean adaptivePartialAggregationEnabled = true;
+    private long adaptivePartialAggregationMinRows = 100_000;
+    private double adaptivePartialAggregationUniqueRowsRatioThreshold = 0.8;
 
     public enum JoinReorderingStrategy
     {
@@ -1511,6 +1519,74 @@ public class FeaturesConfig
     public FeaturesConfig setRevocableMemorySelectionThreshold(DataSize revocableMemorySelectionThreshold)
     {
         this.revocableMemorySelectionThreshold = revocableMemorySelectionThreshold;
+        return this;
+    }
+
+    @Min(0)
+    @Max(1)
+    public double getJoinMultiClauseIndependenceFactor()
+    {
+        return joinMultiClauseIndependenceFactor;
+    }
+
+    @Config("optimizer.join-multi-clause-independence-factor")
+    @ConfigDescription("Scales the strength of independence assumption for selectivity estimates of multi-clause joins")
+    public FeaturesConfig setJoinMultiClauseIndependenceFactor(double joinMultiClauseIndependenceFactor)
+    {
+        this.joinMultiClauseIndependenceFactor = joinMultiClauseIndependenceFactor;
+        return this;
+    }
+
+    @Min(0)
+    @Max(1)
+    public double getFilterConjunctionIndependenceFactor()
+    {
+        return filterConjunctionIndependenceFactor;
+    }
+
+    @Config("optimizer.filter-conjunction-independence-factor")
+    @ConfigDescription("Scales the strength of independence assumption for selectivity estimates of the conjunction of multiple filters")
+    public FeaturesConfig setFilterConjunctionIndependenceFactor(double filterConjunctionIndependenceFactor)
+    {
+        this.filterConjunctionIndependenceFactor = filterConjunctionIndependenceFactor;
+        return this;
+    }
+
+    public boolean isAdaptivePartialAggregationEnabled()
+    {
+        return adaptivePartialAggregationEnabled;
+    }
+
+    @Config("adaptive-partial-aggregation.enabled")
+    public FeaturesConfig setAdaptivePartialAggregationEnabled(boolean adaptivePartialAggregationEnabled)
+    {
+        this.adaptivePartialAggregationEnabled = adaptivePartialAggregationEnabled;
+        return this;
+    }
+
+    public long getAdaptivePartialAggregationMinRows()
+    {
+        return adaptivePartialAggregationMinRows;
+    }
+
+    @Config("adaptive-partial-aggregation.min-rows")
+    @ConfigDescription("Minimum number of processed rows before partial aggregation might be adaptively turned off")
+    public FeaturesConfig setAdaptivePartialAggregationMinRows(long adaptivePartialAggregationMinRows)
+    {
+        this.adaptivePartialAggregationMinRows = adaptivePartialAggregationMinRows;
+        return this;
+    }
+
+    public double getAdaptivePartialAggregationUniqueRowsRatioThreshold()
+    {
+        return adaptivePartialAggregationUniqueRowsRatioThreshold;
+    }
+
+    @Config("adaptive-partial-aggregation.unique-rows-ratio-threshold")
+    @ConfigDescription("Ratio between aggregation output and input rows above which partial aggregation might be adaptively turned off")
+    public FeaturesConfig setAdaptivePartialAggregationUniqueRowsRatioThreshold(double adaptivePartialAggregationUniqueRowsRatioThreshold)
+    {
+        this.adaptivePartialAggregationUniqueRowsRatioThreshold = adaptivePartialAggregationUniqueRowsRatioThreshold;
         return this;
     }
 }

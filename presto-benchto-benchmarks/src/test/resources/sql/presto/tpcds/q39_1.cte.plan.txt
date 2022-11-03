@@ -4,7 +4,7 @@ remote exchange (GATHER, SINGLE, [])
             join (INNER, PARTITIONED):
                 remote exchange (REPARTITION, HASH, ["inv_item_sk", "inv_warehouse_sk"])
                     Filter
-                        remote exchange (REPARTITION, HASH, ["avg", "d_moy", "expr_21", "inv_item_sk", "inv_warehouse_sk", "stddev_samp", "w_warehouse_name"])
+                        remote exchange (REPARTITION, HASH, ["avg", "d_moy", "expr_24", "inv_item_sk", "inv_warehouse_sk", "stddev_samp", "w_warehouse_name"])
                             cte inv
                                 Filter
                                     final hashaggregation over (d_moy, inv_item_sk, inv_warehouse_sk, w_warehouse_name)
@@ -27,15 +27,15 @@ remote exchange (GATHER, SINGLE, [])
                                                             remote exchange (REPLICATE, BROADCAST, [])
                                                                 scan warehouse
                 local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["inv_item_sk_37", "inv_warehouse_sk_38"])
+                    remote exchange (REPARTITION, HASH, ["inv_item_sk_40", "inv_warehouse_sk_41"])
                         Filter
-                            remote exchange (REPARTITION, HASH, ["avg_115", "d_moy_84", "expr_134", "inv_item_sk_37", "inv_warehouse_sk_38", "stddev_samp_114", "w_warehouse_name_64"])
+                            remote exchange (REPARTITION, HASH, ["avg_122", "d_moy_90", "expr_141", "inv_item_sk_40", "inv_warehouse_sk_41", "stddev_samp_121", "w_warehouse_name_69"])
                                 cte inv
                                     Filter
-                                        final hashaggregation over (d_moy_84, inv_item_sk_37, inv_warehouse_sk_38, w_warehouse_name_64)
+                                        final hashaggregation over (d_moy_90, inv_item_sk_40, inv_warehouse_sk_41, w_warehouse_name_69)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["d_moy_84", "inv_item_sk_37", "inv_warehouse_sk_38", "w_warehouse_name_64"])
-                                                    partial hashaggregation over (d_moy_84, inv_item_sk_37, inv_warehouse_sk_38, w_warehouse_name_64)
+                                                remote exchange (REPARTITION, HASH, ["d_moy_90", "inv_item_sk_40", "inv_warehouse_sk_41", "w_warehouse_name_69"])
+                                                    partial hashaggregation over (d_moy_90, inv_item_sk_40, inv_warehouse_sk_41, w_warehouse_name_69)
                                                         join (INNER, REPLICATED):
                                                             join (INNER, REPLICATED):
                                                                 join (INNER, REPLICATED):

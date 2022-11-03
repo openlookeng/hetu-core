@@ -4,10 +4,10 @@ final hashaggregation over ()
             partial hashaggregation over ()
                 cross join:
                     join (RIGHT, PARTITIONED):
-                        final hashaggregation over (cs_item_sk_15)
+                        final hashaggregation over (cs_item_sk_17)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cs_item_sk_15"])
-                                    partial hashaggregation over (cs_item_sk_15)
+                                remote exchange (REPARTITION, HASH, ["cs_item_sk_17"])
+                                    partial hashaggregation over (cs_item_sk_17)
                                         join (INNER, REPLICATED):
                                             scan catalog_sales
                                             local exchange (GATHER, SINGLE, [])
