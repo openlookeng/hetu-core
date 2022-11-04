@@ -35,10 +35,12 @@ import io.airlift.slice.Slice;
 import io.prestosql.Session;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.BigintPagesHash;
+import io.prestosql.operator.DefaultPagesHash;
+import io.prestosql.operator.IPagesHash;
 import io.prestosql.operator.JoinHash;
 import io.prestosql.operator.JoinHashSupplier;
 import io.prestosql.operator.LookupSourceSupplier;
-import io.prestosql.operator.PagesHash;
 import io.prestosql.operator.PagesHashStrategy;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -46,11 +48,11 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.function.BuiltInScalarFunctionImplementation;
 import io.prestosql.spi.function.OperatorType;
-import io.prestosql.spi.type.BigintType;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import org.assertj.core.util.VisibleForTesting;
 import org.openjdk.jol.info.ClassLayout;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
@@ -66,6 +68,7 @@ import java.util.OptionalInt;
 import java.util.stream.IntStream;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.bytecode.Access.FINAL;
 import static io.airlift.bytecode.Access.PRIVATE;
 import static io.airlift.bytecode.Access.PUBLIC;
@@ -81,6 +84,7 @@ import static io.airlift.bytecode.expression.BytecodeExpressions.constantTrue;
 import static io.airlift.bytecode.expression.BytecodeExpressions.getStatic;
 import static io.airlift.bytecode.expression.BytecodeExpressions.newInstance;
 import static io.airlift.bytecode.expression.BytecodeExpressions.notEqual;
+import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.sql.analyzer.TypeSignatureProvider.fromTypes;
 import static io.prestosql.sql.gen.InputReferenceCompiler.generateInputReference;
 import static io.prestosql.sql.gen.SqlTypeBytecodeExpression.constantType;
@@ -103,6 +107,7 @@ public class JoinCompiler
             .maximumSize(1000)
             .build(CacheLoader.from(key ->
                     internalCompileHashStrategy(key.getTypes(), key.getOutputChannels(), key.getJoinChannels(), key.getSortChannel())));
+    private final boolean enableSingleChannelBigintLookupSource;
 
     public LookupSourceSupplierFactory compileLookupSourceFactory(List<? extends Type> types, List<Integer> joinChannels, Optional<Integer> sortChannel)
     {
@@ -112,7 +117,14 @@ public class JoinCompiler
     @Inject
     public JoinCompiler(Metadata metadata)
     {
+        this(metadata, true);
+    }
+
+    @VisibleForTesting
+    public JoinCompiler(Metadata metadata, boolean enableSingleChannelBigintLookupSource)
+    {
         this.functionAndTypeManager = requireNonNull(metadata, "metadata is null").getFunctionAndTypeManager();
+        this.enableSingleChannelBigintLookupSource = enableSingleChannelBigintLookupSource;
     }
 
     @Managed
@@ -167,14 +179,23 @@ public class JoinCompiler
     {
         Class<? extends PagesHashStrategy> pagesHashStrategyClass = internalCompileHashStrategy(types, outputChannels, joinChannels, sortChannel);
 
+        OptionalInt singleBigintJoinChannel = OptionalInt.empty();
+        if (enableSingleChannelBigintLookupSource
+                && joinChannels.size() == 1
+                && types.get(getOnlyElement(joinChannels)) == BIGINT) {
+            singleBigintJoinChannel = OptionalInt.of(getOnlyElement(joinChannels));
+        }
+
         Class<? extends LookupSourceSupplier> joinHashSupplierClass = IsolatedClass.isolateClass(
                 new DynamicClassLoader(getClass().getClassLoader()),
                 LookupSourceSupplier.class,
                 JoinHashSupplier.class,
                 JoinHash.class,
-                PagesHash.class);
+                IPagesHash.class,
+                BigintPagesHash.class,
+                DefaultPagesHash.class);
 
-        return new LookupSourceSupplierFactory(joinHashSupplierClass, new PagesHashStrategyFactory(pagesHashStrategyClass));
+        return new LookupSourceSupplierFactory(joinHashSupplierClass, new PagesHashStrategyFactory(pagesHashStrategyClass), singleBigintJoinChannel);
     }
 
     private static FieldDefinition generateInstanceSize(ClassDefinition definition)
@@ -415,7 +436,7 @@ public class JoinCompiler
 
         Variable thisVariable = hashPositionMethod.getThis();
         BytecodeExpression hashChannel = thisVariable.getField(hashChannelField);
-        BytecodeExpression bigintType = constantType(callSiteBinder, BigintType.BIGINT);
+        BytecodeExpression bigintType = constantType(callSiteBinder, BIGINT);
 
         IfStatement ifStatement = new IfStatement();
         ifStatement.condition(notEqual(hashChannel, constantNull(hashChannelField.getType())));
@@ -886,16 +907,18 @@ public class JoinCompiler
     {
         private final Constructor<? extends LookupSourceSupplier> constructor;
         private final PagesHashStrategyFactory pagesHashStrategyFactory;
+        private final OptionalInt singleBigintJoinChannel;
 
-        public LookupSourceSupplierFactory(Class<? extends LookupSourceSupplier> joinHashSupplierClass, PagesHashStrategyFactory pagesHashStrategyFactory)
+        public LookupSourceSupplierFactory(Class<? extends LookupSourceSupplier> joinHashSupplierClass, PagesHashStrategyFactory pagesHashStrategyFactory, OptionalInt singleBigintJoinChannel)
         {
             this.pagesHashStrategyFactory = pagesHashStrategyFactory;
             try {
-                constructor = joinHashSupplierClass.getConstructor(Session.class, PagesHashStrategy.class, LongArrayList.class, List.class, Optional.class, Optional.class, List.class);
+                constructor = joinHashSupplierClass.getConstructor(Session.class, PagesHashStrategy.class, LongArrayList.class, List.class, Optional.class, Optional.class, List.class, OptionalInt.class);
             }
             catch (NoSuchMethodException e) {
                 throw new RuntimeException(e);
             }
+            this.singleBigintJoinChannel = requireNonNull(singleBigintJoinChannel, "singleBigintJoinChannel is null");
         }
 
         public LookupSourceSupplier createLookupSourceSupplier(
@@ -909,7 +932,7 @@ public class JoinCompiler
         {
             PagesHashStrategy pagesHashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel);
             try {
-                return constructor.newInstance(session, pagesHashStrategy, addresses, channels, filterFunctionFactory, sortChannel, searchFunctionFactories);
+                return constructor.newInstance(session, pagesHashStrategy, addresses, channels, filterFunctionFactory, sortChannel, searchFunctionFactories, singleBigintJoinChannel);
             }
             catch (ReflectiveOperationException e) {
                 throw new RuntimeException(e);

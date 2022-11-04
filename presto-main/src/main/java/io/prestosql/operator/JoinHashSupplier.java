@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -33,12 +34,14 @@ public class JoinHashSupplier
         implements LookupSourceSupplier
 {
     private final Session session;
-    private final PagesHash pagesHash;
+    private final IPagesHash pagesHash;
     private final LongArrayList addresses;
     private final List<Page> pages;
     private final Optional<PositionLinks.Factory> positionLinks;
     private final Optional<JoinFilterFunctionFactory> filterFunctionFactory;
     private final List<JoinFilterFunctionFactory> searchFunctionFactories;
+
+    public static final int THRESHOLD_50 = 1 << 20; // 1048576
 
     public JoinHashSupplier(
             Session session,
@@ -47,7 +50,8 @@ public class JoinHashSupplier
             List<List<Block>> channels,
             Optional<JoinFilterFunctionFactory> filterFunctionFactory,
             Optional<Integer> sortChannel,
-            List<JoinFilterFunctionFactory> searchFunctionFactories)
+            List<JoinFilterFunctionFactory> searchFunctionFactories,
+            OptionalInt singleBigintJoinChannel)
     {
         this.session = requireNonNull(session, "session is null");
         this.addresses = requireNonNull(addresses, "addresses is null");
@@ -70,7 +74,13 @@ public class JoinHashSupplier
         }
 
         this.pages = channelsToPages(channels);
-        this.pagesHash = new PagesHash(addresses, pagesHashStrategy, positionLinksFactoryBuilder);
+
+        if (singleBigintJoinChannel.isPresent() && addresses.size() <= THRESHOLD_50) {
+            this.pagesHash = new BigintPagesHash(addresses, pagesHashStrategy, positionLinksFactoryBuilder, pages, singleBigintJoinChannel.getAsInt());
+        }
+        else {
+            this.pagesHash = new DefaultPagesHash(addresses, pagesHashStrategy, positionLinksFactoryBuilder);
+        }
         this.positionLinks = positionLinksFactoryBuilder.isEmpty() ? Optional.empty() : Optional.of(positionLinksFactoryBuilder.build());
     }
 

@@ -336,8 +336,10 @@ public class LookupJoinOperator
     {
         requireNonNull(spillInfoSnapshot, "spillInfoSnapshot is null");
 
+        boolean isSpilled = false;
         Page newPage = page;
         if (restoredPartition == null && spillInfoSnapshot.hasSpilled()) {
+            isSpilled = true;
             newPage = spillAndMaskSpilledPositions(page,
                     spillInfoSnapshot.getSpillMask(),
                     (spillBypassEnabled) ? (i, j) -> true : spillInfoSnapshot.getSpillMatcher());
@@ -348,7 +350,7 @@ public class LookupJoinOperator
 
         // create probe
         inputPageSpillEpoch = spillInfoSnapshot.getSpillEpoch();
-        probe = joinProbeFactory.createJoinProbe(newPage);
+        probe = joinProbeFactory.createJoinProbe(newPage, isSpilled, lookupSourceProvider);
 
         // initialize to invalid join position to force output code to advance the cursors
         joinPosition = -1;

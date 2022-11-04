@@ -37,6 +37,18 @@ public class JoinProbe
             this.probeHashChannel = probeHashChannel;
         }
 
+        public JoinProbe createJoinProbe(Page page, boolean isSpilled, LookupSourceProvider lookupSourceProvider)
+        {
+            LookupSource lookupSource = lookupSourceProvider.withLease((lookupSourceLease -> lookupSourceLease.getLookupSource()));
+            if (isSpilled || !(lookupSource instanceof JoinHash || lookupSource instanceof OuterLookupSource)) {
+                return new JoinProbe(probeOutputChannels, page, probeJoinChannels, probeHashChannel);
+            }
+            else {
+                Page loadedProbePage = page.getLoadedPage(probeJoinChannels.stream().mapToInt(i -> i).toArray());
+                return new UnSpilledJoinProbe(probeOutputChannels, page, probeJoinChannels, probeHashChannel, loadedProbePage, lookupSource, (probeHashChannel.isPresent() ? (probeHashChannel.getAsInt() >= 0 ? page.getBlock(probeHashChannel.getAsInt()).getLoadedBlock() : null) : null));
+            }
+        }
+
         public JoinProbe createJoinProbe(Page page)
         {
             return new JoinProbe(probeOutputChannels, page, probeJoinChannels, probeHashChannel);
@@ -52,7 +64,7 @@ public class JoinProbe
 
     private int position = -1;
 
-    private JoinProbe(int[] probeOutputChannels, Page page, List<Integer> probeJoinChannels, OptionalInt probeHashChannel)
+    protected JoinProbe(int[] probeOutputChannels, Page page, List<Integer> probeJoinChannels, OptionalInt probeHashChannel)
     {
         this.probeOutputChannels = probeOutputChannels;
         this.positionCount = page.getPositionCount();
