@@ -54,7 +54,8 @@ The pushdown function of the Elasticsearch connector is disabled by default. You
 elasticsearch.pushdown.enabled=true
 #true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
 ```
-NOTE: Currently pushdown is only supported as part of where clause partially such as EQUAL, AND, OR, Arithmetic operators, BETWEEN, IN.
+NOTE: Currently pushdown is only supported as part of where clause partially such as EQUAL, AND, OR, Arithmetic operators, BETWEEN, IN 
+and in the case of aggregations such as GROUP BY , SUM, COUNT functions. 
 
 ### `elasticsearch.scroll-size`
 

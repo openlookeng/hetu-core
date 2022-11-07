@@ -39,6 +39,17 @@ elasticsearch.default-schema-name=default
 
 此属性是可选的；默认值为`default`。
 
+### `elasticsearch.pushdown.enabled`
+配置是否启用算子下推功能
+
+默认情况下Elasticsearch连接器的算子下推功能是关闭的。你可以通过如下设置来启用它：
+
+``` properties
+elasticsearch.pushdown.enabled=true
+#true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
+```
+注意：目前算子下推仅支持部分SQL语句的查询关键字，包括EQUAL、AND、OR、算数运算符、BETWEEN、IN，以及部分聚合语法，包括GROUP BY、SUM、COUNT方法。
+
 ### `elasticsearch.scroll-size`
 
 此属性定义每个Elasticsearch滚动请求中可以返回的最大命中数。

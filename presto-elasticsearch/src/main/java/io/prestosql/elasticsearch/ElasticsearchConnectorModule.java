@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.deser.std.FromStringDeserializer;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.prestosql.elasticsearch.optimization.ElasticAggregationBuilder;
 import io.prestosql.elasticsearch.optimization.ElasticSearchPlanOptimizer;
 import io.prestosql.elasticsearch.optimization.ElasticSearchPlanOptimizerProvider;
 import io.prestosql.elasticsearch.optimization.ElasticSearchRowExpressionConverter;
@@ -48,6 +49,7 @@ public class ElasticsearchConnectorModule
         binder.bind(ElasticsearchPageSourceProvider.class).in(Scopes.SINGLETON);
         binder.bind(ElasticsearchClient.class).in(Scopes.SINGLETON);
         binder.bind(ElasticSearchRowExpressionConverter.class).in(Scopes.SINGLETON);
+        binder.bind(ElasticAggregationBuilder.class).in(Scopes.SINGLETON);
         binder.bind(ElasticSearchPlanOptimizer.class).in(Scopes.SINGLETON);
         binder.bind(ElasticSearchPlanOptimizerProvider.class).in(Scopes.SINGLETON);
 

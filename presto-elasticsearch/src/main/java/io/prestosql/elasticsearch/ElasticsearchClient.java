@@ -28,6 +28,8 @@ import io.prestosql.elasticsearch.client.Node;
 import io.prestosql.elasticsearch.client.NodesResponse;
 import io.prestosql.elasticsearch.client.SearchShardsResponse;
 import io.prestosql.elasticsearch.client.Shard;
+import io.prestosql.elasticsearch.optimization.ElasticAggOptimizationContext;
+import io.prestosql.elasticsearch.optimization.ElasticAggregationBuilder;
 import io.prestosql.spi.PrestoException;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -120,8 +122,10 @@ public class ElasticsearchClient
     private final Duration refreshInterval;
     private final boolean tlsEnabled;
 
+    private final ElasticAggregationBuilder elasticAggregationBuilder;
+
     @Inject
-    public ElasticsearchClient(ElasticsearchConfig config, Optional<PasswordConfig> passwordConfig)
+    public ElasticsearchClient(ElasticsearchConfig config, Optional<PasswordConfig> passwordConfig, ElasticAggregationBuilder elasticAggregationBuilder)
     {
         requireNonNull(config, "config is null");
 
@@ -131,6 +135,7 @@ public class ElasticsearchClient
         this.scrollTimeout = config.getScrollTimeout();
         this.refreshInterval = config.getNodeRefreshInterval();
         this.tlsEnabled = config.isTlsEnabled();
+        this.elasticAggregationBuilder = elasticAggregationBuilder;
     }
 
     @PostConstruct
@@ -482,12 +487,13 @@ public class ElasticsearchClient
         return jsonNode.get(name);
     }
 
-    public SearchResponse beginSearch(String index, int shard, QueryBuilder query, Optional<List<String>> fields, List<String> documentFields)
+    public SearchResponse beginSearch(String index, int shard, QueryBuilder query, Optional<List<String>> fields, List<String> documentFields, ElasticAggOptimizationContext elasticAggOptimizationContext)
     {
         SearchSourceBuilder sourceBuilder = SearchSourceBuilder.searchSource()
                 .query(query)
                 .size(scrollSize);
 
+        elasticAggregationBuilder.buildAggOptimzation(elasticAggOptimizationContext, sourceBuilder);
         fields.ifPresent(values -> {
             if (values.isEmpty()) {
                 sourceBuilder.fetchSource(false);
