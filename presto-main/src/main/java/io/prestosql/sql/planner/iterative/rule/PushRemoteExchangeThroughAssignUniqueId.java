@@ -14,6 +14,8 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
+import io.prestosql.Session;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.matching.Capture;
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.matching.Capture.newCapture;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
@@ -93,5 +96,11 @@ public final class PushRemoteExchangeThroughAssignUniqueId
         return symbols.stream()
                 .filter(symbol -> !symbolToRemove.equals(symbol))
                 .collect(toImmutableList());
+    }
+
+    @Override
+    public boolean isEnabled(Session session)
+    {
+        return getRetryPolicy(session) != RetryPolicy.TASK;
     }
 }

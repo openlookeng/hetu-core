@@ -325,9 +325,7 @@ public class SqlQueryScheduler
                 taskExecutionStats,
                 queryResourceManager,
                 tableExecuteContextManager);
-        if (!(getRetryPolicy(queryStateMachine.getSession()) == TASK)) {
-            sqlQueryScheduler.initialize();
-        }
+        sqlQueryScheduler.initialize();
         return sqlQueryScheduler;
     }
 

@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner.iterative.rule;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
 import io.prestosql.cost.CachingStatsProvider;
@@ -68,6 +69,8 @@ import static io.prestosql.expressions.LogicalRowExpressions.extractAllPredicate
 import static io.prestosql.expressions.LogicalRowExpressions.extractConjuncts;
 import static io.prestosql.expressions.LogicalRowExpressions.extractDisjuncts;
 import static io.prestosql.expressions.LogicalRowExpressions.extractPredicates;
+import static io.prestosql.operator.JoinUtils.getJoinDynamicFilters;
+import static io.prestosql.operator.JoinUtils.getSemiJoinDynamicFilterId;
 import static io.prestosql.spi.relation.SpecialForm.Form.AND;
 import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilters;
@@ -157,34 +160,33 @@ public class RemoveUnsupportedDynamicFilters
         @Override
         public PlanWithConsumedDynamicFilters visitJoin(JoinNode node, Set<String> allowedDynamicFilterIds)
         {
+            Map<String, Symbol> currentJoinDynamicFilters = getJoinDynamicFilters(node);
             ImmutableSet.Builder<String> builder = ImmutableSet.<String>builder().addAll(allowedDynamicFilterIds);
             if (!isOptimizeDynamicFilterGeneration(session) || (isOptimizeDynamicFilterGeneration(session) && !hasHighSelectivity(node.getRight()))) {
-                builder.addAll(node.getDynamicFilters().keySet());
+                builder.addAll(currentJoinDynamicFilters.keySet());
             }
             ImmutableSet<String> allowedDynamicFilterIdsProbeSide = builder.build();
 
             PlanWithConsumedDynamicFilters leftResult = node.getLeft().accept(this, allowedDynamicFilterIdsProbeSide);
             Set<String> consumedProbeSide = leftResult.getConsumedDynamicFilterIds();
-            Map<String, Symbol> dynamicFilters = node.getDynamicFilters().entrySet().stream()
+            Map<String, Symbol> dynamicFilters = currentJoinDynamicFilters.entrySet().stream()
                     .filter(entry -> consumedProbeSide.contains(entry.getKey()))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             PlanWithConsumedDynamicFilters rightResult = node.getRight().accept(this, allowedDynamicFilterIds);
             Set<String> consumed = new HashSet<>(rightResult.getConsumedDynamicFilterIds());
-            Set<String> currentJoinDynamicFilters = node.getDynamicFilters().keySet();
-            Set<String> unsupportedDynamicFiltersFromBuildSide = intersection(currentJoinDynamicFilters, consumed);
+            Set<String> unsupportedDynamicFiltersFromBuildSide = intersection(currentJoinDynamicFilters.keySet(), consumed);
             if (!unsupportedDynamicFiltersFromBuildSide.isEmpty()) {
                 removedDynamicFilterIds.addAll(unsupportedDynamicFiltersFromBuildSide);
             }
             consumed.addAll(consumedProbeSide);
-
             consumed.removeAll(dynamicFilters.keySet());
 
             PlanNode left = leftResult.getNode();
             PlanNode right = rightResult.getNode();
             Set<String> removedIdsFromJoin = node.getDynamicFilters().keySet().stream().filter(id -> !dynamicFilters.containsKey(id)).collect(Collectors.toSet());
             removedDynamicFilterIds.addAll(removedIdsFromJoin);
-            if (!left.equals(node.getLeft()) || !right.equals(node.getRight()) || !dynamicFilters.equals(node.getDynamicFilters())) {
+            if (!left.equals(node.getLeft()) || !right.equals(node.getRight()) || !dynamicFilters.equals(currentJoinDynamicFilters)) {
                 return new PlanWithConsumedDynamicFilters(new JoinNode(
                         node.getId(),
                         node.getType(),
@@ -197,7 +199,8 @@ public class RemoveUnsupportedDynamicFilters
                         node.getRightHashSymbol(),
                         node.getDistributionType(),
                         node.isSpillable(),
-                        dynamicFilters),
+                        // When there was no dynamic filter in join, it should remain empty
+                        node.getDynamicFilters().isEmpty() ? ImmutableMap.of() : dynamicFilters),
                         ImmutableSet.copyOf(consumed));
             }
             return new PlanWithConsumedDynamicFilters(node, ImmutableSet.copyOf(consumed));
@@ -206,11 +209,12 @@ public class RemoveUnsupportedDynamicFilters
         @Override
         public PlanWithConsumedDynamicFilters visitSemiJoin(SemiJoinNode node, Set<String> allowedDynamicFilterIds)
         {
-            if (!node.getDynamicFilterId().isPresent()) {
+            Optional<String> dynamicFilterIdOptional = getSemiJoinDynamicFilterId(node);
+
+            if (!dynamicFilterIdOptional.isPresent()) {
                 return visitPlan(node, allowedDynamicFilterIds);
             }
-
-            String dynamicFilterId = node.getDynamicFilterId().get();
+            String dynamicFilterId = dynamicFilterIdOptional.get();
 
             Set<String> allowedDynamicFilterIdsSourceSide = ImmutableSet.<String>builder()
                     .add(dynamicFilterId)
@@ -235,7 +239,7 @@ public class RemoveUnsupportedDynamicFilters
             PlanNode newFilteringSource = filteringSourceResult.getNode();
             if (!newSource.equals(node.getSource())
                     || !newFilteringSource.equals(node.getFilteringSource())
-                    || !newFilterId.equals(node.getDynamicFilterId())) {
+                    || !newFilterId.equals(dynamicFilterIdOptional)) {
                 return new PlanWithConsumedDynamicFilters(new SemiJoinNode(
                         node.getId(),
                         newSource,
@@ -246,7 +250,8 @@ public class RemoveUnsupportedDynamicFilters
                         node.getSourceHashSymbol(),
                         node.getFilteringSourceHashSymbol(),
                         node.getDistributionType(),
-                        newFilterId),
+                        // When there was no dynamic filter in semi-join, it should remain empty
+                        node.getDynamicFilterId().isPresent() ? newFilterId : Optional.empty()),
                         ImmutableSet.copyOf(consumed));
             }
             return new PlanWithConsumedDynamicFilters(node, ImmutableSet.copyOf(consumed));

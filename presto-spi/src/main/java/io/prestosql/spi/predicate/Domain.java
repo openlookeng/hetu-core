@@ -17,12 +17,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.type.Type;
+import org.openjdk.jol.info.ClassLayout;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -42,6 +44,7 @@ import static java.util.Objects.requireNonNull;
  */
 public final class Domain
 {
+    private static final int INSTANCE_SIZE = toIntExact(ClassLayout.parseClass(Domain.class).instanceSize());
     private final ValueSet values;
     private final boolean nullAllowed;
 
@@ -321,6 +324,11 @@ public final class Domain
     public String toString(ConnectorSession session)
     {
         return "[ " + (nullAllowed ? "NULL, " : "") + values.toString(session) + " ]";
+    }
+
+    public long getRetainedSizeInBytes()
+    {
+        return INSTANCE_SIZE;
     }
 
     static class DiscreteSet

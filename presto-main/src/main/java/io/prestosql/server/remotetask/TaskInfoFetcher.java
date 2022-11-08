@@ -263,6 +263,7 @@ public class TaskInfoFetcher
         });
 
         if (updated && updateValue.getTaskStatus().getState().isDone()) {
+            taskStatusFetcher.updateTaskStatus(newValue.getTaskStatus());
             finalTaskInfo.compareAndSet(Optional.empty(), Optional.of(updateValue));
             stop();
         }

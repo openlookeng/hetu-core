@@ -19,6 +19,7 @@ import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.dynamicfilter.DynamicFilterService;
 import io.prestosql.operator.StageExecutionDescriptor;
+import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
@@ -41,6 +42,7 @@ import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
@@ -66,6 +68,8 @@ import javax.inject.Inject;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.GROUPED_SCHEDULING;
@@ -149,16 +153,28 @@ public class SplitSourceFactory
         private Map<PlanNodeId, SplitSource> visitScanAndFilter(TableScanNode node, Optional<FilterNode> filter)
         {
             Optional<RowExpression> filterPredicate = filter.map(FilterNode::getPredicate);
-
-            List<DynamicFilters.Descriptor> dynamicFilters = filterPredicate
+            List<List<DynamicFilters.Descriptor>> dynamicFilters;
+            List<DynamicFilters.Descriptor> descriptors = filterPredicate
                     .map(DynamicFilters::extractDynamicFilters)
                     .map(DynamicFilters.ExtractResult::getDynamicConjuncts)
                     .orElse(ImmutableList.of());
 
+            if (!descriptors.isEmpty()) {
+                dynamicFilters = ImmutableList.of(descriptors);
+            }
+            else {
+                dynamicFilters = ImmutableList.of();
+            }
+
+            Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier = null;
+            if (dynamicFilters != null && !dynamicFilters.isEmpty() && !stageExecutionDescriptor.isScanGroupedExecution(node.getId())) {
+                dynamicFilterSupplier = DynamicFilterService.getDynamicFilterSupplier(session.getQueryId(), dynamicFilters, node.getAssignments());
+            }
+
             // get dataSource for table
             SplitSource splitSource = splitManager.getSplits(
                     session,
-                    node.getTable(),
+                    node.getTable(), dynamicFilterSupplier,
                     stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING);
 
             splitSources.add(splitSource);
@@ -203,6 +219,12 @@ public class SplitSourceFactory
         public Map<PlanNodeId, SplitSource> visitIndexJoin(IndexJoinNode node, Void context)
         {
             return node.getProbeSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitDynamicFilterSource(DynamicFilterSourceNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
         }
 
         @Override

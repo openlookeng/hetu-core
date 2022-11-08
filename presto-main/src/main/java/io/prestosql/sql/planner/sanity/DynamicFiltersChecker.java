@@ -15,6 +15,7 @@ package io.prestosql.sql.planner.sanity;
 
 import com.google.common.collect.ImmutableSet;
 import io.prestosql.Session;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
@@ -25,6 +26,7 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
 import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -39,6 +41,9 @@ import java.util.stream.Collectors;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.intersection;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
+import static io.prestosql.operator.JoinUtils.getJoinDynamicFilters;
+import static io.prestosql.operator.JoinUtils.getSemiJoinDynamicFilterId;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFiltersAsUnion;
 import static io.prestosql.sql.DynamicFilters.getDescriptor;
 
@@ -51,6 +56,7 @@ public class DynamicFiltersChecker
     @Override
     public void validate(PlanNode plan, Session session, Metadata metadata, TypeAnalyzer typeAnalyzer, TypeProvider types, WarningCollector warningCollector)
     {
+        RetryPolicy retryPolicy = getRetryPolicy(session);
         plan.accept(new InternalPlanVisitor<Set<String>, List<String>>()
         {
             @Override
@@ -74,7 +80,11 @@ public class DynamicFiltersChecker
             @Override
             public Set<String> visitJoin(JoinNode node, List<String> context)
             {
-                Set<String> currentJoinDynamicFilters = node.getDynamicFilters().keySet();
+                boolean taskRetriesEnabled = retryPolicy == RetryPolicy.TASK;
+                verify(
+                        !taskRetriesEnabled || node.getDynamicFilters().isEmpty(),
+                        "Dynamic filters %s present in a join in task retry mode", node.getDynamicFilters());
+                Set<String> currentJoinDynamicFilters = getJoinDynamicFilters(node).keySet();
                 context.addAll(currentJoinDynamicFilters);
                 Set<String> consumedProbeSide = node.getLeft().accept(this, context);
                 verify(difference(currentJoinDynamicFilters, consumedProbeSide).isEmpty(),
@@ -93,6 +103,10 @@ public class DynamicFiltersChecker
             @Override
             public Set<String> visitSemiJoin(SemiJoinNode node, List<String> context)
             {
+                boolean taskRetriesEnabled = retryPolicy == RetryPolicy.TASK;
+                verify(
+                        !taskRetriesEnabled || !node.getDynamicFilterId().isPresent(),
+                        "Dynamic filters %s present in a semi-join in task retry mode", node.getDynamicFilterId());
                 if (node.getDynamicFilterId().isPresent()) {
                     Set<String> currentJoinDynamicFilters = ImmutableSet.of(node.getDynamicFilterId().get());
                     context.addAll(currentJoinDynamicFilters);
@@ -106,8 +120,9 @@ public class DynamicFiltersChecker
                 Set<String> unmatched = new HashSet<>(consumedSourceSide);
                 unmatched.addAll(consumedFilteringSourceSide);
 
-                if (node.getDynamicFilterId().isPresent()) {
-                    String dynamicFilterId = node.getDynamicFilterId().get();
+                Optional<String> currentSemiJoinDynamicFilter = getSemiJoinDynamicFilterId(node);
+                if (currentSemiJoinDynamicFilter.isPresent()) {
+                    String dynamicFilterId = currentSemiJoinDynamicFilter.get();
                     verify(consumedSourceSide.contains(dynamicFilterId),
                             "The dynamic filter %s present in semi-join was not consumed by it's source side.", dynamicFilterId);
                     verify(!consumedFilteringSourceSide.contains(dynamicFilterId),
@@ -141,6 +156,17 @@ public class DynamicFiltersChecker
 
                 consumed.addAll(node.getSource().accept(this, context));
                 return consumed.build();
+            }
+
+            @Override
+            public Set<String> visitDynamicFilterSource(DynamicFilterSourceNode node, List<String> context)
+            {
+                verify(
+                        retryPolicy == RetryPolicy.TASK,
+                        "Found DynamicFilterSourceNode %s with retry policy %s",
+                        node,
+                        retryPolicy);
+                return node.getSource().accept(this, context);
             }
         }, new ArrayList<>());
     }

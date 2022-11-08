@@ -48,6 +48,7 @@ import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.SubPlan;
 import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.DynamicFilterUtils;
@@ -338,6 +339,15 @@ public class DynamicFilterService
                 registerTasksHelper(node, semiJoinNode.getFilteringSourceJoinSymbol(), Collections.singletonMap(semiJoinNode.getDynamicFilterId().get(), semiJoinNode.getFilteringSourceJoinSymbol()), taskIds, workers, stateMachine);
             }
         }
+        else if (node instanceof DynamicFilterSourceNode) {
+            DynamicFilterSourceNode dynamicFilterSourceNode = (DynamicFilterSourceNode) node;
+            if (!dynamicFilterSourceNode.getDynamicFilters().isEmpty()) {
+                Set<String> dynamicFilterIds = dynamicFilterSourceNode.getDynamicFilters().keySet();
+                for (String dynamicFilterId : dynamicFilterIds) {
+                    registerTasksHelper(node, dynamicFilterSourceNode.getDynamicFilters().get(dynamicFilterId), dynamicFilterSourceNode.getDynamicFilters(), taskIds, workers, stateMachine);
+                }
+            }
+        }
     }
 
     private void registerTasksHelper(PlanNode node, Symbol buildSymbol, Map<String, Symbol> dynamicFiltersMap, Set<TaskId> taskIds, Set<InternalNode> workers, StageStateMachine stateMachine)
@@ -357,6 +367,9 @@ public class DynamicFilterService
                 }
                 else if (node instanceof SemiJoinNode) {
                     filters.put(filterId, extractDynamicFilterRegistryInfo((SemiJoinNode) node, stateMachine.getSession()));
+                }
+                else if (node instanceof DynamicFilterSourceNode) {
+                    filters.put(filterId, extractDynamicFilterRegistryInfo((DynamicFilterSourceNode) node, stateMachine.getSession()));
                 }
                 dynamicFiltersToTask.putIfAbsent(filterId + "-" + queryId, new CopyOnWriteArraySet<>());
                 CopyOnWriteArraySet<TaskId> taskSet = dynamicFiltersToTask.get(filterId + "-" + queryId);
@@ -480,14 +493,14 @@ public class DynamicFilterService
         List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
         if (filterNodes.isEmpty()) {
-            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty());
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty(), false);
         }
         else {
             Optional<Predicate<List>> filterPredicate = Optional.empty();
             if (symbol == null) {
                 //Symbol is not found in Join Node. It must have been pushed down to filters.
                 for (FilterNode filter : filterNodes) {
-                    DynamicFilters.ExtractResult extractResult = DynamicFilters.extractDynamicFilters(filter.getPredicate());
+                    DynamicFilters.ExtractResult extractResult = extractDynamicFilters(filter.getPredicate());
                     List<DynamicFilters.Descriptor> dynamicConjuncts = extractResult.getDynamicConjuncts();
                     for (DynamicFilters.Descriptor desc : dynamicConjuncts) {
                         if (desc.getId().equals(filterId)) {
@@ -507,7 +520,7 @@ public class DynamicFilterService
                     throw new IllegalStateException("DynamicFilter symbol not found to register");
                 }
             }
-            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, filterPredicate);
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, filterPredicate, false);
         }
     }
 
@@ -517,11 +530,22 @@ public class DynamicFilterService
         List<FilterNode> filterNodes = findFilterNodeInStage(node);
 
         if (filterNodes.isEmpty()) {
-            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty());
+            return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty(), false);
         }
         else {
-            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, Optional.empty());
+            return new DynamicFilterRegistryInfo(symbol, LOCAL, session, Optional.empty(), false);
         }
+    }
+
+    private static DynamicFilterRegistryInfo extractDynamicFilterRegistryInfo(DynamicFilterSourceNode node, Session session)
+    {
+        Symbol symbol = null;
+        List<String> dynamicFilterIds = new ArrayList<>(node.getDynamicFilters().keySet());
+        if (!dynamicFilterIds.isEmpty()) {
+            symbol = node.getDynamicFilters().get(dynamicFilterIds.get(0));
+        }
+        List<FilterNode> filterNodes = findFilterNodeInStage(node);
+        return new DynamicFilterRegistryInfo(symbol, GLOBAL, session, Optional.empty(), true);
     }
 
     public void registerQuery(SqlQueryExecution sqlQueryExecution, SubPlan fragmentedPlan)
@@ -603,7 +627,7 @@ public class DynamicFilterService
     private static Set<String> getProducedDynamicFilters(PlanNode planNode)
     {
         return PlanNodeSearcher.searchFrom(planNode)
-                .whereIsInstanceOfAny(JoinNode.class, SemiJoinNode.class)
+                .whereIsInstanceOfAny(JoinNode.class, SemiJoinNode.class, DynamicFilterSourceNode.class)
                 .findAll().stream()
                 .flatMap(node -> getDynamicFiltersProducedInPlanNode(node).stream())
                 .collect(toImmutableSet());
@@ -625,6 +649,9 @@ public class DynamicFilterService
         if (planNode instanceof SemiJoinNode) {
             return ((SemiJoinNode) planNode).getDynamicFilterId().map(ImmutableSet::of).orElse(ImmutableSet.of());
         }
+        if (planNode instanceof DynamicFilterSourceNode) {
+            return ((DynamicFilterSourceNode) planNode).getDynamicFilters().keySet();
+        }
         throw new IllegalStateException("getDynamicFiltersProducedInPlanNode called with neither JoinNode nor SemiJoinNode");
     }
 
@@ -636,11 +663,11 @@ public class DynamicFilterService
         private boolean isMerged;
         private Optional<Predicate<List>> filter;
 
-        public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session, Optional<Predicate<List>> filter)
+        public DynamicFilterRegistryInfo(Symbol symbol, Type type, Session session, Optional<Predicate<List>> filter, boolean isDynamicFilterSourceNode)
         {
             this.symbol = symbol;
             this.type = type;
-            this.dataType = getDynamicFilterDataType(type, getDynamicFilteringDataType(session));
+            this.dataType = getDynamicFilterDataType(type, getDynamicFilteringDataType(session), isDynamicFilterSourceNode);
             this.isMerged = false;
             this.filter = filter;
         }

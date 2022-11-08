@@ -48,6 +48,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.PlanFragmentId;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -246,6 +247,10 @@ public final class SqlStageExecution
             else if (node instanceof SemiJoinNode) {
                 SemiJoinNode semiJoinNode = (SemiJoinNode) node;
                 dynamicFilterService.registerTasks(semiJoinNode, allTasks, getScheduledNodes(), stateMachine);
+            }
+            else if (node instanceof DynamicFilterSourceNode) {
+                DynamicFilterSourceNode dynamicFilterSourceNode = (DynamicFilterSourceNode) node;
+                dynamicFilterService.registerTasks(dynamicFilterSourceNode, allTasks, getScheduledNodes(), stateMachine);
             }
             traverseNodesForDynamicFiltering(node.getSources());
         }

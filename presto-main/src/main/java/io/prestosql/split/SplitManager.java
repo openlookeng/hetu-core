@@ -84,9 +84,9 @@ public class SplitManager
         splitManagers.remove(catalogName);
     }
 
-    public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
+    public SplitSource getSplits(Session session, TableHandle table, Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier, SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        return getSplits(session, table, splitSchedulingStrategy, null, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false, null);
+        return getSplits(session, table, splitSchedulingStrategy, dynamicFilterSupplier, Optional.empty(), ImmutableMap.of(), ImmutableSet.of(), false, null);
     }
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<List<Set<DynamicFilter>>> dynamicFilterSupplier,

@@ -99,6 +99,11 @@ public class Patterns
         return typeOf(JoinNode.class);
     }
 
+    public static Pattern<DynamicFilterSourceNode> dynamicFilterSource()
+    {
+        return typeOf(DynamicFilterSourceNode.class);
+    }
+
     public static Pattern<SpatialJoinNode> spatialJoin()
     {
         return typeOf(SpatialJoinNode.class);
@@ -336,6 +341,16 @@ public class Patterns
         public static Property<JoinNode, Lookup, JoinNode.Type> type()
         {
             return property("type", JoinNode::getType);
+        }
+
+        public static Property<JoinNode, Lookup, PlanNode> left()
+        {
+            return property("left", (JoinNode joinNode, Lookup lookup) -> lookup.resolve(joinNode.getLeft()));
+        }
+
+        public static Property<JoinNode, Lookup, PlanNode> right()
+        {
+            return property("right", (JoinNode joinNode, Lookup lookup) -> lookup.resolve(joinNode.getRight()));
         }
     }
 

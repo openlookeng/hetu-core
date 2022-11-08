@@ -19,15 +19,21 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.RemoteSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.util.MorePredicates;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
@@ -118,5 +124,41 @@ public final class JoinUtils
 
         ExchangeNode exchangeNode = (ExchangeNode) node;
         return exchangeNode.getScope() == LOCAL && exchangeNode.getType() == GATHER;
+    }
+
+    public static Map<String, Symbol> getJoinDynamicFilters(JoinNode joinNode)
+    {
+        List<DynamicFilterSourceNode> dynamicFilterSourceNodes = PlanNodeSearcher.searchFrom(joinNode.getRight())
+                .where(DynamicFilterSourceNode.class::isInstance)
+                .recurseOnlyWhen(node -> node instanceof ExchangeNode || node instanceof ProjectNode)
+                .findAll();
+        Map<String, Symbol> dynamicFilters = joinNode.getDynamicFilters();
+        // This method maybe called before AddJoinDynamicFilterSource has rewritten join dynamic filters to DynamicFilterSourceNode
+        if (dynamicFilterSourceNodes.isEmpty()) {
+            return dynamicFilters;
+        }
+        verify(
+                dynamicFilters.isEmpty(),
+                "Dynamic filters %s present in a join with a DynamicFilterSourceNode on it's build side", dynamicFilters);
+        verify(dynamicFilterSourceNodes.size() == 1, "Expected only 1 dynamic filter source node");
+        return dynamicFilterSourceNodes.get(0).getDynamicFilters();
+    }
+
+    public static Optional<String> getSemiJoinDynamicFilterId(SemiJoinNode semiJoinNode)
+    {
+        List<DynamicFilterSourceNode> dynamicFilterSourceNodes = PlanNodeSearcher.searchFrom(semiJoinNode.getFilteringSource())
+                .where(DynamicFilterSourceNode.class::isInstance)
+                .recurseOnlyWhen(node -> node instanceof ExchangeNode || node instanceof ProjectNode)
+                .findAll();
+        Optional<String> dynamicFilterId = semiJoinNode.getDynamicFilterId();
+        // This method maybe called before AddSemiJoinDynamicFilterSource has rewritten join dynamic filters to DynamicFilterSourceNode
+        if (dynamicFilterSourceNodes.isEmpty()) {
+            return dynamicFilterId;
+        }
+        verify(
+                !dynamicFilterId.isPresent(),
+                "Dynamic filter %s present in a semi join with a DynamicFilterSourceNode on it's filtering source side", dynamicFilterId);
+        verify(dynamicFilterSourceNodes.size() == 1, "Expected only 1 dynamic filter source node");
+        return Optional.of(getOnlyElement(dynamicFilterSourceNodes.get(0).getDynamicFilters().keySet()));
     }
 }

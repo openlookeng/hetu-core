@@ -221,7 +221,7 @@ public class TestDynamicFilterSourceOperator
                 getDynamicFilteringMaxPerDriverSize(TEST_SESSION));
     }
 
-    private DynamicFilterSourceOperator createOperator(DynamicFilterSourceOperatorFactory operatorFactory)
+    private Operator createOperator(DynamicFilterSourceOperatorFactory operatorFactory)
     {
         return operatorFactory.createOperator(pipelineContext.addDriverContext());
     }
@@ -232,7 +232,7 @@ public class TestDynamicFilterSourceOperator
         String filterId = "0";
         DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory(LOCAL, HASHSET, 2, channel(0, BIGINT, filterId));
 
-        DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
+        Operator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
         verifyPassthrough(op1,
                 ImmutableList.of(BIGINT),
                 new Page(createLongsBlock(1, 2)),
@@ -261,7 +261,7 @@ public class TestDynamicFilterSourceOperator
         DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
                 (GLOBAL, BLOOM_FILTER, 1, channel(0, BIGINT, filterId));
 
-        DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
+        Operator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
         verifyPassthrough(op1,
                 ImmutableList.of(BIGINT),
@@ -287,7 +287,7 @@ public class TestDynamicFilterSourceOperator
         DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
                 (GLOBAL, BLOOM_FILTER, 1, channel(0, VARCHAR, filterId));
 
-        DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
+        Operator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
         verifyPassthrough(op1,
                 ImmutableList.of(VARCHAR),
@@ -314,7 +314,7 @@ public class TestDynamicFilterSourceOperator
         DynamicFilterSourceOperatorFactory operatorFactory = createOperatorFactory
                 (GLOBAL, HASHSET, 1, channel(0, BIGINT, filterId));
 
-        DynamicFilterSourceOperator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
+        Operator op1 = createOperator(operatorFactory); // will finish before noMoreOperators()
 
         verifyPassthrough(op1,
                 ImmutableList.of(BIGINT),

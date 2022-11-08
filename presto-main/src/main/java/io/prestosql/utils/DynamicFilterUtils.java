@@ -22,6 +22,7 @@ import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
 import io.prestosql.sql.planner.optimizations.PlanNodeSearcher;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 
 import java.util.List;
@@ -81,6 +82,15 @@ public class DynamicFilterUtils
         return filterNodes;
     }
 
+    public static List<FilterNode> findFilterNodeInStage(DynamicFilterSourceNode node)
+    {
+        List<FilterNode> filterNodes = PlanNodeSearcher
+                .searchFrom(node)
+                .where(DynamicFilterUtils::isFilterAboveTableScan)
+                .findAll();
+        return filterNodes;
+    }
+
     public static boolean isFilterAboveTableScan(PlanNode node)
     {
         if (node instanceof FilterNode) {
@@ -89,9 +99,9 @@ public class DynamicFilterUtils
         return false;
     }
 
-    public static DataType getDynamicFilterDataType(Type type, DynamicFilterDataType dataType)
+    public static DataType getDynamicFilterDataType(Type type, DynamicFilterDataType dataType, boolean isDynamicFilterSourceNode)
     {
-        if (type == LOCAL || dataType == DynamicFilterDataType.HASHSET) {
+        if (type == LOCAL || dataType == DynamicFilterDataType.HASHSET || isDynamicFilterSourceNode) {
             return HASHSET;
         }
         else {

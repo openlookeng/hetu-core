@@ -31,6 +31,7 @@ import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.iterative.IterativeOptimizer;
 import io.prestosql.sql.planner.iterative.Rule;
+import io.prestosql.sql.planner.iterative.rule.AddDynamicFilterSource;
 import io.prestosql.sql.planner.iterative.rule.AddExchangeAboveCTENode;
 import io.prestosql.sql.planner.iterative.rule.AddExchangesBelowPartialAggregationOverGroupIdRuleSet;
 import io.prestosql.sql.planner.iterative.rule.AddIntermediateAggregations;
@@ -704,6 +705,16 @@ public class PlanOptimizers
 
         // Precomputed hashes - this assumes that partitioning will not change
         builder.add(new HashGenerationOptimizer(metadata));
+
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableList.of(),
+                AddDynamicFilterSource.rules()));
+        // If AddDynamicFilterSource fails to rewrite dynamic filter from JoinNode/SemiJoinNode to DynamicFilterSourceNode,
+        // RemoveUnsupportedDynamicFilters needs to be run again to clean up the corresponding dynamic filter expression left over the table scan.
+        builder.add(new RemoveUnsupportedDynamicFilters(metadata, statsCalculator));
 
         builder.add(new TableDeleteOptimizer(metadata));
         builder.add(new BeginTableWrite(metadata)); // HACK! see comments in BeginTableWrite

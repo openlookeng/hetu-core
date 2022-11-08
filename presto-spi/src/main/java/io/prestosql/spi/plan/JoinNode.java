@@ -177,6 +177,11 @@ public class JoinNode
                 .build();
     }
 
+    public JoinNode withoutDynamicFilters()
+    {
+        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType, spillable, ImmutableMap.of());
+    }
+
     public enum DistributionType
     {
         PARTITIONED,

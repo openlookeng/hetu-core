@@ -44,6 +44,7 @@ import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
@@ -106,6 +107,7 @@ public final class GraphvizPrinter
         INDEX_SOURCE,
         UNNEST,
         ANALYZE_FINISH,
+        DYNAMIC_FILTER_SOURCE
     }
 
     private static final Map<NodeType, String> NODE_COLORS = immutableEnumMap(ImmutableMap.<NodeType, String>builder()
@@ -130,6 +132,7 @@ public final class GraphvizPrinter
             .put(NodeType.UNNEST, "crimson")
             .put(NodeType.SAMPLE, "goldenrod4")
             .put(NodeType.ANALYZE_FINISH, "plum")
+            .put(NodeType.DYNAMIC_FILTER_SOURCE, "magenta")
             .build());
 
     static {
@@ -562,6 +565,13 @@ public final class GraphvizPrinter
             node.getIndexSource().accept(this, context);
 
             return null;
+        }
+
+        @Override
+        public Void visitDynamicFilterSource(DynamicFilterSourceNode node, Void context)
+        {
+            printNode(node, "DynamicFilterSource", NODE_COLORS.get(NodeType.DYNAMIC_FILTER_SOURCE));
+            return node.getSource().accept(this, context);
         }
 
         private void printNode(PlanNode node, String label, String color)

@@ -63,6 +63,7 @@ import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
@@ -648,6 +649,9 @@ public class DistributedExecutionPlanner
         @Override
         public Map<PlanNodeId, SplitSource> visitPlan(PlanNode node, Void context)
         {
+            if (node instanceof DynamicFilterSourceNode) {
+                return ImmutableMap.of();
+            }
             throw new UnsupportedOperationException("not yet implemented: " + node.getClass().getName());
         }
     }

@@ -332,11 +332,12 @@ public class DynamicFilterSourceOperator
          * @return Operator
          */
         @Override
-        public DynamicFilterSourceOperator createOperator(DriverContext driverContext)
+        public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterSourceOperator.class.getSimpleName());
             return new DynamicFilterSourceOperator(
-                    driverContext.addOperatorContext(operatorId, planNodeId, DynamicFilterSourceOperator.class.getSimpleName()),
+                    operatorContext,
                     dynamicPredicateConsumer,
                     channels,
                     planNodeId,
@@ -361,6 +362,62 @@ public class DynamicFilterSourceOperator
         public OperatorFactory duplicate()
         {
             throw new UnsupportedOperationException("duplicate() is not supported for DynamicFilterSourceOperatorFactory");
+        }
+    }
+
+    private static class PassthroughDynamicFilterSourceOperator
+            implements Operator
+    {
+        private final OperatorContext operatorContext;
+        private boolean finished;
+        private Page current;
+
+        private PassthroughDynamicFilterSourceOperator(OperatorContext operatorContext)
+        {
+            this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        }
+
+        @Override
+        public OperatorContext getOperatorContext()
+        {
+            return operatorContext;
+        }
+
+        @Override
+        public boolean needsInput()
+        {
+            return current == null && !finished;
+        }
+
+        @Override
+        public void addInput(Page page)
+        {
+            verify(!finished, "DynamicFilterSourceOperator: addInput() may not be called after finish()");
+            current = page;
+        }
+
+        @Override
+        public Page getOutput()
+        {
+            Page result = current;
+            current = null;
+            return result;
+        }
+
+        @Override
+        public void finish()
+        {
+            if (finished) {
+                // NOTE: finish() may be called multiple times (see comment at Driver::processInternal).
+                return;
+            }
+            finished = true;
+        }
+
+        @Override
+        public boolean isFinished()
+        {
+            return current == null && finished;
         }
     }
 }

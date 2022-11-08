@@ -13,6 +13,7 @@
  */
 package io.prestosql.sql.planner;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
@@ -38,6 +39,7 @@ import io.prestosql.spi.statestore.StateStore;
 import io.prestosql.spi.util.BloomFilter;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.analyzer.FeaturesConfig;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
 import io.prestosql.statestore.StateStoreProvider;
 
@@ -51,6 +53,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringBloomFilterFpp;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringDataType;
 import static io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter.convertBloomFilterToByteArray;
@@ -182,6 +185,41 @@ public class LocalDynamicFilter
         return Optional.of(new LocalDynamicFilter(probeSymbolMultiMap, localChannels, 1, localType, session, taskId, stateStoreProvider));
     }
 
+    public static Optional<LocalDynamicFilter> create(DynamicFilterSourceNode dynamicFilterSourceNode, Session session,
+            TaskId taskId, StateStoreProvider stateStoreProvider)
+    {
+        if (dynamicFilterSourceNode.getDynamicFilters().isEmpty()) {
+            return Optional.empty();
+        }
+        Map<String, Symbol> dynamicFilters = dynamicFilterSourceNode.getDynamicFilters();
+
+        DynamicFilter.Type localType;
+        List<FilterNode> localFilterNodeWithThisDynamicFiltering = findFilterNodeInStage(dynamicFilterSourceNode);
+        if (localFilterNodeWithThisDynamicFiltering.isEmpty()) {
+            localType = DynamicFilter.Type.GLOBAL;
+        }
+        else {
+            localType = DynamicFilter.Type.LOCAL;
+        }
+        Multimap<String, Symbol> probeSymbolMultiMap = ArrayListMultimap.create();
+        for (Map.Entry<String, Symbol> entry : dynamicFilters.entrySet()) {
+            probeSymbolMultiMap.put(entry.getKey(), entry.getValue());
+        }
+
+        Map<String, Integer> dynamicFilterChannels = dynamicFilterSourceNode.getDynamicFilters().entrySet().stream()
+                .collect(toImmutableMap(
+                        // Dynamic filter ID
+                        Map.Entry::getKey,
+                        // Build-side channel index
+                        entry -> {
+                            Symbol buildSymbol = entry.getValue();
+                            int buildChannelIndex = dynamicFilterSourceNode.getOutputSymbols().indexOf(buildSymbol);
+                            verify(buildChannelIndex >= 0);
+                            return buildChannelIndex;
+                        }));
+        return Optional.of(new LocalDynamicFilter(probeSymbolMultiMap, dynamicFilterChannels, 1, localType, session, taskId, stateStoreProvider));
+    }
+
     private static void mapProbeSymbols(RowExpression predicate, Set<String> joinDynamicFilters, Multimap<String, Symbol> probeSymbols)
     {
         DynamicFilters.ExtractResult extractResult = extractDynamicFilters(predicate);
@@ -218,7 +256,6 @@ public class LocalDynamicFilter
     {
         // Called concurrently by each DynamicFilterSourceOperator instance (when collection is over).
         partitionsLeft--;
-        verify(partitionsLeft >= 0);
 
         if (values == null) {
             isIncomplete = true;
@@ -259,7 +296,7 @@ public class LocalDynamicFilter
             return;
         }
 
-        DynamicFilter.DataType dataType = getDynamicFilterDataType(type, dynamicFilterDataType);
+        DynamicFilter.DataType dataType = getDynamicFilterDataType(type, dynamicFilterDataType, false);
         for (Map.Entry<String, Set> filter : result.entrySet()) {
             DynamicFilterSourceOperator.Channel channel = channels.get(filter.getKey());
             Set filterValues = filter.getValue();

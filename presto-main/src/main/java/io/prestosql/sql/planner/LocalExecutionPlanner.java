@@ -197,6 +197,7 @@ import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
+import io.prestosql.sql.planner.plan.DynamicFilterSourceNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
@@ -2677,6 +2678,23 @@ public class LocalExecutionPlanner
                     });
         }
 
+        private Optional<LocalDynamicFilter> createDynamicFilter(DynamicFilterSourceNode node, LocalExecutionPlanContext context)
+        {
+            if (!isEnableDynamicFiltering(context.getSession())) {
+                return Optional.empty();
+            }
+            if (node.getDynamicFilters().isEmpty()) {
+                return Optional.empty();
+            }
+            LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
+            return LocalDynamicFilter
+                    .create(node, context.getSession(), context.taskContext.getTaskId(), stateStoreProvider)
+                    .map(filter -> {
+                        addSuccessCallback(filter.getDynamicFilterResultFuture(), collector::intersectDynamicFilter);
+                        return filter;
+                    });
+        }
+
         private JoinBridgeManager<PartitionedLookupSourceFactory> createLookupSourceFactory(
                 JoinNode node,
                 PlanNode buildNode,
@@ -2877,6 +2895,38 @@ public class LocalExecutionPlanner
                 joinSourcesLayout.put(probeLayoutEntry.getKey(), probeLayoutEntry.getValue() + lookupSourceLayout.size());
             }
             return joinSourcesLayout.build();
+        }
+
+        @Override
+        public PhysicalOperation visitDynamicFilterSource(DynamicFilterSourceNode node, LocalExecutionPlanContext context)
+        {
+            checkState(
+                    !node.getDynamicFilters().isEmpty(),
+                    "Dynamic filters cannot be empty in DynamicFilterSourceNode");
+            log.debug("[DynamicFilterSource] Dynamic filters: %s", node.getDynamicFilters());
+            PhysicalOperation source = node.getSource().accept(this, context);
+            List<DynamicFilterSourceOperator.Channel> filterBuildChannels = node.getDynamicFilters().entrySet().stream()
+                    .map(entry -> {
+                        String dynamicFilterId = entry.getKey();
+                        Symbol buildSymbol = entry.getValue();
+                        int buildChannelIndex = node.getOutputSymbols().indexOf(buildSymbol); // Build-side channel index
+                        Type type = source.getTypes().get(buildChannelIndex);
+                        return new DynamicFilterSourceOperator.Channel(dynamicFilterId, type, buildChannelIndex, context.getSession().getQueryId().toString());
+                    })
+                    .collect(toImmutableList());
+
+            LocalDynamicFilter filterConsumer = createDynamicFilter(node, context).orElse(null);
+            return new PhysicalOperation(
+                    new DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory(
+                            context.getNextOperatorId(),
+                            node.getId(),
+                            filterConsumer.getValueConsumer(), /** the consumer to process all values collected to build the dynamic filter */
+                            filterBuildChannels,
+                            getDynamicFilteringMaxPerDriverValueCount(context.getSession()),
+                            getDynamicFilteringMaxPerDriverSize(context.getSession())),
+                    source.getLayout(),
+                    context,
+                    source);
         }
 
         @Override
