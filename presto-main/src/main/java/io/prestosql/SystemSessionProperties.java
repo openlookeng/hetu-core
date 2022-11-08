@@ -213,6 +213,10 @@ public final class SystemSessionProperties
 
     public static final String QUERY_RESOURCE_TRACKING = "query_resource_tracking_enabled";
 
+    public static final String TRANSFORM_SELF_JOIN_TO_WINDOW = "transform_self_join_to_window"; //
+
+    public static final String TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE = "transform_self_join_to_window_aggregate";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     private static Logger log = Logger.get(SystemSessionProperties.class);
@@ -1037,6 +1041,14 @@ public final class SystemSessionProperties
                         ADAPTIVE_PARTIAL_AGGREGATION_UNIQUE_ROWS_RATIO_THRESHOLD,
                         "Ratio between aggregation output and input rows above which partial aggregation might be adaptively turned off",
                         featuresConfig.getAdaptivePartialAggregationUniqueRowsRatioThreshold(),
+                        false),
+                booleanProperty(TRANSFORM_SELF_JOIN_TO_WINDOW,
+                        "Transform Sub-query SelfJoin using window lead/lag",
+                        featuresConfig.isTransformSelfJoinToWindow(),
+                        false),
+                booleanProperty(TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE,
+                        "Transform Sub-query SelfJoin using window aggregates",
+                        featuresConfig.isTransformSelfJoinAggregatesToWindow(),
                         false));
     }
 
@@ -1819,5 +1831,15 @@ public final class SystemSessionProperties
     public static double getAdaptivePartialAggregationUniqueRowsRatioThreshold(Session session)
     {
         return session.getSystemProperty(ADAPTIVE_PARTIAL_AGGREGATION_UNIQUE_ROWS_RATIO_THRESHOLD, Double.class);
+    }
+
+    public static boolean shouldTransformSelfJoinToWindowFunction(Session session)
+    {
+        return session.getSystemProperty(TRANSFORM_SELF_JOIN_TO_WINDOW, Boolean.class);
+    }
+
+    public static boolean shouldTransformSelfJoinAggregatesToWindowFunction(Session session)
+    {
+        return session.getSystemProperty(TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE, Boolean.class);
     }
 }

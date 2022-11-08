@@ -315,4 +315,22 @@ public final class FunctionResolution
     {
         return functionAndTypeManager.lookupFunction("min", fromTypes(valueType));
     }
+
+    @Override
+    public boolean isSumFunction(FunctionHandle functionHandle)
+    {
+        return functionAndTypeManager.getFunctionMetadata(functionHandle).getName().equals(QualifiedObjectName.valueOf(DEFAULT_NAMESPACE, "sum"));
+    }
+
+    @Override
+    public FunctionHandle sumFunction()
+    {
+        return functionAndTypeManager.lookupFunction("sum", ImmutableList.of());
+    }
+
+    @Override
+    public FunctionHandle sumFunction(Type valueType)
+    {
+        return functionAndTypeManager.lookupFunction("sum", fromTypes(valueType));
+    }
 }

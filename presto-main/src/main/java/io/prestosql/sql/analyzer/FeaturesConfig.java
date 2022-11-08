@@ -192,6 +192,32 @@ public class FeaturesConfig
     private boolean adaptivePartialAggregationEnabled = true;
     private long adaptivePartialAggregationMinRows = 100_000;
     private double adaptivePartialAggregationUniqueRowsRatioThreshold = 0.8;
+    private boolean transformSelfJoinToWindow = true;
+    private boolean transformSelfJoinAggregateToWindow = true;
+
+    @Config("optimizer.transform-self-join-to-window")
+    public FeaturesConfig setTransformSelfJoinToWindow(boolean value)
+    {
+        this.transformSelfJoinToWindow = value;
+        return this;
+    }
+
+    public boolean isTransformSelfJoinToWindow()
+    {
+        return transformSelfJoinToWindow;
+    }
+
+    @Config("optimizer.transform-self-join-aggregates-to-window")
+    public FeaturesConfig setTransformSelfJoinAggregatesToWindow(boolean value)
+    {
+        this.transformSelfJoinAggregateToWindow = value;
+        return this;
+    }
+
+    public boolean isTransformSelfJoinAggregatesToWindow()
+    {
+        return transformSelfJoinAggregateToWindow;
+    }
 
     public enum JoinReorderingStrategy
     {

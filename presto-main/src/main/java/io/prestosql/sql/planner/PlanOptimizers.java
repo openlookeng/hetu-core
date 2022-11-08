@@ -135,8 +135,10 @@ import io.prestosql.sql.planner.iterative.rule.TransformCorrelatedSingleRowSubqu
 import io.prestosql.sql.planner.iterative.rule.TransformExistsApplyToLateralNode;
 import io.prestosql.sql.planner.iterative.rule.TransformFilteringSemiJoinToInnerJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUnCorrelatedInPredicateSubQuerySelfJoinToAggregate;
+import io.prestosql.sql.planner.iterative.rule.TransformUnCorrelatedSubquerySelfJoinToWindowFunctions;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedInPredicateSubqueryToSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoin;
+import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedSubquerySelfJoinAggregatesToWindowFunction;
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
@@ -446,6 +448,13 @@ public class PlanOptimizers
                                 new TransformCorrelatedSingleRowSubqueryToProject(),
                                 new RemoveAggregationInSemiJoin())),
                 new CheckSubqueryNodesAreRewritten());
+
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new TransformUncorrelatedSubquerySelfJoinAggregatesToWindowFunction(metadata),
+                        new TransformUnCorrelatedSubquerySelfJoinToWindowFunctions(metadata))));
 
         builder.add(new IterativeOptimizer(
                 ruleStats,

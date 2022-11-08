@@ -57,6 +57,12 @@ public class MongoTableHandle
     }
 
     @Override
+    public String getTableName()
+    {
+        return this.schemaTableName.getTableName();
+    }
+
+    @Override
     public int hashCode()
     {
         return Objects.hash(schemaTableName, constraint);
