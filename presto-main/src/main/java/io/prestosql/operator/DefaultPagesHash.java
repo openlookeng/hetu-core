@@ -31,9 +31,10 @@ import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
 
 // This implementation assumes arrays used in the hash are always a power of 2
-public final class PagesHash
+public final class DefaultPagesHash
+        implements IPagesHash
 {
-    private static final int INSTANCE_SIZE = ClassLayout.parseClass(PagesHash.class).instanceSize();
+    private static final int INSTANCE_SIZE = ClassLayout.parseClass(DefaultPagesHash.class).instanceSize();
     private static final DataSize CACHE_SIZE = new DataSize(128, KILOBYTE);
     private final LongArrayList addresses;
     private final PagesHashStrategy pagesHashStrategy;
@@ -50,7 +51,7 @@ public final class PagesHash
     private final long hashCollisions;
     private final double expectedHashCollisions;
 
-    public PagesHash(
+    public DefaultPagesHash(
             LongArrayList addresses,
             PagesHashStrategy pagesHashStrategy,
             PositionLinks.FactoryBuilder positionLinks)
@@ -124,7 +125,8 @@ public final class PagesHash
         expectedHashCollisions = estimateNumberOfHashCollisions(addresses.size(), hashSize);
     }
 
-    public final int getChannelCount()
+    @Override
+    public int getChannelCount()
     {
         return channelCount;
     }
@@ -221,22 +223,73 @@ public final class PagesHash
         return pagesHashStrategy.positionEqualsPositionIgnoreNulls(leftBlockIndex, leftBlockPosition, rightBlockIndex, rightBlockPosition);
     }
 
-    private static int getHashPosition(long rawHash, long mask)
+    public int[] getAddressIndex(int[] positions, Page hashChannelsPage)
     {
-        // Avalanches the bits of a long integer by applying the finalisation step of MurmurHash3.
-        //
-        // This function implements the finalisation step of Austin Appleby's <a href="http://sites.google.com/site/murmurhash/">MurmurHash3</a>.
-        // Its purpose is to avalanche the bits of the argument to within 0.25% bias. It is used, among other things, to scramble quickly (but deeply) the hash
-        // values returned by {@link Object#hashCode()}.
-        //
+        long[] hashes = new long[positions[positions.length - 1] + 1];
+        for (int i = 0; i < positions.length; i++) {
+            hashes[positions[i]] = pagesHashStrategy.hashRow(positions[i], hashChannelsPage);
+        }
 
-        long rawHashNew = rawHash;
-        rawHashNew ^= rawHashNew >>> 33;
-        rawHashNew *= 0xff51afd7ed558ccdL;
-        rawHashNew ^= rawHashNew >>> 33;
-        rawHashNew *= 0xc4ceb9fe1a85ec53L;
-        rawHashNew ^= rawHashNew >>> 33;
+        return getAddressIndex(positions, hashChannelsPage, hashes);
+    }
 
-        return (int) (rawHashNew & mask);
+    public int[] getAddressIndex(int[] positions, Page hashChannelsPage, long[] rawHashes)
+    {
+        int positionCount = positions.length;
+        int[] hashPositions = new int[positionCount];
+
+        for (int i = 0; i < positionCount; i++) {
+            hashPositions[i] = getHashPosition(rawHashes[positions[i]], mask);
+        }
+
+        int[] found = new int[positionCount];
+        int foundCount = 0;
+        int[] result = new int[positionCount];
+        Arrays.fill(result, -1);
+        int[] foundKeys = new int[positionCount];
+
+        // Search for positions in the hash array. This is the most CPU-consuming part as
+        // it relies on random memory accesses
+        for (int i = 0; i < positionCount; i++) {
+            foundKeys[i] = key[hashPositions[i]];
+        }
+        // Found positions are put into `found` array
+        for (int i = 0; i < positionCount; i++) {
+            if (foundKeys[i] != -1) {
+                found[foundCount++] = i;
+            }
+        }
+
+        // At this step we determine if the found keys were indeed the proper ones or it is a hash collision.
+        // The result array is updated for the found ones, while the collisions land into `remaining` array.
+        int[] remaining = found; // Rename for readability
+        int remainingCount = 0;
+        for (int i = 0; i < foundCount; i++) {
+            int index = found[i];
+            if (positionEqualsCurrentRowIgnoreNulls(foundKeys[index], (byte) rawHashes[positions[index]], positions[index], hashChannelsPage)) {
+                result[index] = foundKeys[index];
+            }
+            else {
+                remaining[remainingCount++] = index;
+            }
+        }
+
+        // At this point for any reasoable load factor of a hash array (< .75), there is no more than
+        // 10 - 15% of positions left. We search for them in a sequential order and update the result array.
+        for (int i = 0; i < remainingCount; i++) {
+            int index = remaining[i];
+            int position = (hashPositions[index] + 1) & mask; // hashPositions[index] position has already been checked
+
+            while (key[position] != -1) {
+                if (positionEqualsCurrentRowIgnoreNulls(key[position], (byte) rawHashes[positions[index]], positions[index], hashChannelsPage)) {
+                    result[index] = key[position];
+                    break;
+                }
+                // increment position and mask to handler wrap around
+                position = (position + 1) & mask;
+            }
+        }
+
+        return result;
     }
 }

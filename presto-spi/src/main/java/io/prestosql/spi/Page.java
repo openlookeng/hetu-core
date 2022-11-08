@@ -310,6 +310,17 @@ public class Page
         return new Page(this.pageMetadata, loadedBlocks);
     }
 
+    public Page getLoadedPage(int... columns)
+    {
+        requireNonNull(columns, "columns is null");
+
+        Block[] blockArr = new Block[columns.length];
+        for (int i = 0; i < columns.length; i++) {
+            blockArr[i] = this.blocks[columns[i]].getLoadedBlock();
+        }
+        return wrapBlocksWithoutCopy(positionCount, blockArr);
+    }
+
     @Override
     public String toString()
     {

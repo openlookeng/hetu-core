@@ -522,7 +522,8 @@ public class PagesIndex
                 channelLists,
                 filterFunctionFactory,
                 sortChannel,
-                searchFunctionFactories);
+                searchFunctionFactories,
+                OptionalInt.empty());
     }
 
     private List<Integer> rangeList(int endExclusive)
