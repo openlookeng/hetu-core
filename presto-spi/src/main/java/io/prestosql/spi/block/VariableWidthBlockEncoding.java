@@ -93,10 +93,10 @@ public class VariableWidthBlockEncoding
             output.writeBooleans(block.valueIsNull, 0, positionCount);
         }
 
-        int totalSize = block.offsets[block.arrayOffset + positionCount] - block.offsets[block.arrayOffset];
+        int totalSize = block.offsets[block.arrayOffset + positionCount];
         output.writeInt(totalSize);
         if (totalSize != 0) {
-            output.write(block.getRawSlice(0).byteArray(), block.offsets[block.arrayOffset], totalSize);
+            output.write(block.getRawSlice(0).byteArray(), 0, totalSize);
         }
     }
 

@@ -344,9 +344,10 @@ public class VariableWidthBlock
         if (mayHaveNull()) {
             output.writeBooleans(valueIsNull, 0, positionCount);
         }
-        output.write(offsets[arrayOffset + positionCount] - offsets[arrayOffset]);
-        output.write(slice.byteArray(), offsets[arrayOffset],
-                offsets[arrayOffset + positionCount] - offsets[arrayOffset]);
+
+        int totalSize = offsets[arrayOffset + positionCount];
+        output.write(totalSize);
+        output.write(slice.byteArray(), 0, totalSize);
     }
 
     @Override
