@@ -1288,4 +1288,10 @@ public abstract class AbstractTestAggregations
     {
         assertQuery("SELECT count(1) FROM (SELECT count(custkey) FROM orders LIMIT 10) a");
     }
+
+    @Test
+    public void testLongDecimalAggregations()
+    {
+        assertQuery("SELECT avg(value_big), sum(value_big), avg(value_small), sum(value_small) FROM (SELECT orderkey as id, CAST(power(2, 65) as DECIMAL(38, 0)) as value_big, CAST(1 as DECIMAL(38, 0)) as value_small FROM orders LIMIT 10) GROUP BY id");
+    }
 }
