@@ -135,7 +135,7 @@ SHOW CUBES [ FOR table_name ];
 ```
 
 ### 描述
-`SHOW CUBES`列出所有立方体。添加可选的`table_name`仅列出该表的Cubes。
+`SHOW CUBES`列出所有Cubes。添加可选的`table_name`仅列出该表的Cubes。
 
 ### 例子
 
