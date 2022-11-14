@@ -216,7 +216,7 @@ DAY_OF_YEAR($1)
 INSERT语句需要使用CAST强制转换，例如table_name_test表中的数据类型为smallint：
 
 ```
-insert into table_name_test values (cast(1 as small int));
+insert into table_name_test values (cast(1 as smallint));
 ```
 
 由于查询语句的执行顺序不同，ClickHouse支持 as 表达式的别名在where中使用，但在openLooKeng中不允许。
