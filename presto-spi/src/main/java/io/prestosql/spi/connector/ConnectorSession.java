@@ -105,4 +105,9 @@ public interface ConnectorSession
     {
         return false;
     }
+
+    default boolean isRetryModeTask()
+    {
+        return false;
+    }
 }

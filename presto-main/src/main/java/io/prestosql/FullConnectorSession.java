@@ -14,6 +14,7 @@
 package io.prestosql;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.CatalogName;
@@ -180,5 +181,11 @@ public class FullConnectorSession
     public boolean isSnapshotEnabled()
     {
         return SystemSessionProperties.isSnapshotEnabled(session);
+    }
+
+    @Override
+    public boolean isRetryModeTask()
+    {
+        return SystemSessionProperties.getRetryPolicy(session) == RetryPolicy.TASK;
     }
 }
