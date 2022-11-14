@@ -77,8 +77,6 @@ AND
   lineitem.quantity < s_avg;
 ```
 
-The feature is disabled by default. The user can enable it by executing the following command to set the session parameter-
-
 该功能默认是关闭状态。用户可以通过以下命令设置session参数来启用该功能-
 
 ```sql
