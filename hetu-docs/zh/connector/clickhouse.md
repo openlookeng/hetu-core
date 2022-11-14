@@ -71,9 +71,9 @@ case-insensitive-name-matching=true
 
 ### ClickHouse到openLooKeng类型映射
 
-下表显示了ClickHouse数据类型到openLooKeng的的映射关系。
+下表显示了ClickHouse数据类型到openLooKeng的映射关系。
 
-数据类型投影表：
+数据类型映射表：
 
 | ClickHouse类型        | openLooKeng类型 | 说明 |
 | :-------------------- | :-------------- | :--- |
