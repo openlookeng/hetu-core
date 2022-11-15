@@ -30,7 +30,6 @@ import io.prestosql.orc.metadata.Stream;
 import io.prestosql.orc.metadata.Stream.StreamKind;
 import io.prestosql.orc.metadata.statistics.ColumnStatistics;
 import io.prestosql.orc.metadata.statistics.SliceColumnStatisticsBuilder;
-import io.prestosql.orc.metadata.statistics.StringStatisticsBuilder;
 import io.prestosql.orc.stream.ByteArrayOutputStream;
 import io.prestosql.orc.stream.LongOutputStream;
 import io.prestosql.orc.stream.LongOutputStreamV2;
@@ -73,7 +72,6 @@ public class SliceDictionaryColumnWriter
     private final Type type;
     private final CompressionKind compression;
     private final int bufferSize;
-    private final int stringStatisticsLimitInBytes;
 
     private final LongOutputStream dataStream;
     private final PresentOutputStream presentStream;
@@ -86,7 +84,7 @@ public class SliceDictionaryColumnWriter
 
     private IntBigArray values;
     private int rowGroupValueCount;
-    private StringStatisticsBuilder statisticsBuilder;
+    private SliceColumnStatisticsBuilder statisticsBuilder;
 
     private long rawBytes;
     private long totalValueCount;
@@ -100,23 +98,6 @@ public class SliceDictionaryColumnWriter
     private SliceDirectColumnWriter directColumnWriter;
 
     private final Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier;
-    private SliceColumnStatisticsBuilder sliceColumnStatisticsBuilder;
-
-    public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, DataSize stringStatisticsLimit)
-    {
-        this.columnId = requireNonNull(columnId, "columnId is null");
-        this.type = requireNonNull(type, "type is null");
-        this.compression = requireNonNull(compression, "compression is null");
-        this.bufferSize = bufferSize;
-        this.stringStatisticsLimitInBytes = toIntExact(requireNonNull(stringStatisticsLimit, "stringStatisticsLimit is null").toBytes());
-        this.dataStream = new LongOutputStreamV2(compression, bufferSize, false, DATA);
-        this.presentStream = new PresentOutputStream(compression, bufferSize);
-        this.dictionaryDataStream = new ByteArrayOutputStream(compression, bufferSize, StreamKind.DICTIONARY_DATA);
-        this.dictionaryLengthStream = createLengthOutputStream(compression, bufferSize);
-        values = new IntBigArray();
-        this.statisticsBuilder = newStringStatisticsBuilder();
-        this.statisticsBuilderSupplier = null;
-    }
 
     public SliceDictionaryColumnWriter(OrcColumnId columnId, Type type, CompressionKind compression, int bufferSize, Supplier<SliceColumnStatisticsBuilder> statisticsBuilderSupplier)
     {
@@ -130,9 +111,7 @@ public class SliceDictionaryColumnWriter
         this.dictionaryLengthStream = createLengthOutputStream(compression, bufferSize);
         values = new IntBigArray();
         this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
-        this.sliceColumnStatisticsBuilder = statisticsBuilderSupplier.get();
-        this.stringStatisticsLimitInBytes = 0;
-        this.statisticsBuilder = newStringStatisticsBuilder();
+        this.statisticsBuilder = statisticsBuilderSupplier.get();
     }
 
     @Override
@@ -183,7 +162,7 @@ public class SliceDictionaryColumnWriter
         checkState(!closed);
         checkState(!directEncoded);
         if (directColumnWriter == null) {
-            directColumnWriter = new SliceDirectColumnWriter(columnId, type, compression, bufferSize, this::newStringStatisticsBuilder);
+            directColumnWriter = new SliceDirectColumnWriter(columnId, type, compression, bufferSize, statisticsBuilderSupplier);
         }
         checkState(directColumnWriter.getBufferedBytes() == 0);
 
@@ -223,7 +202,7 @@ public class SliceDictionaryColumnWriter
         totalNonNullValueCount = 0;
 
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
 
         directEncoded = true;
 
@@ -333,7 +312,7 @@ public class SliceDictionaryColumnWriter
         ColumnStatistics statistics = statisticsBuilder.buildColumnStatistics();
         rowGroups.add(new DictionaryRowGroup(values, rowGroupValueCount, statistics));
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
         values = new IntBigArray();
         return ImmutableMap.of(columnId, statistics);
     }
@@ -560,7 +539,7 @@ public class SliceDictionaryColumnWriter
         dictionaryLengthStream.reset();
         rowGroups.clear();
         rowGroupValueCount = 0;
-        statisticsBuilder = newStringStatisticsBuilder();
+        statisticsBuilder = statisticsBuilderSupplier.get();
         columnEncoding = null;
 
         dictionary.clear();
@@ -572,11 +551,6 @@ public class SliceDictionaryColumnWriter
             directEncoded = false;
             directColumnWriter.reset();
         }
-    }
-
-    private StringStatisticsBuilder newStringStatisticsBuilder()
-    {
-        return new StringStatisticsBuilder(stringStatisticsLimitInBytes);
     }
 
     private static class DictionaryRowGroup

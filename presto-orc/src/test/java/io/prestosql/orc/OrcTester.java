@@ -847,7 +847,7 @@ public class OrcTester
                 ImmutableList.of("test"),
                 ImmutableList.of(type),
                 compression,
-                new OrcWriterOptions(),
+                new OrcWriterOptions().withShouldCompactMinMax(false),
                 false,
                 ImmutableMap.of(),
                 true,

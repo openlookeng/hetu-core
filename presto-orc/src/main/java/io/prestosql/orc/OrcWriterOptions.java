@@ -107,7 +107,7 @@ public class OrcWriterOptions
         this.maxCompressionBufferSize = maxCompressionBufferSize;
 
         this.writerIdentification = WriterIdentification.TRINO;
-        this.shouldCompactMinMax = false; /*此处false随便写的*/
+        this.shouldCompactMinMax = true;
         this.bloomFilterColumns = Collections.emptySet();
         this.bloomFilterFpp = 0d;
     }
@@ -192,6 +192,13 @@ public class OrcWriterOptions
         return new OrcWriterOptions(stripeMinSize, stripeMaxSize, stripeMaxRowCount, rowGroupMaxRowCount, dictionaryMaxMemory, maxStringStatisticsLimit, maxCompressionBufferSize);
     }
 
+    public OrcWriterOptions withShouldCompactMinMax(boolean shouldCompactMinMax)
+    {
+        return builderFrom(this)
+                .setShouldCompactMinMax(shouldCompactMinMax)
+                .build();
+    }
+
     @Override
     public String toString()
     {
@@ -203,6 +210,7 @@ public class OrcWriterOptions
                 .add("dictionaryMaxMemory", dictionaryMaxMemory)
                 .add("maxStringStatisticsLimit", maxStringStatisticsLimit)
                 .add("maxCompressionBufferSize", maxCompressionBufferSize)
+                .add("shouldCompactMinMax", shouldCompactMinMax)
                 .toString();
     }
 

@@ -16,6 +16,7 @@ package io.prestosql.orc;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
 import io.prestosql.orc.metadata.CompressionKind;
+import io.prestosql.orc.metadata.statistics.StringStatisticsBuilder;
 import io.prestosql.orc.writer.SliceDictionaryColumnWriter;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
@@ -41,7 +42,7 @@ public class TestSliceDictionaryColumnWriter
                 VARCHAR,
                 CompressionKind.NONE,
                 toIntExact(DEFAULT_MAX_COMPRESSION_BUFFER_SIZE.toBytes()),
-                DEFAULT_MAX_STRING_STATISTICS_LIMIT);
+                () -> new StringStatisticsBuilder(toIntExact(DEFAULT_MAX_STRING_STATISTICS_LIMIT.toBytes()), false));
 
         // a single row group exceeds 2G after direct conversion
         byte[] value = new byte[megabytes(1)];

@@ -181,7 +181,8 @@ public final class OrcWriter
         for (int fieldId = 0; fieldId < types.size(); fieldId++) {
             OrcColumnId fieldColumnIndex = localRootType.getFieldTypeIndex(fieldId);
             Type fieldType = types.get(fieldId);
-            ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, maxCompressionBufferSize, options.getMaxStringStatisticsLimit());
+            ColumnWriter columnWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, maxCompressionBufferSize, options.getMaxStringStatisticsLimit(),
+                    options.isShouldCompactMinMax());
             localColumnWriters.add(columnWriter);
 
             if (columnWriter instanceof SliceDictionaryColumnWriter) {

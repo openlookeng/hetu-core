@@ -22,8 +22,13 @@ import java.util.Optional;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
+import static io.airlift.slice.SliceUtf8.codePointToUtf8;
+import static io.airlift.slice.SliceUtf8.getCodePointAt;
+import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static io.prestosql.orc.metadata.statistics.StringStatistics.STRING_VALUE_BYTES_OVERHEAD;
+import static java.lang.Character.MAX_CODE_POINT;
 import static java.lang.Math.addExact;
+import static java.lang.System.arraycopy;
 import static java.util.Objects.requireNonNull;
 
 public class StringStatisticsBuilder
@@ -36,7 +41,6 @@ public class StringStatisticsBuilder
     private Slice maximum;
     private long sum;
 
-    private final BloomFilterBuilder bloomFilterBuilder;
     private final boolean shouldCompactMinMax;
 
     public StringStatisticsBuilder(int stringStatisticsLimitInBytes)
@@ -44,9 +48,9 @@ public class StringStatisticsBuilder
         this(stringStatisticsLimitInBytes, 0, null, null, 0);
     }
 
-    public StringStatisticsBuilder(int stringStatisticsLimitInBytes, BloomFilterBuilder bloomFilterBuilder, boolean shouldCompactMinMax)
+    public StringStatisticsBuilder(int stringStatisticsLimitInBytes, boolean shouldCompactMinMax)
     {
-        this(stringStatisticsLimitInBytes, 0, null, null, 0, bloomFilterBuilder, shouldCompactMinMax);
+        this(stringStatisticsLimitInBytes, 0, null, null, 0, shouldCompactMinMax);
     }
 
     private StringStatisticsBuilder(
@@ -55,7 +59,6 @@ public class StringStatisticsBuilder
             Slice minimum,
             Slice maximum,
             long sum,
-            BloomFilterBuilder bloomFilterBuilder,
             boolean shouldCompactMinMax)
     {
         this.stringStatisticsLimitInBytes = stringStatisticsLimitInBytes;
@@ -63,7 +66,6 @@ public class StringStatisticsBuilder
         this.minimum = minimum;
         this.maximum = maximum;
         this.sum = sum;
-        this.bloomFilterBuilder = requireNonNull(bloomFilterBuilder, "bloomFilterBuilder");
         this.shouldCompactMinMax = shouldCompactMinMax;
     }
 
@@ -74,8 +76,7 @@ public class StringStatisticsBuilder
         this.minimum = minimum;
         this.maximum = maximum;
         this.sum = sum;
-        this.bloomFilterBuilder = null;
-        this.shouldCompactMinMax = false;
+        this.shouldCompactMinMax = true;
     }
 
     public StringStatisticsBuilder withStringStatisticsLimit(int limitInBytes)
@@ -143,8 +144,8 @@ public class StringStatisticsBuilder
         if (nonNullValueCount == 0) {
             return Optional.empty();
         }
-        minimum = dropStringMinMaxIfNecessary(minimum);
-        maximum = dropStringMinMaxIfNecessary(maximum);
+        minimum = computeStringMinMax(minimum, true);
+        maximum = computeStringMinMax(maximum, false);
         if (minimum == null && maximum == null) {
             // Create string stats only when min or max is not null.
             // This corresponds to the behavior of metadata reader.
@@ -188,10 +189,16 @@ public class StringStatisticsBuilder
         return stringStatisticsBuilder.buildStringStatistics();
     }
 
-    private Slice dropStringMinMaxIfNecessary(Slice minOrMax)
+    private Slice computeStringMinMax(Slice minOrMax, boolean isMin)
     {
-        if (minOrMax == null || minOrMax.length() > stringStatisticsLimitInBytes) {
+        if (minOrMax == null || (!shouldCompactMinMax && minOrMax.length() > stringStatisticsLimitInBytes)) {
             return null;
+        }
+        if (minOrMax.length() > stringStatisticsLimitInBytes) {
+            if (isMin) {
+                return StringCompactor.truncateMin(minOrMax, stringStatisticsLimitInBytes);
+            }
+            return StringCompactor.truncateMax(minOrMax, stringStatisticsLimitInBytes);
         }
 
         // Do not hold the entire slice where the actual stats could be small
@@ -199,5 +206,68 @@ public class StringStatisticsBuilder
             return minOrMax;
         }
         return Slices.copyOf(minOrMax);
+    }
+
+    static final class StringCompactor
+    {
+        private static final int INDEX_NOT_FOUND = -1;
+
+        private StringCompactor() {}
+
+        public static Slice truncateMin(Slice slice, int maxBytes)
+        {
+            checkArgument(slice.length() > maxBytes);
+            int lastIndex = findLastCharacterInRange(slice, maxBytes);
+            if (lastIndex == INDEX_NOT_FOUND) {
+                return EMPTY_SLICE;
+            }
+            return slice.slice(0, lastIndex);
+        }
+
+        public static Slice truncateMax(Slice slice, int maxBytes)
+        {
+            int firstRemovedCharacterIndex = findLastCharacterInRange(slice, maxBytes);
+            int lastRetainedCharacterIndex = findLastCharacterInRange(slice, firstRemovedCharacterIndex - 1);
+            if (firstRemovedCharacterIndex == INDEX_NOT_FOUND || lastRetainedCharacterIndex == INDEX_NOT_FOUND) {
+                return EMPTY_SLICE;
+            }
+            int lastRetainedCharacter = getCodePointAt(slice, lastRetainedCharacterIndex);
+            while (lastRetainedCharacter == MAX_CODE_POINT && lastRetainedCharacterIndex > 0) {
+                lastRetainedCharacterIndex = findLastCharacterInRange(slice, lastRetainedCharacterIndex - 1);
+                if (lastRetainedCharacterIndex == INDEX_NOT_FOUND) {
+                    return EMPTY_SLICE;
+                }
+                lastRetainedCharacter = getCodePointAt(slice, lastRetainedCharacterIndex);
+            }
+
+            if (lastRetainedCharacterIndex == 0 && lastRetainedCharacter == MAX_CODE_POINT) {
+                // whole string is made of MAX_CODE_POINT characters, we cannot provide upper bound that is shorter than maxBytes
+                return EMPTY_SLICE;
+            }
+
+            lastRetainedCharacter++;
+            Slice sliceToAppend = codePointToUtf8(lastRetainedCharacter);
+            byte[] result = new byte[lastRetainedCharacterIndex + sliceToAppend.length()];
+            arraycopy(slice.byteArray(), slice.byteArrayOffset(), result, 0, lastRetainedCharacterIndex);
+            arraycopy(sliceToAppend.byteArray(), 0, result, lastRetainedCharacterIndex, sliceToAppend.length());
+            return Slices.wrappedBuffer(result);
+        }
+
+        private static int findLastCharacterInRange(Slice slice, int toInclusive)
+        {
+            int pos = toInclusive;
+            while (pos >= 0) {
+                if (isUtfBlockStartChar(slice.getByte(pos))) {
+                    return pos;
+                }
+                pos--;
+            }
+            return INDEX_NOT_FOUND;
+        }
+
+        private static boolean isUtfBlockStartChar(byte b)
+        {
+            return (b & 0xC0) != 0x80;
+        }
     }
 }

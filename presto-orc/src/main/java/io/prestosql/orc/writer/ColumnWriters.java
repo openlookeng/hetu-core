@@ -46,7 +46,8 @@ public final class ColumnWriters
             Type type,
             CompressionKind compression,
             int bufferSize,
-            DataSize stringStatisticsLimit)
+            DataSize stringStatisticsLimit,
+            boolean isShouldCompactMinMax)
     {
         requireNonNull(type, "type is null");
         OrcType orcType = orcTypes.get(columnId);
@@ -83,12 +84,12 @@ public final class ColumnWriters
             case CHAR:
             case VARCHAR:
             case STRING:
-                return new SliceDictionaryColumnWriter(columnId, type, compression, bufferSize, stringStatisticsLimit);
+                return new SliceDictionaryColumnWriter(columnId, type, compression, bufferSize, () -> new StringStatisticsBuilder(toIntExact(stringStatisticsLimit.toBytes()), isShouldCompactMinMax));
 
             case LIST: {
                 OrcColumnId fieldColumnIndex = orcType.getFieldTypeIndex(0);
                 Type fieldType = type.getTypeParameters().get(0);
-                ColumnWriter elementWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, bufferSize, stringStatisticsLimit);
+                ColumnWriter elementWriter = createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, bufferSize, stringStatisticsLimit, isShouldCompactMinMax);
                 return new ListColumnWriter(columnId, compression, bufferSize, elementWriter);
             }
 
@@ -99,14 +100,16 @@ public final class ColumnWriters
                         type.getTypeParameters().get(0),
                         compression,
                         bufferSize,
-                        stringStatisticsLimit);
+                        stringStatisticsLimit,
+                        isShouldCompactMinMax);
                 ColumnWriter valueWriter = createColumnWriter(
                         orcType.getFieldTypeIndex(1),
                         orcTypes,
                         type.getTypeParameters().get(1),
                         compression,
                         bufferSize,
-                        stringStatisticsLimit);
+                        stringStatisticsLimit,
+                        isShouldCompactMinMax);
                 return new MapColumnWriter(columnId, compression, bufferSize, keyWriter, valueWriter);
             }
 
@@ -115,7 +118,7 @@ public final class ColumnWriters
                 for (int fieldId = 0; fieldId < orcType.getFieldCount(); fieldId++) {
                     OrcColumnId fieldColumnIndex = orcType.getFieldTypeIndex(fieldId);
                     Type fieldType = type.getTypeParameters().get(fieldId);
-                    fieldWriters.add(createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, bufferSize, stringStatisticsLimit));
+                    fieldWriters.add(createColumnWriter(fieldColumnIndex, orcTypes, fieldType, compression, bufferSize, stringStatisticsLimit, isShouldCompactMinMax));
                 }
                 return new StructColumnWriter(columnId, compression, bufferSize, fieldWriters.build());
             }
@@ -177,7 +180,7 @@ public final class ColumnWriters
             case CHAR:
             case VARCHAR:
             case STRING:
-                return new SliceDictionaryColumnWriter(columnId, type, compression, bufferSize, () -> new StringStatisticsBuilder(toIntExact(stringStatisticsLimit.toBytes()), bloomFilterBuilder.get(), shouldCompactMinMax));
+                return new SliceDictionaryColumnWriter(columnId, type, compression, bufferSize, () -> new StringStatisticsBuilder(toIntExact(stringStatisticsLimit.toBytes()), shouldCompactMinMax));
 
             case LIST: {
                 OrcColumnId fieldColumnIndex = orcType.getFieldTypeIndex(0);
