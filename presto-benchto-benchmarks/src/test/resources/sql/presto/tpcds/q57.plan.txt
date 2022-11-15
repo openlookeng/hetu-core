@@ -1,61 +1,21 @@
 local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
-        join (INNER, PARTITIONED):
-            join (INNER, PARTITIONED):
-                local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["cc_name", "i_brand", "i_category"])
-                        final hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
-                            local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cc_name", "d_moy", "d_year", "i_brand", "i_category"])
-                                    partial hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
-                                        join (INNER, REPLICATED):
-                                            join (INNER, REPLICATED):
-                                                join (INNER, REPLICATED):
-                                                    scan catalog_sales
-                                                    local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPLICATE, BROADCAST, [])
-                                                            scan date_dim
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan call_center
-                                            local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan item
-                local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["cc_name_137", "i_brand_52", "i_category_56"])
-                        final hashaggregation over (cc_name_137, d_moy_110, d_year_108, i_brand_52, i_category_56)
-                            local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cc_name_137", "d_moy_110", "d_year_108", "i_brand_52", "i_category_56"])
-                                    partial hashaggregation over (cc_name_137, d_moy_110, d_year_108, i_brand_52, i_category_56)
-                                        join (INNER, REPLICATED):
-                                            join (INNER, REPLICATED):
-                                                join (INNER, REPLICATED):
-                                                    scan catalog_sales
-                                                    local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPLICATE, BROADCAST, [])
-                                                            scan date_dim
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan call_center
-                                            local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan item
-            local exchange (GATHER, SINGLE, [])
-                remote exchange (REPARTITION, HASH, ["cc_name_306", "i_brand_221", "i_category_225"])
-                    final hashaggregation over (cc_name_306, d_moy_279, d_year_277, i_brand_221, i_category_225)
-                        local exchange (GATHER, SINGLE, [])
-                            remote exchange (REPARTITION, HASH, ["cc_name_306", "d_moy_279", "d_year_277", "i_brand_221", "i_category_225"])
-                                partial hashaggregation over (cc_name_306, d_moy_279, d_year_277, i_brand_221, i_category_225)
+        local exchange (GATHER, SINGLE, [])
+            remote exchange (REPARTITION, HASH, ["cc_name", "i_brand", "i_category"])
+                final hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
+                    local exchange (GATHER, SINGLE, [])
+                        remote exchange (REPARTITION, HASH, ["cc_name", "d_moy", "d_year", "i_brand", "i_category"])
+                            partial hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
+                                join (INNER, REPLICATED):
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
-                                            join (INNER, REPLICATED):
-                                                scan catalog_sales
-                                                local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan date_dim
+                                            scan catalog_sales
                                             local exchange (GATHER, SINGLE, [])
                                                 remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan call_center
+                                                    scan date_dim
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                scan item
+                                                scan call_center
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPLICATE, BROADCAST, [])
+                                            scan item

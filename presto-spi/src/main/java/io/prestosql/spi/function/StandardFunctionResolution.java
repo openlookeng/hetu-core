@@ -79,4 +79,10 @@ public interface StandardFunctionResolution
     FunctionHandle likePatternFunction();
 
     FunctionHandle tryFunction(Type returnType);
+
+    boolean isSumFunction(FunctionHandle functionHandle);
+
+    FunctionHandle sumFunction();
+
+    FunctionHandle sumFunction(Type valueType);
 }

@@ -164,7 +164,9 @@ public class TestFeaturesConfig
                 .setAdaptivePartialAggregationMinRows(100_000)
                 .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.8)
                 .setFilterConjunctionIndependenceFactor(0.75)
-                .setJoinMultiClauseIndependenceFactor(0.25));
+                .setJoinMultiClauseIndependenceFactor(0.25)
+                .setTransformSelfJoinToWindow(true)
+                .setTransformSelfJoinAggregatesToWindow(true));
     }
 
     @Test
@@ -279,6 +281,8 @@ public class TestFeaturesConfig
                 .put("adaptive-partial-aggregation.unique-rows-ratio-threshold", "0.99")
                 .put("optimizer.filter-conjunction-independence-factor", "0.99")
                 .put("optimizer.join-multi-clause-independence-factor", "0.99")
+                .put("optimizer.transform-self-join-to-window", "false")
+                .put("optimizer.transform-self-join-aggregates-to-window", "false")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -390,7 +394,9 @@ public class TestFeaturesConfig
                 .setAdaptivePartialAggregationMinRows(1)
                 .setAdaptivePartialAggregationUniqueRowsRatioThreshold(0.99)
                 .setFilterConjunctionIndependenceFactor(0.99)
-                .setJoinMultiClauseIndependenceFactor(0.99);
+                .setJoinMultiClauseIndependenceFactor(0.99)
+                .setTransformSelfJoinToWindow(false)
+                .setTransformSelfJoinAggregatesToWindow(false);
 
         assertFullMapping(properties, expected);
     }
