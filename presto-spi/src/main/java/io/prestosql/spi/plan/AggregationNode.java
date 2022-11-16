@@ -53,6 +53,17 @@ public class AggregationNode
     private AggregationType aggregationType;
     private Optional<Symbol> finalizeSymbol;
 
+    public static AggregationNode singleAggregation(
+            PlanNodeId id,
+            PlanNode source,
+            Map<Symbol, Aggregation> aggregations,
+            GroupingSetDescriptor groupingSets)
+    {
+        return new AggregationNode(id, source, aggregations, groupingSets, ImmutableList.of(), SINGLE,
+                Optional.empty(), Optional.empty(),
+                AggregationType.HASH, Optional.empty());
+    }
+
     @JsonCreator
     public AggregationNode(
             @JsonProperty("id") PlanNodeId id,

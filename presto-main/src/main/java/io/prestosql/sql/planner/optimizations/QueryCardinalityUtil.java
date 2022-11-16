@@ -65,6 +65,21 @@ public final class QueryCardinalityUtil
         return Range.closed(0L, maxCardinality).encloses(extractCardinality(node, lookup));
     }
 
+    public static boolean isAtLeastScalar(PlanNode node, Lookup lookup)
+    {
+        return isAtLeast(node, lookup, 1L);
+    }
+
+    public static boolean isAtLeast(PlanNode node, Lookup lookup, long minCardinality)
+    {
+        return Range.atLeast(minCardinality).encloses(extractCardinality(node, lookup));
+    }
+
+    public static boolean isEmpty(PlanNode node, Lookup lookup)
+    {
+        return isAtMost(node, lookup, 0);
+    }
+
     public static Range<Long> extractCardinality(PlanNode node)
     {
         return extractCardinality(node, noLookup());

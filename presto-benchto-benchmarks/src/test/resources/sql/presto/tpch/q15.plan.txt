@@ -1,24 +1,23 @@
 remote exchange (GATHER, SINGLE, [])
     local exchange (GATHER, UNKNOWN, [])
         remote exchange (REPARTITION, ROUND_ROBIN, [])
-            join (INNER, REPLICATED):
-                scan supplier
-                local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPLICATE, BROADCAST, [])
-                        join (INNER, REPLICATED):
-                            final hashaggregation over (suppkey_0)
+            join (INNER, PARTITIONED):
+                remote exchange (REPARTITION, HASH, ["suppkey"])
+                    scan supplier
+                join (INNER, REPLICATED):
+                    final hashaggregation over (suppkey_0)
+                        local exchange (GATHER, SINGLE, [])
+                            remote exchange (REPARTITION, HASH, ["suppkey_0"])
+                                partial hashaggregation over (suppkey_0)
+                                    scan lineitem
+                    local exchange (GATHER, SINGLE, [])
+                        remote exchange (REPLICATE, BROADCAST, [])
+                            final hashaggregation over ()
                                 local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["suppkey_0"])
-                                        partial hashaggregation over (suppkey_0)
-                                            scan lineitem
-                            local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPLICATE, BROADCAST, [])
-                                    final hashaggregation over ()
-                                        local exchange (GATHER, SINGLE, [])
-                                            remote exchange (GATHER, SINGLE, [])
-                                                partial hashaggregation over ()
-                                                    final hashaggregation over (suppkey_12)
-                                                        local exchange (GATHER, SINGLE, [])
-                                                            remote exchange (REPARTITION, HASH, ["suppkey_12"])
-                                                                partial hashaggregation over (suppkey_12)
-                                                                    scan lineitem
+                                    remote exchange (GATHER, SINGLE, [])
+                                        partial hashaggregation over ()
+                                            final hashaggregation over (suppkey_12)
+                                                local exchange (GATHER, SINGLE, [])
+                                                    remote exchange (REPARTITION, HASH, ["suppkey_12"])
+                                                        partial hashaggregation over (suppkey_12)
+                                                            scan lineitem

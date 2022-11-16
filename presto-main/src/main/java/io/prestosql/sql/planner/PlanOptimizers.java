@@ -45,6 +45,7 @@ import io.prestosql.sql.planner.iterative.rule.DesugarTryExpression;
 import io.prestosql.sql.planner.iterative.rule.DetermineJoinDistributionType;
 import io.prestosql.sql.planner.iterative.rule.DetermineSemiJoinDistributionType;
 import io.prestosql.sql.planner.iterative.rule.EliminateCrossJoins;
+import io.prestosql.sql.planner.iterative.rule.EvaluateEmptyIntersect;
 import io.prestosql.sql.planner.iterative.rule.EvaluateZeroSample;
 import io.prestosql.sql.planner.iterative.rule.ExtractSpatialJoins;
 import io.prestosql.sql.planner.iterative.rule.GatherAndMergeWindows;
@@ -65,10 +66,24 @@ import io.prestosql.sql.planner.iterative.rule.MergeLimits;
 import io.prestosql.sql.planner.iterative.rule.MultipleDistinctAggregationToMarkDistinct;
 import io.prestosql.sql.planner.iterative.rule.PruneAggregationColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneAggregationSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneApplyColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneApplyCorrelation;
+import io.prestosql.sql.planner.iterative.rule.PruneApplySourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneAssignUniqueIdColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneCountAggregationOverScalar;
 import io.prestosql.sql.planner.iterative.rule.PruneCrossJoinColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneDeleteSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneDistinctLimitSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneEnforceSingleRowColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneExceptSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneExchangeColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneExchangeSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneFilterColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneGroupIdColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneGroupIdSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneIndexJoinColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneIndexSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneIntersectSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneJoinChildrenColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneJoinColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneLimitColumns;
@@ -76,11 +91,23 @@ import io.prestosql.sql.planner.iterative.rule.PruneMarkDistinctColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneOffsetColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneOrderByInAggregation;
 import io.prestosql.sql.planner.iterative.rule.PruneOutputColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneOutputSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneProjectColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneRowNumberColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneSampleColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneSemiJoinColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneSemiJoinFilteringSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneSortColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneSpatialJoinChildrenColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneSpatialJoinColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneTableExecuteSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneTableScanColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneTableWriterSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneTopNColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneTopNRankingColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneUnionColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneUnionSourceColumns;
+import io.prestosql.sql.planner.iterative.rule.PruneUpdateSourceColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneValuesColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneWindowColumns;
 import io.prestosql.sql.planner.iterative.rule.PushAggregationThroughOuterJoin;
@@ -110,10 +137,16 @@ import io.prestosql.sql.planner.iterative.rule.PushTopNThroughUnion;
 import io.prestosql.sql.planner.iterative.rule.RemoveAggregationInSemiJoin;
 import io.prestosql.sql.planner.iterative.rule.RemoveDuplicateConditions;
 import io.prestosql.sql.planner.iterative.rule.RemoveEmptyDelete;
+import io.prestosql.sql.planner.iterative.rule.RemoveEmptyExceptBranches;
+import io.prestosql.sql.planner.iterative.rule.RemoveEmptyUnionBranches;
 import io.prestosql.sql.planner.iterative.rule.RemoveFullSample;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantDistinctLimit;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantEnforceSingleRowNode;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantExists;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantJoin;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantLimit;
+import io.prestosql.sql.planner.iterative.rule.RemoveRedundantOffset;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantSort;
 import io.prestosql.sql.planner.iterative.rule.RemoveRedundantTopN;
 import io.prestosql.sql.planner.iterative.rule.RemoveTrivialFilters;
@@ -271,21 +304,47 @@ public class PlanOptimizers
         Set<Rule<?>> columnPruningRules = ImmutableSet.of(
                 new PruneAggregationColumns(),
                 new PruneAggregationSourceColumns(),
-                new PruneCrossJoinColumns(),
+                new PruneApplyColumns(),
+                new PruneApplyCorrelation(),
+                new PruneApplySourceColumns(),
+                new PruneAssignUniqueIdColumns(),
+                new PruneDeleteSourceColumns(),
+                new PruneUpdateSourceColumns(),
+                new PruneDistinctLimitSourceColumns(),
+                new PruneEnforceSingleRowColumns(),
+                new PruneExceptSourceColumns(),
+                new PruneExchangeColumns(),
+                new PruneExchangeSourceColumns(),
                 new PruneFilterColumns(),
+                new PruneGroupIdColumns(),
+                new PruneGroupIdSourceColumns(),
+                new PruneIndexJoinColumns(),
                 new PruneIndexSourceColumns(),
+                new PruneIntersectSourceColumns(),
                 new PruneJoinChildrenColumns(),
                 new PruneJoinColumns(),
+                new PruneLimitColumns(),
                 new PruneMarkDistinctColumns(),
-                new PruneOutputColumns(),
+                new PruneOffsetColumns(),
+                new PruneOutputSourceColumns(),
                 new PruneProjectColumns(),
+                new PruneRowNumberColumns(),
+                new PruneSampleColumns(),
                 new PruneSemiJoinColumns(),
                 new PruneSemiJoinFilteringSourceColumns(),
+                new PruneSortColumns(),
+                new PruneSpatialJoinChildrenColumns(),
+                new PruneSpatialJoinColumns(),
+                new PruneTableExecuteSourceColumns(),
+                new PruneTableWriterSourceColumns(),
                 new PruneTopNColumns(),
+                new PruneTopNRankingColumns(),
+                new PruneUnionColumns(),
+                new PruneUnionSourceColumns(),
                 new PruneValuesColumns(),
                 new PruneWindowColumns(),
-                new PruneOffsetColumns(),
-                new PruneLimitColumns(),
+                new PruneCrossJoinColumns(),
+                new PruneOutputColumns(),
                 new PruneTableScanColumns());
 
         Set<Rule<?>> projectionPushdownRules = ImmutableSet.of(
@@ -352,6 +411,9 @@ public class PlanOptimizers
                                 .addAll(columnPruningRules)
                                 .addAll(ImmutableSet.of(
                                         new RemoveRedundantIdentityProjections(),
+                                        new RemoveEmptyUnionBranches(),
+                                        new EvaluateEmptyIntersect(),
+                                        new RemoveEmptyExceptBranches(),
                                         new RemoveFullSample(),
                                         new EvaluateZeroSample(),
                                         new PushOffsetThroughProject(),
@@ -367,9 +429,13 @@ public class PlanOptimizers
                                         new PushLimitThroughUnion(),
                                         new RemoveTrivialFilters(),
                                         new RemoveRedundantLimit(),
+                                        new RemoveRedundantOffset(),
                                         new RemoveRedundantSort(),
                                         new RemoveRedundantTopN(),
                                         new RemoveRedundantDistinctLimit(),
+                                        new RemoveRedundantJoin(),
+                                        new RemoveRedundantEnforceSingleRowNode(),
+                                        new RemoveRedundantExists(),
                                         new ImplementFilteredAggregations(),
                                         new StarTreeAggregationRule(cubeManager, metadata),
                                         new OptimizeAggregationOverJoin(cubeManager, metadata),
