@@ -141,6 +141,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedLateralToJoi
 import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedSubquerySelfJoinAggregatesToWindowFunction;
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
+import io.prestosql.sql.planner.iterative.rule.UseNonPartitionedJoinLookupSource;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
@@ -673,6 +674,12 @@ public class PlanOptimizers
         builder.add(new AddSortBasedAggregation(metadata, statsCalculator, costCalculator, costComparator));
         // Optimizers above this don't understand local exchanges, so be careful moving this.
         builder.add(new AddLocalExchanges(metadata, typeAnalyzer));
+        // UseNonPartitionedJoinLookupSource needs to run after AddLocalExchanges since it operates on ExchangeNodes added by this optimizer.
+        builder.add(new IterativeOptimizer(
+                ruleStats,
+                statsCalculator,
+                costCalculator,
+                ImmutableSet.of(new UseNonPartitionedJoinLookupSource())));
 
         // Optimizers above this do not need to care about aggregations with the type other than SINGLE
         // This optimizer must be run after all exchange-related optimizers

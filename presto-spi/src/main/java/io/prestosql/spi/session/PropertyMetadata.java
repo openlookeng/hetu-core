@@ -169,6 +169,11 @@ public final class PropertyMetadata<T>
 
     public static PropertyMetadata<Long> longProperty(String name, String description, Long defaultValue, boolean hidden)
     {
+        return longProperty(name, description, defaultValue, value -> {}, hidden);
+    }
+
+    public static PropertyMetadata<Long> longProperty(String name, String description, Long defaultValue, Consumer<Long> validation, boolean hidden)
+    {
         return new PropertyMetadata<>(
                 name,
                 description,
@@ -176,7 +181,11 @@ public final class PropertyMetadata<T>
                 Long.class,
                 defaultValue,
                 hidden,
-                value -> ((Number) value).longValue(),
+                object -> {
+                    long value = (Long) object;
+                    validation.accept(value);
+                    return value;
+                },
                 object -> object);
     }
 

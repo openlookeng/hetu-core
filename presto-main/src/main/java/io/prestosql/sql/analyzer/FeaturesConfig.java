@@ -195,6 +195,8 @@ public class FeaturesConfig
     private boolean transformSelfJoinToWindow = true;
     private boolean transformSelfJoinAggregateToWindow = true;
 
+    private long joinPartitionedBuildMinRowCount = 1_000_000L;
+
     @Config("optimizer.transform-self-join-to-window")
     public FeaturesConfig setTransformSelfJoinToWindow(boolean value)
     {
@@ -1613,6 +1615,20 @@ public class FeaturesConfig
     public FeaturesConfig setAdaptivePartialAggregationUniqueRowsRatioThreshold(double adaptivePartialAggregationUniqueRowsRatioThreshold)
     {
         this.adaptivePartialAggregationUniqueRowsRatioThreshold = adaptivePartialAggregationUniqueRowsRatioThreshold;
+        return this;
+    }
+
+    @Min(0)
+    public long getJoinPartitionedBuildMinRowCount()
+    {
+        return joinPartitionedBuildMinRowCount;
+    }
+
+    @Config("optimizer.join-partitioned-build-min-row-count")
+    @ConfigDescription("Minimum number of join build side rows required to use partitioned join lookup")
+    public FeaturesConfig setJoinPartitionedBuildMinRowCount(long joinPartitionedBuildMinRowCount)
+    {
+        this.joinPartitionedBuildMinRowCount = joinPartitionedBuildMinRowCount;
         return this;
     }
 }
