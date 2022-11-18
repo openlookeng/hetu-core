@@ -18,13 +18,16 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.RestorableConfig;
 import io.prestosql.spi.type.Type;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -36,7 +39,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 // TODO-cp-I2TJ3G: will add snapshot support later
-@RestorableConfig(unsupported = true)
+@RestorableConfig()
 public class CommonTableExpressionOperator
         implements Operator, Closeable
 {
@@ -47,9 +50,10 @@ public class CommonTableExpressionOperator
     private final PlanNodeId consumer;
     private final CommonTableExecutionContext cteContext;
     private final Function<Page, Page> pagePreprocessor;
-    private final int operatorInstaceId;
+    private int operatorInstaceId;
     private boolean finish;
     private boolean isFeeder;
+    private final SingleInputSnapshotState snapshotState;
 
     public CommonTableExpressionOperator(
             PlanNodeId self,
@@ -65,6 +69,7 @@ public class CommonTableExpressionOperator
         this.cteContext = requireNonNull(cteContext, "CTE context is null");
         this.operatorInstaceId = operatorInstaceId;
         this.pagePreprocessor = pagePreprocessor;
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
 
         synchronized (cteContext) {
             if (cteContext.isFeeder(consumer)) {
@@ -176,6 +181,15 @@ public class CommonTableExpressionOperator
     @Override
     public void addInput(Page page)
     {
+
+        checkState(needsInput(), "Operator is already finishing");
+        requireNonNull(page, "page is null");
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
         /* Got a new page... Place it in the Queue! */
         Page addPage = pagePreprocessor.apply(page);
         cteContext.addPage(addPage);
@@ -189,6 +203,13 @@ public class CommonTableExpressionOperator
     @Override
     public Page getOutput()
     {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
         try {
             Page page = cteContext.getPage(consumer);
             if (page != null) {
@@ -210,8 +231,7 @@ public class CommonTableExpressionOperator
     @Override
     public Page pollMarker()
     {
-        //TODO-cp-I2TJ3G: Operator currently not supported for Snapshot
-        return null;
+        return snapshotState.nextMarker();
     }
 
     /**
@@ -264,6 +284,9 @@ public class CommonTableExpressionOperator
     @Override
     public boolean isFinished()
     {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            return false;
+        }
         return finish;
     }
 
@@ -273,6 +296,45 @@ public class CommonTableExpressionOperator
     @Override
     public void close() throws IOException
     {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
         LOG.debug("CTE(" + cteContext.getName() + ")[" + consumer + "-" + operatorInstaceId + "] Operator Closed");
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+
+        CommonTableOperatorState myState = new CommonTableOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        if (isFeeder) {
+            myState.cteContext = cteContext.capture(serdeProvider);
+        }
+        myState.finish = finish;
+        myState.isFeeder = isFeeder;
+        return myState;
+
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        CommonTableOperatorState myState = (CommonTableOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        isFeeder = myState.isFeeder;
+        if (isFeeder) {
+            this.cteContext.restore(myState.cteContext, serdeProvider);
+        }
+        finish = myState.finish;
+    }
+
+    private static class CommonTableOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private Object cteContext;
+        private boolean finish;
+        private boolean isFeeder;
     }
 }

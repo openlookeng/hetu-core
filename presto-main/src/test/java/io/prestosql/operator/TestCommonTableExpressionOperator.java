@@ -27,7 +27,10 @@ import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.testing.MaterializedResult;
 import org.testng.annotations.Test;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -35,6 +38,7 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.operator.OperatorAssertion.assertOperatorEquals;
+import static io.prestosql.operator.OperatorAssertion.assertOperatorEqualsWithSimpleSelfStateComparison;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.testing.TestingTaskContext.createTaskContext;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -93,6 +97,42 @@ public class TestCommonTableExpressionOperator
         assertOperatorEquals(parent1, driverContext, ImmutableList.of(input), result);
         assertOperatorEquals(parent2, driverContext, ImmutableList.of(input), result);
     }
+
+
+    @Test
+    public void testOperatorSourceSnapshot() {
+        final Page input = SequencePageBuilder.createSequencePage(ImmutableList.of(VARCHAR), 10_000, 0);
+        DriverContext driverContext = newDriverContext();
+
+        CommonTableExecutionContext cteContext = new CommonTableExecutionContext("test_cte_prod_1",
+                ImmutableSet.of(new PlanNodeId("consumer_1"), new PlanNodeId("consumer_2")), new PlanNodeId("consumer_1"),
+                driverContext.getNotificationExecutor(), 0, 1024, 512);
+
+        CommonTableExpressionOperator.CommonTableExpressionOperatorFactory parent1 = new CommonTableExpressionOperator.CommonTableExpressionOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                cteContext,
+                ImmutableList.of(VARCHAR),
+                new DataSize(0, DataSize.Unit.BYTE),
+                0,
+                symbol -> symbol);
+        parent1.addConsumer(new PlanNodeId("consumer_1"));
+
+        MaterializedResult result = MaterializedResult.resultBuilder(driverContext.getSession(), VARCHAR)
+                .page(input)
+                .build();
+        assertOperatorEqualsWithSimpleSelfStateComparison(parent1, driverContext, ImmutableList.of(input), result, createExpectedMapping());
+    }
+
+    private Map<String, Object> createExpectedMapping()
+    {
+        Map<String, Object> expectedMapping = new HashMap<>();
+        expectedMapping.put("operatorContext", 0);
+        expectedMapping.put("finish", false);
+        expectedMapping.put("isFeeder", true);
+        return expectedMapping;
+    }
+
 
     private static List<Page> toPages(Operator operator)
     {
