@@ -78,10 +78,16 @@ public class IntArrayBlockEncoding
 
         output.writeBoolean(block.mayHaveNull());
         if (block.mayHaveNull()) {
-            output.writeBooleans(block.valueIsNull, 0, positionCount);
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(block.isNull(position));
+            }
         }
 
-        output.writeInts(block.values, block.arrayOffset, positionCount);
+        for (int position = 0; position < positionCount; position++) {
+            if (!block.isNull(position)) {
+                output.writeInt(block.getInt(position, 0));
+            }
+        }
     }
 
     @Override
@@ -92,7 +98,12 @@ public class IntArrayBlockEncoding
         if (input.readBoolean()) {
             valuesIsNull = input.readBooleans(positionCount);
         }
-        int[] values = input.readInts(positionCount);
+        int[] values = new int[positionCount];
+        for (int position = 0; position < positionCount; position++) {
+            if (valuesIsNull == null || !valuesIsNull[position]) {
+                values[position] = input.readInt();
+            }
+        }
         return new IntArrayBlock(0, positionCount, valuesIsNull, values);
     }
 
