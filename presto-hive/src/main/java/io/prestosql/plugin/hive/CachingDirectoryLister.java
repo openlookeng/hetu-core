@@ -21,7 +21,6 @@ import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.connector.SchemaTableName;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.weakref.jmx.Managed;
@@ -41,7 +40,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class CachingDirectoryLister
         implements DirectoryLister
 {
-    private final Cache<Path, List<LocatedFileStatus>> cache;
+    private final Cache<Path, List<PrestoFileStatus>> cache;
     private final Set<SchemaTableName> tableNames;
 
     @Inject
@@ -54,7 +53,7 @@ public class CachingDirectoryLister
     {
         this.cache = CacheBuilder.newBuilder()
                 .maximumWeight(maxSize)
-                .weigher((Weigher<Path, List<LocatedFileStatus>>) (key, value) -> value.size())
+                .weigher((Weigher<Path, List<PrestoFileStatus>>) (key, value) -> value.size())
                 .expireAfterWrite(expireAfterWrite.toMillis(), TimeUnit.MILLISECONDS)
                 .recordStats()
                 .build();
@@ -71,14 +70,14 @@ public class CachingDirectoryLister
     }
 
     @Override
-    public RemoteIterator<LocatedFileStatus> list(FileSystem fs, Table table, Path path)
+    public RemoteIterator<PrestoFileStatus> list(FileSystem fs, Table table, Path path)
             throws IOException
     {
-        List<LocatedFileStatus> files = cache.getIfPresent(path);
+        List<PrestoFileStatus> files = cache.getIfPresent(path);
         if (files != null) {
             return simpleRemoteIterator(files);
         }
-        RemoteIterator<LocatedFileStatus> iterator = fs.listLocatedStatus(path);
+        RemoteIterator<PrestoFileStatus> iterator = new PrestoFileStatusRemoteIterator(fs.listLocatedStatus(path));
 
         if (!tableNames.contains(table.getSchemaTableName())) {
             return iterator;
@@ -86,11 +85,11 @@ public class CachingDirectoryLister
         return cachingRemoteIterator(iterator, path);
     }
 
-    private RemoteIterator<LocatedFileStatus> cachingRemoteIterator(RemoteIterator<LocatedFileStatus> iterator, Path path)
+    private RemoteIterator<PrestoFileStatus> cachingRemoteIterator(RemoteIterator<PrestoFileStatus> iterator, Path path)
     {
-        return new RemoteIterator<LocatedFileStatus>()
+        return new RemoteIterator<PrestoFileStatus>()
         {
-            private final List<LocatedFileStatus> files = new ArrayList<>();
+            private final List<PrestoFileStatus> files = new ArrayList<>();
 
             @Override
             public boolean hasNext()
@@ -104,21 +103,21 @@ public class CachingDirectoryLister
             }
 
             @Override
-            public LocatedFileStatus next()
+            public PrestoFileStatus next()
                     throws IOException
             {
-                LocatedFileStatus next = iterator.next();
+                PrestoFileStatus next = iterator.next();
                 files.add(next);
                 return next;
             }
         };
     }
 
-    private static RemoteIterator<LocatedFileStatus> simpleRemoteIterator(List<LocatedFileStatus> files)
+    private static RemoteIterator<PrestoFileStatus> simpleRemoteIterator(List<PrestoFileStatus> files)
     {
-        return new RemoteIterator<LocatedFileStatus>()
+        return new RemoteIterator<PrestoFileStatus>()
         {
-            private final Iterator<LocatedFileStatus> iterator = ImmutableList.copyOf(files).iterator();
+            private final Iterator<PrestoFileStatus> iterator = ImmutableList.copyOf(files).iterator();
 
             @Override
             public boolean hasNext()
@@ -127,7 +126,7 @@ public class CachingDirectoryLister
             }
 
             @Override
-            public LocatedFileStatus next()
+            public PrestoFileStatus next()
             {
                 return iterator.next();
             }
