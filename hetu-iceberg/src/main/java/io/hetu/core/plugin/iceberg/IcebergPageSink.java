@@ -16,6 +16,7 @@ package io.hetu.core.plugin.iceberg;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import io.airlift.json.JsonCodec;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.hetu.core.plugin.iceberg.PartitionTransforms.ColumnTransform;
 import io.prestosql.plugin.hive.HdfsEnvironment;
@@ -73,6 +74,7 @@ import static io.prestosql.spi.type.TimeType.TIME_MICROS;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MICROS;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
 import static io.prestosql.spi.type.Timestamps.PICOSECONDS_PER_MICROSECOND;
+import static io.prestosql.spi.type.Timestamps.PICOSECONDS_PER_NANOSECOND;
 import static io.prestosql.type.UuidType.trinoUuidToJavaUuid;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.Math.toIntExact;
@@ -86,6 +88,8 @@ public class IcebergPageSink
         implements ConnectorPageSink
 {
     private static final int MAX_PAGE_POSITIONS = 4096;
+
+    private static final Logger log = Logger.get(IcebergPageSink.class);
 
     private final int maxOpenWriters;
     private final Schema outputSchema;
@@ -339,6 +343,7 @@ public class IcebergPageSink
         String fileName = fileFormat.toIceberg().addExtension(session.getQueryId() + "-" + randomUUID());
         Path outputPath = partitionData.map(partition -> new Path(locationProvider.newDataLocation(partitionSpec, partition, fileName)))
                 .orElse(new Path(locationProvider.newDataLocation(fileName)));
+        log.debug("outputPath is :" + outputPath.toUri().toString());
 
         IcebergFileWriter writer = fileWriterFactory.createDataFileWriter(
                 outputPath,
@@ -399,13 +404,13 @@ public class IcebergPageSink
         if (type instanceof DoubleType) {
             return type.getDouble(block, position);
         }
-        if (type.equals(TIME_MICROS)) {
+        if (type.equals(TIME_MICROS) || type.getTypeId().equals(TIME_MICROS.getTypeId())) {
             return type.getLong(block, position) / PICOSECONDS_PER_MICROSECOND;
         }
-        if (type.equals(TIMESTAMP_MICROS)) {
-            return type.getLong(block, position);
+        if (type.equals(TIMESTAMP_MICROS) || type.getTypeId().equals(TIMESTAMP_MICROS.getTypeId())) {
+            return type.getLong(block, position) * PICOSECONDS_PER_NANOSECOND;
         }
-        if (type.equals(TIMESTAMP_TZ_MICROS)) {
+        if (type.equals(TIMESTAMP_TZ_MICROS) || type.getTypeId().equals(TIMESTAMP_TZ_MICROS.getTypeId())) {
             return timestampTzToMicros(getTimestampTz(block, position));
         }
         if (type instanceof VarbinaryType) {
@@ -414,7 +419,7 @@ public class IcebergPageSink
         if (type instanceof VarcharType) {
             return type.getSlice(block, position).toStringUtf8();
         }
-        if (type instanceof UuidType) {
+        if (type instanceof UuidType || UuidType.UUID.getTypeId().equals(type.getTypeId())) {
             return trinoUuidToJavaUuid(type.getSlice(block, position));
         }
         throw new UnsupportedOperationException("Type not supported as partition column: " + type.getDisplayName());

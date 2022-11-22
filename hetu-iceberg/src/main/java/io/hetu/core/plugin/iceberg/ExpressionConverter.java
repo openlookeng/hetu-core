@@ -210,15 +210,15 @@ public final class ExpressionConverter
             return toIntExact(((Long) trinoNativeValue));
         }
 
-        if (type.equals(TIME_MICROS)) {
+        if (type.equals(TIME_MICROS) || type.getTypeId().equals(TIME_MICROS.getTypeId())) {
             return ((long) trinoNativeValue) / PICOSECONDS_PER_MICROSECOND;
         }
 
-        if (type.equals(TIMESTAMP_MICROS)) {
-            return (long) trinoNativeValue;
+        if (type.equals(TIMESTAMP_MICROS) || type.getTypeId().equals(TIMESTAMP_MICROS.getTypeId())) {
+            return ((LongArrayBlock) trinoNativeValue).getLong(0, 0);
         }
 
-        if (type.equals(TIMESTAMP_TZ_MICROS)) {
+        if (type.equals(TIMESTAMP_TZ_MICROS) || type.getTypeId().equals(TIMESTAMP_TZ_MICROS.getTypeId())) {
             return timestampTzToMicros((LongTimestampWithTimeZone) trinoNativeValue);
         }
 

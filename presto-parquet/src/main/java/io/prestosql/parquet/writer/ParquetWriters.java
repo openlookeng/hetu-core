@@ -24,7 +24,6 @@ import io.prestosql.parquet.writer.valuewriter.IntegerValueWriter;
 import io.prestosql.parquet.writer.valuewriter.PrimitiveValueWriter;
 import io.prestosql.parquet.writer.valuewriter.RealValueWriter;
 import io.prestosql.parquet.writer.valuewriter.TimeMicrosValueWriter;
-import io.prestosql.parquet.writer.valuewriter.TimestampMillisValueWriter;
 import io.prestosql.parquet.writer.valuewriter.TimestampNanosValueWriter;
 import io.prestosql.parquet.writer.valuewriter.TimestampTzMicrosValueWriter;
 import io.prestosql.parquet.writer.valuewriter.TimestampTzMillisValueWriter;
@@ -68,6 +67,7 @@ import static io.prestosql.spi.type.TimestampType.TIMESTAMP_NANOS;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
 import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
+import static io.prestosql.type.UuidType.UUID;
 import static java.util.Objects.requireNonNull;
 
 final class ParquetWriters
@@ -183,30 +183,28 @@ final class ParquetWriters
         if (DATE.equals(type)) {
             return new DateValueWriter(valuesWriter, parquetType);
         }
-        if (TIME_MICROS.equals(type)) {
+        if (TIME_MICROS.equals(type) || TIME_MICROS.getTypeId().equals(type.getTypeId())) {
             verifyParquetType(type, parquetType, OriginalType.TIME_MICROS);
             return new TimeMicrosValueWriter(valuesWriter, parquetType);
         }
-        if (TIMESTAMP_MILLIS.equals(type)) {
-            verifyParquetType(type, parquetType, OriginalType.TIMESTAMP_MILLIS);
+        if (TIMESTAMP_MILLIS.equals(type) || TIMESTAMP_MILLIS.getTypeId().equals(type.getTypeId())) {
             // TODO when writing with Hive connector, isAdjustedToUTC is being set to true, which might be incorrect
-            return new TimestampMillisValueWriter(valuesWriter, type, parquetType);
+            return new BigintValueWriter(valuesWriter, type, parquetType);
         }
-        if (TIMESTAMP_MICROS.equals(type)) {
+        if (TIMESTAMP_MICROS.equals(type) || TIMESTAMP_MICROS.getTypeId().equals(type.getTypeId())) {
             verifyParquetType(type, parquetType, OriginalType.TIMESTAMP_MICROS);
             // TODO when writing with Hive connector, isAdjustedToUTC is being set to true, which might be incorrect
             return new BigintValueWriter(valuesWriter, type, parquetType);
         }
-        if (TIMESTAMP_NANOS.equals(type)) {
+        if (TIMESTAMP_NANOS.equals(type) || TIMESTAMP_NANOS.getTypeId().equals(type.getTypeId())) {
             verifyParquetType(type, parquetType, (OriginalType) null); // no OriginalType for timestamp NANOS
             verifyParquetType(type, parquetType, TimestampLogicalTypeAnnotation.class, isTimestamp(LogicalTypeAnnotation.TimeUnit.NANOS));
             return new TimestampNanosValueWriter(valuesWriter, type, parquetType);
         }
-        if (TIMESTAMP_TZ_MILLIS.equals(type)) {
-            verifyParquetType(type, parquetType, OriginalType.TIMESTAMP_MILLIS);
+        if (TIMESTAMP_TZ_MILLIS.equals(type) || TIMESTAMP_TZ_MILLIS.getTypeId().equals(type.getTypeId())) {
             return new TimestampTzMillisValueWriter(valuesWriter, parquetType);
         }
-        if (TIMESTAMP_TZ_MICROS.equals(type)) {
+        if (TIMESTAMP_TZ_MICROS.equals(type) || TIMESTAMP_TZ_MICROS.getTypeId().equals(type.getTypeId())) {
             verifyParquetType(type, parquetType, OriginalType.TIMESTAMP_MICROS);
             return new TimestampTzMicrosValueWriter(valuesWriter, parquetType);
         }
@@ -220,7 +218,7 @@ final class ParquetWriters
             // Binary writer is suitable also for char data, as UTF-8 encoding is used on both sides.
             return new BinaryValueWriter(valuesWriter, type, parquetType);
         }
-        if (type instanceof UuidType) {
+        if (type instanceof UuidType || UUID.getTypeId().equals(type.getTypeId())) {
             return new UuidValueWriter(valuesWriter, parquetType);
         }
         throw new PrestoException(NOT_SUPPORTED, String.format("Unsupported type for Parquet writer: %s", type));

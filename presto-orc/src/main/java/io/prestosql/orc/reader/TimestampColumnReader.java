@@ -27,6 +27,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.TimestampWithTimeZoneType;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
 import org.openjdk.jol.info.ClassLayout;
@@ -87,7 +88,8 @@ public class TimestampColumnReader
             throws OrcCorruptionException
     {
         requireNonNull(type, "type is null");
-        verifyStreamType(column, type, TimestampType.class::isInstance);
+        //verifyStreamType(column, type, TimestampType.class::isInstance);
+        verifyStreamType(column, type, t -> t instanceof TimestampType || t instanceof TimestampWithTimeZoneType);
 
         this.column = requireNonNull(column, "column is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");

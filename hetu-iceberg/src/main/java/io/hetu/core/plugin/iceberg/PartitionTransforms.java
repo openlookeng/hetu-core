@@ -119,10 +119,10 @@ public final class PartitionTransforms
                 }
                 throw new UnsupportedOperationException("Unsupported type for 'day': " + field);
             case "hour":
-                if (type.equals(TIMESTAMP_MICROS)) {
+                if (type.getTypeId().equals(TIMESTAMP_MICROS.getTypeId())) {
                     return hoursFromTimestamp();
                 }
-                if (type.equals(TIMESTAMP_TZ_MICROS)) {
+                if (type.getTypeId().equals(TIMESTAMP_TZ_MICROS.getTypeId())) {
                     return hoursFromTimestampWithTimeZone();
                 }
                 throw new UnsupportedOperationException("Unsupported type for 'hour': " + field);

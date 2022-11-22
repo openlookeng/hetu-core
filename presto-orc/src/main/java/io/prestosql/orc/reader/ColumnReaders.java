@@ -21,15 +21,36 @@ import io.prestosql.orc.OrcCorruptionException;
 import io.prestosql.orc.OrcRowDataCacheKey;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.type.IcebergUuidType;
+import io.prestosql.spi.type.TimeType;
 import io.prestosql.spi.type.Type;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static io.prestosql.orc.metadata.OrcType.OrcTypeKind.BINARY;
+import static io.prestosql.orc.metadata.OrcType.OrcTypeKind.LONG;
+import static io.prestosql.orc.reader.ReaderUtils.invalidStreamType;
+import static io.prestosql.spi.type.TimeType.TIME_MICROS;
 
 public final class ColumnReaders
 {
-    private ColumnReaders() {}
+    public static final String ICEBERG_BINARY_TYPE = "iceberg.binary-type";
+
+    private ColumnReaders()
+    {}
 
     public static ColumnReader createColumnReader(Type type, OrcColumn column, AggregatedMemoryContext systemMemoryContext, NestedBlockFactory blockFactory)
             throws OrcCorruptionException, PrestoException
     {
+        if (type instanceof TimeType) {
+            if (!type.getTypeId().equals(TIME_MICROS.getTypeId()) || column.getColumnType() != LONG) {
+                throw invalidStreamType(column, type);
+            }
+            return new TimeColumnReader(type, column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));
+        }
+        if (type instanceof IcebergUuidType || type.getTypeId().equals(IcebergUuidType.UUID.getTypeId())) {
+            checkArgument(column.getColumnType() == BINARY, "UUID type can only be read from BINARY column but got " + column);
+            return new UuidColumnReader(column);
+        }
         switch (column.getColumnType()) {
             case BOOLEAN:
                 return new BooleanColumnReader(type, column, systemMemoryContext.newLocalMemoryContext(ColumnReaders.class.getSimpleName()));

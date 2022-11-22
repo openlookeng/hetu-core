@@ -53,9 +53,9 @@ import static io.prestosql.orc.metadata.Stream.StreamKind.SECONDARY;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MICROS;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MILLIS;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP_NANOS;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_MICROS;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_MILLIS;
-import static io.prestosql.spi.type.TimestampType.TIMESTAMP_TZ_NANOS;
+import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
+import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
+import static io.prestosql.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_NANOS;
 import static java.time.ZoneOffset.UTC;
 import static java.util.Objects.requireNonNull;
 
@@ -121,27 +121,28 @@ public class TimestampColumnWriter
         this.presentStream = new PresentOutputStream(compression, bufferSize);
         this.statisticsBuilderSupplier = requireNonNull(statisticsBuilderSupplier, "statisticsBuilderSupplier is null");
         this.statisticsBuilder = statisticsBuilderSupplier.get();
-        this.baseTimestampInSeconds = 0L;
+        this.baseTimestampInSeconds = OffsetDateTime.of(2015, 1, 1, 0, 0, 0, 0, UTC).toEpochSecond();
     }
 
     private static TimestampKind timestampKindForType(Type type)
     {
-        if (type.equals(TIMESTAMP_MILLIS)) {
+        String id = type.getTypeId().getId();
+        if (id.equals(TIMESTAMP_MILLIS.getTypeId().getId())) {
             return TimestampKind.TIMESTAMP_MILLIS;
         }
-        if (type.equals(TIMESTAMP_MICROS)) {
+        if (id.equals(TIMESTAMP_MICROS.getTypeId().getId())) {
             return TimestampKind.TIMESTAMP_MICROS;
         }
-        if (type.equals(TIMESTAMP_NANOS)) {
+        if (id.equals(TIMESTAMP_NANOS.getTypeId().getId())) {
             return TimestampKind.TIMESTAMP_NANOS;
         }
-        if (type.equals(TIMESTAMP_TZ_MILLIS)) {
+        if (id.equals(TIMESTAMP_TZ_MILLIS.getTypeId().getId())) {
             return TimestampKind.INSTANT_MILLIS;
         }
-        if (type.equals(TIMESTAMP_TZ_MICROS)) {
+        if (id.equals(TIMESTAMP_TZ_MICROS.getTypeId().getId()) || TIMESTAMP_TZ_MICROS.getTypeId().getId().contains(id)) {
             return TimestampKind.INSTANT_MICROS;
         }
-        if (type.equals(TIMESTAMP_TZ_NANOS)) {
+        if (id.equals(TIMESTAMP_TZ_NANOS.getTypeId().getId())) {
             return TimestampKind.INSTANT_NANOS;
         }
         throw new IllegalArgumentException("Unsupported type for ORC timestamp writer: " + type);

@@ -151,8 +151,8 @@ public final class TypeConverter
         if (type.equals(TIMESTAMP_TZ_MICROS)) {
             return Types.TimestampType.withZone();
         }
-        if (type.equals(UUID)) {
-            return Types.UUIDType.get();
+        if (type.getTypeId().equals(UUID.getTypeId())) {
+            throw new PrestoException(NOT_SUPPORTED, format("UUID not supported for Iceberg."));
         }
         if (type instanceof RowType) {
             return fromRow((RowType) type);
@@ -164,13 +164,13 @@ public final class TypeConverter
             return fromMap((MapType) type);
         }
         if (type instanceof TimeType) {
-            throw new PrestoException(NOT_SUPPORTED, format("Time precision (%s) not supported for Iceberg. Use \"time(6)\" instead.", ((TimeType) type).getPrecision()));
+            return Types.TimeType.get();
         }
         if (type instanceof TimestampType) {
-            throw new PrestoException(NOT_SUPPORTED, format("Timestamp precision (%s) not supported for Iceberg. Use \"timestamp(6)\" instead.", ((TimestampType) type).getPrecision()));
+            return Types.TimestampType.withoutZone();
         }
         if (type instanceof TimestampWithTimeZoneType) {
-            throw new PrestoException(NOT_SUPPORTED, format("Timestamp precision (%s) not supported for Iceberg. Use \"timestamp(6) with time zone\" instead.", ((TimestampWithTimeZoneType) type).getPrecision()));
+            return Types.TimestampType.withZone();
         }
         throw new PrestoException(NOT_SUPPORTED, "Type not supported for Iceberg: " + type.getDisplayName());
     }

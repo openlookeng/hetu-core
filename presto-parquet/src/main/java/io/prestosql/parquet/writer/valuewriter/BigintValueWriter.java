@@ -18,6 +18,9 @@ import io.prestosql.spi.type.Type;
 import org.apache.parquet.column.values.ValuesWriter;
 import org.apache.parquet.schema.PrimitiveType;
 
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MICROS;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP_MILLIS;
+import static io.prestosql.spi.type.Timestamps.MICROSECONDS_PER_MILLISECOND;
 import static java.util.Objects.requireNonNull;
 
 public class BigintValueWriter
@@ -37,6 +40,9 @@ public class BigintValueWriter
         for (int i = 0; i < block.getPositionCount(); i++) {
             if (!block.isNull(i)) {
                 long value = type.getLong(block, i);
+                if (type.getTypeId().equals(TIMESTAMP_MILLIS.getTypeId()) || type.getTypeId().equals(TIMESTAMP_MICROS.getTypeId())) {
+                    value = value * MICROSECONDS_PER_MILLISECOND;
+                }
                 getValueWriter().writeLong(value);
                 getStatistics().updateStats(value);
             }

@@ -475,8 +475,7 @@ public class IcebergPageSourceProvider
 
             for (IcebergColumnHandle column : readColumns) {
                 verify(column.isBaseColumn(), "Column projections must be based from a root column");
-                OrcColumn orcColumn = fileColumnsByIcebergId.get(column.getId());
-
+                OrcColumn orcColumn = fileColumnsByIcebergId.values().stream().filter(a -> a.getColumnName().equalsIgnoreCase(column.getColumnName())).findFirst().orElse(null);
                 if (column.isIsDeletedColumn()) {
                     columnAdaptations.add(ColumnAdaptation.constantColumn(nativeValueToBlock(BOOLEAN, false)));
                 }

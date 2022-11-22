@@ -30,6 +30,13 @@ public final class TimestampType
     public static final int MAX_PRECISION = 12;
     public static final int MAX_SHORT_PRECISION = 6;
     private static final TimestampType[] TYPES = new TimestampType[MAX_PRECISION + 1];
+
+    static {
+        for (int precision = 0; precision <= MAX_PRECISION; precision++) {
+            TYPES[precision] = (precision <= MAX_SHORT_PRECISION) ? new TimestampType(precision) : new TimestampType(precision);
+        }
+    }
+
     public static final TimestampType TIMESTAMP = new TimestampType();
     public static final TimestampType TIMESTAMP_MICROS = new TimestampType();
 
@@ -44,6 +51,12 @@ public final class TimestampType
     {
         super(parseTypeSignature(StandardTypes.TIMESTAMP));
         this.precision = 0;
+    }
+
+    private TimestampType(int precision)
+    {
+        super(parseTypeSignature(StandardTypes.TIMESTAMP));
+        this.precision = precision;
     }
 
     public static TimestampType createTimestampWithTimeZoneType(int precision)

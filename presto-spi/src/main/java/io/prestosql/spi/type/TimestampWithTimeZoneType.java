@@ -28,9 +28,17 @@ public final class TimestampWithTimeZoneType
     public static final int MAX_PRECISION = 12;
     public static final int MAX_SHORT_PRECISION = 3;
     private static final TimestampWithTimeZoneType[] TYPES = new TimestampWithTimeZoneType[MAX_PRECISION + 1];
+
+    static {
+        for (int precision = 0; precision <= MAX_PRECISION; precision++) {
+            TYPES[precision] = (precision <= MAX_SHORT_PRECISION) ? new TimestampWithTimeZoneType(precision) : new TimestampWithTimeZoneType(precision);
+        }
+    }
+
     public static final TimestampWithTimeZoneType TIMESTAMP_WITH_TIME_ZONE = new TimestampWithTimeZoneType();
-    public static final TimestampWithTimeZoneType TIMESTAMP_TZ_MILLIS = new TimestampWithTimeZoneType();
-    public static final TimestampWithTimeZoneType TIMESTAMP_TZ_MICROS = new TimestampWithTimeZoneType();
+    public static final TimestampWithTimeZoneType TIMESTAMP_TZ_MILLIS = createTimestampWithTimeZoneType(3);
+    public static final TimestampWithTimeZoneType TIMESTAMP_TZ_MICROS = createTimestampWithTimeZoneType(6);
+    public static final TimestampWithTimeZoneType TIMESTAMP_TZ_NANOS = createTimestampWithTimeZoneType(9);
 
     private final int precision;
 
@@ -38,6 +46,12 @@ public final class TimestampWithTimeZoneType
     {
         super(parseTypeSignature(StandardTypes.TIMESTAMP_WITH_TIME_ZONE));
         this.precision = 0;
+    }
+
+    private TimestampWithTimeZoneType(int precision)
+    {
+        super(parseTypeSignature(StandardTypes.TIMESTAMP_WITH_TIME_ZONE));
+        this.precision = precision;
     }
 
     public static TimestampWithTimeZoneType createTimestampWithTimeZoneType(int precision)
