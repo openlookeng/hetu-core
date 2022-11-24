@@ -166,7 +166,8 @@ public class TestFeaturesConfig
                 .setFilterConjunctionIndependenceFactor(0.75)
                 .setJoinMultiClauseIndependenceFactor(0.25)
                 .setTransformSelfJoinToWindow(true)
-                .setTransformSelfJoinAggregatesToWindow(true));
+                .setTransformSelfJoinAggregatesToWindow(true)
+                .setJoinPartitionedBuildMinRowCount(1_000_000L));
     }
 
     @Test
@@ -283,6 +284,7 @@ public class TestFeaturesConfig
                 .put("optimizer.join-multi-clause-independence-factor", "0.99")
                 .put("optimizer.transform-self-join-to-window", "false")
                 .put("optimizer.transform-self-join-aggregates-to-window", "false")
+                .put("optimizer.join-partitioned-build-min-row-count", "100000")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -396,7 +398,8 @@ public class TestFeaturesConfig
                 .setFilterConjunctionIndependenceFactor(0.99)
                 .setJoinMultiClauseIndependenceFactor(0.99)
                 .setTransformSelfJoinToWindow(false)
-                .setTransformSelfJoinAggregatesToWindow(false);
+                .setTransformSelfJoinAggregatesToWindow(false)
+                .setJoinPartitionedBuildMinRowCount(1_000_00L);
 
         assertFullMapping(properties, expected);
     }
