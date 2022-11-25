@@ -77,10 +77,16 @@ public class ByteArrayBlockEncoding
         output.writeInt(positionCount);
         output.writeBoolean(block.mayHaveNull());
         if (block.mayHaveNull()) {
-            output.writeBooleans(block.valueIsNull, 0, positionCount);
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(block.isNull(position));
+            }
         }
 
-        output.writeBytes(block.values, block.arrayOffset, positionCount);
+        for (int position = 0; position < positionCount; position++) {
+            if (!block.isNull(position)) {
+                output.writeByte(block.getByte(position, 0));
+            }
+        }
     }
 
     @Override
@@ -91,7 +97,13 @@ public class ByteArrayBlockEncoding
         if (input.readBoolean()) {
             valueIsNull = input.readBooleans(positionCount);
         }
-        byte[] values = input.readBytes(positionCount);
+
+        byte[] values = new byte[positionCount];
+        for (int position = 0; position < positionCount; position++) {
+            if (valueIsNull == null || !valueIsNull[position]) {
+                values[position] = input.readByte();
+            }
+        }
         return new ByteArrayBlock(0, positionCount, valueIsNull, values);
     }
 

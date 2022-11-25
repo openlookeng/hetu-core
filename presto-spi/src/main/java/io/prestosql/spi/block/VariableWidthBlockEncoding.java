@@ -86,17 +86,23 @@ public class VariableWidthBlockEncoding
     {
         int positionCount = block.getPositionCount();
         output.writeInt(positionCount);
-        output.writeInts(block.offsets, block.arrayOffset, positionCount + 1);
+        int totalLength = 0;
+        for (int position = 0; position < positionCount; position++) {
+            int length = block.getSliceLength(position);
+            totalLength += length;
+            output.writeInt(totalLength);
+        }
 
         output.writeBoolean(block.mayHaveNull());
         if (block.mayHaveNull()) {
-            output.writeBooleans(block.valueIsNull, 0, positionCount);
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(block.isNull(position));
+            }
         }
 
-        int totalSize = block.offsets[block.arrayOffset + positionCount];
-        output.writeInt(totalSize);
-        if (totalSize != 0) {
-            output.write(block.getRawSlice(0).byteArray(), 0, totalSize);
+        output.writeInt(totalLength);
+        if (totalLength != 0) {
+            output.writeBytes(block.getRawSlice(0).byteArray(), block.getPositionOffset(0), totalLength);
         }
     }
 
@@ -104,7 +110,12 @@ public class VariableWidthBlockEncoding
     public VariableWidthBlock read(Kryo kryo, Input input, Class<? extends VariableWidthBlock> aClass)
     {
         int positionCount = input.readInt();
-        int[] offsets = input.readInts(positionCount + 1);
+        int[] offsets = new int[positionCount + 1];
+
+        for (int position = 1; position <= positionCount; position++) {
+            offsets[position] = input.readInt();
+        }
+
         boolean[] valuesIsNull = null;
         if (input.readBoolean()) {
             valuesIsNull = input.readBooleans(positionCount);

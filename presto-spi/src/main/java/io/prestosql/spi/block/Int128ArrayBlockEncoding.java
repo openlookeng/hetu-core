@@ -80,10 +80,17 @@ public class Int128ArrayBlockEncoding
         output.writeBoolean(block.mayHaveNull());
 
         if (block.mayHaveNull()) {
-            output.writeBooleans(block.valueIsNull, 0, positionCount);
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(block.isNull(position));
+            }
         }
 
-        output.writeLongs(block.values, block.positionOffset, positionCount * 2);
+        for (int position = 0; position < positionCount; position++) {
+            if (!block.isNull(position)) {
+                output.writeLong(block.getLong(position, 0));
+                output.writeLong(block.getLong(position, 8));
+            }
+        }
     }
 
     @Override
@@ -94,7 +101,14 @@ public class Int128ArrayBlockEncoding
         if (input.readBoolean()) {
             valuesIsNull = input.readBooleans(positionCount);
         }
-        long[] values = input.readLongs(positionCount * 2);
+
+        long[] values = new long[positionCount * 2];
+        for (int position = 0; position < positionCount; position++) {
+            if (valuesIsNull == null || !valuesIsNull[position]) {
+                values[position * 2] = input.readLong();
+                values[(position * 2) + 1] = input.readLong();
+            }
+        }
         return new Int128ArrayBlock(0, positionCount, valuesIsNull, values);
     }
 

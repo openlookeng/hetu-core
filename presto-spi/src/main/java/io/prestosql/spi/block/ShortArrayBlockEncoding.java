@@ -78,10 +78,16 @@ public class ShortArrayBlockEncoding
 
         output.writeBoolean(block.mayHaveNull());
         if (block.mayHaveNull()) {
-            output.writeBooleans(block.valueIsNull, 0, positionCount);
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(block.isNull(position));
+            }
         }
 
-        output.writeShorts(block.values, block.arrayOffset, positionCount);
+        for (int position = 0; position < positionCount; position++) {
+            if (!block.isNull(position)) {
+                output.writeShort(block.getShort(position, 0));
+            }
+        }
     }
 
     @Override
@@ -92,7 +98,12 @@ public class ShortArrayBlockEncoding
         if (input.readBoolean()) {
             valuesIsNull = input.readBooleans(positionCount);
         }
-        short[] values = input.readShorts(positionCount);
+        short[] values = new short[positionCount];
+        for (int position = 0; position < positionCount; position++) {
+            if (valuesIsNull == null || !valuesIsNull[position]) {
+                values[position] = input.readShort();
+            }
+        }
         return new ShortArrayBlock(0, positionCount, valuesIsNull, values);
     }
 

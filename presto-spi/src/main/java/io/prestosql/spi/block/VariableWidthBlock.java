@@ -339,15 +339,25 @@ public class VariableWidthBlock
         *  [buffer]
         */
         output.write(getPositionCount());
-        output.writeInts(offsets, arrayOffset, positionCount + 1);
-        output.writeBoolean(mayHaveNull());
-        if (mayHaveNull()) {
-            output.writeBooleans(valueIsNull, 0, positionCount);
+
+        int totalLength = 0;
+        for (int position = 0; position < positionCount; position++) {
+            int length = getSliceLength(position);
+            totalLength += length;
+            output.writeInt(totalLength);
         }
 
-        int totalSize = offsets[arrayOffset + positionCount];
-        output.write(totalSize);
-        output.write(slice.byteArray(), 0, totalSize);
+        output.writeBoolean(mayHaveNull());
+        if (mayHaveNull()) {
+            for (int position = 0; position < positionCount; position++) {
+                output.writeBoolean(isNull(position));
+            }
+        }
+
+        output.writeInt(totalLength);
+        if (totalLength != 0) {
+            output.writeBytes(getRawSlice(0).byteArray(), getPositionOffset(0), totalLength);
+        }
     }
 
     @Override
@@ -358,12 +368,23 @@ public class VariableWidthBlock
         }
 
         positionCount = input.read();
-        offsets = input.readInts(positionCount + 1);
+        offsets = new int[positionCount + 1];
+
+        for (int position = 1; position <= positionCount; position++) {
+            offsets[position] = input.readInt();
+        }
+
+        valueIsNull = null;
         if (input.readBoolean()) {
             valueIsNull = input.readBooleans(positionCount);
         }
-        int blockSize = input.read();
-        slice = Slices.wrappedBuffer(input.readBytes(blockSize));
+        int blockSize = input.readInt();
+        if (blockSize != 0) {
+            slice = Slices.wrappedBuffer(input.readBytes(blockSize));
+        }
+        else {
+            slice = Slices.EMPTY_SLICE;
+        }
 
         isInitialized = true;
         sizeInBytes = offsets[arrayOffset + positionCount] - offsets[arrayOffset] + ((Integer.BYTES + Byte.BYTES) * (long) positionCount);
