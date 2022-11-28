@@ -19,8 +19,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.execution.warnings.WarningCollector;
@@ -73,6 +75,7 @@ import io.prestosql.sql.tree.QualifiedName;
 import io.prestosql.sql.tree.SymbolReference;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -90,7 +93,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
@@ -263,7 +265,7 @@ public class HashGenerationOptimizer
         {
             // skip hash symbol generation for single bigint
             if (canSkipHashGeneration(node.getDistinctSymbols())) {
-                return planSimpleNodeWithProperties(node, parentPreference);
+                return planSimpleNodeWithProperties(node, parentPreference, false);
             }
 
             Optional<HashComputation> hashComputation = computeHash(metadata, planSymbolAllocator, node.getDistinctSymbols());
@@ -698,7 +700,9 @@ public class HashGenerationOptimizer
                     hashExpression = toVariableReference(hashSymbol, planSymbolAllocator.getTypes().get(hashSymbol));
                 }
                 newAssignments.put(hashSymbol, hashExpression);
-                allHashSymbols.put(hashComputation, hashSymbol);
+                for (HashComputation sourceHashComputation : sourceContext.lookup(hashComputation)) {
+                    allHashSymbols.put(sourceHashComputation, hashSymbol);
+                }
             }
 
             return new PlanWithProperties(new ProjectNode(node.getId(), child.getNode(), newAssignments.build()), allHashSymbols);
@@ -893,52 +897,60 @@ public class HashGenerationOptimizer
 
     private static class HashComputationSet
     {
-        private final Set<HashComputation> hashes;
+        private final Multimap<HashComputation, HashComputation> hashes;
 
         public HashComputationSet()
         {
-            hashes = ImmutableSet.of();
+            hashes = ImmutableSetMultimap.of();
         }
 
         public HashComputationSet(Optional<HashComputation> hash)
         {
             requireNonNull(hash, "hash is null");
             if (hash.isPresent()) {
-                this.hashes = ImmutableSet.of(hash.get());
+                this.hashes = ImmutableSetMultimap.of(hash.get(), hash.get());
             }
             else {
-                this.hashes = ImmutableSet.of();
+                this.hashes = ImmutableSetMultimap.of();
             }
         }
 
-        private HashComputationSet(Iterable<HashComputation> hashes)
+        private HashComputationSet(Multimap<HashComputation, HashComputation> hashes)
         {
             requireNonNull(hashes, "hashes is null");
-            this.hashes = ImmutableSet.copyOf(hashes);
+            this.hashes = ImmutableSetMultimap.copyOf(hashes);
         }
 
         public Set<HashComputation> getHashes()
         {
-            return hashes;
+            return hashes.keySet();
         }
 
         public HashComputationSet pruneSymbols(List<Symbol> symbols)
         {
             Set<Symbol> uniqueSymbols = ImmutableSet.copyOf(symbols);
-            return new HashComputationSet(hashes.stream()
+            ImmutableSetMultimap.Builder<HashComputation, HashComputation> builder = ImmutableSetMultimap.builder();
+
+            hashes.keySet().stream()
                     .filter(hash -> hash.canComputeWith(uniqueSymbols))
-                    .collect(toImmutableSet()));
+                    .forEach(hash -> builder.putAll(hash, hashes.get(hash)));
+
+            return new HashComputationSet(builder.build());
         }
 
         public HashComputationSet translate(Function<Symbol, Optional<Symbol>> translator)
         {
-            Set<HashComputation> newHashes = hashes.stream()
-                    .map(hash -> hash.translate(translator))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .collect(toImmutableSet());
+            ImmutableSetMultimap.Builder<HashComputation, HashComputation> builder = ImmutableSetMultimap.builder();
+            for (HashComputation hashComputation : hashes.keySet()) {
+                hashComputation.translate(translator)
+                        .ifPresent(hash -> builder.put(hash, hashComputation));
+            }
+            return new HashComputationSet(builder.build());
+        }
 
-            return new HashComputationSet(newHashes);
+        public Collection<HashComputation> lookup(HashComputation hashComputation)
+        {
+            return hashes.get(hashComputation);
         }
 
         public HashComputationSet withHashComputation(PlanNode node, Optional<HashComputation> hashComputation)
@@ -948,12 +960,12 @@ public class HashGenerationOptimizer
 
         public HashComputationSet withHashComputation(Optional<HashComputation> hashComputation)
         {
-            if (!hashComputation.isPresent()) {
+            if (!hashComputation.isPresent() || hashes.containsKey(hashComputation.get())) {
                 return this;
             }
-            return new HashComputationSet(ImmutableSet.<HashComputation>builder()
-                    .addAll(hashes)
-                    .add(hashComputation.get())
+            return new HashComputationSet(ImmutableSetMultimap.<HashComputation, HashComputation>builder()
+                    .putAll(hashes)
+                    .put(hashComputation.get(), hashComputation.get())
                     .build());
         }
     }

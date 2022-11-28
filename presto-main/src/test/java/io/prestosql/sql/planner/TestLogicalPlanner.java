@@ -24,6 +24,7 @@ import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.LimitNode;
+import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
@@ -73,6 +74,7 @@ import static io.prestosql.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
+import static io.prestosql.SystemSessionProperties.TASK_CONCURRENCY;
 import static io.prestosql.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_LAST;
 import static io.prestosql.spi.plan.AggregationNode.Step.FINAL;
@@ -397,23 +399,6 @@ public class TestLogicalPlanner
                                                         ImmutableMap.of(
                                                                 "REGION_NAME", "name",
                                                                 "REGION_REGIONKEY", "regionkey")))))));
-    }
-
-    @Test
-    public void testSameScalarSubqueryIsAppliedOnlyOnce()
-    {
-        // three subqueries with two duplicates (coerced to two different types), only two scalar joins should be in plan
-        assertEquals(
-                countOfMatchingNodes(
-                        plan("SELECT * FROM orders WHERE CAST(orderkey AS INTEGER) = (SELECT 1) AND custkey = (SELECT 2) AND CAST(custkey as REAL) != (SELECT 1)"),
-                        EnforceSingleRowNode.class::isInstance),
-                2);
-        // same query used for left, right and complex join condition
-        assertEquals(
-                countOfMatchingNodes(
-                        plan("SELECT * FROM orders o1 JOIN orders o2 ON o1.orderkey = (SELECT 1) AND o2.orderkey = (SELECT 1) AND o1.orderkey + o2.orderkey = (SELECT 1)"),
-                        EnforceSingleRowNode.class::isInstance),
-                1);
     }
 
     @Test
@@ -1177,5 +1162,59 @@ public class TestLogicalPlanner
                 .setSystemProperty(JOIN_REORDERING_STRATEGY, JoinReorderingStrategy.NONE.name())
                 .setSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.PARTITIONED.name())
                 .build();
+    }
+
+    @Test
+    public void testRedundantHashRemovalForUnionAll()
+    {
+        assertPlan(
+                "SELECT count(*) FROM ((SELECT nationkey FROM customer) UNION ALL (SELECT nationkey FROM customer)) GROUP BY nationkey",
+                output(
+                project(
+                    node(AggregationNode.class,
+                        exchange(LOCAL, REPARTITION,
+                            project(ImmutableMap.of("hash", expression("combine_hash(bigint '0', coalesce(\"$operator$hash_code\"(nationkey), 0))")),
+                                node(AggregationNode.class,
+                                    tableScan("customer", ImmutableMap.of("nationkey", "nationkey")))),
+                            project(ImmutableMap.of("hash_1", expression("combine_hash(bigint '0', coalesce(\"$operator$hash_code\"(nationkey_6), 0))")),
+                                node(AggregationNode.class,
+                                    tableScan("customer", ImmutableMap.of("nationkey_6", "nationkey")))))))));
+    }
+
+    @Test
+    public void testRedundantHashRemovalForMarkDistinct()
+    {
+        assertDistributedPlan(
+                "select count(*), count(distinct orderkey), count(distinct partkey), count(distinct suppkey) from lineitem",
+                Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(TASK_CONCURRENCY, "16")
+                .build(),
+                output(
+                anyTree(
+                    node(ProjectNode.class,
+                        node(MarkDistinctNode.class,
+                            anyTree(
+                                project(
+                                    node(MarkDistinctNode.class,
+                                        tableScan("lineitem", ImmutableMap.of("suppkey", "suppkey", "partkey", "partkey"))))))))));
+    }
+
+    @Test
+    public void testRedundantHashRemovalForUnionAllAndMarkDistinct()
+    {
+        assertDistributedPlan(
+                "SELECT count(distinct(custkey)), count(distinct(nationkey)) FROM ((SELECT custkey, nationkey FROM customer) UNION ALL ( SELECT custkey, custkey FROM customer))",
+                output(
+                anyTree(
+                    node(MarkDistinctNode.class,
+                        anyTree(
+                            node(MarkDistinctNode.class,
+                                exchange(LOCAL, REPARTITION,
+                                    exchange(REMOTE, REPARTITION,
+                                        project(ImmutableMap.of("hash_custkey", expression("combine_hash(bigint '0', COALESCE(\"$operator$hash_code\"(custkey), 0))"), "hash_nationkey", expression("combine_hash(bigint '0', COALESCE(\"$operator$hash_code\"(nationkey), 0))")),
+                                            tableScan("customer", ImmutableMap.of("custkey", "custkey", "nationkey", "nationkey")))),
+                                    exchange(REMOTE, REPARTITION,
+                                        node(ProjectNode.class,
+                                            node(TableScanNode.class))))))))));
     }
 }

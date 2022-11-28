@@ -53,6 +53,7 @@ import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.REMOTE;
+import static io.prestosql.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPARTITION;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Type.REPLICATE;
 import static io.prestosql.testing.TestingSession.testSessionBuilder;
@@ -166,7 +167,7 @@ public class TestAddExchangesPlans
                                 exchange(REMOTE, REPARTITION,
                                         anyTree(
                                                 tableScan("nation", ImmutableMap.of("nationkey", "nationkey")))),
-                                exchange(LOCAL, REPARTITION,
+                                exchange(LOCAL, GATHER,
                                         exchange(REMOTE, REPARTITION,
                                                 anyTree(
                                                         tableScan("region", ImmutableMap.of("regionkey", "regionkey"))))))));

@@ -74,14 +74,29 @@ public class Patterns
         return typeOf(UpdateNode.class);
     }
 
+    public static Pattern<TableExecuteNode> tableExecute()
+    {
+        return typeOf(TableExecuteNode.class);
+    }
+
     public static Pattern<ExchangeNode> exchange()
     {
         return typeOf(ExchangeNode.class);
     }
 
+    public static Pattern<ExplainAnalyzeNode> explainAnalyze()
+    {
+        return typeOf(ExplainAnalyzeNode.class);
+    }
+
     public static Pattern<EnforceSingleRowNode> enforceSingleRow()
     {
         return typeOf(EnforceSingleRowNode.class);
+    }
+
+    public static Pattern<IndexJoinNode> indexJoin()
+    {
+        return typeOf(IndexJoinNode.class);
     }
 
     public static Pattern<FilterNode> filter()
@@ -197,6 +212,11 @@ public class Patterns
     public static Pattern<RowNumberNode> rowNumber()
     {
         return typeOf(RowNumberNode.class);
+    }
+
+    public static Pattern<TopNRankingNumberNode> topNRankingNumber()
+    {
+        return typeOf(TopNRankingNumberNode.class);
     }
 
     public static Pattern<DistinctLimitNode> distinctLimit()
@@ -336,6 +356,16 @@ public class Patterns
         public static Property<JoinNode, Lookup, JoinNode.Type> type()
         {
             return property("type", JoinNode::getType);
+        }
+
+        public static Property<JoinNode, Lookup, PlanNode> left()
+        {
+            return property("left", (JoinNode joinNode, Lookup lookup) -> lookup.resolve(joinNode.getLeft()));
+        }
+
+        public static Property<JoinNode, Lookup, PlanNode> right()
+        {
+            return property("right", (JoinNode joinNode, Lookup lookup) -> lookup.resolve(joinNode.getRight()));
         }
     }
 

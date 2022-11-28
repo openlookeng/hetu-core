@@ -212,6 +212,7 @@ public final class SystemSessionProperties
     public static final String EXCHANGE_FILESYSTEM_BASE_DIRECTORY = "exchange_filesystem_base_directory";
 
     public static final String QUERY_RESOURCE_TRACKING = "query_resource_tracking_enabled";
+    public static final String JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT = "join_partitioned_build_min_row_count";
 
     public static final String TRANSFORM_SELF_JOIN_TO_WINDOW = "transform_self_join_to_window"; //
 
@@ -1049,7 +1050,21 @@ public final class SystemSessionProperties
                 booleanProperty(TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE,
                         "Transform Sub-query SelfJoin using window aggregates",
                         featuresConfig.isTransformSelfJoinAggregatesToWindow(),
+                        false),
+                longProperty(
+                        JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT,
+                        "Minimum number of join build side rows required to use partitioned join lookup",
+                        featuresConfig.getJoinPartitionedBuildMinRowCount(),
+                        value -> validateNonNegativeLongValue(value, JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT),
                         false));
+    }
+
+    private static void validateNonNegativeLongValue(Object value, String property)
+    {
+        long longValue = (long) value;
+        if (longValue < 0) {
+            throw new PrestoException(INVALID_SESSION_PROPERTY, format("%s must be equal or greater than 0", property));
+        }
     }
 
     private static double validateDoubleRange(Object value, String property, double lowerBoundIncluded, double upperBoundIncluded)
@@ -1841,5 +1856,10 @@ public final class SystemSessionProperties
     public static boolean shouldTransformSelfJoinAggregatesToWindowFunction(Session session)
     {
         return session.getSystemProperty(TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE, Boolean.class);
+    }
+
+    public static long getJoinPartitionedBuildMinRowCount(Session session)
+    {
+        return session.getSystemProperty(JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT, Long.class);
     }
 }
