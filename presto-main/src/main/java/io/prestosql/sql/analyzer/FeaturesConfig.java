@@ -221,6 +221,8 @@ public class FeaturesConfig
         return transformSelfJoinAggregateToWindow;
     }
 
+    private boolean useExactPartitioning;
+
     public enum JoinReorderingStrategy
     {
         NONE,
@@ -1629,6 +1631,19 @@ public class FeaturesConfig
     public FeaturesConfig setJoinPartitionedBuildMinRowCount(long joinPartitionedBuildMinRowCount)
     {
         this.joinPartitionedBuildMinRowCount = joinPartitionedBuildMinRowCount;
+        return this;
+    }
+
+    public boolean isUseExactPartitioning()
+    {
+        return useExactPartitioning;
+    }
+
+    @Config("optimizer.use-exact-partitioning")
+    @ConfigDescription("When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects")
+    public FeaturesConfig setUseExactPartitioning(boolean useExactPartitioning)
+    {
+        this.useExactPartitioning = useExactPartitioning;
         return this;
     }
 }
