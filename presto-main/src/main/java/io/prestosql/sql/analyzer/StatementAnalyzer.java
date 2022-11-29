@@ -1634,6 +1634,8 @@ class StatementAnalyzer
             List<Field> newOutputFields = fields.build();
             Scope tableScope = createAndAssignScope(table, scope, newOutputFields);
 
+            tableScope.registerTable(tableHandle.get());
+
             if (updateKind.isPresent()) {
                 FieldReference reference = new FieldReference(newOutputFields.size() - 1);
                 analyzeExpression(reference, tableScope);

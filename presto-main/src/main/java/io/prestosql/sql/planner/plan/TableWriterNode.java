@@ -44,6 +44,7 @@ import javax.annotation.concurrent.Immutable;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -350,6 +351,21 @@ public class TableWriterNode
         public boolean supportsReportingWrittenBytes(Metadata metadata, Session session)
         {
             return reportingWrittenBytesSupported;
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            CreateTarget createTarget = (CreateTarget) obj;
+            return Objects.equals(this.handle, createTarget.handle) &&
+                    Objects.equals(this.schemaTableName, createTarget.schemaTableName) &&
+                    this.reportingWrittenBytesSupported == createTarget.reportingWrittenBytesSupported;
         }
     }
 

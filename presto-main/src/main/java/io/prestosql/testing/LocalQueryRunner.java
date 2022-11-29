@@ -26,6 +26,7 @@ import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.system.AnalyzePropertiesSystemTable;
@@ -989,7 +990,7 @@ public class LocalQueryRunner
                 cubeManager);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager, cubeManager);
 
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER);
 
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
         return logicalPlanner.plan(analysis, false, stage);

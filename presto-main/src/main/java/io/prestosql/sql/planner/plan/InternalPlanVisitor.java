@@ -90,6 +90,16 @@ public abstract class InternalPlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitCacheTableWriter(CacheTableWriterNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
+    public R visitCacheTableFinish(CacheTableFinishNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitDelete(DeleteNode node, C context)
     {
         return visitPlan(node, context);

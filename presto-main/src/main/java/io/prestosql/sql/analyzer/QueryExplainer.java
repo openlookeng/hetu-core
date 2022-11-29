@@ -15,6 +15,7 @@ package io.prestosql.sql.analyzer;
 
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
@@ -187,7 +188,7 @@ public class QueryExplainer
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
 
         // plan statement
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER);
         return logicalPlanner.plan(analysis, false);
     }
 

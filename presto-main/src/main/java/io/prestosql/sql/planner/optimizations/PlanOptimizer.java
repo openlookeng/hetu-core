@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner.optimizations;
 
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
@@ -28,4 +29,15 @@ public interface PlanOptimizer
             PlanSymbolAllocator planSymbolAllocator,
             PlanNodeIdAllocator idAllocator,
             WarningCollector warningCollector);
+
+    default PlanNode optimize(PlanNode plan,
+                              Session session,
+                              TypeProvider types,
+                              PlanSymbolAllocator planSymbolAllocator,
+                              PlanNodeIdAllocator idAllocator,
+                              WarningCollector warningCollector,
+                              CachedDataStorageProvider cachedDataStorageProvider)
+    {
+        return optimize(plan, session, types, planSymbolAllocator, idAllocator, warningCollector);
+    }
 }

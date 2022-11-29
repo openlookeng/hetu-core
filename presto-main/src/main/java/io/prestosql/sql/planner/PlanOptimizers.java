@@ -175,6 +175,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedSubquerySelf
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
 import io.prestosql.sql.planner.iterative.rule.UseNonPartitionedJoinLookupSource;
+import io.prestosql.sql.planner.optimizations.AddCacheTableWriterAboveCTEOptimizer;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
@@ -208,7 +209,6 @@ import org.weakref.jmx.MBeanExporter;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-
 import java.util.List;
 import java.util.Set;
 
@@ -683,6 +683,7 @@ public class PlanOptimizers
                             estimatedExchangesCostCalculator,
                             ImmutableSet.of(new PushTableWriteThroughUnion()))); // Must run before AddExchanges
         }
+        builder.add(new AddCacheTableWriterAboveCTEOptimizer(metadata));
         if (!forceSingleNode) {
             builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer, false)));
         }

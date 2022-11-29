@@ -43,6 +43,8 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -341,6 +343,24 @@ public final class ValidateDependenciesChecker
             source.accept(this, boundSymbols); // visit child
 
             checkDependencies(source.getOutputSymbols(), node.getOutputSymbols(), "Invalid node. Output column dependencies (%s) not in source plan output (%s)", node.getOutputSymbols(), source.getOutputSymbols());
+
+            return null;
+        }
+
+        @Override
+        public Void visitCacheTableWriter(CacheTableWriterNode node, Set<Symbol> boundSymbols)
+        {
+            PlanNode source = node.getSource();
+            source.accept(this, boundSymbols); // visit child
+
+            return null;
+        }
+
+        @Override
+        public Void visitCacheTableFinish(CacheTableFinishNode node, Set<Symbol> boundSymbols)
+        {
+            PlanNode source = node.getSource();
+            source.accept(this, boundSymbols); // visit child
 
             return null;
         }

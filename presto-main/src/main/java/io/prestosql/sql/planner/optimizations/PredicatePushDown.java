@@ -68,6 +68,8 @@ import io.prestosql.sql.planner.VariablesExtractor;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Memo;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -101,6 +103,7 @@ import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
+import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.expressions.LogicalRowExpressions.FALSE_CONSTANT;
@@ -245,6 +248,32 @@ public class PredicatePushDown
         }
 
         @Override
+        public PlanNode visitCacheTableWriter(CacheTableWriterNode node, RewriteContext<RowExpression> context)
+        {
+            PlanNode rewrittenNode = context.defaultRewrite(node.getSource(), context.get());
+            if (rewrittenNode != node.getSource()) {
+                return new CacheTableWriterNode(node.getId(), rewrittenNode, node.getTarget(), node.getRowCountSymbol(), node.getFragmentSymbol(), node.getColumns(), node.getColumnNames(),node.getPartitioningScheme());
+            }
+
+            return node;
+        }
+
+        @Override
+        public PlanNode visitCacheTableFinish(CacheTableFinishNode node, RewriteContext<RowExpression> context)
+        {
+            PlanNode rewrittenNode = context.defaultRewrite(node.getSource(), context.get());
+            if (rewrittenNode != node.getSource()) {
+                return new CacheTableFinishNode(node.getId(), rewrittenNode,
+                        node.getTarget(),
+                        node.getRowCountSymbol(),
+                        node.getStatisticsAggregationDescriptor(),
+                        node.getCacheDataStorage());
+            }
+
+            return node;
+        }
+
+        @Override
         public PlanNode visitCTEScan(CTEScanNode node, RewriteContext<RowExpression> context)
         {
             if (!pushdownForCTE) {
@@ -320,6 +349,10 @@ public class PredicatePushDown
                 else {
                     // remove CTE node if cost is not optimal
                     rewrittenNode = ((CTEScanNode) context.defaultRewrite(node, context.get()));
+                    if (isCTEResultCacheEnabled(session)) {
+                        //todo(SURYA): modified this so CTE can't be removed post add Exchanges and according to the logic
+                        return rewrittenNode;
+                    }
                     return rewrittenNode.getSource();
                 }
             }

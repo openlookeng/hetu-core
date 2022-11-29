@@ -42,6 +42,8 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.iterative.Lookup;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
@@ -310,6 +312,13 @@ public class PlanFragmenter
         }
 
         @Override
+        public PlanNode visitCacheTableFinish(CacheTableFinishNode node, RewriteContext<FragmentProperties> context)
+        {
+            context.get().setCoordinatorOnlyDistribution();
+            return context.defaultRewrite(node, context.get());
+        }
+
+        @Override
         public PlanNode visitCubeFinish(CubeFinishNode node, RewriteContext<FragmentProperties> context)
         {
             context.get().setCoordinatorOnlyDistribution();
@@ -343,6 +352,15 @@ public class PlanFragmenter
 
         @Override
         public PlanNode visitTableWriter(TableWriterNode node, RewriteContext<FragmentProperties> context)
+        {
+            if (node.getPartitioningScheme().isPresent()) {
+                context.get().setDistribution(node.getPartitioningScheme().get().getPartitioning().getHandle(), metadata, session);
+            }
+            return context.defaultRewrite(node, context.get());
+        }
+
+        @Override
+        public PlanNode visitCacheTableWriter(CacheTableWriterNode node, RewriteContext<FragmentProperties> context)
         {
             if (node.getPartitioningScheme().isPresent()) {
                 context.get().setDistribution(node.getPartitioningScheme().get().getPartitioning().getHandle(), metadata, session);

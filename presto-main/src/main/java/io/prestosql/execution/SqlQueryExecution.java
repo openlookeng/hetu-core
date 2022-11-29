@@ -23,6 +23,9 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataStorageProvider;
+import io.prestosql.cache.elements.CachedDataKey;
+import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
@@ -787,7 +790,7 @@ public class SqlQueryExecution
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-        Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
+        Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector(), CachedDataStorageProvider.NULL_PROVIDER);
         queryPlan.set(localPlan);
 
         // extract inputs
@@ -826,9 +829,10 @@ public class SqlQueryExecution
             TypeAnalyzer typeAnalyzer,
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            CachedDataStorageProvider cachedData)
     {
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
         return logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(session));
     }
 
@@ -1326,6 +1330,7 @@ public class SqlQueryExecution
         private final TableExecuteContextManager tableExecuteContextManager;
 
         private final QueryResourceManagerService queryResourceManagerService;
+        private final Optional<Cache<CachedDataKey, CachedDataStorage>> dataCache;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1402,6 +1407,16 @@ public class SqlQueryExecution
             else {
                 this.cache = Optional.empty();
             }
+
+            if (hetuConfig.isExecutionDataCacheEnabled()) {
+                this.dataCache = Optional.of(CacheBuilder.newBuilder()
+                        .maximumSize(hetuConfig.getExecutionDataCacheMaxSize())
+                        .build());
+            }
+            else {
+                this.dataCache = Optional.empty();
+            }
+
             this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
             this.coordinatorTaskManager = requireNonNull(coordinatorTaskManager, "coordinatorTaskManager is null");
             this.taskSourceFactory = requireNonNull(taskSourceFactory, "taskSourceFactory is null");
@@ -1468,7 +1483,8 @@ public class SqlQueryExecution
                     partitionMemoryEstimatorFactory,
                     taskExecutionStats,
                     queryResourceManagerService,
-                    tableExecuteContextManager);
+                    tableExecuteContextManager,
+                    this.dataCache);
         }
     }
 }

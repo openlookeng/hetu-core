@@ -29,6 +29,8 @@ import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -53,7 +55,9 @@ import io.prestosql.sql.planner.plan.TableWriterNode.WriterTarget;
 import io.prestosql.sql.planner.plan.UpdateNode;
 import io.prestosql.sql.planner.plan.VacuumTableNode;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
@@ -117,6 +121,21 @@ public class BeginTableWrite
                     node.getPartitioningScheme(),
                     node.getStatisticsAggregation(),
                     node.getStatisticsAggregationDescriptor());
+        }
+
+        @Override
+        public PlanNode visitCacheTableWriter(CacheTableWriterNode node, RewriteContext<Context> context)
+        {
+            WriterTarget writerTarget = context.get().getCacheMaterializedHandle(node.getTarget()).get();
+            return new CacheTableWriterNode(
+                    node.getId(),
+                    node.getSource().accept(this, context),
+                    writerTarget,
+                    node.getRowCountSymbol(),
+                    node.getFragmentSymbol(),
+                    node.getColumns(),
+                    node.getColumnNames(),
+                    node.getPartitioningScheme());
         }
 
         @Override
@@ -219,6 +238,26 @@ public class BeginTableWrite
                     node.getStatisticsAggregationDescriptor());
         }
 
+        @Override
+        public PlanNode visitCacheTableFinish(CacheTableFinishNode node, RewriteContext<Context> context)
+        {
+            PlanNode child = node.getSource();
+
+            WriterTarget originalTarget = getTarget(child);
+            WriterTarget newTarget = createWriterTarget(originalTarget);
+
+            context.get().addCacheMaterializedHandle(originalTarget, newTarget);
+            child = child.accept(this, context);
+
+            return new CacheTableFinishNode(
+                    node.getId(),
+                    child,
+                    newTarget,
+                    node.getRowCountSymbol(),
+                    node.getStatisticsAggregationDescriptor(),
+                    node.getCacheDataStorage());
+        }
+
         public WriterTarget getTarget(PlanNode node)
         {
             if (node instanceof TableWriterNode) {
@@ -243,7 +282,7 @@ public class BeginTableWrite
                         update.getUpdatedColumns(),
                         update.getUpdatedColumnTypes());
             }
-            if (node instanceof ExchangeNode || node instanceof UnionNode) {
+            if (node instanceof ExchangeNode || node instanceof UnionNode || node instanceof ProjectNode) {
                 Set<WriterTarget> writerTargets = node.getSources().stream()
                         .map(this::getTarget)
                         .collect(toSet());
@@ -256,6 +295,9 @@ public class BeginTableWrite
                         findTableScanHandleForTableExecute(((TableExecuteNode) node).getSource()),
                         target.getSchemaTableName(),
                         target.isReportingWrittenBytesSupported());
+            }
+            if (node instanceof CacheTableWriterNode) {
+                return ((CacheTableWriterNode) node).getTarget();
             }
             throw new IllegalArgumentException("Invalid child for TableCommitNode: " + node.getClass().getSimpleName());
         }
@@ -410,12 +452,26 @@ public class BeginTableWrite
     {
         private Optional<WriterTarget> handle = Optional.empty();
         private Optional<WriterTarget> materializedHandle = Optional.empty();
+        private Map<WriterTarget, WriterTarget> cacheHandleMap = new LinkedHashMap<>();
 
         public void addMaterializedHandle(WriterTarget handle, WriterTarget materializedHandle)
         {
             checkState(!this.handle.isPresent(), "can only have one WriterTarget in a subtree");
             this.handle = Optional.of(handle);
             this.materializedHandle = Optional.of(materializedHandle);
+        }
+
+        public void addCacheMaterializedHandle(WriterTarget handle, WriterTarget materializedHandle)
+        {
+            if (!this.cacheHandleMap.containsKey(handle)) {
+                this.cacheHandleMap.put(handle, materializedHandle);
+            }
+        }
+
+        public Optional<WriterTarget> getCacheMaterializedHandle(WriterTarget handle)
+        {
+            checkState(this.cacheHandleMap.containsKey(handle), "can't find handle for WriterTarget");
+            return Optional.of(this.cacheHandleMap.get(handle));
         }
 
         public Optional<WriterTarget> getMaterializedHandle(WriterTarget handle)

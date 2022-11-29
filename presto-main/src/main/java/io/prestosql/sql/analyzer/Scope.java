@@ -14,15 +14,20 @@
 package io.prestosql.sql.analyzer;
 
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
+import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.QualifiedName;
+import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.WithQuery;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +37,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.prestosql.sql.analyzer.SemanticExceptions.ambiguousAttributeException;
 import static io.prestosql.sql.analyzer.SemanticExceptions.missingAttributeException;
+import static java.util.Collections.unmodifiableCollection;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
@@ -42,6 +48,7 @@ public class Scope
     private final RelationId relationId;
     private final RelationType relation;
     private final Map<String, WithQuery> namedQueries;
+    private List<TableHandle> tables = new LinkedList<>();
 
     public static Scope create()
     {
@@ -193,6 +200,19 @@ public class Scope
         }
 
         return Optional.empty();
+    }
+
+    public void registerTable(TableHandle table)
+    {
+        tables.add(table);
+        if (parent.isPresent()) {
+            parent.get().registerTable(table);
+        }
+    }
+
+    public Collection<TableHandle> getTables()
+    {
+        return unmodifiableCollection(tables);
     }
 
     @Override

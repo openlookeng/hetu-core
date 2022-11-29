@@ -15,6 +15,7 @@
 package io.prestosql.query;
 
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
 import io.prestosql.cost.CostCalculator;
@@ -34,11 +35,14 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
+import io.prestosql.sql.tree.Query;
 import io.prestosql.utils.OptimizerUtils;
 
 import java.util.List;
 import java.util.Optional;
 
+import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
+import static io.prestosql.SystemSessionProperties.isResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static io.prestosql.sql.planner.sanity.PlanSanityChecker.DISTRIBUTED_PLAN_SANITY_CHECKER;
@@ -66,12 +70,14 @@ public class HetuLogicalPlanner
 
     private final WarningCollector warningCollector;
 
+    private final CachedDataStorageProvider cachedDataStorageProvider;
+
     public HetuLogicalPlanner(Session session, List<PlanOptimizer> planOptimizers, PlanNodeIdAllocator idAllocator,
-            Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
-            WarningCollector warningCollector)
+                              Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
+                              WarningCollector warningCollector, CachedDataStorageProvider cachedData)
     {
         super(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator,
-                warningCollector);
+                warningCollector, cachedData);
         this.session = session;
         this.planOptimizers = planOptimizers;
         this.planSanityChecker = DISTRIBUTED_PLAN_SANITY_CHECKER;
@@ -81,12 +87,19 @@ public class HetuLogicalPlanner
         this.statsCalculator = statsCalculator;
         this.costCalculator = costCalculator;
         this.warningCollector = warningCollector;
+        this.cachedDataStorageProvider = cachedData;
     }
 
     @Override
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
-        PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode root;
+        if (isResultCacheEnabled(session) && analysis.getStatement() instanceof Query && !isCTEResultCacheEnabled(session)) {
+            root = planStatementWithResultCache(analysis, analysis.getStatement(), cachedDataStorageProvider.getOrCreateCachedDataKey(null));
+        }
+        else {
+            root = planStatement(analysis, analysis.getStatement());
+        }
         PlanNode.SkipOptRuleLevel optimizationLevel = APPLY_ALL_RULES;
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(),
@@ -103,7 +116,7 @@ public class HetuLogicalPlanner
 
                     if (OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                         root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                                warningCollector);
+                                warningCollector, cachedDataStorageProvider);
                         requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                         optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                     }

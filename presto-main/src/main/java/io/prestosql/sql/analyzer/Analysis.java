@@ -598,6 +598,11 @@ public class Analysis
         return unmodifiableCollection(tables.values());
     }
 
+    public Collection<TableHandle> getTablesByNamedQuery(Table table)
+    {
+        return unmodifiableCollection(scopes.get(scopes.keySet().stream().filter(k -> k.getNode().equals(table)).findAny().get()).getTables());
+    }
+
     public void registerTable(Table table, TableHandle handle)
     {
         tables.put(NodeRef.of(table), handle);
@@ -792,6 +797,15 @@ public class Analysis
     public Query getNamedQuery(Table table)
     {
         return namedQueries.get(NodeRef.of(table));
+    }
+
+    public Query getNamedQueryByRef(Table table)
+    {
+        Optional<NodeRef<Table>> key = namedQueries.keySet().stream().filter(k -> k.getNode().equals(table)).findAny();
+        if (key.isPresent()) {
+            return namedQueries.get(key.get());
+        }
+        return null;
     }
 
     public void registerNamedQuery(Table tableReference, Query query)

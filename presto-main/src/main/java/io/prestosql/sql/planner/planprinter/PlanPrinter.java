@@ -77,6 +77,8 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.JoinNodeUtils;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -1116,6 +1118,19 @@ public class PlanPrinter
         }
 
         @Override
+        public Void visitCacheTableWriter(CacheTableWriterNode node, Void context)
+        {
+            NodeRepresentation nodeOutput = addNode(node, "TableWriter");
+            for (int i = 0; i < node.getColumnNames().size(); i++) {
+                String name = node.getColumnNames().get(i);
+                Symbol symbol = node.getColumns().get(i);
+                nodeOutput.appendDetailsLine("%s := %s", name, symbol);
+            }
+
+            return processChildren(node, context);
+        }
+
+        @Override
         public Void visitStatisticsWriterNode(StatisticsWriterNode node, Void context)
         {
             addNode(node, "StatisticsWriter", format("[%s]", node.getTarget()));
@@ -1132,6 +1147,13 @@ public class PlanPrinter
                 printStatisticAggregations(nodeOutput, node.getStatisticsAggregation().get(), node.getStatisticsAggregationDescriptor().get());
             }
 
+            return processChildren(node, context);
+        }
+
+        @Override
+        public Void visitCacheTableFinish(CacheTableFinishNode node, Void context)
+        {
+            NodeRepresentation nodeOutput = addNode(node, "CacheTableCommit", format("[%s]", node.getTarget()));
             return processChildren(node, context);
         }
 

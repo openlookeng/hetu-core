@@ -152,6 +152,8 @@ public class FeaturesConfig
     private boolean reuseTableScanEnabled;
     private boolean spillReuseTableScan;
     private int spillOperatorThresholdReuseExchange = 10;
+    private boolean resultCacheEnabled;
+    private boolean cteResultCacheEnabled;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering = true;
@@ -932,6 +934,32 @@ public class FeaturesConfig
         this.spillToHdfs = spillToHdfs;
         return this;
     }
+
+    public boolean isResultCacheEnabled()
+    {
+        return resultCacheEnabled;
+    }
+
+    @Config("enable-result-cache")
+    public FeaturesConfig setResultCacheEnabled(boolean resultCacheEnabled)
+    {
+        this.resultCacheEnabled = resultCacheEnabled;
+        return this;
+    }
+
+    public boolean isCTEResultCacheEnabled()
+    {
+        return cteResultCacheEnabled;
+    }
+
+    @Config("enable-cte-result-cache")
+    public FeaturesConfig setCTEResultCacheEnabled(boolean cteResultCacheEnabled)
+    {
+        this.cteResultCacheEnabled = cteResultCacheEnabled;
+        return this;
+    }
+
+
 
     public String getSpillProfile()
     {

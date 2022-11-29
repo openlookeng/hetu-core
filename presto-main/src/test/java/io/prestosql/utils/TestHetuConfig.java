@@ -58,7 +58,11 @@ public class TestHetuConfig
                 .setExtensionExecutionPlannerEnabled(false)
                 .setExtensionExecutionPlannerJarPath(null)
                 .setExtensionExecutionPlannerClassPath(null)
-                .setNoResourceRetryCount(5));
+                .setNoResourceRetryCount(5)
+                .setExecutionDataCacheEnabled(false)
+                .setExecutionDataCacheMaxSize(10000L)
+                .setCachingConnectorName("hive")
+                .setCachingSchemaName("cache"));
     }
 
     @Test
@@ -93,6 +97,10 @@ public class TestHetuConfig
                 .put("extension_execution_planner_jar_path", "")
                 .put("extension_execution_planner_class_path", "")
                 .put("query-no-resource-retry-count", "15")
+                .put("hetu.execution.data-cache.enabled", "true")
+                .put("hetu.execution.data-cache.enabled", "10")
+                .put("hetu.execution.data-cache.schema-name", "memCache")
+                .put("hetu.execution.data-cache.connector-name", "memory")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -123,7 +131,11 @@ public class TestHetuConfig
                 .setExtensionExecutionPlannerEnabled(true)
                 .setExtensionExecutionPlannerJarPath("")
                 .setExtensionExecutionPlannerClassPath("")
-                .setNoResourceRetryCount(15);
+                .setNoResourceRetryCount(15)
+                .setExecutionDataCacheMaxSize(10)
+                .setExecutionDataCacheEnabled(true)
+                .setCachingConnectorName("memory")
+                .setCachingSchemaName("memCache");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

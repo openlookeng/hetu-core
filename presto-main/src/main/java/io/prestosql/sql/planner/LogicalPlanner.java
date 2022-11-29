@@ -20,6 +20,8 @@ import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
+import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
 import io.prestosql.cost.CostCalculator;
@@ -65,6 +67,8 @@ import io.prestosql.sql.analyzer.Scope;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.planner.StatisticsAggregationPlanner.TableStatisticAggregation;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
 import io.prestosql.sql.planner.plan.ExplainAnalyzeNode;
@@ -131,6 +135,8 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
+import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
+import static io.prestosql.SystemSessionProperties.isResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
@@ -180,6 +186,7 @@ public class LogicalPlanner
     private final WarningCollector warningCollector;
     private final Map<QualifiedName, Integer> namedSubPlan = new HashMap<>();
     private final UniqueIdAllocator uniqueIdAllocator = new UniqueIdAllocator();
+    private final CachedDataStorageProvider cachedDataStorageProvider;
 
     public LogicalPlanner(Session session,
                           List<PlanOptimizer> planOptimizers,
@@ -188,9 +195,10 @@ public class LogicalPlanner
                           TypeAnalyzer typeAnalyzer,
                           StatsCalculator statsCalculator,
                           CostCalculator costCalculator,
-                          WarningCollector warningCollector)
+                          WarningCollector warningCollector,
+                          CachedDataStorageProvider cachedData)
     {
-        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
+        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
     }
 
     public LogicalPlanner(Session session,
@@ -201,7 +209,8 @@ public class LogicalPlanner
                           TypeAnalyzer typeAnalyzer,
                           StatsCalculator statsCalculator,
                           CostCalculator costCalculator,
-                          WarningCollector warningCollector)
+                          WarningCollector warningCollector,
+                          CachedDataStorageProvider cachedData)
     {
         this.session = requireNonNull(session, "session is null");
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
@@ -214,6 +223,7 @@ public class LogicalPlanner
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.cachedDataStorageProvider = cachedData;
     }
 
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan)
@@ -223,7 +233,13 @@ public class LogicalPlanner
 
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
-        PlanNode root = planStatement(analysis, analysis.getStatement());
+        PlanNode root;
+        if (isResultCacheEnabled(session) && analysis.getStatement() instanceof Query && !isCTEResultCacheEnabled(session)) {
+            root = planStatementWithResultCache(analysis, analysis.getStatement(), null);
+        }
+        else {
+            root = planStatement(analysis, analysis.getStatement());
+        }
         PlanNode.SkipOptRuleLevel optimizationLevel = APPLY_ALL_RULES;
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(), warningCollector);
@@ -232,7 +248,7 @@ public class LogicalPlanner
             for (PlanOptimizer optimizer : planOptimizers) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root) && OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                     root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                            warningCollector);
+                            warningCollector, cachedDataStorageProvider);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                     optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                 }
@@ -267,6 +283,19 @@ public class LogicalPlanner
             return new OutputNode(idAllocator.getNextId(), source, ImmutableList.of("rows"), ImmutableList.of(symbol));
         }
         return createOutputPlan(planStatementWithoutOutput(analysis, statement), analysis);
+    }
+
+    public PlanNode planStatementWithResultCache(Analysis analysis, Statement statement, CachedDataStorage qds)
+    {
+        if (!(statement instanceof Query)) {
+            throw new PrestoException(NOT_SUPPORTED, "Result Cache is not supported in this context " + statement.getClass().getSimpleName());
+        }
+        return createOutputPlan(planStatementWithoutOutputWithResultCache(analysis, statement, qds), analysis);
+    }
+
+    private RelationPlan planStatementWithoutOutputWithResultCache(Analysis analysis, Statement statement, CachedDataStorage qds)
+    {
+        return createResultCacheTableCreationPlan(analysis, (Query) statement, qds);
     }
 
     private RelationPlan planStatementWithoutOutput(Analysis analysis, Statement statement)
@@ -409,6 +438,35 @@ public class LogicalPlanner
                 tableStatisticsMetadata.getTableStatistics().contains(ROW_COUNT),
                 tableStatisticAggregation.getDescriptor());
         return new RelationPlan(planNode, analysis.getScope(analyzeStatement), planNode.getOutputSymbols());
+    }
+
+    private RelationPlan createResultCacheTableCreationPlan(Analysis analysis, Query query, CachedDataStorage qds)
+    {
+        QualifiedObjectName destination = QualifiedObjectName.valueOf(qds.getDataTable());
+
+        RelationPlan plan = createRelationPlan(analysis, query);
+
+        ConnectorTableMetadata tableMetadata = createTableMetadata(
+                destination,
+                getOutputTableColumns(plan, Optional.empty()),
+                ImmutableMap.of(),
+                ImmutableList.of(),
+                Optional.empty());
+        analysis.setCreateTableMetadata(tableMetadata);
+        Optional<NewTableLayout> newTableLayout = metadata.getNewTableLayout(session, destination.getCatalogName(), tableMetadata);
+
+        List<String> columnNames = tableMetadata.getColumns().stream()
+                .filter(column -> !column.isHidden())
+                .map(ColumnMetadata::getName)
+                .collect(toImmutableList());
+
+        return createResultCacheTableWriterPlan(
+                analysis,
+                plan,
+                new CreateReference(destination.getCatalogName(), tableMetadata, newTableLayout),
+                columnNames,
+                newTableLayout,
+                qds);
     }
 
     private RelationPlan createTableCreationPlan(Analysis analysis, Query query)
@@ -667,6 +725,72 @@ public class LogicalPlanner
         }
 
         return new Cast(expression, toType.getTypeSignature().toString());
+    }
+
+    private RelationPlan createResultCacheTableWriterPlan(
+            Analysis analysis,
+            RelationPlan plan,
+            WriterTarget target,
+            List<String> columnNames,
+            Optional<NewTableLayout> writeTableLayout,
+            CachedDataStorage qds)
+    {
+        ImmutableList.Builder<Symbol> outputs = ImmutableList.builder();
+        PlanNode source = plan.getRoot();
+
+        if (!analysis.isCreateTableAsSelectWithData()) {
+            source = new LimitNode(idAllocator.getNextId(), source, 0L, false);
+        }
+
+        writeTableLayout.ifPresent(layout -> {
+            if (!ImmutableSet.copyOf(columnNames).containsAll(layout.getPartitionColumns())) {
+                throw new PrestoException(NOT_SUPPORTED, "INSERT must write all distribution columns: " + layout.getPartitionColumns());
+            }
+        });
+
+        List<Symbol> symbols = plan.getFieldMappings();
+
+        Optional<PartitioningScheme> partitioningScheme = Optional.empty();
+        if (writeTableLayout.isPresent()) {
+            List<Symbol> partitionFunctionArguments = new ArrayList<>();
+            writeTableLayout.get().getPartitionColumns().stream()
+                    .mapToInt(columnNames::indexOf)
+                    .mapToObj(symbols::get)
+                    .forEach(partitionFunctionArguments::add);
+
+            List<Symbol> outputLayout = new ArrayList<>(symbols);
+
+            PartitioningHandle partitioningHandle = writeTableLayout.get().getPartitioning()
+                    .orElse(FIXED_HASH_DISTRIBUTION);
+
+            partitioningScheme = Optional.of(new PartitioningScheme(
+                    Partitioning.create(partitioningHandle, partitionFunctionArguments),
+                    outputLayout));
+        }
+
+        RelationType outputDescriptor = analysis.getOutputDescriptor();
+        for (Field field : outputDescriptor.getVisibleFields()) {
+            int fieldIndex = outputDescriptor.indexOf(field);
+            Symbol symbol = plan.getSymbol(fieldIndex);
+            outputs.add(symbol);
+        }
+
+        CacheTableFinishNode commitNode = new CacheTableFinishNode(
+                idAllocator.getNextId(),
+                new CacheTableWriterNode(
+                        idAllocator.getNextId(),
+                        source,
+                        target,
+                        planSymbolAllocator.newSymbol("partialrows", BIGINT),
+                        planSymbolAllocator.newSymbol("fragment", VARBINARY),
+                        outputs.build(),
+                        columnNames,
+                        partitioningScheme),
+                target,
+                planSymbolAllocator.newSymbol("rows", BIGINT),
+                Optional.empty(),
+                Optional.ofNullable(qds));
+        return new RelationPlan(commitNode, analysis.getRootScope(), commitNode.getOutputSymbols());
     }
 
     private RelationPlan createTableWriterPlan(
