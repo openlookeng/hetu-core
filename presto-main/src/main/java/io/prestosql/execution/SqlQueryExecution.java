@@ -834,16 +834,16 @@ public class SqlQueryExecution
 
     private void checkTaskRetrySupport(Session session)
     {
-        List<String> reasons = new ArrayList<>();
-
         if (isCTEReuseEnabled(session)) {
-            reasons.add("Disable Task Retry If CTEReuse is enabled");
+            String reasonsMessage = "CTE Reuse feature is disabled: CTE Reuse feature is supported only when Task Retry feature is disabled";
+            session.disableCTEReuse();
+            warningCollector.add(new PrestoWarning(StandardWarningCode.CTE_REUSE_NOT_SUPPORTED, reasonsMessage));
         }
 
-        if (!reasons.isEmpty()) {
-            session.disableTaskRetry();
-            String reasonsMessage = "Task retry feature is disabled: \n" + String.join(". \n", reasons);
-            warningCollector.add(new PrestoWarning(StandardWarningCode.TASK_RETRY_NOT_SUPPORTED, reasonsMessage));
+        if (SystemSessionProperties.isReuseTableScanEnabled(session)) {
+            String reasonsMessage = "Reuse Table Scan feature is disabled: Reuse Table Scan feature is supported only when Task Retry feature is disabled";
+            session.disableReuseTableScan();
+            warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
         }
     }
 
@@ -883,9 +883,16 @@ public class SqlQueryExecution
         }
 
         // Doesn't work with the following features
-        if (SystemSessionProperties.isReuseTableScanEnabled(session)
-                || SystemSessionProperties.isCTEReuseEnabled(session)) {
-            reasons.add("No support along with reuse_table_scan or cte_reuse_enabled features");
+        if (SystemSessionProperties.isReuseTableScanEnabled(session)) {
+            String reasonsMessage = "Reuse Table Scan Feature is Disabled: It is supported only when Snapshot or Recovery feature is disabled";
+            warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
+            session.disableReuseTableScan();
+        }
+
+        if (SystemSessionProperties.isCTEReuseEnabled(session)) {
+            String reasonsMessage = "CTE Reuse Feature is Disabled: It is support only when Snapshot or Recovery feature is disabled";
+            warningCollector.add(new PrestoWarning(StandardWarningCode.CTE_REUSE_NOT_SUPPORTED, reasonsMessage));
+            session.disableCTEReuse();
         }
 
         // All input tables must support snapshotting
