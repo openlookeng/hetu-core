@@ -94,7 +94,7 @@ public class TestIndexCacheFetch
             IndexCache indexCache = new IndexCache(indexCacheLoader, new NoOpIndexClient(), false);
             List<IndexMetadata> actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 2000);
+            Thread.sleep(loadDelay + 8000);
             actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
             assertEquals(actualSplitIndex.get(0), expectedIndices.get(0));

@@ -26,14 +26,20 @@ import io.prestosql.spi.heuristicindex.IndexMetadata;
 import io.prestosql.spi.service.PropertyService;
 import io.prestosql.testing.NoOpIndexClient;
 import org.mockito.internal.stubbing.answers.Returns;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
+import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -51,6 +57,7 @@ public class TestIndexCacheRemoval
     private Split split;
     private ConnectorSplit connectorSplit;
     private final long numberOfIndexTypes = IndexCache.INDEX_TYPES.size();
+    private ExecutorService executor = newCachedThreadPool(daemonThreadsNamed("test-%s"));
 
     @BeforeClass
     public void setupBeforeClass()
@@ -69,6 +76,13 @@ public class TestIndexCacheRemoval
         split = new Split(catalogName, connectorSplit, lifespan);
         when(connectorSplit.getFilePath()).thenReturn(testPath);
         when(connectorSplit.getLastModifiedTime()).thenReturn(testLastModifiedTime);
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void shutdown()
+    {
+        executor.shutdownNow();
+        executor = null;
     }
 
     @Test
@@ -120,9 +134,15 @@ public class TestIndexCacheRemoval
             when(indexCacheLoader.load(any())).then(new Returns(expectedIndices1));
 
             // each index is has memory usage of 2, and limit is 2*types of idx, so all should be loaded
-            List<IndexMetadata> actualSplitIndex = indexCache.getIndices(table, column, split);
-            assertEquals(actualSplitIndex.size(), 0);
-            Thread.sleep(loadDelay + 2000);
+            List<IndexMetadata> actualSplitIndex = null;
+            List<Future<?>> indexCacheFutureList = new ArrayList<>();
+            indexCacheFutureList.add(executor.submit(() -> indexCache.getIndices(table, column, split)));
+            for (Future<?> query : indexCacheFutureList) {
+                synchronized (query) {
+                    query.wait(16000L);
+                    actualSplitIndex = (List<IndexMetadata>) query.get();
+                }
+            }
             actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
             assertEquals(actualSplitIndex.get(0), indexMetadata1);
@@ -141,10 +161,14 @@ public class TestIndexCacheRemoval
             expectedIndices2.add(indexMetadata2);
             when(indexCacheLoader.load(any())).then(new Returns(expectedIndices2));
 
-            actualSplitIndex = indexCache.getIndices(table, column, split);
-            assertEquals(actualSplitIndex.size(), 0);
-            assertEquals(indexCache.getCacheSize(), numberOfIndexTypes);
-            Thread.sleep(loadDelay + 2000);
+            indexCacheFutureList = new ArrayList<>();
+            indexCacheFutureList.add(executor.submit(() -> indexCache.getIndices(table, column, split)));
+            for (Future<?> query : indexCacheFutureList) {
+                synchronized (query) {
+                    query.wait(16000L);
+                    actualSplitIndex = (List<IndexMetadata>) query.get();
+                }
+            }
             actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
             assertEquals(actualSplitIndex.get(0), indexMetadata2);

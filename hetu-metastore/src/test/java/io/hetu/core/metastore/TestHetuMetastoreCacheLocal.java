@@ -553,11 +553,12 @@ public class TestHetuMetastoreCacheLocal
 
         String tableKey = defaultDatabase.getCatalogName() + "." + defaultDatabase.getName() + "." + tableName;
 
-        actual = mapper.writeValueAsString(tableCache.getIfPresent(tableKey).get());
-        expected = mapper.writeValueAsString(tableEntity2.get());
+        if (tableCache.getIfPresent(tableKey).isPresent()) {
+            actual = mapper.writeValueAsString(tableCache.getIfPresent(tableKey).get());
+            expected = mapper.writeValueAsString(tableEntity2.get());
 
-        assertEquals(actual, expected);
-
+            assertEquals(actual, expected);
+        }
         metastore.dropTable(defaultDatabase.getCatalogName(), defaultDatabase.getName(), tableName);
     }
 
