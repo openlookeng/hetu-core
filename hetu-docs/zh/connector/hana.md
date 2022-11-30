@@ -226,7 +226,7 @@ FROM SCORES
 GROUP BY NAME
 ```
 
-在Prersto中，可以使用`case`作为替代实现：
+在openLooKeng中，可以使用`case`作为替代实现：
 
 Hana与openLooKeng SQL语法的其他差异，请参考以下官方文档列表：
 
