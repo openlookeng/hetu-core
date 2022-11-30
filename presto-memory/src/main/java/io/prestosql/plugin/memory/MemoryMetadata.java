@@ -338,9 +338,9 @@ public class MemoryMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        return getTableInfo(handle.getId())
-                .getColumn(columnHandle)
-                .getMetadata(typeManager);
+        MemoryColumnHandle memColHandle = getTableInfo(handle.getId())
+                .getColumn(columnHandle);
+        return memColHandle != null ? memColHandle.getMetadata(typeManager) : null;
     }
 
     @Override

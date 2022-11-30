@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -620,8 +621,9 @@ public class TestMemorySelection
         for (MaterializedRow item2 : result2.getMaterializedRows()) {
             data2.add(item2.toString());
         }
+        ArrayList<String> data2WithoutDuplicates = new ArrayList<>(new LinkedHashSet<>(data2));
         Collections.sort(data1);
-        Collections.sort(data2);
-        return data1.equals(data2);
+        Collections.sort(data2WithoutDuplicates);
+        return data1.equals(data2WithoutDuplicates);
     }
 }

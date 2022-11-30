@@ -43,6 +43,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -64,6 +65,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 @Test
 public class TestSqlTaskManager
@@ -155,7 +157,7 @@ public class TestSqlTaskManager
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.RUNNING, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
 
             BufferResult results = sqlTaskManager.getTaskResults(taskId, OUT, 0, new DataSize(1, Unit.MEGABYTE), "0-test_instance_id").get();
             assertEquals(results.isBufferComplete(), false);
@@ -232,18 +234,18 @@ public class TestSqlTaskManager
         try (SqlTaskManager sqlTaskManager = createSqlTaskManager(new TaskManagerConfig())) {
             TaskId taskId = TASK_ID;
             TaskInfo taskInfo = createTask(sqlTaskManager, taskId, ImmutableSet.of(SPLIT), createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds());
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.RUNNING, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.RUNNING, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
 
             sqlTaskManager.abortTaskResults(taskId, OUT, "0-test_instance_id");
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, taskInfo.getTaskStatus().getState(), "0-test_instance_id").get(1, TimeUnit.SECONDS);
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
         }
     }
 

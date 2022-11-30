@@ -127,7 +127,10 @@ public final class MemoryColumnHandle
             return false;
         }
         MemoryColumnHandle that = (MemoryColumnHandle) obj;
-        return columnIndex == that.columnIndex && isPartitionKey == that.isPartitionKey && columnName.equals(that.columnName) && typeSignature.equals(that.typeSignature) && typeCache.equals(that.typeCache);
+        boolean cloumnNameFlag = columnName != null ? columnName.equals(that.columnName) : false;
+        boolean typSignatureFlag = typeSignature != null ? typeSignature.equals(that.typeSignature) : false;
+        boolean typeCacheFlag = typeCache != null ? typeCache.equals(that.typeCache) : false;
+        return columnIndex == that.columnIndex && isPartitionKey == that.isPartitionKey && cloumnNameFlag && typSignatureFlag && typeCacheFlag;
     }
 
     @Override
