@@ -32,7 +32,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * DynamicFilterOrcPredicate
  *
- * @author Huawei
  * @since 29-Sep-2022
  */
 public class DynamicFilterOrcPredicate

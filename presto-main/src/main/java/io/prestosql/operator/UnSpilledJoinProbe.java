@@ -32,7 +32,6 @@ import static java.util.Objects.requireNonNull;
 /**
  * UnSpilledJoinProbe
  *
- * @author Huawei
  * @since 02-Nov-2022
  */
 public class UnSpilledJoinProbe

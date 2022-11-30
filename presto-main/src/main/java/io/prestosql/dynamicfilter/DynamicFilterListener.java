@@ -54,6 +54,7 @@ public class DynamicFilterListener
         DynamicFilter dynamicFilter = null;
         if (newDynamicFilter instanceof Set) {
             dynamicFilter = DynamicFilterFactory.create(filterId, null, (Set<?>) newDynamicFilter, GLOBAL);
+            dynamicFilter.setMinMax();
             LOG.debug("Got new HashSet DynamicFilter from state store: " + filterId + ", size: " + dynamicFilter.getSize());
         }
         else if (newDynamicFilter instanceof byte[]) {
