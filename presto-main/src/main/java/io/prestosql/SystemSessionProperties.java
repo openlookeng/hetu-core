@@ -218,6 +218,8 @@ public final class SystemSessionProperties
 
     public static final String TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE = "transform_self_join_to_window_aggregate";
 
+    public static final String USE_EXACT_PARTITIONING = "use_exact_partitioning";
+
     private final List<PropertyMetadata<?>> sessionProperties;
 
     private static Logger log = Logger.get(SystemSessionProperties.class);
@@ -1056,6 +1058,11 @@ public final class SystemSessionProperties
                         "Minimum number of join build side rows required to use partitioned join lookup",
                         featuresConfig.getJoinPartitionedBuildMinRowCount(),
                         value -> validateNonNegativeLongValue(value, JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT),
+                        false),
+                booleanProperty(
+                        USE_EXACT_PARTITIONING,
+                        "When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects",
+                        featuresConfig.isUseExactPartitioning(),
                         false));
     }
 
@@ -1861,5 +1868,10 @@ public final class SystemSessionProperties
     public static long getJoinPartitionedBuildMinRowCount(Session session)
     {
         return session.getSystemProperty(JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT, Long.class);
+    }
+
+    public static boolean isUseExactPartitioning(Session session)
+    {
+        return session.getSystemProperty(USE_EXACT_PARTITIONING, Boolean.class);
     }
 }
