@@ -17,7 +17,6 @@ package io.prestosql.sql.planner.optimizations;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
@@ -38,12 +37,9 @@ import io.prestosql.sql.tree.Expression;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
-import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static java.util.Objects.requireNonNull;
 
@@ -101,7 +97,6 @@ public class PruneCTENodes
 
         private final Map<Integer, Integer> cteUsageMap;
         private final Set<PlanNodeId> probeCTEToPrune;
-        private final Set<Integer> cteNotToPrune;
         private final Session session;
         private boolean removeSelfJoin;
 
@@ -115,7 +110,6 @@ public class PruneCTENodes
             probeCTEToPrune = new HashSet<>();
             this.session = session;
             this.removeSelfJoin = removeSelfJoin;
-            this.cteNotToPrune = new HashSet<>();
         }
 
         @Override
@@ -196,7 +190,6 @@ public class PruneCTENodes
             CTEScanNode node = inputNode;
             Integer commonCTERefNum = node.getCommonCTERefNum();
             if (isNodeAlreadyVisited && probeCTEToPrune.contains(node.getId()) && removeSelfJoin) {
-                cteNotToPrune.add(commonCTERefNum);
                 return getSourceNode(node.getSource());
             }
             if (pruneCTEWithCrossJoin) {
@@ -221,7 +214,7 @@ public class PruneCTENodes
                 cteUsageMap.merge(commonCTERefNum, 1, Integer::sum);
             }
             else {
-                if ((cteUsageMap.get(commonCTERefNum) == 1 && !cteNotToPrune.contains(commonCTERefNum))) {
+                if (cteUsageMap.get(commonCTERefNum) == 1) {
                     node = (CTEScanNode) visitPlan(node, context);
                     return node.getSource();
                 }

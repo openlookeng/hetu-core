@@ -255,7 +255,7 @@ public class BeginTableWrite
                     newTarget,
                     node.getRowCountSymbol(),
                     node.getStatisticsAggregationDescriptor(),
-                    node.getCacheDataStorage());
+                    node.getCachedDataKey());
         }
 
         public WriterTarget getTarget(PlanNode node)

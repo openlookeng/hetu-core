@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,33 +12,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.prestosql.cache.elements;
 
+import io.prestosql.Session;
+import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
+import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.metadata.TableHandle;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.lang.System.currentTimeMillis;
 
 public class CachedDataStorage
 {
     private final CachedDataKey identifier;
 
-    private class TableInfo
+    public class TableInfo
     {
+        private final String location;
         private final long age;
         private final long dataAge;
 
-        public TableInfo(long age, long dataAge)
+        private ConnectorTableHandle tableHandle;
+
+        public TableInfo(String location, long age, long dataAge)
         {
+            this.location = location;
             this.age = age;
             this.dataAge = dataAge;
         }
@@ -52,15 +59,30 @@ public class CachedDataStorage
         {
             return dataAge;
         }
+
+        public String getLocation()
+        {
+            return location;
+        }
+
+        public ConnectorTableHandle getTableHandle()
+        {
+            return tableHandle;
+        }
+
+        public void setTableHandle(ConnectorTableHandle tableHandle)
+        {
+            this.tableHandle = tableHandle;
+        }
     }
 
     private final CatalogSchemaTableName dataTable;
     private final long createTime = currentTimeMillis();
-    private final Map<String, TableInfo> tableInfoMap = new HashMap<>();
+    private final Map<String, TableInfo> tableInfoMap;
 
-    private long commitTime = 0;
-    private long abortTime = 0;
-    private long lastAccessTime = 0;
+    private long commitTime;
+    private long abortTime;
+    private long lastAccessTime;
     private long dataSize;
     private long runtime;
     private boolean isNonCachable;
@@ -77,6 +99,18 @@ public class CachedDataStorage
         this.dataTable = dataTable;
         this.commitActions = commit;
         this.abortActions = abort;
+
+        this.tableInfoMap = identifier.getTables()
+                .stream()
+                .collect(toImmutableMap(s -> s, v -> new TableInfo(v, 0, 0)));
+    }
+
+    public void updateTableReferences(Metadata metadata, Session session)
+    {
+        tableInfoMap.entrySet().forEach(es -> {
+            TableHandle tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation())).get();
+            es.getValue().setTableHandle(tableHandle.getConnectorHandle());
+        });
     }
 
     public CachedDataKey getIdentifier()
@@ -84,7 +118,7 @@ public class CachedDataStorage
         return identifier;
     }
 
-    public void commit(long runtime, long dataSize)
+    public synchronized void commit(long runtime, long dataSize)
     {
         checkArgument(!isCommitted.get(), "result is already committed.");
         commitTime = currentTimeMillis();
@@ -97,7 +131,7 @@ public class CachedDataStorage
         }
     }
 
-    public void abort()
+    public synchronized void abort()
     {
         checkArgument(!isCommitted.get(), "result is already committed.");
         abortTime = currentTimeMillis();
@@ -107,7 +141,7 @@ public class CachedDataStorage
         }
     }
 
-    public void reset()
+    public synchronized void reset()
     {
         isCommitted.compareAndSet(true, false);
         inProgress.compareAndSet(false, true);
@@ -118,9 +152,11 @@ public class CachedDataStorage
         return isNonCachable;
     }
 
-    public void setNonCachable(boolean nonCachable)
+    public synchronized void setNonCachable(boolean nonCachable)
     {
         isNonCachable = nonCachable;
+        inProgress.set(false);
+        isCommitted.set(false);
     }
 
     public boolean isCommitted()
@@ -177,7 +213,7 @@ public class CachedDataStorage
     {
         this.refCount.incrementAndGet();
         this.lastAccessTime = currentTimeMillis();
-        return true; // todo(nitin) use this to avoid race b/w access and eviction
+        return true; // todo: use this to avoid race b/w access and eviction
     }
 
     @Override

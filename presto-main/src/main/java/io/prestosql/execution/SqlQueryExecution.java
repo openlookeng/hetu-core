@@ -23,9 +23,8 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataManager;
 import io.prestosql.cache.CachedDataStorageProvider;
-import io.prestosql.cache.elements.CachedDataKey;
-import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
@@ -137,11 +136,11 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.SystemSessionProperties.getRetryPolicy;
+import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
-import static io.prestosql.SystemSessionProperties.isRecoveryEnabled;
 import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
@@ -875,7 +874,7 @@ public class SqlQueryExecution
             reasons.add("CTE result cache is supported only for SELECT queries");
         }
 
-        if (!reasons.isEmpty()) {
+        if (!reasons.isEmpty() && isCTEResultCacheEnabled(session)) {
             session.disableCteResultCache();
             String reasonsMessage = String.join(". \n", reasons);
             warningCollector.add(new PrestoWarning(CTE_RESULT_CACHE_NOT_SUPPORTED, reasonsMessage));
@@ -1361,7 +1360,7 @@ public class SqlQueryExecution
         private final TableExecuteContextManager tableExecuteContextManager;
 
         private final QueryResourceManagerService queryResourceManagerService;
-        private final Optional<Cache<CachedDataKey, CachedDataStorage>> dataCache;
+        private final CachedDataManager dataCache;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1398,7 +1397,8 @@ public class SqlQueryExecution
                 PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
                 TaskExecutionStats taskExecutionStats,
                 QueryResourceManagerService queryResourceManagerService,
-                TableExecuteContextManager tableExecuteContextManager)
+                TableExecuteContextManager tableExecuteContextManager,
+                CachedDataManager cachedDataManager)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1439,15 +1439,7 @@ public class SqlQueryExecution
                 this.cache = Optional.empty();
             }
 
-            if (hetuConfig.isExecutionDataCacheEnabled()) {
-                this.dataCache = Optional.of(CacheBuilder.newBuilder()
-                        .maximumSize(hetuConfig.getExecutionDataCacheMaxSize())
-                        .build());
-            }
-            else {
-                this.dataCache = Optional.empty();
-            }
-
+            this.dataCache = requireNonNull(cachedDataManager, "cachedDataManager is null");
             this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
             this.coordinatorTaskManager = requireNonNull(coordinatorTaskManager, "coordinatorTaskManager is null");
             this.taskSourceFactory = requireNonNull(taskSourceFactory, "taskSourceFactory is null");

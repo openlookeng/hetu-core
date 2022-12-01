@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableList;
@@ -63,13 +62,13 @@ public class ResultCacheTableRead
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session,  TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         return plan;
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session,  TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector, CachedDataStorageProvider provider)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector, CachedDataStorageProvider provider)
     {
         return SimplePlanRewriter.rewriteWith(new ResultCacheTableRead.Rewriter(session, planSymbolAllocator, idAllocator, provider), plan, null);
     }
@@ -101,8 +100,7 @@ public class ResultCacheTableRead
 
             /* use Cache provider for cache entry lookup */
             CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(keyBuilder.build());
-            if (cds == null || !cds.isCommitted())
-            {
+            if (cds == null || !cds.isCommitted()) {
                 return node;
             }
             QualifiedObjectName destination = QualifiedObjectName.valueOf(cds.getDataTable());
@@ -137,19 +135,19 @@ public class ResultCacheTableRead
             }
         }
 
-        private boolean isSourceCacheFinishNode(PlanNode node)
+        private boolean isSourceCacheTableFinishNode(PlanNode node)
         {
             if (node.getSources().stream().anyMatch(planNode -> planNode instanceof CacheTableFinishNode)) {
                 return true;
             }
             if (node instanceof OutputNode) {
-                return isSourceCacheFinishNode(((OutputNode) node).getSource());
+                return isSourceCacheTableFinishNode(((OutputNode) node).getSource());
             }
             if (node instanceof ExchangeNode) {
-                return isSourceCacheFinishNode(node.getSources().get(0));
+                return isSourceCacheTableFinishNode(node.getSources().get(0));
             }
             if (node instanceof ProjectNode) {
-                return isSourceCacheFinishNode(((ProjectNode) node).getSource());
+                return isSourceCacheTableFinishNode(((ProjectNode) node).getSource());
             }
             return false;
         }

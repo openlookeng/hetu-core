@@ -136,7 +136,8 @@ public final class Session
         requireNonNull(systemProperties, "systemProperties is null");
         if (Boolean.parseBoolean(systemProperties.get(RECOVERY_ENABLED))
                 || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))
-                    || "TASK".equalsIgnoreCase(systemProperties.get(RETRY_POLICY))) {
+                || "TASK".equalsIgnoreCase(systemProperties.get(RETRY_POLICY))
+                || Boolean.parseBoolean(systemProperties.get(ENABLE_CTE_RESULT_CACHE))) {
             // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
             this.systemProperties = new HashMap<>(systemProperties);
         }

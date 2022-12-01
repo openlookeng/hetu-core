@@ -32,6 +32,7 @@ public class TestLimitPushDown
     {
         LimitPushDown optimizer = Mockito.mock(LimitPushDown.class);
         when(optimizer.optimize(any(), any(), any(), any(), any(), any())).thenCallRealMethod();
+        when(optimizer.optimize(any(), any(), any(), any(), any(), any(), any())).thenCallRealMethod();
 
         MockLocalQueryRunner queryRunner = new MockLocalQueryRunner(ImmutableMap.of("push_limit_down", "true"));
         queryRunner.init();

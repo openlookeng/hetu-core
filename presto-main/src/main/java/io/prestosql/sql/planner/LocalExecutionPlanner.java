@@ -31,6 +31,8 @@ import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataManager;
+import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
@@ -394,6 +396,7 @@ public class LocalExecutionPlanner
     private final ExchangeManagerRegistry exchangeManagerRegistry;
     protected final TableExecuteContextManager tableExecuteContextManager;
     private final PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
+    private final CachedDataManager cachedDataManager;
 
     public Metadata getMetadata()
     {
@@ -574,7 +577,8 @@ public class LocalExecutionPlanner
             HeuristicIndexerManager heuristicIndexerManager,
             CubeManager cubeManager,
             ExchangeManagerRegistry exchangeManagerRegistry,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            CachedDataManager cachedDataManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -610,6 +614,7 @@ public class LocalExecutionPlanner
         this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
         this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
+        this.cachedDataManager = requireNonNull(cachedDataManager, "cachedDataManager is null");
     }
 
     public LocalExecutionPlan plan(
@@ -3132,7 +3137,20 @@ public class LocalExecutionPlanner
                     tableExecuteContextManager,
                     session,
                     thresholdSize,
-                    node.getCacheDataStorage());
+                    (endTime, size) -> {
+                        CachedDataStorage cds = cachedDataManager.get(node.getCachedDataKey());
+                        cds.commit(endTime, size);
+                        log.info("Cache Write committed for CTE: %s with size(%d)",
+                                node.getCachedDataKey().getName(), size);
+                        return null;
+                    },
+                    () -> {
+                        CachedDataStorage cds = cachedDataManager.get(node.getCachedDataKey());
+                        cds.setNonCachable(true);
+                        log.info("Cache Write aborted for CTE: %s for exceeding threshold size",
+                                node.getCachedDataKey().getName());
+                        return null;
+                    });
 
             return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
         }
@@ -3167,9 +3185,8 @@ public class LocalExecutionPlanner
                 outputMapping.put(symbol, i);
             }
 
-            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes()/nodePartitioningManager.getNodeScheduler().
-                    getNodeManager().getActiveConnectorNodes(new CatalogName("hive")).size();
-
+            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes() / nodePartitioningManager.getNodeScheduler()
+                    .getNodeManager().getActiveConnectorNodes(new CatalogName("hive")).size();
 
             OperatorFactory operatorFactory = new CacheTableWriterOperator.CacheTableWriterOperatorFactory(
                     context.getNextOperatorId(),

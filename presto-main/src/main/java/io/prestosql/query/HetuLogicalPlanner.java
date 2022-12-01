@@ -35,14 +35,11 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.BeginTableWrite;
 import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.sanity.PlanSanityChecker;
-import io.prestosql.sql.tree.Query;
 import io.prestosql.utils.OptimizerUtils;
 
 import java.util.List;
 import java.util.Optional;
 
-import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
-import static io.prestosql.SystemSessionProperties.isResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.spi.plan.PlanNode.SkipOptRuleLevel.APPLY_ALL_RULES;
 import static io.prestosql.sql.planner.sanity.PlanSanityChecker.DISTRIBUTED_PLAN_SANITY_CHECKER;

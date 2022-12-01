@@ -354,6 +354,12 @@ public class TableWriterNode
         }
 
         @Override
+        public int hashCode()
+        {
+            return Objects.hash(handle, schemaTableName, reportingWrittenBytesSupported);
+        }
+
+        @Override
         public boolean equals(Object obj)
         {
             if (this == obj) {

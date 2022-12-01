@@ -67,7 +67,7 @@ public class HetuConfig
     private boolean extensionExecutionPlannerEnabled;
     private int noResourceRetryCount = 5;
     private boolean isExecutionDataCacheEnabled;
-    private long executionDataCacheMaxItems = 10000L;
+    private long executionDataCacheMaxItems = 1024L * 1024L * 1024L * 2;
     private String cachingSchemaName = "cache";
     private String cachingConnectorName = "hive";
 
@@ -484,7 +484,7 @@ public class HetuConfig
         return executionDataCacheMaxItems;
     }
 
-    @Config("hetu.execution.data-cache.max-size") /* Todo(Nitin) add size based logic for cache conformation instead of number alone.. */
+    @Config("hetu.execution.data-cache.max-size") /* Todo: add size based logic for cache conformation instead of number alone.. */
     @ConfigDescription("Max number of items in the cache")
     public HetuConfig setExecutionDataCacheMaxSize(long maxItems)
     {
@@ -509,7 +509,6 @@ public class HetuConfig
     {
         return cachingConnectorName;
     }
-
 
     @Config("hetu.execution.data-cache.connector-name")
     @ConfigDescription("Target connector name for data cache storage")

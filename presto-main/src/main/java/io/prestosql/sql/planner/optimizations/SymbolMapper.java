@@ -318,7 +318,7 @@ public class SymbolMapper
                 node.getTarget(),
                 map(node.getRowCountSymbol()),
                 node.getStatisticsAggregationDescriptor().map(this::map),
-                node.getCacheDataStorage());
+                node.getCachedDataKey());
     }
 
     public CubeFinishNode map(CubeFinishNode node, PlanNode source)

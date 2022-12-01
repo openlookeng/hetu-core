@@ -60,7 +60,7 @@ public class TestHetuConfig
                 .setExtensionExecutionPlannerClassPath(null)
                 .setNoResourceRetryCount(5)
                 .setExecutionDataCacheEnabled(false)
-                .setExecutionDataCacheMaxSize(10000L)
+                .setExecutionDataCacheMaxSize(1024L * 1024L * 1024L * 2)
                 .setCachingConnectorName("hive")
                 .setCachingSchemaName("cache"));
     }
@@ -98,7 +98,7 @@ public class TestHetuConfig
                 .put("extension_execution_planner_class_path", "")
                 .put("query-no-resource-retry-count", "15")
                 .put("hetu.execution.data-cache.enabled", "true")
-                .put("hetu.execution.data-cache.enabled", "10")
+                .put("hetu.execution.data-cache.max-size", "10")
                 .put("hetu.execution.data-cache.schema-name", "memCache")
                 .put("hetu.execution.data-cache.connector-name", "memory")
                 .build();

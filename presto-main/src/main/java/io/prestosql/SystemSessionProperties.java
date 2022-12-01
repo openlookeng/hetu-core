@@ -1073,16 +1073,6 @@ public final class SystemSessionProperties
                         "When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects",
                         featuresConfig.isUseExactPartitioning(),
                         false),
-                stringProperty(
-                        DATA_CACHE_CATALOG_NAME,
-                        "Name of the Connector to store cached result data",
-                        hetuConfig.getCachingConnectorName(),
-                        false),
-                stringProperty(
-                        DATA_CACHE_SCHEMA_NAME,
-                        "Name of the table schema to store cached result data",
-                        hetuConfig.getCachingSchemaName(),
-                        false),
                 dataSizeProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE,
                         "Maximum allowed size to be stored as part of cte result cache per CTE per query",
                         featuresConfig.getCteResultCacheThresholdSize(),
@@ -1906,7 +1896,6 @@ public final class SystemSessionProperties
     public static boolean isUseExactPartitioning(Session session)
     {
         return session.getSystemProperty(USE_EXACT_PARTITIONING, Boolean.class);
-
     }
 
     public static boolean isCTEResultCacheEnabled(Session session)

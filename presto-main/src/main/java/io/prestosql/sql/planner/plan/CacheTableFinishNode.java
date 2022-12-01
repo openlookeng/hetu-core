@@ -1,11 +1,24 @@
+/*
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.prestosql.sql.planner.plan;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import io.prestosql.cache.CachedDataStorageProvider;
-import io.prestosql.cache.elements.CachedDataStorage;
+import io.prestosql.cache.elements.CachedDataKey;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.Symbol;
@@ -17,14 +30,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class CacheTableFinishNode
-    extends InternalPlanNode
+        extends InternalPlanNode
 {
-
     private final PlanNode source;
     private final TableWriterNode.WriterTarget target;
     private final Symbol rowCountSymbol;
     private final Optional<StatisticAggregationsDescriptor<Symbol>> statisticsAggregationDescriptor;
-    private final Optional<CachedDataStorage> cachedDataStorage;
+    private final CachedDataKey cachedDataKey;
 
     @JsonCreator
     public CacheTableFinishNode(
@@ -32,15 +44,8 @@ public class CacheTableFinishNode
             @JsonProperty("source") PlanNode source,
             @JsonProperty("target") TableWriterNode.WriterTarget target,
             @JsonProperty("rowCountSymbol") Symbol rowCountSymbol,
-            @JsonProperty("statisticsAggregationDescriptor") Optional<StatisticAggregationsDescriptor<Symbol>> statisticsAggregationDescriptor)
-    {
-        this(id, source, target, rowCountSymbol, statisticsAggregationDescriptor, Optional.empty());
-    }
-
-    public CacheTableFinishNode(PlanNodeId id, PlanNode source,
-                                TableWriterNode.WriterTarget target, Symbol rowCountSymbol,
-                                Optional<StatisticAggregationsDescriptor<Symbol>> statisticsAggregationDescriptor,
-                                Optional<CachedDataStorage> cachedDataStorage)
+            @JsonProperty("statisticsAggregationDescriptor") Optional<StatisticAggregationsDescriptor<Symbol>> statisticsAggregationDescriptor,
+            @JsonProperty("cachedDataKey") CachedDataKey cachedDataKey)
     {
         super(id);
         checkArgument(target != null || source instanceof TableWriterNode);
@@ -49,7 +54,7 @@ public class CacheTableFinishNode
         this.target = requireNonNull(target, "target is null");
         this.rowCountSymbol = requireNonNull(rowCountSymbol, "rowCountSymbol is null");
         this.statisticsAggregationDescriptor = requireNonNull(statisticsAggregationDescriptor, "statisticsAggregationDescriptor is null");
-        this.cachedDataStorage = requireNonNull(cachedDataStorage, "cachedDataStorage is null");
+        this.cachedDataKey = requireNonNull(cachedDataKey, "cachedDataKey is null");
     }
 
     @JsonProperty
@@ -74,6 +79,12 @@ public class CacheTableFinishNode
     public Optional<StatisticAggregationsDescriptor<Symbol>> getStatisticsAggregationDescriptor()
     {
         return statisticsAggregationDescriptor;
+    }
+
+    @JsonProperty
+    public CachedDataKey getCachedDataKey()
+    {
+        return cachedDataKey;
     }
 
     @Override
@@ -103,11 +114,6 @@ public class CacheTableFinishNode
                 target,
                 rowCountSymbol,
                 statisticsAggregationDescriptor,
-                cachedDataStorage);
-    }
-
-    public Optional<CachedDataStorage> getCacheDataStorage()
-    {
-        return cachedDataStorage;
+                cachedDataKey);
     }
 }

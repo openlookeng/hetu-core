@@ -33,7 +33,6 @@ import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
-import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.service.PropertyService;

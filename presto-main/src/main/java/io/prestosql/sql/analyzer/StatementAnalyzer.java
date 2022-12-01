@@ -1384,6 +1384,7 @@ class StatementAnalyzer
             Scope queryScope = Scope.builder()
                     .withParent(withScope)
                     .withRelationType(RelationId.of(node), queryBodyScope.getRelationType())
+                    .withTables(queryBodyScope.getTables())
                     .build();
 
             analysis.setScope(node, queryScope);
@@ -2507,6 +2508,7 @@ class StatementAnalyzer
             Scope orderByScope = Scope.builder()
                     .withParent(sourceScope)
                     .withRelationType(outputScope.getRelationId(), outputScope.getRelationType())
+                    .withTables(sourceScope.getTables())
                     .build();
             analysis.setScope(node, orderByScope);
             return orderByScope;
@@ -2551,6 +2553,7 @@ class StatementAnalyzer
             Scope orderByScope = Scope.builder()
                     .withParent(orderByAggregationScope)
                     .withRelationType(outputScope.getRelationId(), outputScope.getRelationType())
+                    .withTables(orderByAggregationScope.getTables())
                     .build();
             analysis.setScope(node, orderByScope);
             analysis.setOrderByAggregates(node, orderByAggregationExpressions);
@@ -2918,7 +2921,7 @@ class StatementAnalyzer
             Scope.Builder withScopeBuilder = scopeBuilder(scope);
             for (WithQuery withQuery : with.getQueries()) {
                 Query query = withQuery.getQuery();
-                process(query, withScopeBuilder.build());
+                Scope retScope = process(query, withScopeBuilder.build());
 
                 String name = withQuery.getName().getValue().toLowerCase(ENGLISH);
                 if (withScopeBuilder.containsNamedQuery(name)) {
@@ -2934,7 +2937,8 @@ class StatementAnalyzer
                     }
                 }
 
-                withScopeBuilder.withNamedQuery(name, withQuery);
+                withScopeBuilder.withNamedQuery(name, withQuery)
+                        .withTables(retScope.getTables());
             }
 
             Scope withScope = withScopeBuilder.build();
@@ -3115,9 +3119,18 @@ class StatementAnalyzer
 
         private Scope createAndAssignScope(Node node, Optional<Scope> parentScope, RelationType relationType)
         {
-            Scope scope = scopeBuilder(parentScope)
-                    .withRelationType(RelationId.of(node), relationType)
-                    .build();
+            Scope scope;
+            if (parentScope.isPresent()) {
+                scope = scopeBuilder(parentScope)
+                        .withRelationType(RelationId.of(node), relationType)
+                        .withTables(parentScope.get().getTables())
+                        .build();
+            }
+            else {
+                scope = scopeBuilder(parentScope)
+                        .withRelationType(RelationId.of(node), relationType)
+                        .build();
+            }
 
             analysis.setScope(node, scope);
             return scope;

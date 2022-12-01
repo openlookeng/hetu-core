@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2018-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.ImmutableList;
@@ -45,10 +44,8 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.CacheTableFinishNode;
 import io.prestosql.sql.planner.plan.CacheTableWriterNode;
-import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableWriterNode;
-import io.prestosql.sql.tree.QualifiedName;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,14 +58,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
-import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static java.util.Objects.requireNonNull;
 
 public class AddCacheTableWriterAboveCTEOptimizer
-    implements PlanOptimizer
+        implements PlanOptimizer
 {
     private final Metadata metadata;
 
@@ -103,7 +99,6 @@ public class AddCacheTableWriterAboveCTEOptimizer
     private class Rewriter
             extends SimplePlanRewriter<Void>
     {
-
         private final Session session;
         private final PlanNodeIdAllocator planNodeIdAllocator;
         private final PlanSymbolAllocator planSymbolAllocator;
@@ -126,20 +121,18 @@ public class AddCacheTableWriterAboveCTEOptimizer
                 return node;
             }
 
-            CachedDataKey.Builder keyBuilder = cachedDataStorageProvider.getCachedDataKeyBuilder(node.getCteRefName());
+            CachedDataKey dataKey = cachedDataStorageProvider.getCachedDataKeyBuilder(node.getCteRefName()).build();
 
             /* use Cache provider for cache entry lookup */
-            CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(keyBuilder.build());
-            if (cds == null)
-            {
+            CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(dataKey);
+            if (cds == null) {
                 return node;
             }
 
             QualifiedObjectName destination = QualifiedObjectName.valueOf(cds.getDataTable());
             if (cds.isCommitted()) {
-                Optional<TableScanNode> tableScanNode = isTableExists(node, destination);
+                Optional<TableScanNode> tableScanNode = replaceCteWithCachedDataScan(node, destination);
 
-                //todo(Surya): add check for eligibilty of the table.
                 if (tableScanNode.isPresent()) {
                     return tableScanNode.get();
                 }
@@ -149,7 +142,7 @@ public class AddCacheTableWriterAboveCTEOptimizer
             }
 
             CatalogName catalogName = metadata.getCatalogHandle(session, destination.getCatalogName())
-                    .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + "hive"));
+                    .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + destination.getCatalogName()));
 
             Map<String, Object> properties = metadata.getTablePropertyManager().getProperties(
                     catalogName,
@@ -162,7 +155,8 @@ public class AddCacheTableWriterAboveCTEOptimizer
             for (Symbol symbol : node.getSource().getOutputSymbols()) {
                 columns.add(new ColumnMetadata(symbol.getName(), typeProvider.get(symbol)));
             }
-            ConnectorTableMetadata tableMetadata =  new ConnectorTableMetadata(toSchemaTableName(destination), columns.build(), properties, Optional.empty());
+
+            ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(toSchemaTableName(destination), columns.build(), properties, Optional.empty());
             Optional<NewTableLayout> newTableLayout = metadata.getNewTableLayout(session, destination.getCatalogName(), tableMetadata);
             Optional<PartitioningScheme> partitioningScheme = Optional.empty();
             if (newTableLayout.isPresent()) {
@@ -195,12 +189,12 @@ public class AddCacheTableWriterAboveCTEOptimizer
                     target,
                     planSymbolAllocator.newSymbol("rows", BIGINT),
                     Optional.empty(),
-                    Optional.of(cds));
+                    dataKey);
 
             return new CTEScanNode(planNodeIdAllocator.getNextId(), commitNode, node.getOutputSymbols(), node.getPredicate(), node.getCteRefName(), node.getConsumerPlans(), node.getCommonCTERefNum());
         }
 
-        private Optional<TableScanNode> isTableExists(CTEScanNode node, QualifiedObjectName cacheStore)
+        private Optional<TableScanNode> replaceCteWithCachedDataScan(CTEScanNode node, QualifiedObjectName cacheStore)
         {
             Optional<TableHandle> targetTable = metadata.getTableHandle(session, cacheStore);
             if (targetTable.isPresent()) {

@@ -18,19 +18,18 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.sql.tree.DereferenceExpression;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.Identifier;
-import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.sql.tree.QualifiedName;
-import io.prestosql.sql.tree.Table;
 import io.prestosql.sql.tree.WithQuery;
 
 import javax.annotation.concurrent.Immutable;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -48,7 +47,7 @@ public class Scope
     private final RelationId relationId;
     private final RelationType relation;
     private final Map<String, WithQuery> namedQueries;
-    private List<TableHandle> tables = new LinkedList<>();
+    private Set<TableHandle> tables = new HashSet<>();
 
     public static Scope create()
     {
@@ -65,13 +64,15 @@ public class Scope
             boolean queryBoundary,
             RelationId relationId,
             RelationType relation,
-            Map<String, WithQuery> namedQueries)
+            Map<String, WithQuery> namedQueries,
+            Collection<TableHandle> tableHandles)
     {
         this.parent = requireNonNull(parent, "parent is null");
         this.relationId = requireNonNull(relationId, "relationId is null");
         this.queryBoundary = queryBoundary;
         this.relation = requireNonNull(relation, "relation is null");
         this.namedQueries = ImmutableMap.copyOf(requireNonNull(namedQueries, "namedQueries is null"));
+        this.tables.addAll(tableHandles);
     }
 
     public Optional<Scope> getOuterQueryParent()
@@ -229,6 +230,7 @@ public class Scope
         private RelationType relationType = new RelationType();
         private final Map<String, WithQuery> namedQueries = new HashMap<>();
         private Optional<Scope> parent = Optional.empty();
+        private Set<TableHandle> tableHandles = new HashSet<>();
         private boolean queryBoundary;
 
         public Builder withRelationType(RelationId relationId, RelationType relationType)
@@ -260,6 +262,18 @@ public class Scope
             return this;
         }
 
+        public Builder withTables(Collection<TableHandle> tables)
+        {
+            this.tableHandles.addAll(tables);
+            return this;
+        }
+
+        public Builder withTable(TableHandle table)
+        {
+            this.tableHandles.add(table);
+            return this;
+        }
+
         public boolean containsNamedQuery(String name)
         {
             return namedQueries.containsKey(name);
@@ -267,7 +281,7 @@ public class Scope
 
         public Scope build()
         {
-            return new Scope(parent, queryBoundary, relationId, relationType, namedQueries);
+            return new Scope(parent, queryBoundary, relationId, relationType, namedQueries, tableHandles);
         }
     }
 }

@@ -233,7 +233,6 @@ public class AddLocalExchanges
         @Override
         public PlanWithProperties visitCacheTableFinish(CacheTableFinishNode node, StreamPreferredProperties context)
         {
-
             // table commit requires that all data be in one stream
             // this node changes the input organization completely, so we do not pass through parent preferences
             return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));

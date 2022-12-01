@@ -103,7 +103,6 @@ import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.filter;
-import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.expressions.LogicalRowExpressions.FALSE_CONSTANT;
@@ -252,7 +251,14 @@ public class PredicatePushDown
         {
             PlanNode rewrittenNode = context.defaultRewrite(node.getSource(), context.get());
             if (rewrittenNode != node.getSource()) {
-                return new CacheTableWriterNode(node.getId(), rewrittenNode, node.getTarget(), node.getRowCountSymbol(), node.getFragmentSymbol(), node.getColumns(), node.getColumnNames(),node.getPartitioningScheme());
+                return new CacheTableWriterNode(node.getId(),
+                        rewrittenNode,
+                        node.getTarget(),
+                        node.getRowCountSymbol(),
+                        node.getFragmentSymbol(),
+                        node.getColumns(),
+                        node.getColumnNames(),
+                        node.getPartitioningScheme());
             }
 
             return node;
@@ -267,7 +273,7 @@ public class PredicatePushDown
                         node.getTarget(),
                         node.getRowCountSymbol(),
                         node.getStatisticsAggregationDescriptor(),
-                        node.getCacheDataStorage());
+                        node.getCachedDataKey());
             }
 
             return node;
@@ -349,10 +355,6 @@ public class PredicatePushDown
                 else {
                     // remove CTE node if cost is not optimal
                     rewrittenNode = ((CTEScanNode) context.defaultRewrite(node, context.get()));
-                    if (isCTEResultCacheEnabled(session)) {
-                        //todo(SURYA): modified this so CTE can't be removed post add Exchanges and according to the logic
-                        return rewrittenNode;
-                    }
                     return rewrittenNode.getSource();
                 }
             }
