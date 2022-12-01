@@ -258,7 +258,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         long localTotalRowCount = 0;
         long localFileRowCount = 0;
         ImmutableList.Builder<StripeInformation> localStripes = ImmutableList.builder();
-        Map<StripeInformation, List<IndexMetadata>> stripeIndexes = new HashMap<>();
+        ImmutableList.Builder<StripeInfo> localStripeInfos = ImmutableList.builder();
         ImmutableList.Builder<Long> localStripeFilePositions = ImmutableList.builder();
         if (!fileStats.isPresent() || predicate.matches(numberOfRows, fileStats.get())) {
             // select stripes that start within the specified split
@@ -269,6 +269,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
                         && isStripeIncluded(stripe, info.getStats(), predicate)
                         && !filterStripeUsingIndex(stripe, stripeOffsetToIndex, domains, orDomains)) {
                     localStripes.add(stripe);
+                    localStripeInfos.add(info);
                     localStripeFilePositions.add(localFileRowCount);
                     localTotalRowCount += stripe.getNumberOfRows();
                 }
@@ -277,7 +278,7 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         }
         this.totalRowCount = localTotalRowCount;
         this.stripes = localStripes.build();
-        this.stripeInfos = sortedStripeInfos;
+        this.stripeInfos = localStripeInfos.build();
         this.stripeFilePositions = localStripeFilePositions.build();
 
         OrcDataSource localOrcDataSource = inputOrcDataSource;
@@ -818,8 +819,6 @@ abstract class AbstractOrcRecordReader<T extends AbstractColumnReader>
         if (predicate.getDynamicFilterPredicate().isPresent()) {
             return;
         }
-        //construct DF predicate
-        List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = dynamicFilterSupplier.get().getDynamicFilters();
         DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder dfPredicateBuilder = DynamicFilterOrcPredicate.DynamicFilterOrcPredicateBuilder.builder();
         if (null != readColumns && !readColumns.isEmpty()) {
             for (OrcColumn readColumn : readColumns) {

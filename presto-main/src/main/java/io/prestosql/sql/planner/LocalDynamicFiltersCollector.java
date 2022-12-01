@@ -168,6 +168,7 @@ public class LocalDynamicFiltersCollector
                         Optional<RowExpression> filter = context.getFilter(filterId, i);
                         Optional<Predicate<List>> filterPredicate = DynamicFilters.createDynamicFilterPredicate(filter);
                         DynamicFilter dynamicFilter = DynamicFilterFactory.create(filterId, columnHandle, predicates.get(filterId), LOCAL, filterPredicate, filter);
+                        dynamicFilter.setMinMax();
                         cachedDynamicFilters.put(filterId, dynamicFilter);
                         result.put(columnHandle, dynamicFilter);
                     }
