@@ -33,6 +33,7 @@ import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.HostAddress;
+import io.prestosql.spi.NodeManager;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.service.PropertyService;
@@ -132,6 +133,11 @@ public class NodeScheduler
             counters.put(i == 0 ? "all" : networkLocationSegmentNames.get(i - 1), topologicalSplitCounters.get(i));
         }
         return counters.build();
+    }
+
+    public InternalNodeManager getNodeManager()
+    {
+        return nodeManager;
     }
 
     public NodeSelector createNodeSelector(CatalogName catalogName, boolean keepConsumerOnFeederNodes, Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes)

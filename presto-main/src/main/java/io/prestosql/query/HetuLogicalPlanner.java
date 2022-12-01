@@ -93,13 +93,7 @@ public class HetuLogicalPlanner
     @Override
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan, Stage stage)
     {
-        PlanNode root;
-        if (isResultCacheEnabled(session) && analysis.getStatement() instanceof Query && !isCTEResultCacheEnabled(session)) {
-            root = planStatementWithResultCache(analysis, analysis.getStatement(), cachedDataStorageProvider.getOrCreateCachedDataKey(null));
-        }
-        else {
-            root = planStatement(analysis, analysis.getStatement());
-        }
+        PlanNode root = planStatement(analysis, analysis.getStatement());
         PlanNode.SkipOptRuleLevel optimizationLevel = APPLY_ALL_RULES;
 
         planSanityChecker.validateIntermediatePlan(root, session, metadata, typeAnalyzer, planSymbolAllocator.getTypes(),

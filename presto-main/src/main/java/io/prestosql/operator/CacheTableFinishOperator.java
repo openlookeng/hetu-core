@@ -18,10 +18,12 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.prestosql.Session;
+import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.execution.TableExecuteContext;
 import io.prestosql.execution.TableExecuteContextManager;
 import io.prestosql.snapshot.SingleInputSnapshotState;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.ConnectorOutputMetadata;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -36,6 +38,7 @@ import java.util.Queue;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.SystemSessionProperties.isStatisticsCpuTimerEnabled;
+import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.util.Objects.requireNonNull;
 
 public class CacheTableFinishOperator
@@ -51,6 +54,8 @@ public class CacheTableFinishOperator
         private final StatisticAggregationsDescriptor<Integer> descriptor;
         private final Session session;
         private boolean closed;
+        private final long thresholdSize;
+        private final Optional<CachedDataStorage> cachedDataStorage;
 
         public CacheTableFinishOperatorFactory(
                 int operatorId,
@@ -58,7 +63,9 @@ public class CacheTableFinishOperator
                 TableFinishOperator.TableFinisher tableFinisher,
                 StatisticAggregationsDescriptor<Integer> descriptor,
                 TableExecuteContextManager tableExecuteContextManager,
-                Session session)
+                Session session,
+                long thresholdSize,
+                Optional<CachedDataStorage> cachedDataStorage)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -66,6 +73,8 @@ public class CacheTableFinishOperator
             this.descriptor = requireNonNull(descriptor, "descriptor is null");
             this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
             this.session = requireNonNull(session, "session is null");
+            this.thresholdSize = thresholdSize;
+            this.cachedDataStorage = cachedDataStorage;
         }
 
         @Override
@@ -76,7 +85,7 @@ public class CacheTableFinishOperator
             boolean cpuTimerEnabled = isStatisticsCpuTimerEnabled(session);
             QueryId queryId = driverContext.getPipelineContext().getTaskContext().getQueryContext().getQueryId();
             TableExecuteContext tableExecuteContextForQuery = tableExecuteContextManager.getTableExecuteContextForQuery(queryId);
-            return new CacheTableFinishOperator(context, tableFinisher, descriptor, tableExecuteContextForQuery, cpuTimerEnabled);
+            return new CacheTableFinishOperator(context, tableFinisher, descriptor, tableExecuteContextForQuery, cpuTimerEnabled, thresholdSize, cachedDataStorage);
         }
 
         @Override
@@ -88,7 +97,7 @@ public class CacheTableFinishOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new CacheTableFinishOperator.CacheTableFinishOperatorFactory(operatorId, planNodeId, tableFinisher, descriptor, tableExecuteContextManager, session);
+            return new CacheTableFinishOperator.CacheTableFinishOperatorFactory(operatorId, planNodeId, tableFinisher, descriptor, tableExecuteContextManager, session, thresholdSize, cachedDataStorage);
         }
     }
 
@@ -115,12 +124,18 @@ public class CacheTableFinishOperator
 
     private Queue<Page> outputPages = new LinkedList<>();
 
+    private final long thresholdSize;
+    private long currentSize;
+    private final Optional<CachedDataStorage> cachedDataStorage;
+
     public CacheTableFinishOperator(
             OperatorContext operatorContext,
             TableFinishOperator.TableFinisher tableFinisher,
             StatisticAggregationsDescriptor<Integer> descriptor,
             TableExecuteContext tableExecuteContext,
-            boolean statisticsCpuTimerEnabled)
+            boolean statisticsCpuTimerEnabled,
+            long thresholdSize,
+            Optional<CachedDataStorage> cachedDataStorage)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.tableFinisher = requireNonNull(tableFinisher, "tableCommitter is null");
@@ -128,6 +143,8 @@ public class CacheTableFinishOperator
         this.statisticsCpuTimerEnabled = statisticsCpuTimerEnabled;
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
         this.tableExecuteContext = requireNonNull(tableExecuteContext, "tableExecuteContext is null");
+        this.thresholdSize = thresholdSize;
+        this.cachedDataStorage = cachedDataStorage;
     }
 
     @Override
@@ -182,6 +199,8 @@ public class CacheTableFinishOperator
             }
         }
 
+        currentSize += page.getSizeInBytes();
+
         outputPages.add(page);
     }
 
@@ -201,7 +220,9 @@ public class CacheTableFinishOperator
 
         if (outputPages.isEmpty()) {
             if (state == State.FINISHING) {
-                outputMetadata = tableFinisher.finishTable(ImmutableList.copyOf(fragment), ImmutableList.copyOf(computedStatistics), tableExecuteContext);
+                if (currentSize <= thresholdSize) {
+                    outputMetadata = tableFinisher.finishTable(ImmutableList.copyOf(fragment), ImmutableList.copyOf(computedStatistics), tableExecuteContext);
+                }
                 state = State.FINISHED;
             }
         }

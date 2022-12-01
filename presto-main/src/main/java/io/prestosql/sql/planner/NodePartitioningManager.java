@@ -25,6 +25,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.Split;
 import io.prestosql.operator.BucketPartitionFunction;
 import io.prestosql.operator.PartitionFunction;
+import io.prestosql.spi.Node;
 import io.prestosql.spi.connector.BucketFunction;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorBucketNodeMap;
@@ -62,6 +63,11 @@ public class NodePartitioningManager
     public NodePartitioningManager(NodeScheduler nodeScheduler)
     {
         this.nodeScheduler = requireNonNull(nodeScheduler, "nodeScheduler is null");
+    }
+
+    public NodeScheduler getNodeScheduler()
+    {
+        return nodeScheduler;
     }
 
     public void addPartitioningProvider(CatalogName catalogName, ConnectorNodePartitioningProvider nodePartitioningProvider)

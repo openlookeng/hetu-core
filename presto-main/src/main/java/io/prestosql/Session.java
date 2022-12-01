@@ -50,6 +50,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
+import static io.prestosql.SystemSessionProperties.ENABLE_CTE_RESULT_CACHE;
 import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
 import static io.prestosql.SystemSessionProperties.RETRY_POLICY;
 import static io.prestosql.SystemSessionProperties.REUSE_TABLE_SCAN;
@@ -584,6 +585,11 @@ public final class Session
     public void disableReuseTableScan()
     {
         systemProperties.put(REUSE_TABLE_SCAN, "false");
+    }
+
+    public void disableCteResultCache()
+    {
+        systemProperties.put(ENABLE_CTE_RESULT_CACHE, "false");
     }
 
     public static class SessionBuilder

@@ -29,15 +29,12 @@ import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.operator.ReuseExchangeOperator;
-import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.plan.TableScanNode;
-import io.prestosql.sql.planner.Partitioning;
-import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.CacheTableFinishNode;
@@ -54,8 +51,6 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
-import static io.prestosql.SystemSessionProperties.isResultCacheEnabled;
-import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 
 public class ResultCacheTableRead
         implements PlanOptimizer
@@ -70,7 +65,7 @@ public class ResultCacheTableRead
     @Override
     public PlanNode optimize(PlanNode plan, Session session,  TypeProvider types, PlanSymbolAllocator planSymbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
-        return SimplePlanRewriter.rewriteWith(new ResultCacheTableRead.Rewriter(session, planSymbolAllocator, idAllocator, CachedDataStorageProvider.NULL_PROVIDER), plan, null);
+        return plan;
     }
 
     @Override
@@ -93,52 +88,6 @@ public class ResultCacheTableRead
             this.planSymbolAllocator = planSymbolAllocator;
             this.planNodeIdAllocator = planNodeIdAllocator;
             this.cachedDataStorageProvider = provider;
-        }
-
-        @Override
-        public PlanNode visitOutput(OutputNode node, RewriteContext<Void> context)
-        {
-            if (isSourceCacheFinishNode(node) && isResultCacheEnabled(session)) {
-                CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(null);
-                if (!cds.isCommitted()) {
-                    return context.defaultRewrite(node, context.get());
-                }
-
-                Optional<TableHandle> targetTable = metadata.getTableHandle(session, QualifiedObjectName.valueOf(cds.getDataTable()));
-                if (targetTable.isPresent()) {
-                    Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, targetTable.get());
-                    ImmutableList.Builder<Symbol> tableScanOutputs = ImmutableList.builder();
-                    ImmutableMap.Builder<Symbol, ColumnHandle> symbolToColumnHandle = ImmutableMap.builder();
-                    ImmutableMap.Builder<String, Symbol> columnNameToSymbol = ImmutableMap.builder();
-                    TableMetadata tableMetadata = metadata.getTableMetadata(session, targetTable.get());
-                    for (ColumnMetadata column : tableMetadata.getColumns()) {
-                        Symbol symbol = planSymbolAllocator.newSymbol(column.getName(), column.getType());
-                        tableScanOutputs.add(symbol);
-                        symbolToColumnHandle.put(symbol, columnHandles.get(column.getName()));
-                        columnNameToSymbol.put(column.getName(), symbol);
-                    }
-
-                    TableScanNode tableScanNode = TableScanNode.newInstance(planNodeIdAllocator.getNextId(), targetTable.get(), tableScanOutputs.build(),
-                            symbolToColumnHandle.build(), ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT,
-                            new UUID(0, 0), 0, false);
-                    ExchangeNode exchangeNode = new ExchangeNode(
-                            planNodeIdAllocator.getNextId(),
-                            ExchangeNode.Type.GATHER,
-                            ExchangeNode.Scope.REMOTE,
-                            new PartitioningScheme(Partitioning.create(SINGLE_DISTRIBUTION, ImmutableList.of()), tableScanNode.getOutputSymbols()),
-                            ImmutableList.of(tableScanNode),
-                            ImmutableList.of(tableScanNode.getOutputSymbols()),
-                            Optional.empty(),
-                            AggregationNode.AggregationType.HASH);
-                    return new OutputNode(planNodeIdAllocator.getNextId(), exchangeNode, node.getColumnNames(), node.getOutputSymbols());
-                }
-                else {
-                    throw new NoSuchElementException();
-                }
-            }
-            else {
-                return context.defaultRewrite(node, context.get());
-            }
         }
 
         @Override

@@ -168,8 +168,8 @@ public final class SystemSessionProperties
     public static final String SORT_BASED_AGGREGATION_ENABLED = "sort_based_aggregation_enabled";
     public static final String PRCNT_DRIVERS_FOR_PARTIAL_AGGR = "prcnt_drivers_for_partial_aggr";
     public static final String SPILL_TO_HDFS_ENABLED = "spill_to_hdfs_enabled";
-    public static final String ENABLE_RESULT_CACHE = "enable_result_cache";
     public static final String ENABLE_CTE_RESULT_CACHE = "enable_cte_result_cache";
+    public static final String CTE_RESULT_CACHE_THRESHOLD_SIZE = "cte_result_cache_threshold_size";
     // CTE Optimization configurations
     public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
@@ -924,11 +924,6 @@ public final class SystemSessionProperties
                         },
                         value -> value),
                 booleanProperty(
-                        ENABLE_RESULT_CACHE,
-                        "Enable result cache",
-                        featuresConfig.isResultCacheEnabled(),
-                        false),
-                booleanProperty(
                         ENABLE_CTE_RESULT_CACHE,
                         "Enable CTE result cache",
                         featuresConfig.isCTEResultCacheEnabled(),
@@ -1077,6 +1072,20 @@ public final class SystemSessionProperties
                 booleanProperty(USE_EXACT_PARTITIONING,
                         "When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects",
                         featuresConfig.isUseExactPartitioning(),
+                        false),
+                stringProperty(
+                        DATA_CACHE_CATALOG_NAME,
+                        "Name of the Connector to store cached result data",
+                        hetuConfig.getCachingConnectorName(),
+                        false),
+                stringProperty(
+                        DATA_CACHE_SCHEMA_NAME,
+                        "Name of the table schema to store cached result data",
+                        hetuConfig.getCachingSchemaName(),
+                        false),
+                dataSizeProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE,
+                        "Maximum allowed size to be stored as part of cte result cache per CTE per query",
+                        featuresConfig.getCteResultCacheThresholdSize(),
                         false),
                 stringProperty(
                         DATA_CACHE_CATALOG_NAME,
@@ -1900,11 +1909,6 @@ public final class SystemSessionProperties
 
     }
 
-    public static boolean isResultCacheEnabled(Session session)
-    {
-        return session.getSystemProperty(ENABLE_RESULT_CACHE, Boolean.class);
-    }
-
     public static boolean isCTEResultCacheEnabled(Session session)
     {
         return session.getSystemProperty(ENABLE_CTE_RESULT_CACHE, Boolean.class);
@@ -1918,5 +1922,10 @@ public final class SystemSessionProperties
     public static String getDataCacheCatalogName(Session session)
     {
         return session.getSystemProperty(DATA_CACHE_CATALOG_NAME, String.class);
+    }
+
+    public static DataSize getCteResultCacheThresholdSize(Session session)
+    {
+        return session.getSystemProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE, DataSize.class);
     }
 }

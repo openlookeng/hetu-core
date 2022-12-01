@@ -107,6 +107,7 @@ import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.InsertCube;
+import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
@@ -140,10 +141,13 @@ import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
+import static io.prestosql.SystemSessionProperties.isRecoveryEnabled;
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.connector.StandardWarningCode.CTE_RESULT_CACHE_NOT_SUPPORTED;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.NORMAL;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
@@ -816,6 +820,10 @@ public class SqlQueryExecution
             checkTaskRetrySupport(getSession());
         }
 
+        if (getRetryPolicy(getSession()) != RetryPolicy.NONE || isSnapshotEnabled(getSession()) || !(analysis.getStatement() instanceof Query)) {
+            disableCteResultCache(getSession());
+        }
+
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
 
@@ -848,6 +856,29 @@ public class SqlQueryExecution
             String reasonsMessage = "Reuse Table Scan feature is disabled: Reuse Table Scan feature is supported only when Task Retry feature is disabled";
             session.disableReuseTableScan();
             warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
+        }
+    }
+
+    private void disableCteResultCache(Session session)
+    {
+        List<String> reasons = new ArrayList<>();
+
+        if (getRetryPolicy(getSession()) != RetryPolicy.NONE) {
+            reasons.add("CTE result cache is not supported when task snapshot is enabled");
+        }
+
+        if (isSnapshotEnabled(getSession())) {
+            reasons.add("CTE result cache is not supported when operator snapshot is enabled");
+        }
+
+        if (!(analysis.getStatement() instanceof Query)) {
+            reasons.add("CTE result cache is supported only for SELECT queries");
+        }
+
+        if (!reasons.isEmpty()) {
+            session.disableCteResultCache();
+            String reasonsMessage = String.join(". \n", reasons);
+            warningCollector.add(new PrestoWarning(CTE_RESULT_CACHE_NOT_SUPPORTED, reasonsMessage));
         }
     }
 

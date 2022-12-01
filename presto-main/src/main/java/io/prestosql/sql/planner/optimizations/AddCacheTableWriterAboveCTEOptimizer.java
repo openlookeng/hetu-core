@@ -45,6 +45,7 @@ import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.CacheTableFinishNode;
 import io.prestosql.sql.planner.plan.CacheTableWriterNode;
+import io.prestosql.sql.planner.plan.OutputNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.tree.QualifiedName;
@@ -93,8 +94,10 @@ public class AddCacheTableWriterAboveCTEOptimizer
         requireNonNull(planSymbolAllocator, "symbolAllocator is null");
         requireNonNull(idAllocator, "idAllocator is null");
         requireNonNull(cdsProvider, "cachedDataStorage is null");
-
-        return SimplePlanRewriter.rewriteWith(new Rewriter(session, idAllocator, planSymbolAllocator, types, cdsProvider), plan, null);
+        if (isCTEResultCacheEnabled(session)) {
+            return SimplePlanRewriter.rewriteWith(new Rewriter(session, idAllocator, planSymbolAllocator, types, cdsProvider), plan, null);
+        }
+        return plan;
     }
 
     private class Rewriter

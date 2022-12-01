@@ -808,6 +808,16 @@ public class Analysis
         return null;
     }
 
+    public Query getNamedQueriesByName(Table table)
+    {
+        Optional<NodeRef<Table>> key = namedQueries.keySet().stream().filter(k -> k.getNode().equals(table)).findAny();
+
+        if (key.isPresent()) {
+            return namedQueries.get(key.get());
+        }
+        return null;
+    }
+
     public void registerNamedQuery(Table tableReference, Query query)
     {
         requireNonNull(tableReference, "tableReference is null");

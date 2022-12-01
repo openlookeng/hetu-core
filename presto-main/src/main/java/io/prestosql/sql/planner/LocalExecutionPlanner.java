@@ -138,6 +138,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorIndex;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -272,6 +273,7 @@ import static io.prestosql.SystemSessionProperties.getAdaptivePartialAggregation
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
 import static io.prestosql.SystemSessionProperties.getCteMaxPrefetchQueueSize;
 import static io.prestosql.SystemSessionProperties.getCteMaxQueueSize;
+import static io.prestosql.SystemSessionProperties.getCteResultCacheThresholdSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
@@ -3120,13 +3122,17 @@ public class LocalExecutionPlanner
                 outputMapping.put(symbol, i);
             }
 
+            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes();
+
             OperatorFactory operatorFactory = new CacheTableFinishOperator.CacheTableFinishOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
                     createTableFinisher(session, node, metadata),
                     descriptor,
                     tableExecuteContextManager,
-                    session);
+                    session,
+                    thresholdSize,
+                    node.getCacheDataStorage());
 
             return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
         }
@@ -3161,6 +3167,10 @@ public class LocalExecutionPlanner
                 outputMapping.put(symbol, i);
             }
 
+            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes()/nodePartitioningManager.getNodeScheduler().
+                    getNodeManager().getActiveConnectorNodes(new CatalogName("hive")).size();
+
+
             OperatorFactory operatorFactory = new CacheTableWriterOperator.CacheTableWriterOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
@@ -3168,7 +3178,8 @@ public class LocalExecutionPlanner
                     node.getTarget(),
                     inputChannels,
                     session,
-                    Optional.of(context.getTaskId()));
+                    Optional.of(context.getTaskId()),
+                    thresholdSize);
 
             return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
         }

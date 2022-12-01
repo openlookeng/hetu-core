@@ -296,7 +296,7 @@ public class PlanOptimizers
 
         builder.add(new AdjustApplicableOptimizationRule()); //This must be the first rule, as based on this next set of rule to apply will vary.
 
-        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false));
+        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false, true));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
 
@@ -598,7 +598,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
                 new MetadataQueryOptimizer(metadata),
-                new PruneCTENodes(metadata, typeAnalyzer, true),
+                new PruneCTENodes(metadata, typeAnalyzer, true, true),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,

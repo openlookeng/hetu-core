@@ -60,6 +60,7 @@ public class CacheTableWriterOperator
         private final Session session;
         private final Optional<TaskId> taskId;
         private boolean closed;
+        private long thresholdSize;
 
         public CacheTableWriterOperatorFactory(int operatorId,
                 PlanNodeId planNodeId,
@@ -67,7 +68,8 @@ public class CacheTableWriterOperator
                 TableWriterNode.WriterTarget writerTarget,
                 List<Integer> columnChannels,
                 Session session,
-                Optional<TaskId> taskId)
+                Optional<TaskId> taskId,
+                long thresholdSize)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -82,6 +84,7 @@ public class CacheTableWriterOperator
             this.target = requireNonNull(writerTarget, "writerTarget is null");
             this.session = session;
             this.taskId = taskId;
+            this.thresholdSize = thresholdSize;
         }
 
         @Override
@@ -90,7 +93,7 @@ public class CacheTableWriterOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext context = driverContext.addOperatorContext(operatorId, planNodeId, CacheTableWriterOperator.class.getSimpleName());
             boolean cpuTimerEnabled = isStatisticsCpuTimerEnabled(session);
-            return new CacheTableWriterOperator(context, createPageSink(driverContext), columnChannels, cpuTimerEnabled);
+            return new CacheTableWriterOperator(context, createPageSink(driverContext), columnChannels, cpuTimerEnabled, thresholdSize);
         }
 
         private ConnectorPageSink createPageSink(DriverContext driverContext)
@@ -129,7 +132,8 @@ public class CacheTableWriterOperator
                     target,
                     columnChannels,
                     session,
-                    taskId);
+                    taskId,
+                    thresholdSize);
         }
     }
 
@@ -151,6 +155,9 @@ public class CacheTableWriterOperator
     private boolean committed;
     private boolean closed;
     private long writtenBytes;
+    private long thresholdSize;
+    private long currentSize;
+    private boolean isPageSinkAborted = false;
 
     private final OperationTimer.OperationTiming statisticsTiming = new OperationTimer.OperationTiming();
     private final boolean statisticsCpuTimerEnabled;
@@ -158,7 +165,7 @@ public class CacheTableWriterOperator
     private final SingleInputSnapshotState snapshotState;
     private Queue<Page> outputQueue = new LinkedList<>();
 
-    public CacheTableWriterOperator(OperatorContext operatorContext, ConnectorPageSink pageSink, List<Integer> columnChannels, boolean statisticsCpuTimerEnabled)
+    public CacheTableWriterOperator(OperatorContext operatorContext, ConnectorPageSink pageSink, List<Integer> columnChannels, boolean statisticsCpuTimerEnabled, long thresholdSize)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.pageSinkMemoryContext = operatorContext.newLocalSystemMemoryContext(CacheTableWriterOperator.class.getSimpleName());
@@ -166,6 +173,7 @@ public class CacheTableWriterOperator
         this.columnChannels = requireNonNull(columnChannels, "columnChannels is null");
         this.statisticsCpuTimerEnabled = statisticsCpuTimerEnabled;
         this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+        this.thresholdSize = thresholdSize;
     }
 
     @Override
@@ -217,8 +225,18 @@ public class CacheTableWriterOperator
         OperationTimer timer = new OperationTimer(statisticsCpuTimerEnabled);
         timer.end(statisticsTiming);
 
+        CompletableFuture<?> future = CompletableFuture.completedFuture(null);
         Page inputPage = new Page(blocks);
-        CompletableFuture<?> future = pageSink.appendPage(inputPage);
+        currentSize += inputPage.getSizeInBytes();
+        if (currentSize > thresholdSize) {
+            if (!isPageSinkAborted) {
+                pageSink.abort();
+            }
+            isPageSinkAborted = true;
+        }
+        else {
+            future = pageSink.appendPage(inputPage);
+        }
         outputQueue.add(inputPage);
 
         updateMemoryUsage();
