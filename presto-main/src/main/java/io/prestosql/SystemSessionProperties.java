@@ -1603,7 +1603,8 @@ public final class SystemSessionProperties
 
     public static boolean isReuseTableScanEnabled(Session session)
     {
-        return session.getSystemProperty(REUSE_TABLE_SCAN, Boolean.class);
+        //return false always if retry policy or recovery is enabled
+        return !(getRetryPolicy(session) == RetryPolicy.TASK) && !isRecoveryEnabled(session) && session.getSystemProperty(REUSE_TABLE_SCAN, Boolean.class);
     }
 
     public static boolean isSpillReuseExchange(Session session)
@@ -1618,7 +1619,8 @@ public final class SystemSessionProperties
 
     public static boolean isCTEReuseEnabled(Session session)
     {
-        return session.getSystemProperty(CTE_REUSE_ENABLED, Boolean.class);
+        //return false always if retry policy or recovery is enabled
+        return !(getRetryPolicy(session) == RetryPolicy.TASK) && !isRecoveryEnabled(session) && session.getSystemProperty(CTE_REUSE_ENABLED, Boolean.class);
     }
 
     public static int getCteMaxPrefetchQueueSize(Session session)
