@@ -67,7 +67,7 @@ public class TestMemoryWorkerCrash
     {
         DistributedQueryRunner queryRunner = (DistributedQueryRunner) getQueryRunner();
         long start = System.nanoTime();
-        while (queryRunner.getCoordinator().refreshNodes().getActiveNodes().size() < numberOfNodes) {
+        while (queryRunner.getCoordinator().refreshNodes().getActiveNodes().size() > numberOfNodes) {
             assertLessThan(nanosSince(start), new Duration(10, SECONDS));
             MILLISECONDS.sleep(10);
         }

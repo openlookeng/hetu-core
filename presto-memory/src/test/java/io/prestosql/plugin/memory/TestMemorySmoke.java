@@ -206,9 +206,11 @@ public class TestMemorySmoke
     @Test
     public void testSelectFromEmptyTable()
     {
-        assertUpdate("CREATE TABLE test_select_empty AS SELECT * FROM tpch.tiny.nation WHERE nationkey > 1000", "SELECT count(*) FROM nation WHERE nationkey > 1000");
-
-        assertQueryResult("SELECT count(*) FROM test_select_empty", 0L);
+        assertUpdate("CREATE SCHEMA IF NOT EXISTS schema10");
+        assertUpdate("CREATE TABLE schema10.test_select_empty AS SELECT * FROM tpch.tiny.nation WHERE nationkey > 1000", "SELECT count(*) FROM nation WHERE nationkey > 1000");
+        assertQueryResult("SELECT count(*) FROM schema10.test_select_empty", 0L);
+        assertUpdate("DROP TABLE schema10.test_select_empty");
+        assertUpdate("DROP SCHEMA IF EXISTS schema10");
     }
 
     @Test

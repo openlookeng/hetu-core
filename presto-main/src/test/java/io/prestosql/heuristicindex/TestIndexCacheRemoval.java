@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -136,12 +137,16 @@ public class TestIndexCacheRemoval
             // each index is has memory usage of 2, and limit is 2*types of idx, so all should be loaded
             List<IndexMetadata> actualSplitIndex = null;
             List<Future<?>> indexCacheFutureList = new ArrayList<>();
-            indexCacheFutureList.add(executor.submit(() -> indexCache.getIndices(table, column, split)));
-            for (Future<?> query : indexCacheFutureList) {
-                synchronized (query) {
-                    query.wait(16000L);
-                    actualSplitIndex = (List<IndexMetadata>) query.get();
+            indexCacheFutureList.add(executor.submit((Callable<List<IndexMetadata>>) () -> {
+                List<IndexMetadata> listIndexMetadata = indexCache.getIndices(table, column, split);
+                while (listIndexMetadata.size() < numberOfIndexTypes) {
+                    Thread.sleep(1000L);
+                    listIndexMetadata = indexCache.getIndices(table, column, split);
                 }
+                return listIndexMetadata;
+            }));
+            for (Future<?> query : indexCacheFutureList) {
+                actualSplitIndex = (List<IndexMetadata>) query.get(16000, TimeUnit.SECONDS);
             }
             actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
@@ -160,14 +165,18 @@ public class TestIndexCacheRemoval
             List<IndexMetadata> expectedIndices2 = new LinkedList<>();
             expectedIndices2.add(indexMetadata2);
             when(indexCacheLoader.load(any())).then(new Returns(expectedIndices2));
+            indexCacheFutureList.clear();
 
-            indexCacheFutureList = new ArrayList<>();
-            indexCacheFutureList.add(executor.submit(() -> indexCache.getIndices(table, column, split)));
-            for (Future<?> query : indexCacheFutureList) {
-                synchronized (query) {
-                    query.wait(16000L);
-                    actualSplitIndex = (List<IndexMetadata>) query.get();
+            indexCacheFutureList.add(executor.submit((Callable<List<IndexMetadata>>) () -> {
+                List<IndexMetadata> listIndexMetadata = indexCache.getIndices(table, column, split);
+                while (listIndexMetadata.size() < numberOfIndexTypes) {
+                    Thread.sleep(1000L);
+                    listIndexMetadata = indexCache.getIndices(table, column, split);
                 }
+                return listIndexMetadata;
+            }));
+            for (Future<?> query : indexCacheFutureList) {
+                actualSplitIndex = (List<IndexMetadata>) query.get(16000, TimeUnit.SECONDS);
             }
             actualSplitIndex = indexCache.getIndices(table, column, split);
             assertEquals(actualSplitIndex.size(), numberOfIndexTypes);
