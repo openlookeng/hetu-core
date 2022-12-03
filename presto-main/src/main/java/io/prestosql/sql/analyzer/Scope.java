@@ -244,6 +244,7 @@ public class Scope
         {
             checkArgument(!this.parent.isPresent(), "parent is already set");
             this.parent = Optional.of(parent);
+            this.tableHandles.addAll(parent.tables);
             return this;
         }
 
@@ -252,6 +253,7 @@ public class Scope
             checkArgument(!this.parent.isPresent(), "parent is already set");
             this.parent = Optional.of(parent);
             this.queryBoundary = true;
+            this.tableHandles.addAll(parent.tables);
             return this;
         }
 

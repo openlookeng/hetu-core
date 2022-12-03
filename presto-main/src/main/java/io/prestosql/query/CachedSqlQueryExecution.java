@@ -92,6 +92,7 @@ import io.prestosql.sql.planner.optimizations.PlanOptimizer;
 import io.prestosql.sql.planner.optimizations.ResultCacheTableRead;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
+import io.prestosql.sql.tree.CTEReference;
 import io.prestosql.sql.tree.CreateIndex;
 import io.prestosql.sql.tree.CreateTable;
 import io.prestosql.sql.tree.CreateTableAsSelect;
@@ -266,7 +267,7 @@ public class CachedSqlQueryExecution
                 CachedDataKey.Builder keyBuilder = super.getCachedDataKeyBuilder(cteName)
                         .addRules(optimizers.toArray(new String[0]))
                         .setQuery(analysis.getNamedQueryByRef(cteRef)); // Check how can identify and assign TableName and Column Names here!
-                validateAndExtractTableAndColumnsByCTE(analysis, metadata, session, cteRef, keyBuilder);
+                validateAndExtractTableAndColumnsByCTE(analysis, metadata, session, new CTEReference(QualifiedName.of(cteName)), keyBuilder);
                 return keyBuilder;
             }
 
@@ -418,7 +419,7 @@ public class CachedSqlQueryExecution
             Analysis analysis,
             Metadata metadata,
             Session session,
-            Table namedQuery,
+            CTEReference namedQuery,
             CachedDataKey.Builder builder)
     {
         for (TableHandle tableHandle : analysis.getTablesByNamedQuery(namedQuery)) {
