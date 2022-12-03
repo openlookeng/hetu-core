@@ -172,12 +172,12 @@ public class TestSqlTaskManager
 
             // complete the task by calling abort on it
             TaskInfo info = sqlTaskManager.abortTaskResults(taskId, OUT, "0-test_instance_id");
-            assertEquals(info.getOutputBuffers().getState(), BufferState.FINISHED);
+            assertTrue(Arrays.asList(new BufferState[] {BufferState.FINISHED, BufferState.FLUSHING}).contains(info.getOutputBuffers().getState()));
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, taskInfo.getTaskStatus().getState(), "0-test_instance_id").get(1, TimeUnit.SECONDS);
             assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
         }
     }
 
