@@ -18,9 +18,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.prestosql.Session;
 import io.prestosql.plugin.tpch.TpchConnectorFactory;
-import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
-import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
@@ -29,7 +27,6 @@ import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
 
-import java.util.List;
 import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
@@ -171,20 +168,6 @@ public class TestAddExchangesPlans
                                         exchange(REMOTE, REPARTITION,
                                                 anyTree(
                                                         tableScan("region", ImmutableMap.of("regionkey", "regionkey"))))))));
-    }
-
-    @Test
-    public void testExchangeNodeAboveCTESCanNode()
-    {
-        List<PlanOptimizer> allOptimizers = getQueryRunner().getPlanOptimizers(false);
-
-        assertPlan("with ss as (select * from orders), sd as (select * from ss) " +
-                        " select * from ss,sd where ss.orderkey = sd.orderkey",
-                cteEnabledSession(),
-                anyTree(node(JoinNode.class,
-                        anyTree(exchange(node(CTEScanNode.class, tableScan("orders")))),
-                        anyTree(exchange(node(CTEScanNode.class, tableScan("orders")))))),
-                allOptimizers);
     }
 
     private Session spillEnabledWithJoinDistributionType(JoinDistributionType joinDistributionType)

@@ -58,6 +58,8 @@ import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.VariableReferenceSymbolConverter;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -481,6 +483,14 @@ public class UnaliasSymbolReferences
         }
 
         @Override
+        public PlanNode visitCacheTableFinish(CacheTableFinishNode node, RewriteContext<Void> context)
+        {
+            PlanNode source = context.rewrite(node.getSource());
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
+            return mapper.map(node, source);
+        }
+
+        @Override
         public PlanNode visitCubeFinish(CubeFinishNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
@@ -692,6 +702,14 @@ public class UnaliasSymbolReferences
 
         @Override
         public PlanNode visitTableWriter(TableWriterNode node, RewriteContext<Void> context)
+        {
+            PlanNode source = context.rewrite(node.getSource());
+            SymbolMapper mapper = new SymbolMapper(mapping, types);
+            return mapper.map(node, source);
+        }
+
+        @Override
+        public PlanNode visitCacheTableWriter(CacheTableWriterNode node, RewriteContext<Void> context)
         {
             PlanNode source = context.rewrite(node.getSource());
             SymbolMapper mapper = new SymbolMapper(mapping, types);

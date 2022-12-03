@@ -32,6 +32,8 @@ import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.block.BlockJsonSerde;
+import io.prestosql.cache.CacheStorageMonitor;
+import io.prestosql.cache.CachedDataManager;
 import io.prestosql.catalog.CatalogInfo;
 import io.prestosql.catalog.CatalogStoreUtil;
 import io.prestosql.catalog.DynamicCatalogConfig;
@@ -485,6 +487,8 @@ public class ServerMainModule
 
         // Cube manager
         binder.bind(CubeManager.class).in(Scopes.SINGLETON);
+        binder.bind(CacheStorageMonitor.class).in(Scopes.SINGLETON);
+        binder.bind(CachedDataManager.class).in(Scopes.SINGLETON);
 
         // system connector
         binder.install(new SystemConnectorModule());

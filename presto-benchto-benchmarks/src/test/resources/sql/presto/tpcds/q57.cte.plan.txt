@@ -2,26 +2,27 @@ local exchange (GATHER, SINGLE, [])
     remote exchange (GATHER, SINGLE, [])
         Filter
             Filter
-                local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["cc_name", "i_brand", "i_category"])
-                        final hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
-                            local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["cc_name", "d_moy", "d_year", "i_brand", "i_category"])
-                                    partial hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
-                                        join (INNER, REPLICATED):
+                Filter
+                    local exchange (GATHER, SINGLE, [])
+                        remote exchange (REPARTITION, HASH, ["cc_name", "i_brand", "i_category"])
+                            final hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
+                                local exchange (GATHER, SINGLE, [])
+                                    remote exchange (REPARTITION, HASH, ["cc_name", "d_moy", "d_year", "i_brand", "i_category"])
+                                        partial hashaggregation over (cc_name, d_moy, d_year, i_brand, i_category)
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
-                                                    Filter
-                                                        scan catalog_sales
+                                                    join (INNER, REPLICATED):
+                                                        Filter
+                                                            scan catalog_sales
+                                                        local exchange (GATHER, SINGLE, [])
+                                                            remote exchange (REPLICATE, BROADCAST, [])
+                                                                Filter
+                                                                    scan date_dim
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
                                                             Filter
-                                                                scan date_dim
+                                                                scan call_center
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
                                                         Filter
-                                                            scan call_center
-                                            local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPLICATE, BROADCAST, [])
-                                                    Filter
-                                                        scan item
+                                                            scan item

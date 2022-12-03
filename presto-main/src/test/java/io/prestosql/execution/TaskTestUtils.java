@@ -17,6 +17,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
+import io.prestosql.cache.CacheStorageMonitor;
+import io.prestosql.cache.CachedDataManager;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
@@ -68,6 +70,7 @@ import io.prestosql.statestore.listener.StateStoreListenerManager;
 import io.prestosql.testing.TestingMetadata.TestingColumnHandle;
 import io.prestosql.testing.TestingSplit;
 import io.prestosql.util.FinalizerService;
+import io.prestosql.utils.HetuConfig;
 
 import java.util.List;
 import java.util.Optional;
@@ -184,7 +187,8 @@ public final class TaskTestUtils
                 heuristicIndexerManager,
                 cubeManager,
                 new ExchangeManagerRegistry(new ExchangeHandleResolver()),
-                tableExecuteContextManager);
+                tableExecuteContextManager,
+                new CachedDataManager(new HetuConfig(), new CacheStorageMonitor(new HetuConfig(), metadata), metadata));
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)

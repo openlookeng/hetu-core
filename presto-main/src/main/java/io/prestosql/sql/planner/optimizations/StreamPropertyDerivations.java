@@ -46,6 +46,8 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -443,6 +445,14 @@ public final class StreamPropertyDerivations
         }
 
         @Override
+        public StreamProperties visitCacheTableFinish(CacheTableFinishNode node, List<StreamProperties> inputProperties)
+        {
+            StreamProperties properties = Iterables.getOnlyElement(inputProperties);
+            // table finish only outputs the row count
+            return properties.withUnspecifiedPartitioning();
+        }
+
+        @Override
         public StreamProperties visitCubeFinish(CubeFinishNode node, List<StreamProperties> inputProperties)
         {
             StreamProperties properties = Iterables.getOnlyElement(inputProperties);
@@ -492,6 +502,12 @@ public final class StreamPropertyDerivations
             StreamProperties properties = Iterables.getOnlyElement(inputProperties);
             // table writer only outputs the row count
             return properties.withUnspecifiedPartitioning();
+        }
+
+        @Override
+        public StreamProperties visitCacheTableWriter(CacheTableWriterNode node, List<StreamProperties> inputProperties)
+        {
+            return Iterables.getOnlyElement(inputProperties);
         }
 
         @Override

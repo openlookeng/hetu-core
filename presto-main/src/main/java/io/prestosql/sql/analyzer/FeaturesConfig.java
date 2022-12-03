@@ -152,6 +152,7 @@ public class FeaturesConfig
     private boolean reuseTableScanEnabled;
     private boolean spillReuseTableScan;
     private int spillOperatorThresholdReuseExchange = 10;
+    private boolean cteResultCacheEnabled;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering = true;
@@ -194,6 +195,7 @@ public class FeaturesConfig
     private double adaptivePartialAggregationUniqueRowsRatioThreshold = 0.8;
     private boolean transformSelfJoinToWindow = true;
     private boolean transformSelfJoinAggregateToWindow = true;
+    private DataSize cteResultCacheThresholdSize = new DataSize(128, MEGABYTE);
 
     private long joinPartitionedBuildMinRowCount = 1_000_000L;
 
@@ -933,6 +935,18 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isCTEResultCacheEnabled()
+    {
+        return cteResultCacheEnabled;
+    }
+
+    @Config("enable-cte-result-cache")
+    public FeaturesConfig setCTEResultCacheEnabled(boolean cteResultCacheEnabled)
+    {
+        this.cteResultCacheEnabled = cteResultCacheEnabled;
+        return this;
+    }
+
     public String getSpillProfile()
     {
         return spillProfile;
@@ -1644,6 +1658,19 @@ public class FeaturesConfig
     public FeaturesConfig setUseExactPartitioning(boolean useExactPartitioning)
     {
         this.useExactPartitioning = useExactPartitioning;
+        return this;
+    }
+
+    public DataSize getCteResultCacheThresholdSize()
+    {
+        return cteResultCacheThresholdSize;
+    }
+
+    @Config("cte-result-cache-threshold-size")
+    @ConfigDescription("Maximum allowed size to be stored as part of cte result cache per CTE per query")
+    public FeaturesConfig setCteResultCacheThresholdSize(DataSize cteResultCacheThresholdSize)
+    {
+        this.cteResultCacheThresholdSize = cteResultCacheThresholdSize;
         return this;
     }
 }

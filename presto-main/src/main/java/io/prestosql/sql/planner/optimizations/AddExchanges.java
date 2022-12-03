@@ -53,6 +53,8 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.iterative.rule.PushPredicateIntoTableScan;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.ChildReplacer;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
@@ -588,6 +590,34 @@ public class AddExchanges
         }
 
         @Override
+        public PlanWithProperties visitCacheTableWriter(CacheTableWriterNode node, PreferredProperties preferredProperties)
+        {
+            PlanWithProperties source = node.getSource().accept(this, preferredProperties);
+
+            Optional<PartitioningScheme> partitioningScheme = node.getPartitioningScheme();
+            if (!partitioningScheme.isPresent()) {
+                if (scaleWriters) {
+                    partitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(SCALED_WRITER_DISTRIBUTION, ImmutableList.of()), source.getNode().getOutputSymbols()));
+                }
+                else if (redistributeWrites) {
+                    // Redistribute write operators using partition column if the query is using partition
+                    partitioningScheme = Optional.of(new PartitioningScheme(Partitioning.create(FIXED_ARBITRARY_DISTRIBUTION, ImmutableList.of()), source.getNode().getOutputSymbols()));
+                }
+            }
+
+            if (partitioningScheme.isPresent() && !source.getProperties().isCompatibleTablePartitioningWith(partitioningScheme.get().getPartitioning(), false, metadata, session)) {
+                source = withDerivedProperties(
+                        partitionedExchange(
+                                idAllocator.getNextId(),
+                                REMOTE,
+                                source.getNode(),
+                                partitioningScheme.get()),
+                        source.getProperties());
+            }
+            return rebaseAndDeriveProperties(node, source);
+        }
+
+        @Override
         public PlanWithProperties visitTableExecute(PlanNode planNode, PreferredProperties preferredProperties)
         {
             TableExecuteNode node = (TableExecuteNode) planNode;
@@ -713,6 +743,25 @@ public class AddExchanges
 
         @Override
         public PlanWithProperties visitTableFinish(TableFinishNode node, PreferredProperties preferredProperties)
+        {
+            PlanWithProperties child = planChild(node, PreferredProperties.any());
+
+            // if the child is already a gathering exchange, don't add another
+            if ((child.getNode() instanceof ExchangeNode) && ((ExchangeNode) child.getNode()).getType().equals(GATHER)) {
+                return rebaseAndDeriveProperties(node, child);
+            }
+
+            if (!child.getProperties().isCoordinatorOnly()) {
+                child = withDerivedProperties(
+                        gatheringExchange(idAllocator.getNextId(), REMOTE, child.getNode()),
+                        child.getProperties());
+            }
+
+            return rebaseAndDeriveProperties(node, child);
+        }
+
+        @Override
+        public PlanWithProperties visitCacheTableFinish(CacheTableFinishNode node, PreferredProperties context)
         {
             PlanWithProperties child = planChild(node, PreferredProperties.any());
 

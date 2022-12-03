@@ -20,6 +20,7 @@ import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
 import io.prestosql.cost.CostCalculator;
@@ -180,6 +181,7 @@ public class LogicalPlanner
     private final WarningCollector warningCollector;
     private final Map<QualifiedName, Integer> namedSubPlan = new HashMap<>();
     private final UniqueIdAllocator uniqueIdAllocator = new UniqueIdAllocator();
+    private final CachedDataStorageProvider cachedDataStorageProvider;
 
     public LogicalPlanner(Session session,
                           List<PlanOptimizer> planOptimizers,
@@ -188,9 +190,10 @@ public class LogicalPlanner
                           TypeAnalyzer typeAnalyzer,
                           StatsCalculator statsCalculator,
                           CostCalculator costCalculator,
-                          WarningCollector warningCollector)
+                          WarningCollector warningCollector,
+                          CachedDataStorageProvider cachedData)
     {
-        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
+        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
     }
 
     public LogicalPlanner(Session session,
@@ -201,7 +204,8 @@ public class LogicalPlanner
                           TypeAnalyzer typeAnalyzer,
                           StatsCalculator statsCalculator,
                           CostCalculator costCalculator,
-                          WarningCollector warningCollector)
+                          WarningCollector warningCollector,
+                          CachedDataStorageProvider cachedData)
     {
         this.session = requireNonNull(session, "session is null");
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
@@ -214,6 +218,7 @@ public class LogicalPlanner
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
+        this.cachedDataStorageProvider = cachedData;
     }
 
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan)
@@ -232,7 +237,7 @@ public class LogicalPlanner
             for (PlanOptimizer optimizer : planOptimizers) {
                 if (OptimizerUtils.isEnabledLegacy(optimizer, session, root) && OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                     root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                            warningCollector);
+                            warningCollector, cachedDataStorageProvider);
                     requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                     optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                 }

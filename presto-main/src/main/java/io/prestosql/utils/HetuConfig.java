@@ -66,6 +66,10 @@ public class HetuConfig
     private String extensionExecutionPlannerClassPath;
     private boolean extensionExecutionPlannerEnabled;
     private int noResourceRetryCount = 5;
+    private boolean isExecutionDataCacheEnabled;
+    private long executionDataCacheMaxItems = 1024L * 1024L * 1024L * 2;
+    private String cachingSchemaName = "cache";
+    private String cachingConnectorName = "hive";
 
     public HetuConfig()
     {
@@ -459,6 +463,58 @@ public class HetuConfig
     public HetuConfig setNoResourceRetryCount(int retryCount)
     {
         this.noResourceRetryCount = retryCount;
+        return this;
+    }
+
+    public boolean isExecutionDataCacheEnabled()
+    {
+        return this.isExecutionDataCacheEnabled;
+    }
+
+    @Config("hetu.execution.data-cache.enabled")
+    @ConfigDescription("Enable data cache for query output results")
+    public HetuConfig setExecutionDataCacheEnabled(boolean flag)
+    {
+        this.isExecutionDataCacheEnabled = flag;
+        return this;
+    }
+
+    public long getExecutionDataCacheMaxSize()
+    {
+        return executionDataCacheMaxItems;
+    }
+
+    @Config("hetu.execution.data-cache.max-size") /* Todo: add size based logic for cache conformation instead of number alone.. */
+    @ConfigDescription("Max number of items in the cache")
+    public HetuConfig setExecutionDataCacheMaxSize(long maxItems)
+    {
+        this.executionDataCacheMaxItems = maxItems;
+        return this;
+    }
+
+    public String getCachingSchemaName()
+    {
+        return cachingSchemaName;
+    }
+
+    @Config("hetu.execution.data-cache.schema-name")
+    @ConfigDescription("Target schema name for data cache storage")
+    public HetuConfig setCachingSchemaName(String schema)
+    {
+        this.cachingSchemaName = schema;
+        return this;
+    }
+
+    public String getCachingConnectorName()
+    {
+        return cachingConnectorName;
+    }
+
+    @Config("hetu.execution.data-cache.connector-name")
+    @ConfigDescription("Target connector name for data cache storage")
+    public HetuConfig setCachingConnectorName(String connector)
+    {
+        this.cachingConnectorName = connector;
         return this;
     }
 }

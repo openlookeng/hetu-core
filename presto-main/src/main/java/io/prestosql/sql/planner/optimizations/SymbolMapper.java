@@ -33,6 +33,8 @@ import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.SymbolUtils;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.StatisticAggregations;
 import io.prestosql.sql.planner.plan.StatisticAggregationsDescriptor;
@@ -238,6 +240,29 @@ public class SymbolMapper
                 node.isPartial());
     }
 
+    public CacheTableWriterNode map(CacheTableWriterNode node, PlanNode source)
+    {
+        return map(node, source, node.getId());
+    }
+
+    public CacheTableWriterNode map(CacheTableWriterNode node, PlanNode source, PlanNodeId newNodeId)
+    {
+        // Intentionally does not use canonicalizeAndDistinct as that would remove columns
+        ImmutableList<Symbol> columns = node.getColumns().stream()
+                .map(this::map)
+                .collect(toImmutableList());
+
+        return new CacheTableWriterNode(
+                newNodeId,
+                source,
+                node.getTarget(),
+                map(node.getRowCountSymbol()),
+                map(node.getFragmentSymbol()),
+                columns,
+                node.getColumnNames(),
+                node.getPartitioningScheme().map(partitioningScheme -> canonicalize(partitioningScheme, source)));
+    }
+
     public TableWriterNode map(TableWriterNode node, PlanNode source)
     {
         return map(node, source, node.getId());
@@ -283,6 +308,17 @@ public class SymbolMapper
                 map(node.getRowCountSymbol()),
                 node.getStatisticsAggregation().map(this::map),
                 node.getStatisticsAggregationDescriptor().map(descriptor -> descriptor.map(this::map)));
+    }
+
+    public CacheTableFinishNode map(CacheTableFinishNode node, PlanNode source)
+    {
+        return new CacheTableFinishNode(
+                node.getId(),
+                source,
+                node.getTarget(),
+                map(node.getRowCountSymbol()),
+                node.getStatisticsAggregationDescriptor().map(this::map),
+                node.getCachedDataKey());
     }
 
     public CubeFinishNode map(CubeFinishNode node, PlanNode source)

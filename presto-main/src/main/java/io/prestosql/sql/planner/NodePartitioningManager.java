@@ -64,6 +64,11 @@ public class NodePartitioningManager
         this.nodeScheduler = requireNonNull(nodeScheduler, "nodeScheduler is null");
     }
 
+    public NodeScheduler getNodeScheduler()
+    {
+        return nodeScheduler;
+    }
+
     public void addPartitioningProvider(CatalogName catalogName, ConnectorNodePartitioningProvider nodePartitioningProvider)
     {
         requireNonNull(catalogName, "catalogName is null");

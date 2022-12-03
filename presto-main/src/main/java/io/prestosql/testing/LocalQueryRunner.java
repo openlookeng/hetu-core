@@ -26,6 +26,9 @@ import io.prestosql.GroupByHashPageIndexerFactory;
 import io.prestosql.PagesIndexPageSorter;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CacheStorageMonitor;
+import io.prestosql.cache.CachedDataManager;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.connector.CatalogConnectorStore;
 import io.prestosql.connector.ConnectorManager;
 import io.prestosql.connector.system.AnalyzePropertiesSystemTable;
@@ -299,6 +302,7 @@ public class LocalQueryRunner
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final CubeManager cubeManager;
     private boolean printPlan;
+    private final CachedDataManager cachedDataManager;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -386,6 +390,8 @@ public class LocalQueryRunner
         this.hetuMetaStoreManager = new HetuMetaStoreManager();
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
+        HetuConfig hetuConfig = new HetuConfig();
+        this.cachedDataManager = new CachedDataManager(hetuConfig, new CacheStorageMonitor(hetuConfig, metadata), metadata);
         this.connectorManager = new ConnectorManager(
                 materializedViewPropertyManager,
                 hetuMetaStoreManager,
@@ -844,7 +850,8 @@ public class LocalQueryRunner
                 heuristicIndexerManager,
                 cubeManager,
                 exchangeManagerRegistry,
-                tableExecuteContextManager);
+                tableExecuteContextManager,
+                cachedDataManager);
 
         // plan query
         StageExecutionDescriptor stageExecutionDescriptor = subplan.getFragment().getStageExecutionDescriptor();
@@ -989,7 +996,7 @@ public class LocalQueryRunner
                 cubeManager);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager, cubeManager);
 
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER);
 
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
         return logicalPlanner.plan(analysis, false, stage);

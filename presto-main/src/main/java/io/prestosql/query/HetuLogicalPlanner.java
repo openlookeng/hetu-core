@@ -15,6 +15,7 @@
 package io.prestosql.query;
 
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
 import io.prestosql.cost.CostCalculator;
@@ -66,12 +67,14 @@ public class HetuLogicalPlanner
 
     private final WarningCollector warningCollector;
 
+    private final CachedDataStorageProvider cachedDataStorageProvider;
+
     public HetuLogicalPlanner(Session session, List<PlanOptimizer> planOptimizers, PlanNodeIdAllocator idAllocator,
-            Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
-            WarningCollector warningCollector)
+                              Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
+                              WarningCollector warningCollector, CachedDataStorageProvider cachedData)
     {
         super(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator,
-                warningCollector);
+                warningCollector, cachedData);
         this.session = session;
         this.planOptimizers = planOptimizers;
         this.planSanityChecker = DISTRIBUTED_PLAN_SANITY_CHECKER;
@@ -81,6 +84,7 @@ public class HetuLogicalPlanner
         this.statsCalculator = statsCalculator;
         this.costCalculator = costCalculator;
         this.warningCollector = warningCollector;
+        this.cachedDataStorageProvider = cachedData;
     }
 
     @Override
@@ -103,7 +107,7 @@ public class HetuLogicalPlanner
 
                     if (OptimizerUtils.canApplyOptimizer(optimizer, optimizationLevel)) {
                         root = optimizer.optimize(root, session, planSymbolAllocator.getTypes(), planSymbolAllocator, idAllocator,
-                                warningCollector);
+                                warningCollector, cachedDataStorageProvider);
                         requireNonNull(root, format("%s returned a null plan", optimizer.getClass().getName()));
                         optimizationLevel = optimizationLevel == APPLY_ALL_RULES ? root.getSkipOptRuleLevel() : optimizationLevel;
                     }

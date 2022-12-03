@@ -134,6 +134,11 @@ public class NodeScheduler
         return counters.build();
     }
 
+    public InternalNodeManager getNodeManager()
+    {
+        return nodeManager;
+    }
+
     public NodeSelector createNodeSelector(CatalogName catalogName, boolean keepConsumerOnFeederNodes, Map<PlanNodeId, FixedNodeScheduleData> feederScheduledNodes)
     {
         // this supplier is thread-safe. TODO: this logic should probably move to the scheduler since the choice of which node to run in should be

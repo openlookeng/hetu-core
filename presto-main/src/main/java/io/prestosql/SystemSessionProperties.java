@@ -168,6 +168,8 @@ public final class SystemSessionProperties
     public static final String SORT_BASED_AGGREGATION_ENABLED = "sort_based_aggregation_enabled";
     public static final String PRCNT_DRIVERS_FOR_PARTIAL_AGGR = "prcnt_drivers_for_partial_aggr";
     public static final String SPILL_TO_HDFS_ENABLED = "spill_to_hdfs_enabled";
+    public static final String ENABLE_CTE_RESULT_CACHE = "enable_cte_result_cache";
+    public static final String CTE_RESULT_CACHE_THRESHOLD_SIZE = "cte_result_cache_threshold_size";
     // CTE Optimization configurations
     public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
@@ -219,6 +221,9 @@ public final class SystemSessionProperties
     public static final String TRANSFORM_SELF_JOIN_CTE_TO_WINDOW_AGGREGATE = "transform_self_join_to_window_aggregate";
 
     public static final String USE_EXACT_PARTITIONING = "use_exact_partitioning";
+
+    public static final String DATA_CACHE_CATALOG_NAME = "data_cache_catalog_name";
+    public static final String DATA_CACHE_SCHEMA_NAME = "data_cache_schema_name";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -919,6 +924,11 @@ public final class SystemSessionProperties
                         },
                         value -> value),
                 booleanProperty(
+                        ENABLE_CTE_RESULT_CACHE,
+                        "Enable CTE result cache",
+                        featuresConfig.isCTEResultCacheEnabled(),
+                        false),
+                booleanProperty(
                         ELIMINATE_DUPLICATE_SPILL_FILES,
                         "Eliminates back up of spill files",
                         recoveryConfig.isEliminateDuplicateSpillFilesEnabled(),
@@ -1059,10 +1069,23 @@ public final class SystemSessionProperties
                         featuresConfig.getJoinPartitionedBuildMinRowCount(),
                         value -> validateNonNegativeLongValue(value, JOIN_PARTITIONED_BUILD_MIN_ROW_COUNT),
                         false),
-                booleanProperty(
-                        USE_EXACT_PARTITIONING,
+                booleanProperty(USE_EXACT_PARTITIONING,
                         "When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects",
                         featuresConfig.isUseExactPartitioning(),
+                        false),
+                dataSizeProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE,
+                        "Maximum allowed size to be stored as part of cte result cache per CTE per query",
+                        featuresConfig.getCteResultCacheThresholdSize(),
+                        false),
+                stringProperty(
+                        DATA_CACHE_CATALOG_NAME,
+                        "Name of the Connector to store cached result data",
+                        hetuConfig.getCachingConnectorName(),
+                        false),
+                stringProperty(
+                        DATA_CACHE_SCHEMA_NAME,
+                        "Name of the table schema to store cached result data",
+                        hetuConfig.getCachingSchemaName(),
                         false));
     }
 
@@ -1875,5 +1898,25 @@ public final class SystemSessionProperties
     public static boolean isUseExactPartitioning(Session session)
     {
         return session.getSystemProperty(USE_EXACT_PARTITIONING, Boolean.class);
+    }
+
+    public static boolean isCTEResultCacheEnabled(Session session)
+    {
+        return session.getSystemProperty(ENABLE_CTE_RESULT_CACHE, Boolean.class);
+    }
+
+    public static String getDataCacheSchemaName(Session session)
+    {
+        return session.getSystemProperty(DATA_CACHE_SCHEMA_NAME, String.class);
+    }
+
+    public static String getDataCacheCatalogName(Session session)
+    {
+        return session.getSystemProperty(DATA_CACHE_CATALOG_NAME, String.class);
+    }
+
+    public static DataSize getCteResultCacheThresholdSize(Session session)
+    {
+        return session.getSystemProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE, DataSize.class);
     }
 }

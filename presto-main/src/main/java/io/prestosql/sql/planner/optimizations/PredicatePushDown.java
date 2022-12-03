@@ -68,6 +68,8 @@ import io.prestosql.sql.planner.VariablesExtractor;
 import io.prestosql.sql.planner.iterative.Lookup;
 import io.prestosql.sql.planner.iterative.Memo;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SampleNode;
 import io.prestosql.sql.planner.plan.SemiJoinNode;
@@ -242,6 +244,39 @@ public class PredicatePushDown
                 rewrittenNode = new FilterNode(idAllocator.getNextId(), rewrittenNode, context.get());
             }
             return rewrittenNode;
+        }
+
+        @Override
+        public PlanNode visitCacheTableWriter(CacheTableWriterNode node, RewriteContext<RowExpression> context)
+        {
+            PlanNode rewrittenNode = context.defaultRewrite(node.getSource(), context.get());
+            if (rewrittenNode != node.getSource()) {
+                return new CacheTableWriterNode(node.getId(),
+                        rewrittenNode,
+                        node.getTarget(),
+                        node.getRowCountSymbol(),
+                        node.getFragmentSymbol(),
+                        node.getColumns(),
+                        node.getColumnNames(),
+                        node.getPartitioningScheme());
+            }
+
+            return node;
+        }
+
+        @Override
+        public PlanNode visitCacheTableFinish(CacheTableFinishNode node, RewriteContext<RowExpression> context)
+        {
+            PlanNode rewrittenNode = context.defaultRewrite(node.getSource(), context.get());
+            if (rewrittenNode != node.getSource()) {
+                return new CacheTableFinishNode(node.getId(), rewrittenNode,
+                        node.getTarget(),
+                        node.getRowCountSymbol(),
+                        node.getStatisticsAggregationDescriptor(),
+                        node.getCachedDataKey());
+            }
+
+            return node;
         }
 
         @Override

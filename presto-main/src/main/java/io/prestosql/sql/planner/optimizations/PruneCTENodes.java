@@ -22,12 +22,15 @@ import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
+import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.SimplePlanRewriter;
 import io.prestosql.sql.tree.Expression;
@@ -49,12 +52,14 @@ public class PruneCTENodes
     private final Metadata metadata;
     private final TypeAnalyzer typeAnalyzer;
     private final boolean pruneCTEWithCrossJoin;
+    private final boolean removeSelfJoin;
 
-    public PruneCTENodes(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pruneCTEWithCrossJoin)
+    public PruneCTENodes(Metadata metadata, TypeAnalyzer typeAnalyzer, boolean pruneCTEWithCrossJoin, boolean removeSelfJoin)
     {
         this.metadata = metadata;
         this.typeAnalyzer = typeAnalyzer;
         this.pruneCTEWithCrossJoin = pruneCTEWithCrossJoin;
+        this.removeSelfJoin = removeSelfJoin;
     }
 
     @Override
@@ -71,7 +76,7 @@ public class PruneCTENodes
             return plan;
         }
         else {
-            OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(metadata, typeAnalyzer, false, pruneCTEWithCrossJoin);
+            OptimizedPlanRewriter optimizedPlanRewriter = new OptimizedPlanRewriter(metadata, typeAnalyzer, false, pruneCTEWithCrossJoin, session, removeSelfJoin);
             PlanNode newNode = SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, plan);
             if (optimizedPlanRewriter.isSecondTraverseRequired()) {
                 return SimplePlanRewriter.rewriteWith(optimizedPlanRewriter, newNode);
@@ -91,16 +96,20 @@ public class PruneCTENodes
         private Set<Integer> cTEWithCrossJoinList = new HashSet<>();
 
         private final Map<Integer, Integer> cteUsageMap;
-        private final Set<Integer> cteToPrune; //because of dynamic filter not matching
+        private final Set<PlanNodeId> probeCTEToPrune;
+        private final Session session;
+        private boolean removeSelfJoin;
 
-        private OptimizedPlanRewriter(Metadata metadata, TypeAnalyzer typeAnalyzer, Boolean isNodeAlreadyVisited, boolean pruneCTEWithCrossJoin)
+        private OptimizedPlanRewriter(Metadata metadata, TypeAnalyzer typeAnalyzer, Boolean isNodeAlreadyVisited, boolean pruneCTEWithCrossJoin, Session session, boolean removeSelfJoin)
         {
             this.metadata = metadata;
             this.typeAnalyzer = typeAnalyzer;
             this.isNodeAlreadyVisited = isNodeAlreadyVisited;
             this.cteUsageMap = new HashMap<>();
             this.pruneCTEWithCrossJoin = pruneCTEWithCrossJoin;
-            cteToPrune = new HashSet<>();
+            probeCTEToPrune = new HashSet<>();
+            this.session = session;
+            this.removeSelfJoin = removeSelfJoin;
         }
 
         @Override
@@ -114,9 +123,48 @@ public class PruneCTENodes
                 }
             }
             if (left != null && right != null && left.equals(right)) {
-                cteToPrune.add(left);
+                if (!isNodeAlreadyVisited) {
+                    PlanNodeId probeCteNodeId = getProbeCTENodeId(node.getLeft());
+                    if (probeCteNodeId != null) {
+                        probeCTEToPrune.add(probeCteNodeId);
+                    }
+                }
             }
             return context.defaultRewrite(node, context.get());
+        }
+
+        private PlanNodeId getProbeCTENodeId(PlanNode node)
+        {
+            if (node instanceof CTEScanNode) {
+                return node.getId();
+            }
+            else if (node instanceof ProjectNode) {
+                return getProbeCTENodeId(((ProjectNode) node).getSource());
+            }
+            else if (node instanceof FilterNode) {
+                return getProbeCTENodeId(((FilterNode) node).getSource());
+            }
+            else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
+                return getProbeCTENodeId(node.getSources().get(0));
+            }
+            return null;
+        }
+
+        private String getCteRefName(PlanNode node)
+        {
+            if (node instanceof CTEScanNode) {
+                return ((CTEScanNode) node).getCteRefName();
+            }
+            else if (node instanceof ProjectNode) {
+                return getCteRefName(((ProjectNode) node).getSource());
+            }
+            else if (node instanceof FilterNode) {
+                return getCteRefName(((FilterNode) node).getSource());
+            }
+            else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
+                return getCteRefName(node.getSources().get(0));
+            }
+            return null;
         }
 
         private Integer getChildCTERefNum(PlanNode node)
@@ -141,6 +189,9 @@ public class PruneCTENodes
         {
             CTEScanNode node = inputNode;
             Integer commonCTERefNum = node.getCommonCTERefNum();
+            if (isNodeAlreadyVisited && probeCTEToPrune.contains(node.getId()) && removeSelfJoin) {
+                return getSourceNode(node.getSource());
+            }
             if (pruneCTEWithCrossJoin) {
                 if (cTEWithCrossJoinList.contains(commonCTERefNum)) {
                     node = (CTEScanNode) visitPlan(node, context);
@@ -163,7 +214,7 @@ public class PruneCTENodes
                 cteUsageMap.merge(commonCTERefNum, 1, Integer::sum);
             }
             else {
-                if (cteUsageMap.get(commonCTERefNum) == 1 || (cteToPrune.contains(commonCTERefNum) && cteUsageMap.get(commonCTERefNum) > 3)) {
+                if (cteUsageMap.get(commonCTERefNum) == 1) {
                     node = (CTEScanNode) visitPlan(node, context);
                     return node.getSource();
                 }
@@ -192,8 +243,25 @@ public class PruneCTENodes
         private boolean isSecondTraverseRequired()
         {
             isNodeAlreadyVisited = cteUsageMap.size() != 0 && cteUsageMap.values().stream().filter(x -> x <= 1).count() > 0
-                                    || cteToPrune.size() > 0;
+                                    || probeCTEToPrune.size() > 0;
             return isNodeAlreadyVisited;
+        }
+
+        private PlanNode getSourceNode(PlanNode planNode)
+        {
+            if (planNode instanceof ExchangeNode && planNode.getSources().size() == 1 && (planNode.getSources().get(0) instanceof CacheTableWriterNode || planNode.getSources().get(0) instanceof CacheTableFinishNode)) {
+                return getSourceNode(planNode.getSources().get(0));
+            }
+            if (planNode instanceof CacheTableFinishNode) {
+                return getSourceNode(((CacheTableFinishNode) planNode).getSource());
+            }
+            if (planNode instanceof CacheTableWriterNode) {
+                return getSourceNode(((CacheTableWriterNode) planNode).getSource());
+            }
+            if (planNode instanceof ProjectNode && (((ProjectNode) planNode).getSource() instanceof CacheTableFinishNode || ((ProjectNode) planNode).getSource() instanceof CacheTableWriterNode)) {
+                return getSourceNode(((ProjectNode) planNode).getSource());
+            }
+            return planNode;
         }
     }
 }

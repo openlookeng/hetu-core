@@ -25,9 +25,11 @@ import io.prestosql.execution.StageState;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.AggregationNode;
+import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.PlanFragment;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.IndexJoinNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
@@ -466,6 +468,40 @@ public class PrioritizeUtilizationExecutionSchedule
                     // an operator that can fully consume input data without producing any output
                     // (e.g. final aggregation)
                     true);
+        }
+
+        @Override
+        public FragmentSubGraph visitCacheTableWriter(CacheTableWriterNode node, PlanFragmentId currentFragmentId)
+        {
+            List<FragmentSubGraph> sourceSubGraphs = node.getSources().stream()
+                    .map(subPlanNode -> subPlanNode.accept(this, currentFragmentId))
+                    .collect(toImmutableList());
+
+            return new FragmentSubGraph(
+                    sourceSubGraphs.stream()
+                            .flatMap(source -> source.getUpstreamFragments().stream())
+                            .collect(toImmutableSet()),
+                    sourceSubGraphs.stream()
+                            .flatMap(source -> source.getLazyUpstreamFragments().stream())
+                            .collect(toImmutableSet()),
+                    false);
+        }
+
+        @Override
+        public FragmentSubGraph visitCTEScan(CTEScanNode node, PlanFragmentId currentFragmentId)
+        {
+            List<FragmentSubGraph> sourceSubGraphs = node.getSources().stream()
+                    .map(subPlanNode -> subPlanNode.accept(this, currentFragmentId))
+                    .collect(toImmutableList());
+
+            return new FragmentSubGraph(
+                    sourceSubGraphs.stream()
+                            .flatMap(source -> source.getUpstreamFragments().stream())
+                            .collect(toImmutableSet()),
+                    sourceSubGraphs.stream()
+                            .flatMap(source -> source.getLazyUpstreamFragments().stream())
+                            .collect(toImmutableSet()),
+                    false);
         }
 
         @Override

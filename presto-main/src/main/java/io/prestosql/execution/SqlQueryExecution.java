@@ -23,6 +23,8 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataManager;
+import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.PlanCostEstimate;
 import io.prestosql.cost.StatsCalculator;
@@ -104,6 +106,7 @@ import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
 import io.prestosql.sql.tree.Insert;
 import io.prestosql.sql.tree.InsertCube;
+import io.prestosql.sql.tree.Query;
 import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
@@ -133,14 +136,17 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.SystemSessionProperties.getRetryPolicy;
+import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
 import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
+import static io.prestosql.SystemSessionProperties.isSnapshotEnabled;
 import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
+import static io.prestosql.spi.connector.StandardWarningCode.CTE_RESULT_CACHE_NOT_SUPPORTED;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.NORMAL;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
@@ -787,7 +793,7 @@ public class SqlQueryExecution
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-        Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector());
+        Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector(), CachedDataStorageProvider.NULL_PROVIDER);
         queryPlan.set(localPlan);
 
         // extract inputs
@@ -813,6 +819,10 @@ public class SqlQueryExecution
             checkTaskRetrySupport(getSession());
         }
 
+        if (getRetryPolicy(getSession()) != RetryPolicy.NONE || isSnapshotEnabled(getSession()) || !(analysis.getStatement() instanceof Query)) {
+            disableCteResultCache(getSession());
+        }
+
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
 
@@ -826,9 +836,10 @@ public class SqlQueryExecution
             TypeAnalyzer typeAnalyzer,
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
-            WarningCollector warningCollector)
+            WarningCollector warningCollector,
+            CachedDataStorageProvider cachedData)
     {
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
         return logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(session));
     }
 
@@ -844,6 +855,29 @@ public class SqlQueryExecution
             String reasonsMessage = "Reuse Table Scan feature is disabled: Reuse Table Scan feature is supported only when Task Retry feature is disabled";
             session.disableReuseTableScan();
             warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
+        }
+    }
+
+    private void disableCteResultCache(Session session)
+    {
+        List<String> reasons = new ArrayList<>();
+
+        if (getRetryPolicy(getSession()) != RetryPolicy.NONE) {
+            reasons.add("CTE result cache is not supported when task snapshot is enabled");
+        }
+
+        if (isSnapshotEnabled(getSession())) {
+            reasons.add("CTE result cache is not supported when operator snapshot is enabled");
+        }
+
+        if (!(analysis.getStatement() instanceof Query)) {
+            reasons.add("CTE result cache is supported only for SELECT queries");
+        }
+
+        if (!reasons.isEmpty() && isCTEResultCacheEnabled(session)) {
+            session.disableCteResultCache();
+            String reasonsMessage = String.join(". \n", reasons);
+            warningCollector.add(new PrestoWarning(CTE_RESULT_CACHE_NOT_SUPPORTED, reasonsMessage));
         }
     }
 
@@ -1326,6 +1360,7 @@ public class SqlQueryExecution
         private final TableExecuteContextManager tableExecuteContextManager;
 
         private final QueryResourceManagerService queryResourceManagerService;
+        private final CachedDataManager dataCache;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1362,7 +1397,8 @@ public class SqlQueryExecution
                 PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
                 TaskExecutionStats taskExecutionStats,
                 QueryResourceManagerService queryResourceManagerService,
-                TableExecuteContextManager tableExecuteContextManager)
+                TableExecuteContextManager tableExecuteContextManager,
+                CachedDataManager cachedDataManager)
         {
             requireNonNull(config, "config is null");
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
@@ -1402,6 +1438,8 @@ public class SqlQueryExecution
             else {
                 this.cache = Optional.empty();
             }
+
+            this.dataCache = requireNonNull(cachedDataManager, "cachedDataManager is null");
             this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
             this.coordinatorTaskManager = requireNonNull(coordinatorTaskManager, "coordinatorTaskManager is null");
             this.taskSourceFactory = requireNonNull(taskSourceFactory, "taskSourceFactory is null");
@@ -1468,7 +1506,8 @@ public class SqlQueryExecution
                     partitionMemoryEstimatorFactory,
                     taskExecutionStats,
                     queryResourceManagerService,
-                    tableExecuteContextManager);
+                    tableExecuteContextManager,
+                    this.dataCache);
         }
     }
 }

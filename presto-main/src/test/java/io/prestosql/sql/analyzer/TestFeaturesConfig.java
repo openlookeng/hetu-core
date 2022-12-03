@@ -168,7 +168,9 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinToWindow(true)
                 .setTransformSelfJoinAggregatesToWindow(true)
                 .setJoinPartitionedBuildMinRowCount(1_000_000L)
-                .setUseExactPartitioning(false));
+                .setUseExactPartitioning(false)
+                .setCteResultCacheThresholdSize(new DataSize(128, MEGABYTE))
+                .setCTEResultCacheEnabled(false));
     }
 
     @Test
@@ -287,6 +289,8 @@ public class TestFeaturesConfig
                 .put("optimizer.transform-self-join-aggregates-to-window", "false")
                 .put("optimizer.join-partitioned-build-min-row-count", "100000")
                 .put("optimizer.use-exact-partitioning", "true")
+                .put("cte-result-cache-threshold-size", "512MB")
+                .put("enable-cte-result-cache", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -402,7 +406,9 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinToWindow(false)
                 .setTransformSelfJoinAggregatesToWindow(false)
                 .setJoinPartitionedBuildMinRowCount(1_000_00L)
-                .setUseExactPartitioning(true);
+                .setUseExactPartitioning(true)
+                .setCteResultCacheThresholdSize(new DataSize(512, MEGABYTE))
+                .setCTEResultCacheEnabled(true);
 
         assertFullMapping(properties, expected);
     }

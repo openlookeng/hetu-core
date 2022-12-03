@@ -31,6 +31,8 @@ import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
 import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
+import io.prestosql.cache.CachedDataManager;
+import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
@@ -48,6 +50,8 @@ import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.AssignUniqueIdOperator;
 import io.prestosql.operator.BloomFilterUtils;
+import io.prestosql.operator.CacheTableFinishOperator;
+import io.prestosql.operator.CacheTableWriterOperator;
 import io.prestosql.operator.CommonTableExecutionContext;
 import io.prestosql.operator.CubeFinishOperator.CubeFinishOperatorFactory;
 import io.prestosql.operator.DeleteOperator.DeleteOperatorFactory;
@@ -136,6 +140,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.SortOrder;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorIndex;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -193,6 +198,8 @@ import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.planner.optimizations.IndexJoinOptimizer;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
 import io.prestosql.sql.planner.plan.AssignmentUtils;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -268,6 +275,7 @@ import static io.prestosql.SystemSessionProperties.getAdaptivePartialAggregation
 import static io.prestosql.SystemSessionProperties.getAggregationOperatorUnspillMemoryLimit;
 import static io.prestosql.SystemSessionProperties.getCteMaxPrefetchQueueSize;
 import static io.prestosql.SystemSessionProperties.getCteMaxQueueSize;
+import static io.prestosql.SystemSessionProperties.getCteResultCacheThresholdSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverSize;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriverValueCount;
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
@@ -306,6 +314,7 @@ import static io.prestosql.operator.TableWriterOperator.TableWriterOperatorFacto
 import static io.prestosql.operator.WindowFunctionDefinition.window;
 import static io.prestosql.operator.unnest.UnnestOperator.UnnestOperatorFactory;
 import static io.prestosql.spi.StandardErrorCode.COMPILER_ERROR;
+import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN;
 import static io.prestosql.spi.function.OperatorType.LESS_THAN_OR_EQUAL;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
@@ -387,6 +396,7 @@ public class LocalExecutionPlanner
     private final ExchangeManagerRegistry exchangeManagerRegistry;
     protected final TableExecuteContextManager tableExecuteContextManager;
     private final PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
+    private final CachedDataManager cachedDataManager;
 
     public Metadata getMetadata()
     {
@@ -567,7 +577,8 @@ public class LocalExecutionPlanner
             HeuristicIndexerManager heuristicIndexerManager,
             CubeManager cubeManager,
             ExchangeManagerRegistry exchangeManagerRegistry,
-            TableExecuteContextManager tableExecuteContextManager)
+            TableExecuteContextManager tableExecuteContextManager,
+            CachedDataManager cachedDataManager)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -603,6 +614,7 @@ public class LocalExecutionPlanner
         this.logicalRowExpressions = new LogicalRowExpressions(new RowExpressionDeterminismEvaluator(metadata), functionResolution, metadata.getFunctionAndTypeManager());
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
         this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
+        this.cachedDataManager = requireNonNull(cachedDataManager, "cachedDataManager is null");
     }
 
     public LocalExecutionPlan plan(
@@ -3102,6 +3114,94 @@ public class LocalExecutionPlanner
         }
 
         @Override
+        public PhysicalOperation visitCacheTableFinish(CacheTableFinishNode node, LocalExecutionPlanContext context)
+        {
+            PhysicalOperation source = node.getSource().accept(this, context);
+
+            ImmutableMap.Builder<Symbol, Integer> outputMapping = ImmutableMap.builder();
+            StatisticAggregationsDescriptor<Integer> descriptor = StatisticAggregationsDescriptor.empty();
+
+            List<Symbol> outputSymbols = node.getOutputSymbols();
+            for (int i = 0; i < outputSymbols.size(); i++) {
+                Symbol symbol = outputSymbols.get(i);
+                outputMapping.put(symbol, i);
+            }
+
+            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes();
+
+            OperatorFactory operatorFactory = new CacheTableFinishOperator.CacheTableFinishOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    createTableFinisher(session, node, metadata),
+                    descriptor,
+                    tableExecuteContextManager,
+                    session,
+                    thresholdSize,
+                    (endTime, size) -> {
+                        CachedDataStorage cds = cachedDataManager.get(node.getCachedDataKey());
+                        cds.commit(endTime, size);
+                        log.info("Cache Write committed for CTE: %s with size(%d)",
+                                node.getCachedDataKey().getName(), size);
+                        return null;
+                    },
+                    () -> {
+                        CachedDataStorage cds = cachedDataManager.get(node.getCachedDataKey());
+                        cds.setNonCachable(true);
+                        log.info("Cache Write aborted for CTE: %s for exceeding threshold size",
+                                node.getCachedDataKey().getName());
+                        return null;
+                    });
+
+            return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
+        }
+
+        @Override
+        public PhysicalOperation visitCacheTableWriter(CacheTableWriterNode node, LocalExecutionPlanContext context)
+        {
+            // Set table writer count
+            if (node.getPartitioningScheme().isPresent()) {
+                PartitioningHandle partitioningHandle = node.getPartitioningScheme().get().getPartitioning().getHandle();
+                if (partitioningHandle.equals(FIXED_HASH_DISTRIBUTION)) {
+                    context.setDriverInstanceCount(getTaskWriterCount(session));
+                }
+                else {
+                    context.setDriverInstanceCount(1);
+                }
+            }
+            else {
+                context.setDriverInstanceCount(getTaskWriterCount(session));
+            }
+
+            // serialize writes by forcing data through a single writer
+            PhysicalOperation source = node.getSource().accept(this, context);
+            List<Integer> inputChannels = node.getColumns().stream()
+                    .map(source::symbolToChannel)
+                    .collect(toImmutableList());
+            List<Symbol> outputSymbols = node.getOutputSymbols();
+
+            ImmutableMap.Builder<Symbol, Integer> outputMapping = ImmutableMap.builder();
+            for (int i = 0; i < outputSymbols.size(); i++) {
+                Symbol symbol = outputSymbols.get(i);
+                outputMapping.put(symbol, i);
+            }
+
+            long thresholdSize = getCteResultCacheThresholdSize(session).toBytes() / nodePartitioningManager.getNodeScheduler()
+                    .getNodeManager().getActiveConnectorNodes(new CatalogName("hive")).size();
+
+            OperatorFactory operatorFactory = new CacheTableWriterOperator.CacheTableWriterOperatorFactory(
+                    context.getNextOperatorId(),
+                    node.getId(),
+                    pageSinkManager,
+                    node.getTarget(),
+                    inputChannels,
+                    session,
+                    Optional.of(context.getTaskId()),
+                    thresholdSize);
+
+            return new PhysicalOperation(operatorFactory, outputMapping.build(), context, source);
+        }
+
+        @Override
         public PhysicalOperation visitCubeFinish(CubeFinishNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation source = node.getSource().accept(this, context);
@@ -3751,6 +3851,17 @@ public class LocalExecutionPlanner
                         getAdaptivePartialAggregationMinRows(session),
                         getAdaptivePartialAggregationUniqueRowsRatioThreshold(session))) :
                 Optional.empty();
+    }
+
+    private static TableFinisher createTableFinisher(Session session, CacheTableFinishNode node, Metadata metadata)
+    {
+        WriterTarget target = node.getTarget();
+        return (fragments, computedStatistics, tableExecuteContext) -> {
+            if (!(target instanceof CreateTarget)) {
+                throw new PrestoException(NOT_SUPPORTED, "Result Cache Table is not support for: " + target.getClass().getName());
+            }
+            return metadata.finishCreateTable(session, ((CreateTarget) target).getHandle(), fragments, computedStatistics);
+        };
     }
 
     private static TableFinisher createTableFinisher(Session session, TableFinishNode node, Metadata metadata)

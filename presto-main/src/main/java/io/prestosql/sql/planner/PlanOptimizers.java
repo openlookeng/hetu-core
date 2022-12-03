@@ -175,6 +175,7 @@ import io.prestosql.sql.planner.iterative.rule.TransformUncorrelatedSubquerySelf
 import io.prestosql.sql.planner.iterative.rule.TranslateExpressions;
 import io.prestosql.sql.planner.iterative.rule.UnwrapCastInComparison;
 import io.prestosql.sql.planner.iterative.rule.UseNonPartitionedJoinLookupSource;
+import io.prestosql.sql.planner.optimizations.AddCacheTableWriterAboveCTEOptimizer;
 import io.prestosql.sql.planner.optimizations.AddExchanges;
 import io.prestosql.sql.planner.optimizations.AddLocalExchanges;
 import io.prestosql.sql.planner.optimizations.AddReuseExchange;
@@ -296,7 +297,7 @@ public class PlanOptimizers
 
         builder.add(new AdjustApplicableOptimizationRule()); //This must be the first rule, as based on this next set of rule to apply will vary.
 
-        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false));
+        builder.add(new PruneCTENodes(metadata, typeAnalyzer, false, true));
         Set<Rule<?>> predicatePushDownRules = ImmutableSet.of(
                 new MergeFilters());
 
@@ -598,7 +599,7 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())),
                 new MetadataQueryOptimizer(metadata),
-                new PruneCTENodes(metadata, typeAnalyzer, true),
+                new PruneCTENodes(metadata, typeAnalyzer, true, true),
                 new IterativeOptimizer(
                         ruleStats,
                         statsCalculator,
@@ -683,6 +684,7 @@ public class PlanOptimizers
                             estimatedExchangesCostCalculator,
                             ImmutableSet.of(new PushTableWriteThroughUnion()))); // Must run before AddExchanges
         }
+        builder.add(new AddCacheTableWriterAboveCTEOptimizer(metadata));
         if (!forceSingleNode) {
             builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeAnalyzer, false)));
         }

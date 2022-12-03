@@ -41,6 +41,8 @@ import io.prestosql.sql.planner.TypeAnalyzer;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.optimizations.StreamPropertyDerivations.StreamProperties;
 import io.prestosql.sql.planner.plan.ApplyNode;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
@@ -222,6 +224,14 @@ public class AddLocalExchanges
 
         @Override
         public PlanWithProperties visitTableFinish(TableFinishNode node, StreamPreferredProperties parentPreferences)
+        {
+            // table commit requires that all data be in one stream
+            // this node changes the input organization completely, so we do not pass through parent preferences
+            return planAndEnforceChildren(node, singleStream(), defaultParallelism(session));
+        }
+
+        @Override
+        public PlanWithProperties visitCacheTableFinish(CacheTableFinishNode node, StreamPreferredProperties context)
         {
             // table commit requires that all data be in one stream
             // this node changes the input organization completely, so we do not pass through parent preferences
@@ -539,6 +549,36 @@ public class AddLocalExchanges
                 // avoid change in order of data.
                 requiredProperties = fixedParallelism();
                 preferredProperties = fixedParallelism();
+            }
+            return planAndEnforceChildren(node, requiredProperties, preferredProperties);
+        }
+
+        @Override
+        public PlanWithProperties visitCacheTableWriter(CacheTableWriterNode node, StreamPreferredProperties context)
+        {
+            StreamPreferredProperties requiredProperties;
+            StreamPreferredProperties preferredProperties;
+            if (getTaskWriterCount(session) > 1) {
+                boolean hasFixedHashDistribution = node.getPartitioningScheme()
+                        .map(scheme -> scheme.getPartitioning().getHandle())
+                        .filter(isEqual(FIXED_HASH_DISTRIBUTION))
+                        .isPresent();
+                if (!node.getPartitioningScheme().isPresent()) {
+                    requiredProperties = fixedParallelism();
+                    preferredProperties = fixedParallelism();
+                }
+                else if (hasFixedHashDistribution) {
+                    requiredProperties = exactlyPartitionedOn(node.getPartitioningScheme().get().getPartitioning().getColumns());
+                    preferredProperties = requiredProperties;
+                }
+                else {
+                    requiredProperties = singleStream();
+                    preferredProperties = defaultParallelism(session);
+                }
+            }
+            else {
+                requiredProperties = singleStream();
+                preferredProperties = defaultParallelism(session);
             }
             return planAndEnforceChildren(node, requiredProperties, preferredProperties);
         }

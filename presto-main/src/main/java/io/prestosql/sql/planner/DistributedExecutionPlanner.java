@@ -59,6 +59,8 @@ import io.prestosql.split.SplitManager;
 import io.prestosql.split.SplitSource;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.CreateIndexNode;
 import io.prestosql.sql.planner.plan.CubeFinishNode;
 import io.prestosql.sql.planner.plan.DeleteNode;
@@ -562,7 +564,19 @@ public class DistributedExecutionPlanner
         }
 
         @Override
+        public Map<PlanNodeId, SplitSource> visitCacheTableWriter(CacheTableWriterNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
+        }
+
+        @Override
         public Map<PlanNodeId, SplitSource> visitTableFinish(TableFinishNode node, Void context)
+        {
+            return node.getSource().accept(this, context);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitCacheTableFinish(CacheTableFinishNode node, Void context)
         {
             return node.getSource().accept(this, context);
         }
