@@ -84,6 +84,7 @@ import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.Analyze;
 import io.prestosql.sql.tree.ArrayConstructor;
 import io.prestosql.sql.tree.AssignmentItem;
+import io.prestosql.sql.tree.CTEReference;
 import io.prestosql.sql.tree.Call;
 import io.prestosql.sql.tree.CallArgument;
 import io.prestosql.sql.tree.Comment;
@@ -2939,6 +2940,7 @@ class StatementAnalyzer
 
                 withScopeBuilder.withNamedQuery(name, withQuery)
                         .withTables(retScope.getTables());
+                analysis.setScope(new CTEReference(QualifiedName.of(withQuery.getName().getValue())), retScope);
             }
 
             Scope withScope = withScopeBuilder.build();

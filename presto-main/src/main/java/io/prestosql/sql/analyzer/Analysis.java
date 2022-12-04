@@ -37,6 +37,7 @@ import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.plan.TableExecuteHandle;
+import io.prestosql.sql.tree.CTEReference;
 import io.prestosql.sql.tree.ExistsPredicate;
 import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.FieldReference;
@@ -598,7 +599,7 @@ public class Analysis
         return unmodifiableCollection(tables.values());
     }
 
-    public Collection<TableHandle> getTablesByNamedQuery(Table table)
+    public Collection<TableHandle> getTablesByNamedQuery(CTEReference table)
     {
         return unmodifiableCollection(scopes.get(scopes.keySet().stream().filter(k -> k.getNode().equals(table)).findAny().get()).getTables());
     }
