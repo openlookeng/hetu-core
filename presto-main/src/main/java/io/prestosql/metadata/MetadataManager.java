@@ -148,6 +148,7 @@ public final class MetadataManager
     private final TablePropertyManager tablePropertyManager;
     private final ColumnPropertyManager columnPropertyManager;
     private final AnalyzePropertyManager analyzePropertyManager;
+    private final MaterializedViewPropertyManager materializedViewPropertyManager;
     private final TransactionManager transactionManager;
 
     private final ConcurrentMap<QueryId, QueryCatalogs> catalogsByQueryId = new ConcurrentHashMap<>();
@@ -158,6 +159,7 @@ public final class MetadataManager
 
     @Inject
     public MetadataManager(
+            MaterializedViewPropertyManager materializedViewPropertyManager,
             FunctionAndTypeManager functionAndTypeManager,
             FeaturesConfig featuresConfig,
             SessionPropertyManager sessionPropertyManager,
@@ -168,6 +170,7 @@ public final class MetadataManager
             TransactionManager transactionManager,
             Provider<DataCenterConnectorManager> dataCenterConnectorManager)
     {
+        this.materializedViewPropertyManager = requireNonNull(materializedViewPropertyManager, "materializedViewPropertyManager is null");
         this.functionAndTypeManager = requireNonNull(functionAndTypeManager, "functionAndTypeManager is null");
         this.procedures = new ProcedureRegistry(this);
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
@@ -215,6 +218,7 @@ public final class MetadataManager
     public static MetadataManager createTestMetadataManager(TransactionManager transactionManager, FeaturesConfig featuresConfig)
     {
         return new MetadataManager(
+                new MaterializedViewPropertyManager(),
                 new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()),
                 featuresConfig,
                 new SessionPropertyManager(),
@@ -1668,6 +1672,12 @@ public final class MetadataManager
     public TablePropertyManager getTablePropertyManager()
     {
         return tablePropertyManager;
+    }
+
+    @Override
+    public MaterializedViewPropertyManager getMaterializedViewPropertyManager()
+    {
+        return materializedViewPropertyManager;
     }
 
     @Override

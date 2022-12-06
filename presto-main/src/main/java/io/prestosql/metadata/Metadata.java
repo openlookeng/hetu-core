@@ -562,6 +562,11 @@ public interface Metadata
 
     AnalyzePropertyManager getAnalyzePropertyManager();
 
+    default MaterializedViewPropertyManager getMaterializedViewPropertyManager()
+    {
+        return new MaterializedViewPropertyManager();
+    }
+
     /**
      * Hetu can only cache execution plans for supported connectors.
      * This method checks if the property for supporting execution plan caching is enabled for a given connector.

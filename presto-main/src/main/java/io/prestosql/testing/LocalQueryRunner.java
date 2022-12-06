@@ -357,6 +357,7 @@ public class LocalQueryRunner
         this.planOptimizerManager = new ConnectorPlanOptimizerManager();
 
         this.metadata = new MetadataManager(
+                new MaterializedViewPropertyManager(),
                 new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()),
                 featuresConfig,
                 // new HetuConfig object passed, if split filtering is needed in the runner, a modified HetuConfig object with filter settings manually set must be used.
