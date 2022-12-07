@@ -104,11 +104,11 @@ remote exchange (GATHER, SINGLE, [])
                                                 Filter
                                                     scan item
                 local exchange (GATHER, SINGLE, [])
-                    remote exchange (REPARTITION, HASH, ["s_store_name_427", "s_zip_447", "ss_item_sk_210"])
-                        final hashaggregation over (ca_city_529, ca_city_543, ca_street_name_526, ca_street_name_540, ca_street_number_525, ca_street_number_539, ca_zip_532, ca_zip_546, d_year_341, d_year_370, d_year_399, i_product_name_580, s_store_name_427, s_zip_447, ss_item_sk_210)
+                    remote exchange (REPARTITION, HASH, ["cs_item_sk_268", "s_store_name_427", "s_zip_447"])
+                        final hashaggregation over (ca_city_529, ca_city_543, ca_street_name_526, ca_street_name_540, ca_street_number_525, ca_street_number_539, ca_zip_532, ca_zip_546, cs_item_sk_268, d_year_341, d_year_370, d_year_399, i_product_name_580, s_store_name_427, s_zip_447)
                             local exchange (GATHER, SINGLE, [])
-                                remote exchange (REPARTITION, HASH, ["ca_city_529", "ca_city_543", "ca_street_name_526", "ca_street_name_540", "ca_street_number_525", "ca_street_number_539", "ca_zip_532", "ca_zip_546", "d_year_341", "d_year_370", "d_year_399", "i_product_name_580", "s_store_name_427", "s_zip_447", "ss_item_sk_210"])
-                                    partial hashaggregation over (ca_city_529, ca_city_543, ca_street_name_526, ca_street_name_540, ca_street_number_525, ca_street_number_539, ca_zip_532, ca_zip_546, d_year_341, d_year_370, d_year_399, i_product_name_580, s_store_name_427, s_zip_447, ss_item_sk_210)
+                                remote exchange (REPARTITION, HASH, ["ca_city_529", "ca_city_543", "ca_street_name_526", "ca_street_name_540", "ca_street_number_525", "ca_street_number_539", "ca_zip_532", "ca_zip_546", "cs_item_sk_268", "d_year_341", "d_year_370", "d_year_399", "i_product_name_580", "s_store_name_427", "s_zip_447"])
+                                    partial hashaggregation over (ca_city_529, ca_city_543, ca_street_name_526, ca_street_name_540, ca_street_number_525, ca_street_number_539, ca_zip_532, ca_zip_546, cs_item_sk_268, d_year_341, d_year_370, d_year_399, i_product_name_580, s_store_name_427, s_zip_447)
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
