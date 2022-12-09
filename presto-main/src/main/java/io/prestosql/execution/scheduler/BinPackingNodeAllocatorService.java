@@ -36,6 +36,7 @@ import io.prestosql.metadata.InternalNode;
 import io.prestosql.metadata.InternalNodeManager;
 import io.prestosql.metadata.InternalNodeManager.NodesSnapshot;
 import io.prestosql.spi.ErrorCode;
+import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.memory.MemoryPoolInfo;
 import org.assertj.core.util.VisibleForTesting;
@@ -48,6 +49,7 @@ import javax.inject.Inject;
 import java.time.Duration;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -506,7 +508,7 @@ public class BinPackingNodeAllocatorService
 
         public ReserveResult tryReserve(PendingAcquire acquire)
         {
-            NodeRequirements requirements = acquire.getNodeRequirements();
+            NodeRequirements requirements = updateRequirementsFromActiveNodes(acquire.getNodeRequirements());
             Optional<Set<InternalNode>> catalogNodes = requirements.getCatalogName().map(nodesSnapshot::getConnectorNodes);
 
             List<InternalNode> candidates = allNodesSorted.stream()
@@ -516,7 +518,7 @@ public class BinPackingNodeAllocatorService
                         if (requirements.getAddresses().contains(node.getHostAndPort())) {
                             return true;
                         }
-                        if (requirements.getAddresses().isEmpty() || !(requirements.getAddresses().contains(node.getHostAndPort()))) {
+                        if (requirements.getAddresses().isEmpty()) {
                             return scheduleOnCoordinator || !node.isCoordinator();
                         }
                         return false;
@@ -551,6 +553,32 @@ public class BinPackingNodeAllocatorService
                     .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "No node available"));
             subtractFromRemainingMemory(fallbackNode.getNodeIdentifier(), acquire.getMemoryLease());
             return ReserveResult.NOT_ENOUGH_RESOURCES_NOW;
+        }
+
+        // Check addresses and remove nodes which are not active
+        private NodeRequirements updateRequirementsFromActiveNodes(NodeRequirements requirements)
+        {
+            Set<HostAddress> availableAddresses = new HashSet<>();
+            for (HostAddress address : requirements.getAddresses()) {
+                if (presentInActiveNodes(address)) {
+                    availableAddresses.add(address);
+                }
+                else {
+                    log.debug(address.getHostText() + "is not available any more!");
+                }
+            }
+            return new NodeRequirements(requirements.getCatalogName(), availableAddresses, requirements.getMemory());
+        }
+
+        private boolean presentInActiveNodes(HostAddress address)
+        {
+            for (InternalNode node : allNodesSorted) {
+                HostAddress activeAddress = node.getHostAndPort();
+                if (address.equals(activeAddress)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void subtractFromRemainingMemory(String nodeIdentifier, long memoryLease)
