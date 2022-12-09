@@ -175,7 +175,7 @@ public class TestSqlTaskManager
             assertTrue(Arrays.asList(new BufferState[] {BufferState.FINISHED, BufferState.FLUSHING}).contains(info.getOutputBuffers().getState()));
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, taskInfo.getTaskStatus().getState(), "0-test_instance_id").get(1, TimeUnit.SECONDS);
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
             assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
         }
