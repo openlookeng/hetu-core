@@ -473,7 +473,6 @@ public class HeartbeatFailureDetector
         {
             try {
                 stats.recordStart();
-                log.debug("pinging ..." + uri);
                 httpClient.executeAsync(prepareHead().setUri(uri).build(), new ResponseHandler<Object, Exception>()
                 {
                     @Override

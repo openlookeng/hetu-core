@@ -968,7 +968,6 @@ public class Query
             URI uri = task.getTaskStatus().getSelf();
             uniqueNodes.add(uri.getHost() + ":" + uri.getPort());
         }
-        log.debug("StageStats Id: %s, IsRestoring: %b, SnapshotId: %d", stageInfo.getStageId().toString(), stageInfo.isRestoring(), stageInfo.getSnapshotId());
         return StageStats.builder()
                 .setStageId(String.valueOf(stageInfo.getStageId().getId()))
                 .setState(stageInfo.getState().toString())

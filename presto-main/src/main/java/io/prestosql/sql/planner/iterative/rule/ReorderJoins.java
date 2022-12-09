@@ -221,7 +221,6 @@ public class ReorderJoins
                 memo.put(multiJoinKey, bestResult);
             }
 
-            bestResult.planNode.ifPresent((planNode) -> log.debug("Least cost join was: %s", planNode));
             return bestResult;
         }
 
