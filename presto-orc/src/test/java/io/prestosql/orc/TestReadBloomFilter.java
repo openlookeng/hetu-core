@@ -91,7 +91,7 @@ public class TestReadBloomFilter
 
             // without predicate a normal block will be created
             try (OrcRecordReader recordReader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, type, MAX_BATCH_SIZE)) {
-                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 8196);
+                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 1024);
             }
 
             // predicate for specific value within the min/max range without bloom filter being enabled
@@ -100,7 +100,7 @@ public class TestReadBloomFilter
                     .build();
 
             try (OrcRecordReader recordReader = createCustomOrcRecordReader(tempFile, noBloomFilterPredicate, type, MAX_BATCH_SIZE)) {
-                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 8196);
+                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 1024);
             }
 
             // predicate for specific value within the min/max range with bloom filter enabled, but a value not in the bloom filter
@@ -120,7 +120,7 @@ public class TestReadBloomFilter
                     .build();
 
             try (OrcRecordReader recordReader = createCustomOrcRecordReader(tempFile, matchBloomFilterPredicate, type, MAX_BATCH_SIZE)) {
-                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 8196);
+                assertEquals(recordReader.nextPage().getLoadedPage().getPositionCount(), 1024);
             }
         }
     }
