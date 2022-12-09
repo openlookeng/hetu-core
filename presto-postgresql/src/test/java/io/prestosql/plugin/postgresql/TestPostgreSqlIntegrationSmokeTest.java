@@ -33,7 +33,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
-@Test
+@Test(singleThreaded = true)
 public class TestPostgreSqlIntegrationSmokeTest
         extends AbstractTestIntegrationSmokeTest
 {
@@ -88,6 +88,7 @@ public class TestPostgreSqlIntegrationSmokeTest
     public void testUpdateByOneField()
             throws SQLException
     {
+        execute("DROP TABLE IF EXISTS tpch.test_update");
         execute("CREATE TABLE tpch.test_update (id serial primary key, name varchar, sex char, age int, score varchar, birthday date, salary double precision)");
         assertUpdate("INSERT INTO test_update VALUES(1, 'Bob', '1', 24, 'excellent', date'1997-09-28', 40000)", 1);
         assertUpdate("INSERT INTO test_update VALUES(2, 'Jack', '1', 25, 'good', date'1996-08-14', 35000)", 1);
