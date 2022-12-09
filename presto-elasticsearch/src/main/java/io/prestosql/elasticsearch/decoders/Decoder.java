@@ -13,12 +13,21 @@
  */
 package io.prestosql.elasticsearch.decoders;
 
+import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.function.Supplier;
+
+import static io.prestosql.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_MISSING;
 
 public interface Decoder
 {
     void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output);
+
+    default void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        throw new PrestoException(FUNCTION_IMPLEMENTATION_MISSING, "Aggregation Decode not implemented yet");
+    }
 }

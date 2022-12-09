@@ -275,7 +275,7 @@ public class ElasticsearchMetadata
                 handle.getSchema(),
                 handle.getIndex(),
                 handle.getConstraint(),
-                handle.getQuery());
+                handle.getElasticAggOptimizationContext(), handle.getQuery());
 
         return Optional.of(new ConstraintApplicationResult<>(handle, constraint.getSummary()));
     }

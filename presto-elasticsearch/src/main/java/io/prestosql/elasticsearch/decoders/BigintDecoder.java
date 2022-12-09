@@ -16,6 +16,7 @@ package io.prestosql.elasticsearch.decoders;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.function.Supplier;
 
@@ -36,6 +37,21 @@ public class BigintDecoder
 
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
+    {
+        Object value = getter.get();
+        if (value == null) {
+            output.appendNull();
+        }
+        else if (value instanceof Number) {
+            BIGINT.writeLong(output, ((Number) value).longValue());
+        }
+        else {
+            throw new PrestoException(TYPE_MISMATCH, format("Expected a numeric value for field '%s' of type BIGINT: %s [%s]", path, value, value.getClass().getSimpleName()));
+        }
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
     {
         Object value = getter.get();
         if (value == null) {

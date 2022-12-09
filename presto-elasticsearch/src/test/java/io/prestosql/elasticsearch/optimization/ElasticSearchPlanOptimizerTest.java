@@ -152,7 +152,7 @@ public class ElasticSearchPlanOptimizerTest
         elasticSearchPlanOptimizer = new ElasticSearchPlanOptimizer(elasticsearchConfig, elasticSearchRowExpressionConverter);
         elasticSearchPlanOptimizerProvider = new ElasticSearchPlanOptimizerProvider(elasticSearchPlanOptimizer);
 
-        elasticsearchClient = new ElasticsearchClient(elasticsearchConfig, Optional.empty());
+        elasticsearchClient = new ElasticsearchClient(elasticsearchConfig, Optional.empty(), new ElasticAggregationBuilder(elasticSearchRowExpressionConverter));
         elasticsearchMetadata = new ElasticsearchMetadata(new InternalTypeManager(FunctionAndTypeManager.createTestFunctionAndTypeManager()), elasticsearchClient, elasticsearchConfig);
 
         lifeCycleManager = new LifeCycleManager(Collections.emptyList(), null);

@@ -33,6 +33,8 @@ import io.prestosql.elasticsearch.decoders.TimestampDecoder;
 import io.prestosql.elasticsearch.decoders.TinyintDecoder;
 import io.prestosql.elasticsearch.decoders.VarbinaryDecoder;
 import io.prestosql.elasticsearch.decoders.VarcharDecoder;
+import io.prestosql.elasticsearch.optimization.ElasticAggregationBuilder;
+import io.prestosql.elasticsearch.optimization.ElasticsearchAggregationsCompositeResult;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
@@ -44,8 +46,15 @@ import io.prestosql.spi.type.Type;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.Aggregation;
+import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.terms.ParsedTerms;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregation;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +88,7 @@ public class ElasticsearchPageSource
 
     private final List<Decoder> decoders;
 
-    private final SearchHitIterator iterator;
+    private final ElasticSearchResultIterator iterator;
     private final BlockBuilder[] columnBuilders;
     private final List<ElasticsearchColumnHandle> columns;
     private long totalBytes;
@@ -128,9 +137,9 @@ public class ElasticsearchPageSource
                 split.getShard(),
                 buildSearchQuery(table.getConstraint(), columns, table.getQuery()),
                 needAllFields ? Optional.empty() : Optional.of(requiredFields),
-                documentFields);
+                documentFields, table.getElasticAggOptimizationContext());
         readTimeNanos += System.nanoTime() - start;
-        this.iterator = new SearchHitIterator(client, () -> searchResponse);
+        this.iterator = ElasticsearchResultIteratorFactory.getIterator(client, searchResponse);
     }
 
     @Override
@@ -180,17 +189,7 @@ public class ElasticsearchPageSource
 
         long size = 0;
         while (size < PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES && iterator.hasNext()) {
-            SearchHit hit = iterator.next();
-            Map<String, Object> document = hit.getSourceAsMap();
-
-            for (int i = 0; i < decoders.size(); i++) {
-                String field = columns.get(i).getName();
-                decoders.get(i).decode(hit, () -> getField(document, field), columnBuilders[i]);
-            }
-
-            if (hit.getSourceRef() != null) {
-                totalBytes += hit.getSourceRef().length();
-            }
+            populateResultSet();
 
             size = Arrays.stream(columnBuilders)
                     .mapToLong(BlockBuilder::getSizeInBytes)
@@ -204,6 +203,37 @@ public class ElasticsearchPageSource
         }
 
         return new Page(blocks);
+    }
+
+    private void populateResultSet()
+    {
+        if (iterator instanceof SearchHitIterator) {
+            SearchHit hit = (SearchHit) iterator.next();
+            Map<String, Object> document = hit.getSourceAsMap();
+
+            for (int i = 0; i < decoders.size(); i++) {
+                String field = columns.get(i).getName();
+                decoders.get(i).decode(hit, () -> getField(document, field), columnBuilders[i]);
+            }
+
+            if (hit.getSourceRef() != null) {
+                totalBytes += hit.getSourceRef().length();
+            }
+        }
+        else if (iterator instanceof AggregationIterator) {
+            ElasticsearchAggregationsCompositeResult elasticsearchAggregationsCompositeResult = (ElasticsearchAggregationsCompositeResult) iterator.next();
+            if (elasticsearchAggregationsCompositeResult.getAggregations() != null) {
+                Map<String, Aggregation> document = elasticsearchAggregationsCompositeResult.getAggregations().asMap();
+
+                for (int i = 0; i < decoders.size(); i++) {
+                    String field = columns.get(i).getName();
+                    decoders.get(i).decode(elasticsearchAggregationsCompositeResult.getAggregations(), () -> getAggregationOrField(document, field, elasticsearchAggregationsCompositeResult.getGroupbyKeyValueMap()), columnBuilders[i]);
+                }
+
+                // not calculable directly
+                totalBytes += 0;
+            }
+        }
     }
 
     public static Object getField(Map<String, Object> document, String field)
@@ -224,6 +254,42 @@ public class ElasticsearchPageSource
             }
         }
 
+        return value;
+    }
+
+    public static Object getAggregationOrField(Map<String, Aggregation> document, String field, Map<String, Object> groupByFieldValueMap)
+    {
+        String escapedFieldName = ElasticAggregationBuilder.getEscapedFieldName(field);
+        Object value = null;
+        if (groupByFieldValueMap != null) {
+            value = groupByFieldValueMap.get(escapedFieldName);
+        }
+        Object result = null;
+        int resultCount = 0;
+        if (value == null) {
+            for (Map.Entry<String, Aggregation> entry : document.entrySet()) {
+                String key = entry.getKey();
+                if (key.equalsIgnoreCase(escapedFieldName)) {
+                    result = getUnderlyingAggregationValue(entry.getValue());
+                    ++resultCount;
+                }
+            }
+
+            if (resultCount == 1) {
+                return result;
+            }
+        }
+
+        return value;
+    }
+
+    private static Object getUnderlyingAggregationValue(Aggregation value)
+    {
+        if (value instanceof NumericMetricsAggregation.SingleValue) {
+            NumericMetricsAggregation.SingleValue valueCount = (NumericMetricsAggregation.SingleValue) value;
+            return valueCount.value();
+        }
+        // unsupported optimization and hence shouldn't reach below
         return value;
     }
 
@@ -338,26 +404,13 @@ public class ElasticsearchPageSource
     }
 
     private static class SearchHitIterator
-            extends AbstractIterator<SearchHit>
+            extends ElasticSearchResultIterator<SearchHit>
     {
-        private final ElasticsearchClient client;
-        private final Supplier<SearchResponse> first;
-
         private SearchHits searchHits;
-        private String scrollId;
-        private int currentPosition;
-
-        private long readTimeNanos;
 
         public SearchHitIterator(ElasticsearchClient client, Supplier<SearchResponse> first)
         {
-            this.client = client;
-            this.first = first;
-        }
-
-        public long getReadTimeNanos()
-        {
-            return readTimeNanos;
+            super(client, first);
         }
 
         @Override
@@ -392,6 +445,28 @@ public class ElasticsearchPageSource
             searchHits = response.getHits();
             currentPosition = 0;
         }
+    }
+
+    private abstract static class ElasticSearchResultIterator<T>
+            extends AbstractIterator<T>
+    {
+        protected final ElasticsearchClient client;
+        protected final Supplier<SearchResponse> first;
+        protected String scrollId;
+
+        protected int currentPosition;
+        protected long readTimeNanos;
+
+        protected ElasticSearchResultIterator(ElasticsearchClient client, Supplier<SearchResponse> first)
+        {
+            this.client = client;
+            this.first = first;
+        }
+
+        public long getReadTimeNanos()
+        {
+            return readTimeNanos;
+        }
 
         public void close()
         {
@@ -404,6 +479,110 @@ public class ElasticsearchPageSource
                     LOG.debug("Error clearing scroll", e);
                 }
             }
+        }
+    }
+
+    private static class AggregationIterator
+            extends ElasticSearchResultIterator<ElasticsearchAggregationsCompositeResult>
+    {
+        private List<Aggregations> aggregationsList;
+
+        private List<Map<String, Object>> keyList;
+
+        public AggregationIterator(ElasticsearchClient client, Supplier<SearchResponse> first)
+        {
+            super(client, first);
+        }
+
+        @Override
+        protected ElasticsearchAggregationsCompositeResult computeNext()
+        {
+            if (scrollId == null) {
+                long start = System.nanoTime();
+                SearchResponse response = first.get();
+                readTimeNanos += System.nanoTime() - start;
+                reset(response);
+            }
+            else if (currentPosition == aggregationsList.size()) {
+                long start = System.nanoTime();
+                SearchResponse response = client.nextPage(scrollId);
+                readTimeNanos += System.nanoTime() - start;
+                reset(response);
+                return endOfData();
+            }
+            Aggregations aggregations = aggregationsList.get(currentPosition);
+
+            Map<String, Object> key = null;
+            if (keyList != null && keyList.size() > currentPosition) {
+                key = keyList.get(currentPosition);
+            }
+            currentPosition++;
+
+            return new ElasticsearchAggregationsCompositeResult(aggregations, key);
+        }
+
+        private void reset(SearchResponse response)
+        {
+            scrollId = response.getScrollId();
+            aggregationsList = new ArrayList<>();
+            keyList = new ArrayList<>();
+            if (isGroupByClausePresent(Collections.singletonList(response.getAggregations()))) {
+                Map<String, Object> groupingKeyValueMap = new HashMap<>();
+
+                flattenGroupBy(Collections.singletonList(response.getAggregations()), groupingKeyValueMap);
+            }
+            else {
+                if (response.getAggregations() != null && !response.getAggregations().asList().isEmpty()) {
+                    this.aggregationsList = Collections.singletonList(response.getAggregations());
+                }
+            }
+
+            currentPosition = 0;
+        }
+
+        private void flattenGroupBy(List<Aggregations> aggregationsList, Map<String, Object> groupingKeyValueMap)
+        {
+            if (isGroupByClausePresent(aggregationsList)) {
+                Aggregation aggregation = aggregationsList.get(0).asList().get(0);
+                String groupingKey = aggregation.getName().split("group_by_clause_")[1];
+                ParsedTerms parsedTerms = (ParsedTerms) aggregation;
+                List<? extends Terms.Bucket> parsedTermsBuckets = parsedTerms.getBuckets();
+                for (Terms.Bucket parsedTermsBucket : parsedTermsBuckets) {
+                    Aggregations aggregations = parsedTermsBucket.getAggregations();
+                    if (isGroupByClausePresent(Collections.singletonList(aggregations))) {
+                        Object keyValue = parsedTermsBucket.getKey();
+                        groupingKeyValueMap.put(groupingKey, keyValue);
+                        flattenGroupBy(Collections.singletonList(aggregations), groupingKeyValueMap);
+                    }
+                    else {
+                        Object keyValue = parsedTermsBucket.getKey();
+                        groupingKeyValueMap.put(groupingKey, keyValue);
+                        keyList.add(new HashMap<>(groupingKeyValueMap));
+                        this.aggregationsList.add(aggregations);
+                    }
+                }
+            }
+        }
+
+        private boolean isGroupByClausePresent(List<Aggregations> aggregationsList)
+        {
+            return aggregationsList != null && !aggregationsList.isEmpty() && aggregationsList.get(0) != null && !aggregationsList.get(0).asList().isEmpty() && aggregationsList.get(0).asList().get(0).getName().startsWith("group_by_clause_");
+        }
+    }
+
+    private static class ElasticsearchResultIteratorFactory
+    {
+        public static ElasticSearchResultIterator getIterator(ElasticsearchClient client, SearchResponse searchResponse)
+        {
+            ElasticSearchResultIterator elasticSearchResultIterator;
+            if (searchResponse.getAggregations() != null) {
+                elasticSearchResultIterator = new AggregationIterator(client, () -> searchResponse);
+            }
+            else {
+                elasticSearchResultIterator = new SearchHitIterator(client, () -> searchResponse);
+            }
+
+            return elasticSearchResultIterator;
         }
     }
 }

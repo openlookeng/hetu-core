@@ -15,6 +15,7 @@ package io.prestosql.elasticsearch;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.prestosql.elasticsearch.optimization.ElasticAggOptimizationContext;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -32,6 +33,8 @@ public final class ElasticsearchTableHandle
     private final TupleDomain<ColumnHandle> constraint;
     private final Optional<String> query;
 
+    private ElasticAggOptimizationContext elasticAggOptimizationContext;
+
     public ElasticsearchTableHandle(String schema, String index, Optional<String> query)
     {
         this.schema = requireNonNull(schema, "schema is null");
@@ -46,12 +49,14 @@ public final class ElasticsearchTableHandle
             @JsonProperty("schema") String schema,
             @JsonProperty("index") String index,
             @JsonProperty("constraint") TupleDomain<ColumnHandle> constraint,
+            @JsonProperty("elasticAggOptimizationContext") ElasticAggOptimizationContext elasticAggOptimizationContext,
             @JsonProperty("query") Optional<String> query)
     {
         this.schema = requireNonNull(schema, "schema is null");
         this.index = requireNonNull(index, "index is null");
         this.constraint = requireNonNull(constraint, "constraint is null");
         this.query = requireNonNull(query, "query is null");
+        this.elasticAggOptimizationContext = elasticAggOptimizationContext;
     }
 
     @JsonProperty
@@ -76,6 +81,12 @@ public final class ElasticsearchTableHandle
     public Optional<String> getQuery()
     {
         return query;
+    }
+
+    @JsonProperty
+    public ElasticAggOptimizationContext getElasticAggOptimizationContext()
+    {
+        return elasticAggOptimizationContext;
     }
 
     @Override
