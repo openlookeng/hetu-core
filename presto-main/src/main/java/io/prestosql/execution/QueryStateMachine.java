@@ -1170,7 +1170,6 @@ public class QueryStateMachine
 
     public QueryInfo updateQueryInfo(Optional<StageInfo> stageInfo, QueryRecoveryManager queryRecoveryManager)
     {
-        QUERY_STATE_LOG.debug("updateQueryInfo() is called!");
         QueryInfo queryInfo = getQueryInfo(stageInfo);
         if (queryInfo.isFinalQueryInfo()) {
             finalQueryInfo.compareAndSet(Optional.empty(), Optional.of(queryInfo));
