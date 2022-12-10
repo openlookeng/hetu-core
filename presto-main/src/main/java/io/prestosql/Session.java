@@ -27,6 +27,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.security.SelectedRole;
 import io.prestosql.spi.session.ResourceEstimates;
@@ -88,6 +89,18 @@ public final class Session
     private final SessionPropertyManager sessionPropertyManager;
     private final Map<String, String> preparedStatements;
     private boolean pageMetadataEnabled;
+
+    private QueryType queryType;
+
+    public QueryType getQueryType()
+    {
+        return queryType;
+    }
+
+    public void setQueryType(QueryType queryType)
+    {
+        this.queryType = queryType;
+    }
 
     public Session(
             QueryId queryId,

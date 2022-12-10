@@ -15,6 +15,7 @@ package io.prestosql.sql.planner.iterative.rule;
 
 import io.prestosql.matching.Captures;
 import io.prestosql.matching.Pattern;
+import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.sql.planner.iterative.Rule;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 
@@ -35,9 +36,15 @@ public class RemoveRedundantEnforceSingleRowNode
     @Override
     public Result apply(EnforceSingleRowNode node, Captures captures, Context context)
     {
-        if (isScalar(node.getSource(), context.getLookup())) {
+        QueryType queryType = context.getSession().getQueryType();
+        if (isQueryTypeSupported(queryType) && isScalar(node.getSource(), context.getLookup())) {
             return Result.ofPlanNode(node.getSource());
         }
         return Result.empty();
+    }
+
+    private static boolean isQueryTypeSupported(QueryType queryType)
+    {
+        return (null == queryType) || (queryType != QueryType.UPDATE && queryType != QueryType.DELETE);
     }
 }

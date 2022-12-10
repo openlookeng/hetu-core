@@ -61,6 +61,10 @@ public class QueryPreparer
     {
         Statement statement = wrappedStatement;
         Optional<String> prepareSql = Optional.empty();
+        Optional<QueryType> queryType = StatementUtils.getQueryType(statement.getClass());
+        if (queryType.isPresent()) {
+            session.setQueryType(queryType.get());
+        }
         if (statement instanceof Execute) {
             prepareSql = Optional.of(session.getPreparedStatementFromExecute((Execute) statement));
             statement = sqlParser.createStatement(prepareSql.get(), createParsingOptions(session));
