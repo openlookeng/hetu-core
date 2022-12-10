@@ -442,6 +442,7 @@ public class ConnectorManager
         nodePartitioningManager.removePartitioningProvider(catalogName);
         metadataManager.getProcedureRegistry().removeProcedures(catalogName);
         accessControlManager.removeCatalogAccessControl(catalogName);
+        metadataManager.getMaterializedViewPropertyManager().removeProperties(catalogName);
         metadataManager.getTablePropertyManager().removeProperties(catalogName);
         metadataManager.getColumnPropertyManager().removeProperties(catalogName);
         metadataManager.getSchemaPropertyManager().removeProperties(catalogName);
