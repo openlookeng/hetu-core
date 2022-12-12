@@ -167,7 +167,8 @@ public class MppMetadataFactory
                 hiveTransactionHeartbeatInterval, vacuumCleanupRecheckInterval, typeManager, locationService,
                 partitionUpdateCodec, executorService, hiveVacuumService, heartbeatService,
                 hiveMetastoreClientService, typeTranslator, prestoVersion, accessControlMetadataFactory,
-                vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, autoVacuumEnabled, vacuumCollectorInterval, hmsWriteBatchSize);
+                vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold, autoVacuumEnabled, vacuumCollectorInterval,
+                hmsWriteBatchSize, null);
 
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;

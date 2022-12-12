@@ -11,34 +11,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.cache;
+package io.hetu.core.common.cache;
 
-import com.google.common.cache.Cache;
+import com.google.common.cache.LoadingCache;
 
 /**
- * A {@link com.google.common.cache.Cache} that does not support eviction.
+ * A {@link com.google.common.cache.LoadingCache} that does not support key-based eviction.
  */
-public interface NonEvictableCache<K, V>
-        extends Cache<K, V>
+public interface NonKeyEvictableLoadingCache<K, V>
+        extends LoadingCache<K, V>
 {
     /**
-     * @deprecated Not supported. Use {@link EvictableCache} cache implementation instead.
+     * @deprecated Not supported. Use {@link EvictableCacheBuilder} to build a cache instead.
      */
     @Deprecated
     @Override
     void invalidate(Object key);
 
     /**
-     * @deprecated Not supported. Use {@link EvictableCache} cache implementation instead.
+     * @deprecated Not supported. Use {@link EvictableCacheBuilder} to build a cache instead.
      */
     @Deprecated
     @Override
     void invalidateAll(Iterable<?> keys);
 
     /**
-     * @deprecated Not supported. Use {@link EvictableCache} cache implementation instead.
+     * Invalidates all live entries in the cache. Ongoing loads may not be invalidated, so subsequent
+     * get from the cache is not guaranteed to return fresh state. Must not be relied on for correctness,
+     * but can be used for manual intervention, e.g. as a method exposed over JMX.
      */
-    @Deprecated
     @Override
     void invalidateAll();
 }

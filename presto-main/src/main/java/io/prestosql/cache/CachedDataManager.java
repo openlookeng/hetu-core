@@ -16,6 +16,8 @@ package io.prestosql.cache;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
@@ -23,9 +25,12 @@ import io.airlift.log.Logger;
 import io.prestosql.Session;
 import io.prestosql.cache.elements.CachedDataKey;
 import io.prestosql.cache.elements.CachedDataStorage;
+import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.security.Identity;
 import io.prestosql.utils.HetuConfig;
 
 import java.util.Optional;
@@ -43,9 +48,29 @@ public class CachedDataManager
     private final Metadata metadata;
 
     @Inject
-    public CachedDataManager(HetuConfig hetuConfig, CacheStorageMonitor monitor, Metadata metadata)
+    public CachedDataManager(HetuConfig hetuConfig,
+                             CacheStorageMonitor monitor,
+                             Metadata metadata,
+                             QueryIdGenerator queryIdGenerator,
+                             SessionPropertyManager sessionPropertyManager)
     {
         if (hetuConfig.isExecutionDataCacheEnabled()) {
+            Session.SessionBuilder sessionBuilder = Session.builder(sessionPropertyManager)
+                    .setIdentity(new Identity("openLooKeng", Optional.empty()))
+                    .setSource("auto-vacuum");
+            RemovalListener<CachedDataKey, CachedDataStorage> listener = new RemovalListener<CachedDataKey, CachedDataStorage>()
+            {
+                @Override
+                public void onRemoval(RemovalNotification<CachedDataKey, CachedDataStorage> notification)
+                {
+                    if (notification.wasEvicted()) {
+                        LOG.info("CTE Materialized entry evicted, Cause: %s", notification.getCause().name());
+                        monitor.stopTableMonitorForModification(notification.getValue(),
+                                sessionBuilder.setQueryId(queryIdGenerator.createNextQueryId()).build());
+                    }
+                }
+            };
+
             this.dataCache = Optional.of(CacheBuilder.newBuilder()
                     .maximumWeight(hetuConfig.getExecutionDataCacheMaxSize())
                     .weigher(new Weigher<CachedDataKey, CachedDataStorage>() {
@@ -55,6 +80,7 @@ public class CachedDataManager
                             return (int) value.getDataSize();
                         }
                     })
+                    .removalListener(listener)
                     .build());
         }
         else {
@@ -78,10 +104,25 @@ public class CachedDataManager
 
         CachedDataStorage object = get(dataKey);
         if (object != null && validateCacheEntry(dataKey, object, session)) {
+            /* Increment listener count */
+            object.grab();
             return object;
         }
 
         return null;
+    }
+
+    public void done(CachedDataKey dataKey)
+    {
+        if (!dataCache.isPresent()) {
+            return;
+        }
+
+        CachedDataStorage object = get(dataKey);
+        if (object != null) {
+            /* decrement listener count */
+            object.release();
+        }
     }
 
     public CachedDataStorage get(CachedDataKey dataKey)
@@ -100,30 +141,38 @@ public class CachedDataManager
         }
 
         /* Drop the cached data table */
-        Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(object.getDataTable()));
-        if (tableHandle.isPresent()) {
-            // Todo: mark for dropping when reference count reduce
-            metadata.dropTable(session, tableHandle.get());
+        if (object.getRefCount() <= 0) {
+            // mark for dropping when reference count reduce
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(object.getDataTable()));
+            if (tableHandle.isPresent()) {
+                metadata.dropTable(session, tableHandle.get());
+            }
+            invalidate(ImmutableSet.of(key), session);
         }
-        invalidate(ImmutableSet.of(key));
         return false;
     }
 
-    public void put(CachedDataKey key, CachedDataStorage value)
+    public void put(CachedDataKey key, CachedDataStorage value, Session session)
     {
         if (dataCache.isPresent()) {
+            monitor.monitorTableForModification(value, session);
+            value.grab();
             dataCache.get().put(key, value);
         }
     }
 
-    public void invalidate(Set<CachedDataKey> keySet)
+    public void invalidate(Set<CachedDataKey> keySet, Session session)
     {
         if (dataCache.isPresent()) { /* Add invalidators for storage as cacheWalker */
+            cacheWalk(keySet, ((key, cds) -> {
+                monitor.stopTableMonitorForModification(cds, session);
+                return null;
+            }));
             dataCache.get().invalidateAll(keySet);
         }
     }
 
-    public void invalidateAll(Set<CachedDataKey> keySet)
+    public void invalidateAll()
     {
         if (dataCache.isPresent()) { /* Add invalidators for storage as cacheWalker */
             dataCache.get().invalidateAll();

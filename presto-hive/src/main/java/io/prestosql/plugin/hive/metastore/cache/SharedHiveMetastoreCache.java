@@ -43,7 +43,7 @@ import java.util.function.Function;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
-import static io.prestosql.cache.SafeCaches.buildNonEvictableCache;
+import static io.hetu.core.common.cache.SafeCaches.buildNonEvictableCache;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;

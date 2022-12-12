@@ -20,7 +20,6 @@ import io.prestosql.Session;
 import io.prestosql.cache.elements.CachedDataKey;
 import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.metadata.Metadata;
-import io.prestosql.spi.connector.ConnectorTableHandle;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.utils.HetuConfig;
@@ -47,26 +46,36 @@ public class CacheStorageMonitor
         this.metadata = requireNonNull(metadata, "metadata is null");
     }
 
-    private void monitor()
-    {
-        LOG.info("monitor begin check for monitored tables; ");
-    }
-
     public boolean checkTableValidity(CachedDataStorage cachedDataStorage, Session session)
     {
         AtomicBoolean found = new AtomicBoolean(false);
         cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
-            ConnectorTableHandle age = es.getValue().getTableHandle();
-            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation()));
-            if (!tableHandle.isPresent()) {
+            TableHandle age = es.getValue().getTableHandle();
+            if (metadata.isTableModified(session, age)) {
                 found.set(true);
-            }
-            else {
-                if (!tableHandle.get().getConnectorHandle().basicEquals(age)) {
-                    found.set(true);
-                }
             }
         });
         return !found.get();
+    }
+
+    public void monitorTableForModification(CachedDataStorage cachedDataStorage, Session session)
+    {
+        cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation()));
+            if (tableHandle.isPresent()) {
+                TableHandle th = metadata.watchTableForModifications(session, tableHandle.get());
+                es.getValue().setTableHandle(th);
+            }
+        });
+    }
+
+    public void stopTableMonitorForModification(CachedDataStorage cachedDataStorage, Session session)
+    {
+        cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation()));
+            if (tableHandle.isPresent()) {
+                metadata.unwatchTableForModifications(session, tableHandle.get());
+            }
+        });
     }
 }

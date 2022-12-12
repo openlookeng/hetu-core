@@ -57,6 +57,7 @@ import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.LocationFactory;
 import io.prestosql.execution.MemoryRevokingScheduler;
 import io.prestosql.execution.NodeTaskMap;
+import io.prestosql.execution.QueryIdGenerator;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.SqlTaskManager;
 import io.prestosql.execution.StageInfo;
@@ -487,6 +488,8 @@ public class ServerMainModule
 
         // Cube manager
         binder.bind(CubeManager.class).in(Scopes.SINGLETON);
+
+        binder.bind(QueryIdGenerator.class).in(Scopes.SINGLETON);
         binder.bind(CacheStorageMonitor.class).in(Scopes.SINGLETON);
         binder.bind(CachedDataManager.class).in(Scopes.SINGLETON);
 

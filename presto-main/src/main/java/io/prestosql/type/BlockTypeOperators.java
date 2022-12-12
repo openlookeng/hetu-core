@@ -15,7 +15,7 @@ package io.prestosql.type;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import io.prestosql.cache.NonKeyEvictableCache;
+import io.hetu.core.common.cache.NonKeyEvictableCache;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.function.IcebergInvocationConvention;
@@ -33,8 +33,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
-import static io.prestosql.cache.CacheUtils.uncheckedCacheGet;
-import static io.prestosql.cache.SafeCaches.buildNonEvictableCacheWithWeakInvalidateAll;
+import static io.hetu.core.common.cache.CacheUtils.uncheckedCacheGet;
+import static io.hetu.core.common.cache.SafeCaches.buildNonEvictableCacheWithWeakInvalidateAll;
 import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationArgumentConvention.BLOCK_POSITION;
 import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationReturnConvention.FAIL_ON_NULL;
 import static io.prestosql.spi.function.IcebergInvocationConvention.InvocationReturnConvention.NULLABLE_RETURN;

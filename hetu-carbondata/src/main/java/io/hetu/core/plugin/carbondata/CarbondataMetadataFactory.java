@@ -150,7 +150,7 @@ public class CarbondataMetadataFactory
                 accessControlMetadataFactory,
                 2, 0.0, false,
                 Optional.of(new Duration(5, TimeUnit.MINUTES)),
-                hmsWriteBatchSize);
+                hmsWriteBatchSize, null);
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
         this.writesToNonManagedTablesEnabled = writesToNonManagedTablesEnabled;

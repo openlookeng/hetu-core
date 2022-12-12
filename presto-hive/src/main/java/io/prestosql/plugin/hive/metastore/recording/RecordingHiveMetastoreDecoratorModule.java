@@ -16,17 +16,14 @@ package io.prestosql.plugin.hive.metastore.recording;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.prestosql.block.BlockJsonSerde;
 import io.prestosql.plugin.hive.RecordingMetastoreConfig;
 import io.prestosql.plugin.hive.metastore.HiveMetastoreDecorator;
 import io.prestosql.plugin.hive.metastore.RecordingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.WriteHiveMetastoreRecordingProcedure;
 import io.prestosql.plugin.hive.util.HiveBlockEncodingSerde;
-import io.prestosql.spi.block.Block;
 import io.prestosql.spi.procedure.Procedure;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
-import static io.airlift.json.JsonBinder.jsonBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
@@ -42,8 +39,7 @@ public class RecordingHiveMetastoreDecoratorModule
 
             binder.bind(HiveMetastoreRecording.class).in(Scopes.SINGLETON);
             jsonCodecBinder(binder).bindJsonCodec(HiveMetastoreRecording.Recording.class);
-            jsonBinder(binder).addSerializerBinding(Block.class).to(BlockJsonSerde.Serializer.class);
-            jsonBinder(binder).addDeserializerBinding(Block.class).to(BlockJsonSerde.Deserializer.class);
+            //Todo: add json SerDe
 
             // export under the old name, for backwards compatibility
             newExporter(binder).export(HiveMetastoreRecording.class).as(generator -> generator.generatedNameOf(RecordingHiveMetastore.class));

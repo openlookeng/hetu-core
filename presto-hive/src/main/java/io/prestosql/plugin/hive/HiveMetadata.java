@@ -43,6 +43,7 @@ import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.SortingColumn;
 import io.prestosql.plugin.hive.metastore.StorageFormat;
 import io.prestosql.plugin.hive.metastore.Table;
+import io.prestosql.plugin.hive.monitor.HdfsStorageMonitor;
 import io.prestosql.plugin.hive.security.AccessControlMetadata;
 import io.prestosql.plugin.hive.statistics.HiveStatisticsProvider;
 import io.prestosql.plugin.hive.util.ConfigurationUtils;
@@ -246,6 +247,7 @@ public class HiveMetadata
     protected final ScheduledExecutorService vacuumExecutorService;
     protected final ScheduledExecutorService hiveMetastoreClientService;
     private final long vacuumCollectorInterval;
+    private final HdfsStorageMonitor hdfsStorageMonitor;
 
     private boolean externalTable;
 
@@ -268,7 +270,8 @@ public class HiveMetadata
             double vacuumDeltaPercentThreshold,
             ScheduledExecutorService vacuumExecutorService,
             Optional<Duration> vacuumCollectorInterval,
-            ScheduledExecutorService hiveMetastoreClientService)
+            ScheduledExecutorService hiveMetastoreClientService,
+            HdfsStorageMonitor hdfsStorageMonitor)
     {
         this.metastore = requireNonNull(metastore, "metastore is null");
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
@@ -292,6 +295,7 @@ public class HiveMetadata
         this.vacuumCollectorInterval = vacuumCollectorInterval.map(Duration::toMillis)
                 .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Vacuum collector interval is not set correctly"));
         this.hiveMetastoreClientService = hiveMetastoreClientService;
+        this.hdfsStorageMonitor = hdfsStorageMonitor;
     }
 
     public SemiTransactionalHiveMetastore getMetastore()
@@ -3348,5 +3352,69 @@ public class HiveMetadata
     public boolean supportsReportingWrittenBytes(ConnectorSession session, ConnectorTableHandle connectorTableHandle)
     {
         return true;
+    }
+
+    @Override
+    public ConnectorTableHandle watchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        if (hdfsStorageMonitor == null) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support storage watch");
+        }
+
+        HiveIdentity identity = new HiveIdentity(session);
+        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+
+        String location = table.getStorage().getLocation();
+        long refCount = 0;
+        try {
+            refCount = hdfsStorageMonitor.registerLocationForMonitoring(location, session);
+        }
+        catch (IOException e) {
+            log.info("exception while registering table for monitoring: %s", e.getMessage());
+        }
+        catch (InterruptedException e) {
+            log.info("exception while registering table for monitoring: %s", e.getMessage());
+        }
+
+        return new HiveTableState(((HiveTableHandle) tableHandle), refCount);
+    }
+
+    @Override
+    public void unwatchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        if (hdfsStorageMonitor == null) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support storage watch");
+        }
+
+        HiveIdentity identity = new HiveIdentity(session);
+        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+
+        String location = table.getStorage().getLocation();
+        hdfsStorageMonitor.unregisterLocationForMonitoring(location);
+    }
+
+    @Override
+    public boolean isTableModified(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        if (hdfsStorageMonitor == null) {
+            throw new PrestoException(NOT_SUPPORTED, "This connector does not support storage watch");
+        }
+
+        HiveIdentity identity = new HiveIdentity(session);
+        HiveTableState tableState = (HiveTableState) tableHandle;
+        SchemaTableName tableName = tableState.getSchemaTableName();
+        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                .orElseThrow(() -> new TableNotFoundException(tableName));
+
+        HiveTableHandle currentTable = getTableHandle(session, tableName);
+
+        String location = table.getStorage().getLocation();
+        long age = hdfsStorageMonitor.getAgeForLocation(location);
+
+        return tableState.basicEquals(new HiveTableState(currentTable, age));
     }
 }

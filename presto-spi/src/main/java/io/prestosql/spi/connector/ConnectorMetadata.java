@@ -1322,4 +1322,21 @@ public interface ConnectorMetadata
     {
         return Optional.empty();
     }
+
+    default ConnectorTableHandle watchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        // no op
+        return null;
+    }
+
+    default void unwatchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        // no op
+        return;
+    }
+
+    default boolean isTableModified(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        return false;
+    }
 }

@@ -397,7 +397,7 @@ public class LocalQueryRunner
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
         HetuConfig hetuConfig = new HetuConfig();
-        this.cachedDataManager = new CachedDataManager(hetuConfig, new CacheStorageMonitor(hetuConfig, metadata), metadata);
+        this.cachedDataManager = new CachedDataManager(hetuConfig, new CacheStorageMonitor(hetuConfig, metadata), metadata, null, new SessionPropertyManager());
         this.connectorManager = new ConnectorManager(
                 materializedViewPropertyManager,
                 hetuMetaStoreManager,

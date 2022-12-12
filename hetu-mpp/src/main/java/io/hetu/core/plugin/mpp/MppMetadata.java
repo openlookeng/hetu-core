@@ -90,7 +90,7 @@ public class MppMetadata
                 typeManager, locationService, partitionUpdateCodec, typeTranslator,
                 prestoVersion, hiveStatisticsProvider, accessControlMetadata,
                 autoVacuumEnabled, vacuumDeltaNumThreshold, vacuumDeltaPercentThreshold,
-                vacuumExecutorService, vacuumCollectorInterval, hiveMetastoreClientService);
+                vacuumExecutorService, vacuumCollectorInterval, hiveMetastoreClientService, null);
         this.scheduler = scheduler;
         this.mppConfig = mppConfig;
         this.createsOfNonManagedTablesEnabled = createsOfNonManagedTablesEnabled;

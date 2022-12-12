@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.cache;
+package io.hetu.core.common.cache;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -19,7 +19,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.errorprone.annotations.CheckReturnValue;
-import io.prestosql.cache.EvictableCache.Token;
+import io.hetu.core.common.cache.EvictableCache.Token;
 import org.gaul.modernizer_maven_annotations.SuppressModernizer;
 
 import java.time.Duration;

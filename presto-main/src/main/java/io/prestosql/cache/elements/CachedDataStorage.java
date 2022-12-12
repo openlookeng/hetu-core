@@ -14,11 +14,7 @@
  */
 package io.prestosql.cache.elements;
 
-import io.prestosql.Session;
-import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.CatalogSchemaTableName;
-import io.prestosql.spi.connector.ConnectorTableHandle;
-import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
 
 import java.util.Map;
@@ -41,7 +37,7 @@ public class CachedDataStorage
         private final long age;
         private final long dataAge;
 
-        private ConnectorTableHandle tableHandle;
+        private TableHandle tableHandle;
 
         public TableInfo(String location, long age, long dataAge)
         {
@@ -65,12 +61,12 @@ public class CachedDataStorage
             return location;
         }
 
-        public ConnectorTableHandle getTableHandle()
+        public TableHandle getTableHandle()
         {
             return tableHandle;
         }
 
-        public void setTableHandle(ConnectorTableHandle tableHandle)
+        public void setTableHandle(TableHandle tableHandle)
         {
             this.tableHandle = tableHandle;
         }
@@ -103,14 +99,6 @@ public class CachedDataStorage
         this.tableInfoMap = identifier.getTables()
                 .stream()
                 .collect(toImmutableMap(s -> s, v -> new TableInfo(v, 0, 0)));
-    }
-
-    public void updateTableReferences(Metadata metadata, Session session)
-    {
-        tableInfoMap.entrySet().forEach(es -> {
-            TableHandle tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation())).get();
-            es.getValue().setTableHandle(tableHandle.getConnectorHandle());
-        });
     }
 
     public CachedDataKey getIdentifier()
@@ -164,9 +152,9 @@ public class CachedDataStorage
         return isCommitted.get();
     }
 
-    public AtomicInteger getRefCount()
+    public int getRefCount()
     {
-        return refCount;
+        return refCount.get();
     }
 
     public boolean inProgress()
@@ -209,11 +197,15 @@ public class CachedDataStorage
         return runtime;
     }
 
-    public boolean grab()
+    public int grab()
     {
-        this.refCount.incrementAndGet();
         this.lastAccessTime = currentTimeMillis();
-        return true; // todo: use this to avoid race b/w access and eviction
+        return this.refCount.incrementAndGet();
+    }
+
+    public int release()
+    {
+        return this.refCount.decrementAndGet();
     }
 
     @Override

@@ -20,6 +20,7 @@ import io.prestosql.plugin.hive.metastore.CachingHiveMetastore;
 import io.prestosql.plugin.hive.metastore.HiveMetastore;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
 import io.prestosql.plugin.hive.metastore.Table;
+import io.prestosql.plugin.hive.monitor.HdfsStorageMonitor;
 import io.prestosql.plugin.hive.security.AccessControlMetadataFactory;
 import io.prestosql.plugin.hive.statistics.MetastoreHiveStatisticsProvider;
 import io.prestosql.plugin.hive.statistics.TableColumnStatistics;
@@ -68,6 +69,7 @@ public class HiveMetadataFactory
     private final boolean autoVacuumEnabled;
     private Optional<Duration> vacuumCollectorInterval;
     protected final int hmsWriteBatchSize;
+    protected final HdfsStorageMonitor hdfsStorageMonitor;
 
     @Inject
     @SuppressWarnings("deprecation")
@@ -85,7 +87,8 @@ public class HiveMetadataFactory
             JsonCodec<PartitionUpdate> partitionUpdateCodec,
             TypeTranslator typeTranslator,
             NodeVersion nodeVersion,
-            AccessControlMetadataFactory accessControlMetadataFactory)
+            AccessControlMetadataFactory accessControlMetadataFactory,
+            HdfsStorageMonitor hdfsStorageMonitor)
     {
         this(
                 metastore,
@@ -114,7 +117,8 @@ public class HiveMetadataFactory
                 hiveConfig.getVacuumDeltaPercentThreshold(),
                 hiveConfig.getAutoVacuumEnabled(),
                 hiveConfig.getVacuumCollectorInterval(),
-                hiveConfig.getMetastoreWriteBatchSize());
+                hiveConfig.getMetastoreWriteBatchSize(),
+                hdfsStorageMonitor);
     }
 
     public HiveMetadataFactory(
@@ -144,7 +148,7 @@ public class HiveMetadataFactory
             double vacuumDeltaPercentThreshold,
             boolean autoVacuumEnabled,
             Optional<Duration> vacuumCollectorInterval,
-            int hmsWriteBatchSize)
+            int hmsWriteBatchSize, HdfsStorageMonitor hdfsStorageMonitor)
     {
         this.skipDeletionForAlter = skipDeletionForAlter;
         this.skipTargetCleanupOnRollback = skipTargetCleanupOnRollback;
@@ -174,6 +178,7 @@ public class HiveMetadataFactory
         this.autoVacuumEnabled = autoVacuumEnabled;
         this.vacuumCollectorInterval = vacuumCollectorInterval;
         this.hmsWriteBatchSize = hmsWriteBatchSize;
+        this.hdfsStorageMonitor = hdfsStorageMonitor;
     }
 
     @Override
@@ -211,6 +216,7 @@ public class HiveMetadataFactory
                 vacuumDeltaPercentThreshold,
                 hiveVacuumService,
                 vacuumCollectorInterval,
-                hiveMetastoreClientService);
+                hiveMetastoreClientService,
+                hdfsStorageMonitor);
     }
 }

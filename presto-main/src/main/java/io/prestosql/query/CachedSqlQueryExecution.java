@@ -295,19 +295,24 @@ public class CachedSqlQueryExecution
                                 }
                             },
                             null);
-                    cds.updateTableReferences(metadata, session);
-                    dataCache.put(createKey, cds);
+                    dataCache.put(createKey, cds, session);
                     CachedDataStorage finalCds = cds;
                     CachedDataKey finalCachedDataKey = createKey;
+                    CachedDataKey finalCreateKey = createKey;
                     addStateChangeListener(newState -> {
                         if (newState == QueryState.FINISHED && finalCds.isNonCachable() && finalCacheable) {
                             cache.get().invalidate(finalKey);
+                            dataCache.done(finalCreateKey);
                         }
                         if (newState == QueryState.FAILED) {
                             /* In case some CTEs got committed even on failed query is useful */
                             if (!finalCds.isCommitted()) {
                                 finalCds.abort();
-                                dataCache.invalidate(ImmutableSet.of(finalCachedDataKey));
+                                dataCache.invalidate(ImmutableSet.of(finalCachedDataKey), session);
+                                // Todo: Ensure materialized table is also dropped here!
+                            }
+                            else {
+                                dataCache.done(finalCreateKey);
                             }
                             if (finalCacheable) {
                                 cache.get().invalidate(finalKey);
@@ -319,6 +324,12 @@ public class CachedSqlQueryExecution
                 if (cds.inProgress() || cds.isNonCachable()) {
                     return null;
                 }
+                CachedDataKey finalCreateKey1 = createKey;
+                addStateChangeListener(newState -> {
+                    if (newState == QueryState.FINISHED || newState == QueryState.FAILED) {
+                        dataCache.done(finalCreateKey1);
+                    }
+                });
                 return cds;
             }
         };

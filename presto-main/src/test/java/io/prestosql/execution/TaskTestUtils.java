@@ -36,6 +36,7 @@ import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.SessionPropertyManager;
 import io.prestosql.metadata.Split;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.operator.LookupJoinOperators;
@@ -188,7 +189,7 @@ public final class TaskTestUtils
                 cubeManager,
                 new ExchangeManagerRegistry(new ExchangeHandleResolver()),
                 tableExecuteContextManager,
-                new CachedDataManager(new HetuConfig(), new CacheStorageMonitor(new HetuConfig(), metadata), metadata));
+                new CachedDataManager(new HetuConfig(), new CacheStorageMonitor(new HetuConfig(), metadata), metadata, null, new SessionPropertyManager()));
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)
