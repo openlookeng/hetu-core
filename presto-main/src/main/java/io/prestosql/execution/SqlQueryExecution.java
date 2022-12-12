@@ -208,6 +208,7 @@ public class SqlQueryExecution
 
     private AtomicInteger tryCount = new AtomicInteger(0);
     private final TableExecuteContextManager tableExecuteContextManager;
+    private final boolean isMultiCoordinatorEnabled;
 
     public SqlQueryExecution(
             TableExecuteContextManager tableExecuteContextManager,
@@ -247,7 +248,8 @@ public class SqlQueryExecution
             NodeAllocatorService nodeAllocatorService,
             PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
             TaskExecutionStats taskExecutionStats,
-            QueryResourceManagerService queryResourceManager)
+            QueryResourceManagerService queryResourceManager,
+            boolean isMultiCoordinatorEnabled)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -336,6 +338,7 @@ public class SqlQueryExecution
             this.nodeAllocatorService = requireNonNull(nodeAllocatorService, "nodeAllocatorService is null");
             this.partitionMemoryEstimatorFactory = requireNonNull(partitionMemoryEstimatorFactory, "partitionMemoryEstimatorFactory is null");
             this.taskExecutionStats = requireNonNull(taskExecutionStats, "taskExecutionStats is null");
+            this.isMultiCoordinatorEnabled = isMultiCoordinatorEnabled;
         }
     }
 
@@ -793,6 +796,11 @@ public class SqlQueryExecution
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+
+        if (getRetryPolicy(getSession()) != RetryPolicy.NONE || isSnapshotEnabled(getSession()) || !(analysis.getStatement() instanceof Query) || isMultiCoordinatorEnabled) {
+            disableCteResultCache(getSession());
+        }
+
         Plan localPlan = createPlan(analysis, stateMachine.getSession(), planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, stateMachine.getWarningCollector(), CachedDataStorageProvider.NULL_PROVIDER);
         queryPlan.set(localPlan);
 
@@ -817,10 +825,6 @@ public class SqlQueryExecution
         }
         if (SystemSessionProperties.getRetryPolicy(getSession()) == RetryPolicy.TASK) {
             checkTaskRetrySupport(getSession());
-        }
-
-        if (getRetryPolicy(getSession()) != RetryPolicy.NONE || isSnapshotEnabled(getSession()) || !(analysis.getStatement() instanceof Query)) {
-            disableCteResultCache(getSession());
         }
 
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
@@ -872,6 +876,10 @@ public class SqlQueryExecution
 
         if (!(analysis.getStatement() instanceof Query)) {
             reasons.add("CTE result cache is supported only for SELECT queries");
+        }
+
+        if (isMultiCoordinatorEnabled) {
+            reasons.add("CTE result cache is not supported when multi-coordinator is enabled");
         }
 
         if (!reasons.isEmpty() && isCTEResultCacheEnabled(session)) {
@@ -1361,6 +1369,7 @@ public class SqlQueryExecution
 
         private final QueryResourceManagerService queryResourceManagerService;
         private final CachedDataManager dataCache;
+        private final boolean isMultiCoordinatorEnabled;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1447,6 +1456,7 @@ public class SqlQueryExecution
             this.nodeAllocatorService = requireNonNull(nodeAllocatorService, "nodeAllocatorService is null");
             this.partitionMemoryEstimatorFactory = requireNonNull(partitionMemoryEstimatorFactory, "partitionMemoryEstimatorFactory is null");
             this.taskExecutionStats = requireNonNull(taskExecutionStats, "taskExecutionStats is null");
+            this.isMultiCoordinatorEnabled = hetuConfig.isMultipleCoordinatorEnabled();
         }
 
         // Loading properties into PropertyService for later reference
@@ -1507,7 +1517,8 @@ public class SqlQueryExecution
                     taskExecutionStats,
                     queryResourceManagerService,
                     tableExecuteContextManager,
-                    this.dataCache);
+                    this.dataCache,
+                    isMultiCoordinatorEnabled);
         }
     }
 }

@@ -156,7 +156,7 @@ public class CachedSqlQueryExecution
                                    PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats,
                                    QueryResourceManagerService queryResourceManager,
                                    TableExecuteContextManager tableExecuteContextManager,
-                                   CachedDataManager dataCache)
+                                   CachedDataManager dataCache, boolean isMultiCoordinatorEnabled)
     {
         super(tableExecuteContextManager, preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
@@ -164,7 +164,7 @@ public class CachedSqlQueryExecution
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService,
                 heuristicIndexerManager, stateStoreProvider, recoveryUtils, exchangeManagerRegistry, coordinatorTaskManager,
                 taskSourceFactory, taskDescriptorStorage, nodeAllocatorService, partitionMemoryEstimatorFactory, taskExecutionStats,
-                queryResourceManager);
+                queryResourceManager, isMultiCoordinatorEnabled);
         this.cache = cache;
         this.dataCache = dataCache;
         this.beginTableWrite = new BeginTableWrite(metadata);
