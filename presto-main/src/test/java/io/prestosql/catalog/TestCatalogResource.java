@@ -37,7 +37,6 @@ import static io.prestosql.client.PrestoHeaders.PRESTO_USER;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static javax.ws.rs.core.Response.Status.CREATED;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 public class TestCatalogResource
@@ -127,7 +126,7 @@ public class TestCatalogResource
     {
         String catalogName = "tpch7";
         assertTrue(executeAddCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
-        assertThrows(Exception.class, () -> executeUpdateCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
+        assertTrue(executeUpdateCatalogCall(catalogName, "tpch", tpchProperties, ImmutableList.of(), ImmutableList.of()));
     }
 
     @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "The catalog .tpch8. does not exist")

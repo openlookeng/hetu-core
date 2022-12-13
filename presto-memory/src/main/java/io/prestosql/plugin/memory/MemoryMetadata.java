@@ -338,8 +338,11 @@ public class MemoryMetadata
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         MemoryTableHandle handle = (MemoryTableHandle) tableHandle;
-        MemoryColumnHandle memColHandle = getTableInfo(handle.getId())
-                .getColumn(columnHandle);
+        TableInfo tableInfo = getTableInfo(handle.getId());
+        if (tableInfo == null) {
+            return null;
+        }
+        MemoryColumnHandle memColHandle = tableInfo.getColumn(columnHandle);
         return memColHandle != null ? memColHandle.getMetadata(typeManager) : null;
     }
 
