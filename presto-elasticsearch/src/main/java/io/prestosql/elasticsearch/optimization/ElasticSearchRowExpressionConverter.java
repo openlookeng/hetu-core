@@ -94,7 +94,7 @@ public class ElasticSearchRowExpressionConverter
 
         if (functionMetadata.getOperatorType().get() == OperatorType.NOT_EQUAL) {
             String variable = call.getArguments().get(0).accept(this, context);
-            String value = call.getArguments().get(0).accept(this, context);
+            String value = call.getArguments().get(1).accept(this, context);
             return format("NOT (%s: %s)", variable, value);
         }
         Optional<OperatorType> operatorTypeOptional = functionMetadata.getOperatorType();
@@ -212,7 +212,7 @@ public class ElasticSearchRowExpressionConverter
         }
 
         if (type instanceof VarcharType) {
-            return "'" + ((Slice) literal.getValue()).toStringUtf8() + "'";
+            return "\"" + ((Slice) literal.getValue()).toStringUtf8() + "\"";
         }
 
         if (type instanceof TimestampType) {

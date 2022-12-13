@@ -174,8 +174,7 @@ public class ElasticSearchPlanOptimizerTest
     private static void assertOptimizedQuerySuccess(PlanNode optimize, String expectedOp)
     {
         ProjectNode optimizedProjectNode = (ProjectNode) optimize;
-        FilterNode projectNodeSource = (FilterNode) optimizedProjectNode.getSource();
-        TableScanNode newTableScanNode = (TableScanNode) projectNodeSource.getSource();
+        TableScanNode newTableScanNode = (TableScanNode) optimizedProjectNode.getSource();
         TableHandle newTableScanNodeTable = newTableScanNode.getTable();
         ElasticsearchTableHandle newTableScanNodeTableConnectorHandle = (ElasticsearchTableHandle) newTableScanNodeTable.getConnectorHandle();
         Optional<String> query = newTableScanNodeTableConnectorHandle.getQuery();
@@ -293,7 +292,7 @@ public class ElasticSearchPlanOptimizerTest
         PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
 
         PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
-        assertOptimizedQuerySuccess(optimize, "(first_name = 'Lisa')");
+        assertOptimizedQuerySuccess(optimize, "(first_name:\"Lisa\")");
     }
 
     @Test
@@ -340,7 +339,7 @@ public class ElasticSearchPlanOptimizerTest
         PlanNode projectNode = new ProjectNode(planNodeId, filterNode, assignments);
 
         PlanNode optimize = elasticSearchPlanOptimizer.optimize(projectNode, null, null, null, idAllocator);
-        assertOptimizedQuerySuccess(optimize, "(first_name = 'Lisa') OR (first_name = 'Lis')");
+        assertOptimizedQuerySuccess(optimize, "(first_name:\"Lisa\") OR (first_name:\"Lis\")");
     }
 
     @Test
@@ -445,6 +444,6 @@ public class ElasticSearchPlanOptimizerTest
         assertConstantOptimizationSuccess("10", 10, IntegerType.INTEGER);
         assertConstantOptimizationSuccess("10.0", 10.0, DoubleType.DOUBLE);
         assertConstantOptimizationSuccess("0.000000", 1L, RealType.REAL);
-        assertConstantOptimizationSuccess("'value'", new StringLiteral("value").getSlice(), VarcharType.VARCHAR);
+        assertConstantOptimizationSuccess("\"value\"", new StringLiteral("value").getSlice(), VarcharType.VARCHAR);
     }
 }
