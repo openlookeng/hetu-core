@@ -411,7 +411,7 @@ public final class Session
             }
         }
 
-        return new Session(
+        Session session = new Session(
                 queryId,
                 Optional.of(transactionId),
                 clientTransactionSupport,
@@ -436,6 +436,8 @@ public final class Session
                 sessionPropertyManager,
                 preparedStatements,
                 pageMetadataEnabled);
+        session.setQueryType(this.queryType);
+        return session;
     }
 
     public Session withDefaultProperties(Map<String, String> systemPropertyDefaults, Map<String, Map<String, String>> catalogPropertyDefaults)
