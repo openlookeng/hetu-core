@@ -252,10 +252,11 @@ public class CachedSqlQueryExecution
             }
 
             // TODO: Traverse the statement to build the key then combine tables/optimizers.. etc
-            SqlQueryExecutionCacheKeyGenerator.buildKey((Query) statement, tableNames, optimizers, columnTypes, session.getTimeZoneKey(), systemSessionProperties);
+            key = SqlQueryExecutionCacheKeyGenerator.buildKey((Query) statement, tableNames, optimizers, columnTypes, session.getTimeZoneKey(), systemSessionProperties);
         }
 
         boolean finalCacheable = cacheable;
+        int finalKey = key;
         CachedDataStorageProvider cachedDataStorageProvider = new CachedDataStorageProvider()
         {
             CachedDataKey dataKey = builder.build();
@@ -288,7 +289,7 @@ public class CachedSqlQueryExecution
                                 public Void apply(Void unused)
                                 {
                                     if (finalCacheable) {
-                                        cache.get().invalidate(key);
+                                        cache.get().invalidate(finalKey);
                                     }
                                     return null;
                                 }
@@ -300,7 +301,7 @@ public class CachedSqlQueryExecution
                     CachedDataKey finalCachedDataKey = createKey;
                     addStateChangeListener(newState -> {
                         if (newState == QueryState.FINISHED && finalCds.isNonCachable() && finalCacheable) {
-                            cache.get().invalidate(key);
+                            cache.get().invalidate(finalKey);
                         }
                         if (newState == QueryState.FAILED) {
                             /* In case some CTEs got committed even on failed query is useful */
@@ -308,7 +309,9 @@ public class CachedSqlQueryExecution
                                 finalCds.abort();
                                 dataCache.invalidate(ImmutableSet.of(finalCachedDataKey));
                             }
-                            cache.get().invalidate(key);
+                            if (finalCacheable) {
+                                cache.get().invalidate(finalKey);
+                            }
                         }
                     });
                     return cds;
@@ -322,12 +325,12 @@ public class CachedSqlQueryExecution
 
         if (!cacheable) {
             return super.createPlan(analysis, session, planOptimizers, idAllocator, metadata, typeAnalyzer,
-                    statsCalculator, costCalculator, warningCollector, cachedDataStorageProvider);
+                    statsCalculator, costCalculator, warningCollector, (dataCache.isDataCachedEnabled()) ? cachedDataStorageProvider : CachedDataStorageProvider.NULL_PROVIDER);
         }
 
         CachedSqlQueryExecutionPlan cachedPlan = this.cache.get().getIfPresent(key);
         HetuLogicalPlanner logicalPlanner = new HetuLogicalPlanner(session, planOptimizers, idAllocator,
-                metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedDataStorageProvider);
+                metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, (dataCache.isDataCachedEnabled()) ? cachedDataStorageProvider : CachedDataStorageProvider.NULL_PROVIDER);
 
         PlanNode root;
         plan = cachedPlan != null ? cachedPlan.getPlan() : null;
@@ -378,7 +381,7 @@ public class CachedSqlQueryExecution
 
         if (isCTEResultCacheEnabled(session) && analysis.getStatement() instanceof Query) {
             try {
-                root = this.resultCacheTableRead.optimize(root, session, null, new PlanSymbolAllocator(), new PlanNodeIdAllocator(), null, cachedDataStorageProvider);
+                root = this.resultCacheTableRead.optimize(root, session, null, new PlanSymbolAllocator(), new PlanNodeIdAllocator(), null, (dataCache.isDataCachedEnabled()) ? cachedDataStorageProvider : CachedDataStorageProvider.NULL_PROVIDER);
             }
             catch (NoSuchElementException e) {
                 // Cached plan is outdated
