@@ -182,8 +182,6 @@ class RelationPlanner
                 return new RelationPlan(withCoercions.getRoot(), scope, withCoercions.getFieldMappings());
             }
 
-            session.disableReuseTableScan();
-
             Integer commonCTERefNum;
             if (namedSubPlan.containsKey(node.getName())) {
                 commonCTERefNum = namedSubPlan.get(node.getName());
