@@ -50,6 +50,25 @@ elasticsearch.pushdown.enabled=true
 ```
 注意：目前算子下推仅支持部分SQL语句的查询关键字，包括EQUAL、AND、OR、算数运算符、BETWEEN、IN，以及部分聚合语法，包括GROUP BY、SUM、COUNT方法。
 
+
+数据结构算子下推支持矩阵:
+
+| Elasticsearch    | openLooKeng | 聚合  | 查询  |
+|:-----------------|:------------|:----|:----|
+| `binary`         | VARBINARY   | 否   | 否   |
+| `boolean`        | BOOLEAN     | 是   | 是   |
+| `double`         | DOUBLE      | 是   | 是   |
+| `float`          | REAL        | 是   | 是   |
+| `byte`           | TINYINT     | 是   | 是   |
+| `short`          | SMALLINT    | 是   | 是   |
+| `integer`        | INTEGER     | 是   | 是   |
+| `long`           | BIGINT      | 是   | 是   |
+| `keyword`        | VARCHAR     | 是   | 是   |
+| `text`           | VARCHAR     | 是   | 是   |
+| `date`           | TIMESTAMP   | 是   | 是   |
+| `ip`             | IPADDRESS   | 是   | 是   |
+| `(其他类型)`         |             | 否   | 否   |
+
 ### `elasticsearch.scroll-size`
 
 此属性定义每个Elasticsearch滚动请求中可以返回的最大命中数。
