@@ -330,7 +330,8 @@ public class CachedSqlQueryExecution
 
         CachedSqlQueryExecutionPlan cachedPlan = this.cache.get().getIfPresent(key);
         HetuLogicalPlanner logicalPlanner = new HetuLogicalPlanner(session, planOptimizers, idAllocator,
-                metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, (dataCache.isDataCachedEnabled()) ? cachedDataStorageProvider : CachedDataStorageProvider.NULL_PROVIDER);
+                metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, (dataCache.isDataCachedEnabled()) ? cachedDataStorageProvider : CachedDataStorageProvider.NULL_PROVIDER,
+                getSnapshotManager(), getNodeScheduler());
 
         PlanNode root;
         plan = cachedPlan != null ? cachedPlan.getPlan() : null;

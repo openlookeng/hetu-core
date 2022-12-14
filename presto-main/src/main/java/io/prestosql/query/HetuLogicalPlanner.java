@@ -23,8 +23,10 @@ import io.prestosql.cost.CostProvider;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
+import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.sql.analyzer.Analysis;
@@ -71,10 +73,10 @@ public class HetuLogicalPlanner
 
     public HetuLogicalPlanner(Session session, List<PlanOptimizer> planOptimizers, PlanNodeIdAllocator idAllocator,
                               Metadata metadata, TypeAnalyzer typeAnalyzer, StatsCalculator statsCalculator, CostCalculator costCalculator,
-                              WarningCollector warningCollector, CachedDataStorageProvider cachedData)
+                              WarningCollector warningCollector, CachedDataStorageProvider cachedData, QuerySnapshotManager snapshotManager, NodeScheduler nodeScheduler)
     {
         super(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator,
-                warningCollector, cachedData);
+                warningCollector, cachedData, snapshotManager, nodeScheduler);
         this.session = session;
         this.planOptimizers = planOptimizers;
         this.planSanityChecker = DISTRIBUTED_PLAN_SANITY_CHECKER;

@@ -20,6 +20,7 @@ import io.hetu.core.spi.cube.CubeFilter;
 import io.hetu.core.spi.cube.CubeMetadata;
 import io.hetu.core.spi.cube.CubeStatus;
 import io.prestosql.Session;
+import io.prestosql.SystemSessionProperties;
 import io.prestosql.cache.CachedDataStorageProvider;
 import io.prestosql.cost.CachingCostProvider;
 import io.prestosql.cost.CachingStatsProvider;
@@ -28,16 +29,21 @@ import io.prestosql.cost.CostProvider;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cost.StatsProvider;
+import io.prestosql.exchange.RetryPolicy;
+import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metadata.NewTableLayout;
 import io.prestosql.metadata.TableMetadata;
+import io.prestosql.snapshot.QuerySnapshotManager;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
 import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
+import io.prestosql.spi.connector.StandardWarningCode;
 import io.prestosql.spi.cube.CubeUpdateMetadata;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.metadata.TableHandle;
@@ -132,6 +138,8 @@ import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Streams.zip;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
+import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isSkipAttachingStatsWithPlan;
 import static io.prestosql.metadata.MetadataUtil.createQualifiedObjectName;
 import static io.prestosql.metadata.MetadataUtil.toSchemaTableName;
@@ -182,6 +190,8 @@ public class LogicalPlanner
     private final Map<QualifiedName, Integer> namedSubPlan = new HashMap<>();
     private final UniqueIdAllocator uniqueIdAllocator = new UniqueIdAllocator();
     private final CachedDataStorageProvider cachedDataStorageProvider;
+    private final QuerySnapshotManager snapshotManager;
+    private final NodeScheduler nodeScheduler;
 
     public LogicalPlanner(Session session,
                           List<PlanOptimizer> planOptimizers,
@@ -193,7 +203,22 @@ public class LogicalPlanner
                           WarningCollector warningCollector,
                           CachedDataStorageProvider cachedData)
     {
-        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
+        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData, null, null);
+    }
+
+    public LogicalPlanner(Session session,
+            List<PlanOptimizer> planOptimizers,
+            PlanNodeIdAllocator idAllocator,
+            Metadata metadata,
+            TypeAnalyzer typeAnalyzer,
+            StatsCalculator statsCalculator,
+            CostCalculator costCalculator,
+            WarningCollector warningCollector,
+            CachedDataStorageProvider cachedData,
+            QuerySnapshotManager snapshotManager,
+            NodeScheduler nodeScheduler)
+    {
+        this(session, planOptimizers, DISTRIBUTED_PLAN_SANITY_CHECKER, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData, snapshotManager, nodeScheduler);
     }
 
     public LogicalPlanner(Session session,
@@ -205,7 +230,9 @@ public class LogicalPlanner
                           StatsCalculator statsCalculator,
                           CostCalculator costCalculator,
                           WarningCollector warningCollector,
-                          CachedDataStorageProvider cachedData)
+                          CachedDataStorageProvider cachedData,
+                          QuerySnapshotManager snapshotManager,
+                          NodeScheduler nodeScheduler)
     {
         this.session = requireNonNull(session, "session is null");
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
@@ -219,6 +246,8 @@ public class LogicalPlanner
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
         this.warningCollector = requireNonNull(warningCollector, "warningCollector is null");
         this.cachedDataStorageProvider = cachedData;
+        this.snapshotManager = snapshotManager;
+        this.nodeScheduler = nodeScheduler;
     }
 
     public Plan plan(Analysis analysis, boolean skipStatsWithPlan)
@@ -263,14 +292,33 @@ public class LogicalPlanner
         }
     }
 
+    private void checkCasesForDisableCTEAndReUseTableScan(Analysis analysis, Map<String, Object> properties)
+    {
+        // disable reuse_table_scan &  cte_reuse_enabled if retry_policy=task
+        if (SystemSessionProperties.getRetryPolicy(session) == RetryPolicy.TASK) {
+            disableCTEAndReuseTableScan(session);
+        }
+
+        // disable reuse_table_scan &  cte_reuse_enabled if recovery_enabled=true or snapshot_enabled=true
+        if (SystemSessionProperties.isRecoveryEnabled(session) || SystemSessionProperties.isSnapshotEnabled(session)) {
+            checkRecoverySupport(session, analysis, properties);
+        }
+    }
+
     public PlanNode planStatement(Analysis analysis, Statement statement)
     {
         if ((statement instanceof CreateTableAsSelect) && analysis.isCreateTableAsSelectNoOp()) {
             checkState(analysis.getCreateTableDestination().isPresent(), "Table destination is missing");
             Symbol symbol = planSymbolAllocator.newSymbol("rows", BIGINT);
+            checkCasesForDisableCTEAndReUseTableScan(analysis, new HashMap<>());
             PlanNode source = new ValuesNode(idAllocator.getNextId(), ImmutableList.of(symbol), ImmutableList.of(ImmutableList.of(new ConstantExpression(0L, BIGINT))));
             return new OutputNode(idAllocator.getNextId(), source, ImmutableList.of("rows"), ImmutableList.of(symbol));
         }
+
+        if (!(statement instanceof CreateTableAsSelect)) {
+            checkCasesForDisableCTEAndReUseTableScan(analysis, new HashMap<>());
+        }
+
         return createOutputPlan(planStatementWithoutOutput(analysis, statement), analysis);
     }
 
@@ -420,13 +468,18 @@ public class LogicalPlanner
     {
         QualifiedObjectName destination = analysis.getCreateTableDestination().get();
 
+        Map<String, Object> properties = getCreateTableMetaDataProperties(destination, analysis.getCreateTableProperties(),
+                analysis.getParameters());
+
+        /* This check specially handled here to conserve table metadata call */
+        checkCasesForDisableCTEAndReUseTableScan(analysis, properties);
+
         RelationPlan plan = createRelationPlan(analysis, query);
 
         ConnectorTableMetadata tableMetadata = createTableMetadata(
                 destination,
                 getOutputTableColumns(plan, analysis.getColumnAliases()),
-                analysis.getCreateTableProperties(),
-                analysis.getParameters(),
+                properties,
                 analysis.getCreateTableComment());
         analysis.setCreateTableMetadata(tableMetadata);
         Optional<NewTableLayout> newTableLayout = metadata.getNewTableLayout(session, destination.getCatalogName(), tableMetadata);
@@ -959,7 +1012,12 @@ public class LogicalPlanner
                 .process(node, null);
     }
 
-    private ConnectorTableMetadata createTableMetadata(QualifiedObjectName table, List<ColumnMetadata> columns, Map<String, Expression> propertyExpressions, List<Expression> parameters, Optional<String> comment)
+    private ConnectorTableMetadata createTableMetadata(QualifiedObjectName table, List<ColumnMetadata> columns, Map<String, Object> properties, Optional<String> comment)
+    {
+        return new ConnectorTableMetadata(toSchemaTableName(table), columns, properties, comment);
+    }
+
+    private Map<String, Object> getCreateTableMetaDataProperties(QualifiedObjectName table, Map<String, Expression> propertyExpressions, List<Expression> parameters)
     {
         CatalogName catalogName = metadata.getCatalogHandle(session, table.getCatalogName())
                 .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + table.getCatalogName()));
@@ -971,8 +1029,7 @@ public class LogicalPlanner
                 session,
                 metadata,
                 parameters);
-
-        return new ConnectorTableMetadata(toSchemaTableName(table), columns, properties, comment);
+        return properties;
     }
 
     private static List<ColumnMetadata> getOutputTableColumns(RelationPlan plan, Optional<List<Identifier>> columnAliases)
@@ -1001,5 +1058,99 @@ public class LogicalPlanner
             resultMap.put(lambdaArgumentDeclaration, planSymbolAllocator.newSymbol(lambdaArgumentDeclaration.getNode(), entry.getValue()));
         }
         return resultMap;
+    }
+
+    private void disableCTEAndReuseTableScan(Session session)
+    {
+        if (isCTEReuseEnabled(session)) {
+            String reasonsMessage = "CTE Reuse feature is disabled: CTE Reuse feature is supported only when Task Retry or Snapshot or Recovery feature is disabled";
+            session.disableCTEReuse();
+            warningCollector.add(new PrestoWarning(StandardWarningCode.CTE_REUSE_NOT_SUPPORTED, reasonsMessage));
+        }
+
+        if (SystemSessionProperties.isReuseTableScanEnabled(session)) {
+            String reasonsMessage = "Reuse Table Scan feature is disabled: Reuse Table Scan feature is supported only when Task Retry or Snapshot or Recovery feature is disabled";
+            session.disableReuseTableScan();
+            warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
+        }
+    }
+
+    // Check if snapshot feature conflict with other aspects of the query.
+    // If any requirement is not met, then proceed as if snapshot was not enabled
+    private void checkRecoverySupport(Session session, Analysis analysis, Map<String, Object> properties)
+    {
+        List<String> reasons = new ArrayList<>();
+        // Only support create-table-as-select and insert statements
+        Statement statement = analysis.getStatement();
+        if (statement instanceof CreateTableAsSelect) {
+            if (analysis.isCreateTableAsSelectNoOp()) {
+                // Table already exists. Ask catalog if target table supports snapshot
+                if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getCreateTableAsSelectNoOpTarget())) {
+                    reasons.add("Only support inserting into tables in Hive with ORC format");
+                }
+            }
+            else {
+                // Ask catalog if new table supports snapshot
+                Map<String, Object> tableProperties = properties;
+                if (!metadata.isSnapshotSupportedAsNewTable(session, analysis.getTarget().get().getCatalogName(), tableProperties)) {
+                    reasons.add("Only support creating tables in Hive with ORC format");
+                }
+            }
+        }
+        else if (statement instanceof Insert) {
+            // Ask catalog if target table supports snapshot
+            if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getInsert().get().getTarget())) {
+                reasons.add("Only support inserting into tables in Hive with ORC format");
+            }
+        }
+        else if (statement instanceof InsertCube) {
+            reasons.add("INSERT INTO CUBE is not supported, only support CTAS (create table as select) and INSERT INTO (tables) statements");
+        }
+        else {
+            reasons.add("Only support CTAS (create table as select) and INSERT INTO (tables) statements");
+        }
+
+        // All input tables must support snapshotting
+        for (TableHandle tableHandle : analysis.getTables()) {
+            if (!metadata.isSnapshotSupportedAsInput(session, tableHandle)) {
+                reasons.add("Only support reading from Hive, TPCDS, and TPCH source tables");
+                break;
+            }
+        }
+
+        // Must have more than 1 worker
+        if (nodeScheduler.createNodeSelector(null, false, null).selectableNodeCount() == 1) {
+            reasons.add("Requires more than 1 worker nodes");
+        }
+
+        if (!snapshotManager.getRecoveryUtils().hasStoreClient()) {
+            String snapshotProfile = snapshotManager.getRecoveryUtils().getSnapshotProfile();
+            if (snapshotProfile == null) {
+                reasons.add("Property hetu.experimental.snapshot.profile is not specified");
+            }
+            else {
+                reasons.add("Specified value '" + snapshotProfile + "' for property hetu.experimental.snapshot.profile is not valid");
+            }
+        }
+
+        if (getRetryPolicy(session) == RetryPolicy.TASK) {
+            reasons.add("Only support when retry policy is none");
+        }
+
+        if (!reasons.isEmpty()) {
+            // Disable snapshot support in the session. If this value has been used before this point,
+            // then we may need to remedy those places to disable snapshot as well. Fortunately,
+            // most accesses occur before this point, except for classes like ExecutingStatementResource,
+            // where the "snapshot enabled" info is retrieved and set in ExchangeClient. This is harmless.
+            // The ExchangeClient may still have recoveryEnabled=true while it's disabled in the session.
+            // This does not alter ExchangeClient's behavior, because this instance (in coordinator)
+            // will never receive any marker.
+            session.disableSnapshot();
+            String reasonsMessage = "Recovery feature is disabled: \n" + String.join(". \n", reasons);
+            warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, reasonsMessage));
+        }
+        else {
+            disableCTEAndReuseTableScan(session);
+        }
     }
 }

@@ -129,6 +129,7 @@ import io.prestosql.server.ServerConfig;
 import io.prestosql.server.SessionPropertyDefaults;
 import io.prestosql.server.security.PasswordAuthenticatorManager;
 import io.prestosql.snapshot.RecoveryConfig;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PageIndexerFactory;
 import io.prestosql.spi.PageSorter;
 import io.prestosql.spi.Plugin;
@@ -306,6 +307,10 @@ public class LocalQueryRunner
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
+    private final RecoveryUtils recoveryUtils;
+
+    private final NodeScheduler nodeScheduler;
+
     public LocalQueryRunner(Session defaultSession)
     {
         this(defaultSession, new FeaturesConfig(), new NodeSpillConfig(), false, false);
@@ -340,7 +345,7 @@ public class LocalQueryRunner
         this.pageSorter = new PagesIndexPageSorter(new PagesIndex.TestingFactory(false));
         this.indexManager = new IndexManager();
         this.nodeSchedulerConfig = new NodeSchedulerConfig().setIncludeCoordinator(true);
-        NodeScheduler nodeScheduler = new NodeScheduler(
+        NodeScheduler currentNodeScheduler = new NodeScheduler(
                 new LegacyNetworkTopology(),
                 nodeManager,
                 nodeSchedulerConfig,
@@ -353,7 +358,7 @@ public class LocalQueryRunner
                 yieldExecutor,
                 catalogManager,
                 notificationExecutor);
-        this.nodePartitioningManager = new NodePartitioningManager(nodeScheduler);
+        this.nodePartitioningManager = new NodePartitioningManager(currentNodeScheduler);
         this.planOptimizerManager = new ConnectorPlanOptimizerManager();
 
         this.metadata = new MetadataManager(
@@ -529,6 +534,9 @@ public class LocalQueryRunner
         this.singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(metadata, spillerStats, featuresConfig, nodeSpillConfig, fileSystemClientManager);
         this.partitioningSpillerFactory = new GenericPartitioningSpillerFactory(this.singleStreamSpillerFactory);
         this.spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
+
+        this.recoveryUtils = new RecoveryUtils(fileSystemClientManager, new RecoveryConfig(), nodeManager);
+        this.nodeScheduler = currentNodeScheduler;
     }
 
     public static LocalQueryRunner queryRunnerWithInitialTransaction(Session defaultSession)
@@ -994,10 +1002,12 @@ public class LocalQueryRunner
                 costCalculator,
                 dataDefinitionTask,
                 heuristicIndexerManager,
-                cubeManager);
+                cubeManager,
+                recoveryUtils,
+                nodeScheduler);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), preparedQuery.getParameters(), warningCollector, heuristicIndexerManager, cubeManager);
 
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, new PlanSanityChecker(true), idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER, null, null);
 
         Analysis analysis = analyzer.analyze(preparedQuery.getStatement());
         return logicalPlanner.plan(analysis, false, stage);

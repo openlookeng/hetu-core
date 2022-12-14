@@ -23,12 +23,20 @@ import io.prestosql.cost.CostCalculatorWithEstimatedExchanges;
 import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.TaskCountEstimator;
 import io.prestosql.cube.CubeManager;
+import io.prestosql.execution.NodeTaskMap;
 import io.prestosql.execution.QueryManagerConfig;
 import io.prestosql.execution.TaskManagerConfig;
+import io.prestosql.execution.scheduler.LegacyNetworkTopology;
+import io.prestosql.execution.scheduler.NodeScheduler;
+import io.prestosql.execution.scheduler.NodeSchedulerConfig;
 import io.prestosql.execution.warnings.WarningCollector;
+import io.prestosql.filesystem.FileSystemClientManager;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
+import io.prestosql.metadata.InMemoryNodeManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.metastore.HetuMetaStoreManager;
+import io.prestosql.snapshot.RecoveryConfig;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.security.AccessDeniedException;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -43,6 +51,7 @@ import io.prestosql.sql.tree.ExplainType;
 import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
 import io.prestosql.testing.TestingAccessControlManager.TestingPrivilege;
+import io.prestosql.util.FinalizerService;
 import org.intellij.lang.annotations.Language;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -75,6 +84,7 @@ public abstract class AbstractTestQueryFramework
     private QueryRunner queryRunner;
     private H2QueryRunner h2QueryRunner;
     private SqlParser sqlParser;
+    private FinalizerService finalizerService;
 
     protected AbstractTestQueryFramework(QueryRunnerSupplier supplier)
     {
@@ -88,6 +98,8 @@ public abstract class AbstractTestQueryFramework
         queryRunner = queryRunnerSupplier.get();
         h2QueryRunner = new H2QueryRunner();
         sqlParser = new SqlParser();
+        finalizerService = new FinalizerService();
+        finalizerService.start();
     }
 
     @AfterClass(alwaysRun = true)
@@ -395,7 +407,13 @@ public abstract class AbstractTestQueryFramework
                 costCalculator,
                 ImmutableMap.of(),
                 new HeuristicIndexerManager(null, null),
-                new CubeManager(featuresConfig, hetuMetaStoreManager));
+                new CubeManager(featuresConfig, hetuMetaStoreManager),
+                new RecoveryUtils(new FileSystemClientManager(), new RecoveryConfig(), new InMemoryNodeManager()),
+                new NodeScheduler(
+                        new LegacyNetworkTopology(),
+                        new InMemoryNodeManager(),
+                        new NodeSchedulerConfig().setIncludeCoordinator(true),
+                        new NodeTaskMap(finalizerService)));
     }
 
     protected static void skipTestUnless(boolean requirement)
