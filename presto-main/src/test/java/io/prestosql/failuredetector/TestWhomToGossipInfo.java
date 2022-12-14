@@ -35,9 +35,7 @@ import org.testng.annotations.Test;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.List;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.airlift.discovery.client.DiscoveryBinder.discoveryBinder;
@@ -74,12 +72,9 @@ public class TestWhomToGossipInfo
             String infoString = info.toString();
             assertEquals(infoString, "WhomToGossipInfo{uri=http://192.18.18.225:8080,http://192.18.18.125:8080,http://192.0.0.1:8080}");
 
-            List<URI> uris = new ArrayList<>();
-            uris.add(new URI("https://192.10.10.10:9090"));
-            uris.add(new URI("https://192.10.11.10:9090"));
-            uris.add(new URI("https://192.10.12.10:9090"));
-
-            WhomToGossipInfo newInfo = new WhomToGossipInfo(uris);
+            WhomToGossipInfo newInfo = new WhomToGossipInfo(new URI("https://192.10.10.10:9090"));
+            newInfo.add(new URI("https://192.10.11.10:9090"));
+            newInfo.add(new URI("https://192.10.12.10:9090"));
             assertEquals(newInfo.toString(), "WhomToGossipInfo{uri=https://192.10.10.10:9090,https://192.10.11.10:9090,https://192.10.12.10:9090}");
             json = codec.toJson(newInfo);
             assertEquals(json, "{\"uri\":\"https://192.10.10.10:9090,https://192.10.11.10:9090,https://192.10.12.10:9090\"}");

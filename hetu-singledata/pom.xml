@@ -16,14 +16,14 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <dep.shardingsphere.version>5.2.0</dep.shardingsphere.version>
         <dep.curator.version>5.1.0</dep.curator.version>
-        <dep.zookeeper.verison>3.6.0</dep.zookeeper.verison>
+        <dep.zookeeper.verison>3.6.3</dep.zookeeper.verison>
         <dep.calcite.version>1.27.0</dep.calcite.version>
         <dep.antlr4.version>4.9.2</dep.antlr4.version>
         <dep.zaxxer.version>3.4.2</dep.zaxxer.version>
         <dep.testng.version>6.10</dep.testng.version>
         <dep.findbugs.version>3.0.2</dep.findbugs.version>
         <dep.caffeine.version>2.9.2</dep.caffeine.version>
-        <dep.slf4j.version>1.7.29</dep.slf4j.version>
+        <dep.slf4j.version>1.7.36</dep.slf4j.version>
         <dep.h2.version>2.1.214</dep.h2.version>
     </properties>
 
@@ -388,6 +388,10 @@
             <exclusions>
                 <exclusion>
                     <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-epoll</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
                     <artifactId>netty-common</artifactId>
                 </exclusion>
                 <exclusion>
@@ -549,6 +553,10 @@
             <artifactId>shardingsphere-infra-executor</artifactId>
             <version>${dep.shardingsphere.version}</version>
             <exclusions>
+                <exclusion>
+                    <groupId>io.vertx</groupId>
+                    <artifactId>vertx-mysql-client</artifactId>
+                </exclusion>
                 <exclusion>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
