@@ -66,7 +66,6 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.PrestoWarning;
 import io.prestosql.spi.QueryId;
 import io.prestosql.spi.connector.CatalogName;
-import io.prestosql.spi.connector.StandardWarningCode;
 import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
@@ -104,10 +103,7 @@ import io.prestosql.sql.planner.plan.TableFinishNode;
 import io.prestosql.sql.planner.plan.TableWriterNode;
 import io.prestosql.sql.tree.CreateTableAsSelect;
 import io.prestosql.sql.tree.Explain;
-import io.prestosql.sql.tree.Insert;
-import io.prestosql.sql.tree.InsertCube;
 import io.prestosql.sql.tree.Query;
-import io.prestosql.sql.tree.Statement;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.utils.HetuConfig;
 import org.joda.time.DateTime;
@@ -137,7 +133,6 @@ import static io.airlift.units.DataSize.Unit.BYTE;
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.SystemSessionProperties.isCTEResultCacheEnabled;
-import static io.prestosql.SystemSessionProperties.isCTEReuseEnabled;
 import static io.prestosql.SystemSessionProperties.isCrossRegionDynamicFilterEnabled;
 import static io.prestosql.SystemSessionProperties.isEnableDynamicFiltering;
 import static io.prestosql.SystemSessionProperties.isQueryResourceTrackingEnabled;
@@ -820,13 +815,6 @@ public class SqlQueryExecution
 
         boolean explainAnalyze = analysis.getStatement() instanceof Explain && ((Explain) analysis.getStatement()).isAnalyze();
 
-        if (SystemSessionProperties.isRecoveryEnabled(getSession())) {
-            checkRecoverySupport(getSession());
-        }
-        if (SystemSessionProperties.getRetryPolicy(getSession()) == RetryPolicy.TASK) {
-            checkTaskRetrySupport(getSession());
-        }
-
         return new PlanRoot(fragmentedPlan, !explainAnalyze, extractConnectors(analysis));
     }
 
@@ -843,23 +831,8 @@ public class SqlQueryExecution
             WarningCollector warningCollector,
             CachedDataStorageProvider cachedData)
     {
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, typeAnalyzer, statsCalculator, costCalculator, warningCollector, cachedData, snapshotManager, nodeScheduler);
         return logicalPlanner.plan(analysis, !isQueryResourceTrackingEnabled(session));
-    }
-
-    private void checkTaskRetrySupport(Session session)
-    {
-        if (isCTEReuseEnabled(session)) {
-            String reasonsMessage = "CTE Reuse feature is disabled: CTE Reuse feature is supported only when Task Retry feature is disabled";
-            session.disableCTEReuse();
-            warningCollector.add(new PrestoWarning(StandardWarningCode.CTE_REUSE_NOT_SUPPORTED, reasonsMessage));
-        }
-
-        if (SystemSessionProperties.isReuseTableScanEnabled(session)) {
-            String reasonsMessage = "Reuse Table Scan feature is disabled: Reuse Table Scan feature is supported only when Task Retry feature is disabled";
-            session.disableReuseTableScan();
-            warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
-        }
     }
 
     private void disableCteResultCache(Session session)
@@ -886,95 +859,6 @@ public class SqlQueryExecution
             session.disableCteResultCache();
             String reasonsMessage = String.join(". \n", reasons);
             warningCollector.add(new PrestoWarning(CTE_RESULT_CACHE_NOT_SUPPORTED, reasonsMessage));
-        }
-    }
-
-    // Check if snapshot feature conflict with other aspects of the query.
-    // If any requirement is not met, then proceed as if snapshot was not enabled
-    private void checkRecoverySupport(Session session)
-    {
-        List<String> reasons = new ArrayList<>();
-        // Only support create-table-as-select and insert statements
-        Statement statement = analysis.getStatement();
-        if (statement instanceof CreateTableAsSelect) {
-            if (analysis.isCreateTableAsSelectNoOp()) {
-                // Table already exists. Ask catalog if target table supports snapshot
-                if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getCreateTableAsSelectNoOpTarget())) {
-                    reasons.add("Only support inserting into tables in Hive with ORC format");
-                }
-            }
-            else {
-                // Ask catalog if new table supports snapshot
-                Map<String, Object> tableProperties = analysis.getCreateTableMetadata().getProperties();
-                if (!metadata.isSnapshotSupportedAsNewTable(session, analysis.getTarget().get().getCatalogName(), tableProperties)) {
-                    reasons.add("Only support creating tables in Hive with ORC format");
-                }
-            }
-        }
-        else if (statement instanceof Insert) {
-            // Ask catalog if target table supports snapshot
-            if (!metadata.isSnapshotSupportedAsOutput(session, analysis.getInsert().get().getTarget())) {
-                reasons.add("Only support inserting into tables in Hive with ORC format");
-            }
-        }
-        else if (statement instanceof InsertCube) {
-            reasons.add("INSERT INTO CUBE is not supported, only support CTAS (create table as select) and INSERT INTO (tables) statements");
-        }
-        else {
-            reasons.add("Only support CTAS (create table as select) and INSERT INTO (tables) statements");
-        }
-
-        // Doesn't work with the following features
-        if (SystemSessionProperties.isReuseTableScanEnabled(session)) {
-            String reasonsMessage = "Reuse Table Scan Feature is Disabled: It is supported only when Snapshot or Recovery feature is disabled";
-            warningCollector.add(new PrestoWarning(StandardWarningCode.REUSE_TABLE_SCAN_NOT_SUPPORTED, reasonsMessage));
-            session.disableReuseTableScan();
-        }
-
-        if (SystemSessionProperties.isCTEReuseEnabled(session)) {
-            String reasonsMessage = "CTE Reuse Feature is Disabled: It is support only when Snapshot or Recovery feature is disabled";
-            warningCollector.add(new PrestoWarning(StandardWarningCode.CTE_REUSE_NOT_SUPPORTED, reasonsMessage));
-            session.disableCTEReuse();
-        }
-
-        // All input tables must support snapshotting
-        for (TableHandle tableHandle : analysis.getTables()) {
-            if (!metadata.isSnapshotSupportedAsInput(session, tableHandle)) {
-                reasons.add("Only support reading from Hive, TPCDS, and TPCH source tables");
-                break;
-            }
-        }
-
-        // Must have more than 1 worker
-        if (nodeScheduler.createNodeSelector(null, false, null).selectableNodeCount() == 1) {
-            reasons.add("Requires more than 1 worker nodes");
-        }
-
-        if (!snapshotManager.getRecoveryUtils().hasStoreClient()) {
-            String snapshotProfile = snapshotManager.getRecoveryUtils().getSnapshotProfile();
-            if (snapshotProfile == null) {
-                reasons.add("Property hetu.experimental.snapshot.profile is not specified");
-            }
-            else {
-                reasons.add("Specified value '" + snapshotProfile + "' for property hetu.experimental.snapshot.profile is not valid");
-            }
-        }
-
-        if (getRetryPolicy(session) == RetryPolicy.TASK) {
-            reasons.add("Only support when retry policy is none");
-        }
-
-        if (!reasons.isEmpty()) {
-            // Disable snapshot support in the session. If this value has been used before this point,
-            // then we may need to remedy those places to disable snapshot as well. Fortunately,
-            // most accesses occur before this point, except for classes like ExecutingStatementResource,
-            // where the "snapshot enabled" info is retrieved and set in ExchangeClient. This is harmless.
-            // The ExchangeClient may still have recoveryEnabled=true while it's disabled in the session.
-            // This does not alter ExchangeClient's behavior, because this instance (in coordinator)
-            // will never receive any marker.
-            session.disableSnapshot();
-            String reasonsMessage = "Recovery feature is disabled: \n" + String.join(". \n", reasons);
-            warningCollector.add(new PrestoWarning(StandardWarningCode.SNAPSHOT_NOT_SUPPORTED, reasonsMessage));
         }
     }
 
@@ -1520,5 +1404,20 @@ public class SqlQueryExecution
                     this.dataCache,
                     isMultiCoordinatorEnabled);
         }
+    }
+
+    public QuerySnapshotManager getSnapshotManager()
+    {
+        return snapshotManager;
+    }
+
+    public NodeScheduler getNodeScheduler()
+    {
+        return nodeScheduler;
+    }
+
+    public boolean isMultiCoordinatorEnabled()
+    {
+        return isMultiCoordinatorEnabled;
     }
 }

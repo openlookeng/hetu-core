@@ -20,10 +20,12 @@ import io.prestosql.cost.CostCalculator;
 import io.prestosql.cost.StatsCalculator;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.execution.DataDefinitionTask;
+import io.prestosql.execution.scheduler.NodeScheduler;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.heuristicindex.HeuristicIndexerManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
+import io.prestosql.snapshot.RecoveryUtils;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.sql.parser.SqlParser;
@@ -62,6 +64,8 @@ public class QueryExplainer
     private final Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask;
     private final HeuristicIndexerManager heuristicIndexerManager;
     private final CubeManager cubeManager;
+    private final RecoveryUtils recoveryUtils;
+    private final NodeScheduler nodeScheduler;
 
     @Inject
     public QueryExplainer(
@@ -74,7 +78,9 @@ public class QueryExplainer
             CostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask,
             HeuristicIndexerManager heuristicIndexerManager,
-            CubeManager cubeManager)
+            CubeManager cubeManager,
+            RecoveryUtils recoveryUtils,
+            NodeScheduler nodeScheduler)
     {
         this(
                 planOptimizers.get(),
@@ -86,7 +92,7 @@ public class QueryExplainer
                 costCalculator,
                 dataDefinitionTask,
                 heuristicIndexerManager,
-                cubeManager);
+                cubeManager, recoveryUtils, nodeScheduler);
     }
 
     public QueryExplainer(
@@ -99,7 +105,9 @@ public class QueryExplainer
             CostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask,
             HeuristicIndexerManager heuristicIndexerManager,
-            CubeManager cubeManager)
+            CubeManager cubeManager,
+            RecoveryUtils recoveryUtils,
+            NodeScheduler nodeScheduler)
     {
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
         this.planFragmenter = requireNonNull(planFragmenter, "planFragmenter is null");
@@ -111,6 +119,8 @@ public class QueryExplainer
         this.dataDefinitionTask = ImmutableMap.copyOf(requireNonNull(dataDefinitionTask, "dataDefinitionTask is null"));
         this.heuristicIndexerManager = requireNonNull(heuristicIndexerManager, "heuristicIndexerManager is null");
         this.cubeManager = requireNonNull(cubeManager, "cubeManager is null");
+        this.recoveryUtils = recoveryUtils;
+        this.nodeScheduler = nodeScheduler;
     }
 
     public Analysis analyze(Session session, Statement statement, List<Expression> parameters, WarningCollector warningCollector)
@@ -188,7 +198,7 @@ public class QueryExplainer
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
 
         // plan statement
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, new TypeAnalyzer(sqlParser, metadata), statsCalculator, costCalculator, warningCollector, CachedDataStorageProvider.NULL_PROVIDER, recoveryUtils.getOrCreateQuerySnapshotManager(session.getQueryId(), session), nodeScheduler);
         return logicalPlanner.plan(analysis, false);
     }
 
