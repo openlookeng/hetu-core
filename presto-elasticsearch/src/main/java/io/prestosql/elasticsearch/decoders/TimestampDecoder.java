@@ -17,7 +17,9 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.function.Supplier;
@@ -53,6 +55,22 @@ public class TimestampDecoder
                             .atOffset(ZoneOffset.UTC)
                             .toInstant()
                             .toEpochMilli());
+        }
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        Object value = getter.get();
+        if (value == null) {
+            output.appendNull();
+        }
+        else if (value instanceof Number) {
+            Instant instant = Instant.ofEpochMilli(((Number) value).longValue());
+            TIMESTAMP.writeLong(output, instant.atZone(ZoneOffset.UTC).toInstant().toEpochMilli());
+        }
+        else {
+            throw new PrestoException(TYPE_MISMATCH, format("Expected a numeric value for field '%s' of type TIMESTAMP: %s [%s]", path, value, value.getClass().getSimpleName()));
         }
     }
 }

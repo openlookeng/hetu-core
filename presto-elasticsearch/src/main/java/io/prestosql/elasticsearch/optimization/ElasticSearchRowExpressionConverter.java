@@ -13,6 +13,7 @@
  */
 package io.prestosql.elasticsearch.optimization;
 
+import com.google.common.net.InetAddresses;
 import com.google.inject.Inject;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.function.FunctionHandle;
@@ -40,6 +41,8 @@ import io.prestosql.spi.type.TinyintType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -48,6 +51,7 @@ import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.prestosql.spi.type.StandardTypes.IPADDRESS;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.time.ZoneOffset.UTC;
@@ -215,6 +219,14 @@ public class ElasticSearchRowExpressionConverter
             return "\"" + ((Slice) literal.getValue()).toStringUtf8() + "\"";
         }
 
+        if (type.getTypeSignature().getBase().equals(IPADDRESS)) {
+            try {
+                return "\"" + InetAddresses.toAddrString(InetAddress.getByAddress(((Slice) literal.getValue()).getBytes())) + "\"";
+            }
+            catch (UnknownHostException e) {
+                return handleUnsupportedOptimize(context);
+            }
+        }
         if (type instanceof TimestampType) {
             DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
             Long time = (Long) literal.getValue();

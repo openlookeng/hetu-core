@@ -16,6 +16,7 @@ package io.prestosql.elasticsearch.decoders;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.function.Supplier;
 
@@ -37,12 +38,28 @@ public class BooleanDecoder
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
     {
+        decode(getter, output);
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        decode(getter, output);
+    }
+
+    private void decode(Supplier<Object> getter, BlockBuilder output)
+    {
         Object value = getter.get();
         if (value == null) {
             output.appendNull();
         }
         else if (value instanceof Boolean) {
             BOOLEAN.writeBoolean(output, (Boolean) value);
+        }
+        else if (value instanceof Long) {
+            Long longValue = (Long) value;
+            // since elastic search internally stores boolean values as 1 for true and zero for false for aggregations
+            BOOLEAN.writeBoolean(output, longValue == 1);
         }
         else {
             throw new PrestoException(TYPE_MISMATCH, format("Expected a boolean value for field %s of type BOOLEAN: %s [%s]", path, value, value.getClass().getSimpleName()));
