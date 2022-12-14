@@ -53,7 +53,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
 import static io.prestosql.SystemSessionProperties.ENABLE_CTE_RESULT_CACHE;
 import static io.prestosql.SystemSessionProperties.RECOVERY_ENABLED;
-import static io.prestosql.SystemSessionProperties.RETRY_POLICY;
 import static io.prestosql.SystemSessionProperties.REUSE_TABLE_SCAN;
 import static io.prestosql.SystemSessionProperties.SNAPSHOT_ENABLED;
 import static io.prestosql.SystemSessionProperties.TIME_ZONE_ID;
@@ -147,16 +146,7 @@ public final class Session
         this.resourceEstimates = requireNonNull(resourceEstimates, "resourceEstimates is null");
         this.startTime = startTime;
         requireNonNull(systemProperties, "systemProperties is null");
-        if (Boolean.parseBoolean(systemProperties.get(RECOVERY_ENABLED))
-                || Boolean.parseBoolean(systemProperties.get(SNAPSHOT_ENABLED))
-                || "TASK".equalsIgnoreCase(systemProperties.get(RETRY_POLICY))
-                || Boolean.parseBoolean(systemProperties.get(ENABLE_CTE_RESULT_CACHE))) {
-            // Snapshot: it's possible to disable snapshot at a later point, so systemProperties can't be immutable
-            this.systemProperties = new HashMap<>(systemProperties);
-        }
-        else {
-            this.systemProperties = ImmutableMap.copyOf(systemProperties);
-        }
+        this.systemProperties = new HashMap<>(systemProperties);
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.preparedStatements = requireNonNull(preparedStatements, "preparedStatements is null");
         this.pageMetadataEnabled = pageMetadataEnabled;
