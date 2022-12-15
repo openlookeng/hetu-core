@@ -55,7 +55,25 @@ elasticsearch.pushdown.enabled=true
 #true indicates that pushdown is enabled, and false indicates that pushdown is disabled.
 ```
 NOTE: Currently pushdown is only supported as part of where clause partially such as EQUAL, AND, OR, Arithmetic operators, BETWEEN, IN 
-and in the case of aggregations such as GROUP BY , SUM, COUNT functions. 
+and in the case of aggregations such as GROUP BY , SUM, COUNT functions.
+
+Support matrix for pushdown for different datatypes is as follows:
+
+| Elasticsearch  | openLooKeng | Aggregation Pushdown Supported | Predicate Pushdown Supported |
+|:---------------|:------------|:-------------------------------|:-----------------------------|
+| `binary`       | VARBINARY   | No                             | No                           |
+| `boolean`      | BOOLEAN     | Yes                            | Yes                          |
+| `double`       | DOUBLE      | Yes                            | Yes                          |
+| `float`        | REAL        | Yes                            | Yes                          |
+| `byte`         | TINYINT     | Yes                            | Yes                          |
+| `short`        | SMALLINT    | Yes                            | Yes                          |
+| `integer`      | INTEGER     | Yes                            | Yes                          |
+| `long`         | BIGINT      | Yes                            | Yes                          |
+| `keyword`      | VARCHAR     | Yes                            | Yes                          |
+| `text`         | VARCHAR     | Yes                            | Yes                          |
+| `date`         | TIMESTAMP   | Yes                            | Yes                          |
+| `ip`           | IPADDRESS   | Yes                            | Yes                          |
+| `(all others)` |             | No                             | No                           |
 
 ### `elasticsearch.scroll-size`
 
