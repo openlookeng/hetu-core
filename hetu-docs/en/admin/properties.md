@@ -741,6 +741,84 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > **Note:** This is supported only for Hive connector.
 
+### `optimizer.transform-self-join-to-window`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> Enable optimization to remove self join with window function using lead/lag methods.
+
+### `optimizer.transform-self-join-aggregates-to-window`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> Enable optimization to remove self joins with aggregations with window function using lead/lag methods.
+
+### `optimizer.join-partitioned-build-min-row-count`
+
+> -   **Type:** `long`
+> -   **Default value:** `1,000,000`
+>
+> Use gathering exchange for exchanges with less than the specified rows produced, else replace with partitioning exchange.
+
+### `optimizer.use-exact-partitioning`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects.
+
+### `enable-cte-result-cache`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `false`
+>
+> Enable CTE materialization cache feature.
+
+### `cte-result-cache-threshold-size`
+
+> -   **Type:** `Data Size`
+> -   **Default value:** `128MB`
+>
+> Maximum allowed size to be stored as part of cte materialization cache per CTE per query.
+
+### `adaptive-partial-aggregation.enabled`
+
+> -   **Type:** `boolean`
+> -   **Default value:** `true`
+>
+> Enable adaptive partial aggregation feature.
+
+### `adaptive-partial-aggregation.min-rows`
+
+> -   **Type:** `long`
+> -   **Default value:** `100,000`
+>
+> Minimum number of processed rows before partial aggregation might be adaptively turned off.
+
+### `adaptive-partial-aggregation.unique-rows-ratio-threshold`
+
+> -   **Type:** `double`
+> -   **Default value:** `0.8`
+>
+> Ratio between aggregation output and input rows above which partial aggregation might be adaptively turned off.
+
+### `optimizer.join-multi-clause-independence-factor`
+
+> -   **Type:** `double`
+> -   **Default value:** `0.25`
+>
+> Scales the strength of independence assumption for selectivity estimates of multi-clause joins.
+
+### `optimizer.filter-conjunction-independence-factor`
+
+> -   **Type:** `double`
+> -   **Default value:** `0.75`
+>
+> Scales the strength of independence assumption for selectivity estimates of the conjunction of multiple filters.
+
+
 ## Regular Expression Function Properties
 
 The following properties allow tuning the [regexp](../functions/regexp.md).
@@ -867,6 +945,34 @@ of constructing another execution plan, thus reducing the amount of query pre-pr
 >
 > Time in milliseconds to expire cached execution plans after the last access
 
+### `hetu.execution.data-cache.enabled`
+>
+> - **Type:** `boolean`
+> - **Default value:** `false`
+>
+> Enable caching materialization of _Common Table Execution_(**CTE**) thereby, by-passing frequently executed sub-plans.
+
+### `hetu.execution.data-cache.max-size`
+>
+> - **Type:** `long`
+> - **Default value:** `2147483648`
+>
+> Maximum size of the total data stored in CTE materialization storage cache.  
+
+### `hetu.execution.data-cache.schema-name`
+>
+> - **Type:** `string`
+> - **Default value:** `cache`
+>
+> Schema which shall include the materialized cache tables.
+
+### `hetu.execution.data-cache.connector-name`
+>
+> - **Type:** `string`
+> - **Default value:** `hive`
+>
+> Catalog name which shall include the materialized cache tables.
+
 ## SplitCacheMap Properties
 
 SplitCacheMap must be enabled to support caching row data. When enabled, the coordinator stores table, partition and split scheduling metadata that
@@ -966,6 +1072,17 @@ helps with cache affinity scheduling.
 >
 > Note:
 > For snapshot recovery `query.remote-task.max-error-duration` should be greater than `exchange.max-error-duration`.
+
+### `query.execution-policy`
+> -   **Type:** `string`
+> -   **Default value:** `all-at-once`
+>
+> Specifies the execution policy enforced by the scheduler. One of following set of execution policies can be configured: -
+> 1. _**all-at-once**_: This policy makes available all stages for scheduler to process and start.
+> 2. _**phased**_: This policy follows the stage dependency based on the producer source, and schedule all independent stages together.
+> 3. _**prioritize-utilization**_: This policy follows the stage dependency in addition to producer source, it also looks at dynamic filters producers for dependent paths.
+>
+
 
 ## Query Recovery
 
