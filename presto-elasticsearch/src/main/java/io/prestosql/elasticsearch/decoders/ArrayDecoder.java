@@ -15,6 +15,7 @@ package io.prestosql.elasticsearch.decoders;
 
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -45,6 +46,26 @@ public class ArrayDecoder
         else {
             BlockBuilder array = output.beginBlockEntry();
             elementDecoder.decode(hit, () -> data, array);
+            output.closeEntry();
+        }
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        Object data = getter.get();
+
+        if (data == null) {
+            output.appendNull();
+        }
+        else if (data instanceof List) {
+            BlockBuilder array = output.beginBlockEntry();
+            ((List<?>) data).forEach(element -> elementDecoder.decode(aggregations, () -> element, array));
+            output.closeEntry();
+        }
+        else {
+            BlockBuilder array = output.beginBlockEntry();
+            elementDecoder.decode(aggregations, () -> data, array);
             output.closeEntry();
         }
     }

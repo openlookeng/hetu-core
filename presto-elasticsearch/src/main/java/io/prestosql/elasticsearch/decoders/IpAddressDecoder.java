@@ -20,6 +20,7 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.Type;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.function.Supplier;
 
@@ -45,6 +46,11 @@ public class IpAddressDecoder
 
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
+    {
+        decode(getter, output);
+    }
+
+    private void decode(Supplier<Object> getter, BlockBuilder output)
     {
         Object value = getter.get();
         if (value == null) {
@@ -86,5 +92,11 @@ public class IpAddressDecoder
         }
 
         return wrappedBuffer(bytes);
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        decode(getter, output);
     }
 }

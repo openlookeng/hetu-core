@@ -17,6 +17,7 @@ import io.airlift.slice.Slices;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.block.BlockBuilder;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.Base64;
 import java.util.function.Supplier;
@@ -39,6 +40,11 @@ public class VarbinaryDecoder
     @Override
     public void decode(SearchHit hit, Supplier<Object> getter, BlockBuilder output)
     {
+        decode(getter, output);
+    }
+
+    private void decode(Supplier<Object> getter, BlockBuilder output)
+    {
         Object value = getter.get();
         if (value == null) {
             output.appendNull();
@@ -49,5 +55,11 @@ public class VarbinaryDecoder
         else {
             throw new PrestoException(TYPE_MISMATCH, format("Expected a string value for field '%s' of type VARBINARY: %s [%s]", path, value, value.getClass().getSimpleName()));
         }
+    }
+
+    @Override
+    public void decode(Aggregations aggregations, Supplier<Object> getter, BlockBuilder output)
+    {
+        decode(getter, output);
     }
 }
