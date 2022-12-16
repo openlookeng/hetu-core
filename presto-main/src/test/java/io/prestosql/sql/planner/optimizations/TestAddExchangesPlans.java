@@ -23,6 +23,7 @@ import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import io.prestosql.sql.planner.assertions.BasePlanTest;
+import io.prestosql.sql.planner.assertions.PlanMatchPattern;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.testing.LocalQueryRunner;
 import org.testng.annotations.Test;
@@ -30,22 +31,29 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 
 import static io.prestosql.SystemSessionProperties.CTE_REUSE_ENABLED;
+import static io.prestosql.SystemSessionProperties.ENABLE_DYNAMIC_FILTERING;
 import static io.prestosql.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.prestosql.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
 import static io.prestosql.SystemSessionProperties.SPILL_ENABLED;
 import static io.prestosql.SystemSessionProperties.TASK_CONCURRENCY;
+import static io.prestosql.SystemSessionProperties.USE_EXACT_PARTITIONING;
+import static io.prestosql.spi.plan.AggregationNode.Step.SINGLE;
 import static io.prestosql.spi.plan.JoinNode.DistributionType.REPLICATED;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy;
+import static io.prestosql.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.aggregation;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyNot;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anySymbol;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.exchange;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.join;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.node;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.project;
+import static io.prestosql.sql.planner.assertions.PlanMatchPattern.singleGroupingSet;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static io.prestosql.sql.planner.assertions.PlanMatchPattern.values;
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
@@ -192,5 +200,210 @@ public class TestAddExchangesPlans
         return Session.builder(getQueryRunner().getDefaultSession())
                 .setSystemProperty(CTE_REUSE_ENABLED, "true")
                 .build();
+    }
+
+    @Test
+    public void testAggregateIsExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "SELECT\n" +
+                        "    AVG(1)\n" +
+                        "FROM (\n" +
+                        "    SELECT\n" +
+                        "        orderkey,\n" +
+                        "        orderstatus,\n" +
+                        "        COUNT(*)\n" +
+                        "    FROM orders\n" +
+                        "    WHERE\n" +
+                        "        orderdate > CAST('2042-01-01' AS DATE)\n" +
+                        "    GROUP BY\n" +
+                        "        orderkey,\n" +
+                        "        orderstatus\n" +
+                        ")\n" +
+                        "GROUP BY\n" +
+                        "    orderkey",
+                useExactPartitioning(),
+                anyTree(
+                        exchange(REMOTE, REPARTITION,
+                                anyTree(
+                                        exchange(REMOTE, REPARTITION,
+                                                anyTree(
+                                                        tableScan("orders", ImmutableMap.of(
+                                                                "ordertatus", "orderstatus",
+                                                                "orderkey", "orderkey",
+                                                                "orderdate", "orderdate"))))))));
+    }
+
+    private Session useExactPartitioning()
+    {
+        return Session.builder(getQueryRunner().getDefaultSession())
+                .setSystemProperty(JOIN_REORDERING_STRATEGY, ELIMINATE_CROSS_JOINS.name())
+                .setSystemProperty(JOIN_DISTRIBUTION_TYPE, PARTITIONED.name())
+                .setSystemProperty(ENABLE_DYNAMIC_FILTERING, "false")
+                .setSystemProperty(USE_EXACT_PARTITIONING, "true")
+                .build();
+    }
+
+    @Test
+    public void testRowNumberIsExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "SELECT\n" +
+                        "    *\n" +
+                        "FROM (\n" +
+                        "    SELECT\n" +
+                        "        a,\n" +
+                        "        ROW_NUMBER() OVER (\n" +
+                        "            PARTITION BY\n" +
+                        "                a\n" +
+                        "        ) rn\n" +
+                        "    FROM (\n" +
+                        "        VALUES\n" +
+                        "            (1)\n" +
+                        "    ) t (a)\n" +
+                        ") t",
+                useExactPartitioning(),
+                anyTree(
+                        exchange(REMOTE, REPARTITION,
+                                anyTree(
+                                        values("a")))));
+    }
+
+    @Test
+    public void testTopNRowNumberIsExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "SELECT\n" +
+                        "    a,\n" +
+                        "    ROW_NUMBER() OVER (\n" +
+                        "        PARTITION BY\n" +
+                        "            a\n" +
+                        "        ORDER BY\n" +
+                        "            a\n" +
+                        "    ) rn\n" +
+                        "FROM (\n" +
+                        "    SELECT\n" +
+                        "        a,\n" +
+                        "        b,\n" +
+                        "        COUNT(*)\n" +
+                        "    FROM (\n" +
+                        "        VALUES\n" +
+                        "            (1, 2)\n" +
+                        "    ) t (a, b)\n" +
+                        "    GROUP BY\n" +
+                        "        a,\n" +
+                        "        b\n" +
+                        ")\n" +
+                        "LIMIT\n" +
+                        "    2",
+                useExactPartitioning(),
+                anyTree(
+                        exchange(REMOTE, REPARTITION,
+                                anyTree(
+                                        values("a", "b")))));
+    }
+
+    @Test
+    public void testJoinIsExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "SELECT\n" +
+                        "    orders.orderkey,\n" +
+                        "    orders.orderstatus\n" +
+                        "FROM (\n" +
+                        "    SELECT\n" +
+                        "        orderkey,\n" +
+                        "        ARBITRARY(orderstatus) AS orderstatus,\n" +
+                        "        COUNT(*)\n" +
+                        "    FROM orders\n" +
+                        "    GROUP BY\n" +
+                        "        orderkey\n" +
+                        ") t,\n" +
+                        "orders\n" +
+                        "WHERE\n" +
+                        "    orders.orderkey = t.orderkey\n" +
+                        "    AND orders.orderstatus = t.orderstatus",
+                useExactPartitioning(),
+                anyTree(
+                        exchange(REMOTE, REPARTITION,
+                                anyTree(
+                                        aggregation(
+                                                singleGroupingSet("orderkey"),
+                                                ImmutableMap.of(Optional.of("arbitrary"), PlanMatchPattern.functionCall("arbitrary", false, ImmutableList.of(anySymbol()))),
+                                                ImmutableList.of("orderkey"),
+                                                ImmutableMap.of(),
+                                                Optional.empty(),
+                                                SINGLE,
+                                                tableScan("orders", ImmutableMap.of(
+                                                        "orderkey", "orderkey",
+                                                        "orderstatus", "orderstatus"))))),
+                        exchange(LOCAL, GATHER,
+                                exchange(REMOTE, REPARTITION,
+                                        anyTree(
+                                                tableScan("orders", ImmutableMap.of(
+                                                        "orderkey1", "orderkey",
+                                                        "orderstatus3", "orderstatus")))))));
+    }
+
+    @Test
+    public void testMarkDistinctIsExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "    SELECT\n" +
+                        "        orderkey,\n" +
+                        "        orderstatus,\n" +
+                        "        COUNT(DISTINCT orderdate),\n" +
+                        "        COUNT(DISTINCT clerk)\n" +
+                        "    FROM orders\n" +
+                        "    WHERE\n" +
+                        "        orderdate > CAST('2042-01-01' AS DATE)\n" +
+                        "    GROUP BY\n" +
+                        "        orderkey,\n" +
+                        "        orderstatus\n",
+                useExactPartitioning(),
+                anyTree(
+                        exchange(REMOTE, REPARTITION,
+                                anyTree(
+                                        exchange(REMOTE, REPARTITION,
+                                                anyTree(
+                                                        exchange(REMOTE, REPARTITION,
+                                                                anyTree(
+                                                                        tableScan("orders", ImmutableMap.of(
+                                                                                "orderstatus", "orderstatus",
+                                                                                "orderkey", "orderkey",
+                                                                                "clerk", "clerk",
+                                                                                "orderdate", "orderdate"))))))))));
+    }
+
+    // Negative test for use-exact-partitioning
+    @Test
+    public void testJoinNotExactlyPartitioned()
+    {
+        assertDistributedPlan(
+                "SELECT\n" +
+                        "    orders.orderkey,\n" +
+                        "    orders.orderstatus\n" +
+                        "FROM (\n" +
+                        "    SELECT\n" +
+                        "        orderkey,\n" +
+                        "        ARBITRARY(orderstatus) AS orderstatus,\n" +
+                        "        COUNT(*)\n" +
+                        "    FROM orders\n" +
+                        "    GROUP BY\n" +
+                        "        orderkey\n" +
+                        ") t,\n" +
+                        "orders\n" +
+                        "WHERE\n" +
+                        "    orders.orderkey = t.orderkey\n" +
+                        "    AND orders.orderstatus = t.orderstatus",
+                noJoinReordering(),
+                anyTree(
+                        project(
+                                anyTree(
+                                        tableScan("orders"))),
+                        exchange(LOCAL, GATHER,
+                                exchange(REMOTE, REPARTITION,
+                                        anyTree(
+                                                tableScan("orders"))))));
     }
 }
