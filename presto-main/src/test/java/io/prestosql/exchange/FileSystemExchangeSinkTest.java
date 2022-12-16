@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static io.prestosql.testing.assertions.Assert.assertEquals;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -59,6 +60,7 @@ public class FileSystemExchangeSinkTest
         }
         FileSystemExchangeConfig config = new FileSystemExchangeConfig()
                 .setExchangeEncryptionEnabled(false)
+                .setDirectSerializationType(FileSystemExchangeConfig.DirectSerialisationType.OFF)
                 .setBaseDirectories(baseDir);
         FileSystemExchangeStorage exchangeStorage = new HetuFileSystemExchangeStorage();
         exchangeStorage.setFileSystemClient(new HetuLocalFileSystemClient(new LocalConfig(new Properties()), basePath));
@@ -132,5 +134,12 @@ public class FileSystemExchangeSinkTest
         requireNonNull(exchangeSink, "exchangeSink is null");
         exchangeSink.add(0, serializedPageSlice);
         exchangeSink.abort();
+    }
+
+    @Test
+    public void testGetDirectSerialisationType()
+    {
+        requireNonNull(exchangeSink, "exchangeSink is null");
+        assertEquals(exchangeSink.getDirectSerialisationType(), FileSystemExchangeConfig.DirectSerialisationType.OFF);
     }
 }
