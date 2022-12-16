@@ -55,7 +55,7 @@ public class TestFileSystemExchangeSource
     public void setUp()
             throws IOException, InterruptedException
     {
-        String baseDir = "/opt/hetu-server-1.8.0/exchange-base-dir";
+        String baseDir = "/tmp/hetu-server-1.8.0/exchange-base-dir";
         Path basePath = Paths.get(baseDir);
         File base = new File(baseDir);
         if (!base.exists()) {
@@ -80,7 +80,7 @@ public class TestFileSystemExchangeSource
                 config.getBaseDirectories().get(0),
                 10), false);
         exchangeSource = exchangeManager.createSource(ImmutableList.of(new FileSystemExchangeSourceHandle(
-                0, ImmutableList.of(new FileStatus("file:///opt/hetu-server-1.8.0/exchange-base-dir/0_0.data", 104)), Optional.empty(), false)));
+                0, ImmutableList.of(new FileStatus("file:///tmp/hetu-server-1.8.0/exchange-base-dir/0_0.data", 104)), Optional.empty(), false)));
         PagesSerde serde = new TestingPagesSerdeFactory().createPagesSerde();
         BlockBuilder expectedBlockBuilder = VARCHAR.createBlockBuilder(null, 5);
         VARCHAR.writeString(expectedBlockBuilder, "alice");
