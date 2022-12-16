@@ -13,9 +13,12 @@
  */
 package io.prestosql.sql.query;
 
+import io.prestosql.testing.MaterializedResult;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 public class TestUnnest
 {
@@ -97,5 +100,18 @@ public class TestUnnest
                         "   CAST(ARRAY[ROW(1, 'a'), ROW(2, 'b')] as ARRAY(ROW(a int, b varchar)))," +
                         "   CAST(ARRAY[ROW(3, 'c'), ROW(4, 'd')] as ARRAY(ROW(x int, y varchar))))",
                 "VALUES (3), (4)");
+    }
+
+    @Test
+    public void testQueryAssertion()
+    {
+        MaterializedResult materializedResult = assertions.execute("SELECT "
+                + "     x, y " + "FROM " + "     (VALUES "
+                + "         (transform(sequence(1, 600), x -> CAST(ROW(x, 'a') as ROW(x1 integer, x2 varchar)))), "
+                + "         (transform(sequence(1, 400), x -> CAST(NULL as ROW(x1 integer, x2 varchar))))) " + "     AS t(a) "
+                + "     CROSS JOIN UNNEST(a) t(x, y)");
+        assertEquals(materializedResult.getTypes().size(), 2);
+        assertEquals(materializedResult.getTypes().get(0).getDisplayName(), "integer");
+        assertEquals(materializedResult.getTypes().get(1).getDisplayName(), "varchar");
     }
 }
