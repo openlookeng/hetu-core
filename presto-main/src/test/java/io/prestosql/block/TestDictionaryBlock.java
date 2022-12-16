@@ -329,4 +329,12 @@ public class TestDictionaryBlock
             assertEquals(dictionaryBlock.getId(position), expected[position]);
         }
     }
+
+    @Test
+    public void testExpectedUniqueValue()
+    {
+        Slice[] expectedValues = createExpectedUniqueValues(100);
+        DictionaryBlock dictionaryBlock = createDictionaryBlock(expectedValues, 1000);
+        assertEquals(dictionaryBlock.getSizeInBytes(), dictionaryBlock.getDictionary().getSizeInBytes() + (1000 * SIZE_OF_INT));
+    }
 }
