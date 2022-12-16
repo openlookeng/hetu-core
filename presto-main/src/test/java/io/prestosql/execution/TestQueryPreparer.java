@@ -15,6 +15,7 @@ package io.prestosql.execution;
 
 import io.prestosql.Session;
 import io.prestosql.execution.QueryPreparer.PreparedQuery;
+import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.sql.parser.SqlParser;
 import io.prestosql.sql.tree.AllColumns;
 import io.prestosql.sql.tree.QualifiedName;
@@ -80,5 +81,29 @@ public class TestQueryPreparer
                 .build();
         assertSemanticExceptionThrownBy(() -> QUERY_PREPARER.prepareQuery(session, "EXECUTE my_query USING 1"))
                 .hasErrorCode(INVALID_PARAMETER_USAGE);
+    }
+
+    @Test
+    public void testQueryTypeSelectInSession()
+    {
+        QUERY_PREPARER.prepareQuery(TEST_SESSION, "SELECT * FROM foo");
+        QueryType queryType = TEST_SESSION.getQueryType();
+        assertEquals(QueryType.SELECT, queryType);
+    }
+
+    @Test
+    public void testQueryTypeUpdateInSession()
+    {
+        QUERY_PREPARER.prepareQuery(TEST_SESSION, "update foo set name='test'");
+        QueryType queryType = TEST_SESSION.getQueryType();
+        assertEquals(QueryType.UPDATE, queryType);
+    }
+
+    @Test
+    public void testQueryTypeDeleteInSession()
+    {
+        QUERY_PREPARER.prepareQuery(TEST_SESSION, "delete from foo");
+        QueryType queryType = TEST_SESSION.getQueryType();
+        assertEquals(QueryType.DELETE, queryType);
     }
 }
