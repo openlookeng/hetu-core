@@ -19,7 +19,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
-public class CubeUpdateMetadataTest
+public class TestCubeUpdateMetadata
 {
     private CubeUpdateMetadata cubeUpdateMetadataUnderTest;
 
@@ -32,6 +32,9 @@ public class CubeUpdateMetadataTest
     @Test
     public void testToString() throws Exception
     {
-        assertEquals("result", cubeUpdateMetadataUnderTest.toString());
+        assertEquals("cubeName", cubeUpdateMetadataUnderTest.getCubeName());
+        assertEquals(0L, cubeUpdateMetadataUnderTest.getTableLastUpdatedTime());
+        assertEquals("cubeName", cubeUpdateMetadataUnderTest.getCubeName());
+        assertEquals(false, cubeUpdateMetadataUnderTest.isOverwrite());
     }
 }
