@@ -160,4 +160,32 @@ public class TestPage
         }
         return builder.build();
     }
+
+    @Test
+    public void testGetLoadedPageWithTwoBlocks()
+    {
+        int entries = 10;
+        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(null, entries);
+        for (int i = 0; i < entries; i++) {
+            BIGINT.writeLong(blockBuilder, i);
+        }
+        Block block = blockBuilder.build();
+        Page page = new Page(block, block, block, block);
+        Page loadedPage = page.getLoadedPage(new int[]{0, 1});
+        assertEquals(loadedPage.getBlocks().length, 2);
+    }
+
+    @Test
+    public void testGetLoadedPageWithSingleBlock()
+    {
+        int entries = 10;
+        BlockBuilder blockBuilder = BIGINT.createBlockBuilder(null, entries);
+        for (int i = 0; i < entries; i++) {
+            BIGINT.writeLong(blockBuilder, i);
+        }
+        Block block = blockBuilder.build();
+        Page page = new Page(block, block, block, block);
+        Page loadedPage = page.getLoadedPage(new int[]{0});
+        assertEquals(loadedPage.getBlocks().length, 1);
+    }
 }
