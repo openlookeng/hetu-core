@@ -31,7 +31,8 @@ public class LocalFileSystemExchangeManagerTest
         return new FileSystemExchangeManagerFactory().create(ImmutableMap.of(
                 "exchange.base-directories", baseDirectory1 + "," + baseDirectory2,
                 "exchange.sink-max-file-size", "32MB",
-                "exchange.max-page-storage-size", "32MB"
+                "exchange.max-page-storage-size", "32MB",
+                "exchange.direct-serialization-type", "OFF"
         ), new HetuLocalFileSystemClient(new LocalConfig(new Properties()), Paths.get("/")));
     }
 }

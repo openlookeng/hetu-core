@@ -230,7 +230,6 @@ public abstract class AbstractTestExchangeManager
         data.forEach((key, value) -> {
             Slice slice = Slices.utf8Slice(value);
             SliceOutput sliceOutput = Slices.allocate(slice.length() + Integer.BYTES).getOutput();
-            sliceOutput.writeInt(slice.length());
             sliceOutput.writeBytes(slice);
             sink.add(key, sliceOutput.slice());
         });
