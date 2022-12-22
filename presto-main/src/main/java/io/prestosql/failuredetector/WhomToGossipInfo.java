@@ -60,13 +60,6 @@ public class WhomToGossipInfo
         this.uri.add(uri);
     }
 
-    @JsonCreator
-    public WhomToGossipInfo(@JsonProperty("uri") List<URI> uri)
-    {
-        requireNonNull(uri, "uri is null");
-        this.uri.addAll(uri);
-    }
-
     public void add(URI uri)
     {
         requireNonNull(uri, "uri is null");
