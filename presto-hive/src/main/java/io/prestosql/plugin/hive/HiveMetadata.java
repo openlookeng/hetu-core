@@ -3363,19 +3363,27 @@ public class HiveMetadata
 
         HiveIdentity identity = new HiveIdentity(session);
         SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
-        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
-                .orElseThrow(() -> new TableNotFoundException(tableName));
 
-        String location = table.getStorage().getLocation();
-        long refCount = 0;
-        try {
-            refCount = hdfsStorageMonitor.registerLocationForMonitoring(location, session);
+        boolean isTransactional = AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle).getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")));
+        long refCount = 0L;
+        if (!isTransactional) {
+            Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                    .orElseThrow(() -> new TableNotFoundException(tableName));
+
+            String location = table.getStorage().getLocation();
+            try {
+                refCount = hdfsStorageMonitor.registerLocationForMonitoring(location, session);
+            }
+            catch (IOException e) {
+                log.info("exception while registering table for monitoring: %s", e.getMessage());
+            }
+            catch (InterruptedException e) {
+                log.info("exception while registering table for monitoring: %s", e.getMessage());
+            }
         }
-        catch (IOException e) {
-            log.info("exception while registering table for monitoring: %s", e.getMessage());
-        }
-        catch (InterruptedException e) {
-            log.info("exception while registering table for monitoring: %s", e.getMessage());
+        else {
+            HiveTableHandle currentTable = getTableHandle(session, tableName);
+            refCount = currentTable.getWriteId();
         }
 
         return new HiveTableState(((HiveTableHandle) tableHandle), refCount);
@@ -3388,13 +3396,16 @@ public class HiveMetadata
             throw new PrestoException(NOT_SUPPORTED, "This connector does not support storage watch");
         }
 
-        HiveIdentity identity = new HiveIdentity(session);
-        SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
-        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
-                .orElseThrow(() -> new TableNotFoundException(tableName));
+        boolean isTransactional = AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle).getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")));
+        if (!isTransactional) {
+            HiveIdentity identity = new HiveIdentity(session);
+            SchemaTableName tableName = ((HiveTableHandle) tableHandle).getSchemaTableName();
+            Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                    .orElseThrow(() -> new TableNotFoundException(tableName));
 
-        String location = table.getStorage().getLocation();
-        hdfsStorageMonitor.unregisterLocationForMonitoring(location);
+            String location = table.getStorage().getLocation();
+            hdfsStorageMonitor.unregisterLocationForMonitoring(location);
+        }
     }
 
     @Override
@@ -3404,17 +3415,31 @@ public class HiveMetadata
             throw new PrestoException(NOT_SUPPORTED, "This connector does not support storage watch");
         }
 
-        HiveIdentity identity = new HiveIdentity(session);
         HiveTableState tableState = (HiveTableState) tableHandle;
         SchemaTableName tableName = tableState.getSchemaTableName();
-        Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
-                .orElseThrow(() -> new TableNotFoundException(tableName));
 
         HiveTableHandle currentTable = getTableHandle(session, tableName);
 
-        String location = table.getStorage().getLocation();
-        long age = hdfsStorageMonitor.getAgeForLocation(location);
+        boolean isTransactional = AcidUtils.isTransactionalTable(((HiveTableHandle) tableHandle).getTableParameters().orElseThrow(() -> new IllegalStateException("tableParameters missing")));
+        long age = 0L;
+        if (!isTransactional) {
+            HiveIdentity identity = new HiveIdentity(session);
+            Table table = metastore.getTable(identity, tableName.getSchemaName(), tableName.getTableName())
+                    .orElseThrow(() -> new TableNotFoundException(tableName));
+
+            String location = table.getStorage().getLocation();
+            age = hdfsStorageMonitor.getAgeForLocation(location);
+        }
+        else {
+            age = currentTable.getWriteId();
+        }
 
         return !tableState.basicEquals(new HiveTableState(currentTable, age));
+    }
+
+    @Override
+    public boolean isSupportTableMonitoring(ConnectorSession session)
+    {
+        return true;
     }
 }

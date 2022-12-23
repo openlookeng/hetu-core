@@ -122,6 +122,9 @@ public class AddCacheTableWriterAboveCTEOptimizer
             }
 
             CachedDataKey dataKey = cachedDataStorageProvider.getCachedDataKeyBuilder(node.getCteRefName()).build();
+            if (dataKey.equals(CachedDataKey.NULL_KEY)) {
+                return node;
+            }
 
             /* use Cache provider for cache entry lookup */
             CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(dataKey);

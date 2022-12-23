@@ -19,6 +19,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.cache.Weigher;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
@@ -33,10 +34,15 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.security.Identity;
 import io.prestosql.utils.HetuConfig;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class CachedDataManager
@@ -46,7 +52,10 @@ public class CachedDataManager
     private final Optional<Cache<CachedDataKey, CachedDataStorage>> dataCache;
     private final CacheStorageMonitor monitor;
     private final Metadata metadata;
+    private final AtomicLong currentSize = new AtomicLong();
+    private final long cachedDataMaxSize;
     private final String userName;
+    private final AtomicBoolean isReady = new AtomicBoolean();
 
     @Inject
     public CachedDataManager(HetuConfig hetuConfig,
@@ -90,12 +99,13 @@ public class CachedDataManager
 
         this.monitor = requireNonNull(monitor, "monitor is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.cachedDataMaxSize = hetuConfig.getExecutionDataCacheMaxSize();
         this.userName = requireNonNull(hetuConfig, "hetuConfig is null").getCachingUserName();
     }
 
     public boolean isDataCachedEnabled()
     {
-        return dataCache.isPresent();
+        return dataCache.isPresent() && isReady.get();
     }
 
     public CachedDataStorage validateAndGet(CachedDataKey dataKey, Session session)
@@ -114,10 +124,10 @@ public class CachedDataManager
         return null;
     }
 
-    public void done(CachedDataKey dataKey, long cdsTime)
+    public CachedDataStorage done(CachedDataKey dataKey, long cdsTime)
     {
         if (!dataCache.isPresent()) {
-            return;
+            return null;
         }
 
         CachedDataStorage object = get(dataKey);
@@ -125,6 +135,57 @@ public class CachedDataManager
             /* decrement listener count */
             object.release();
         }
+
+        return object;
+    }
+
+    public void commit(CachedDataKey dataKey, Session session, long cdsTime)
+    {
+        if (!dataCache.isPresent()) {
+            return;
+        }
+
+        LOG.debug("Cache materialization completed for key: %s", dataKey.toString());
+        CachedDataStorage data = done(dataKey, cdsTime);
+
+        /* Prune the cache if needed */
+        if (!isSizeAvailableForCacheLimits(data.getDataSize())) {
+            pruneCacheForStaleEntries(data.getDataSize(), session);
+        }
+
+        currentSize.addAndGet(data.getDataSize());
+    }
+
+    private boolean isSizeAvailableForCacheLimits(long requiredSize)
+    {
+        return cachedDataMaxSize >= (currentSize.get() + requiredSize);
+    }
+
+    private void pruneCacheForStaleEntries(long requiredSize, Session session)
+    {
+        /* get candidate keys for elimination */
+        List<CachedDataStorage> evictionCandidates = ImmutableList.copyOf(dataCache.get().asMap().values())
+                .stream()
+                .sorted(Comparator.comparing(CachedDataStorage::getRuntime)
+                        .thenComparing(CachedDataStorage::getRefCount)
+                        .thenComparing(CachedDataStorage::getDataSize)
+                        .thenComparing(CachedDataStorage::getLastAccessTime)
+                        .reversed())
+                .collect(toImmutableList());
+
+        /* invalidate the required number of keys only... */
+        ImmutableSet.Builder<CachedDataKey> toDelete = ImmutableSet.builder();
+        long sizeToFree = requiredSize - (cachedDataMaxSize - currentSize.get());
+        for (CachedDataStorage cds : evictionCandidates) {
+            if (sizeToFree <= 0) {
+                break;
+            }
+
+            toDelete.add(cds.getIdentifier());
+            sizeToFree -= cds.getDataSize();
+        }
+
+        invalidate(toDelete.build(), session);
     }
 
     public CachedDataStorage get(CachedDataKey dataKey)
@@ -145,13 +206,6 @@ public class CachedDataManager
         /* Drop the cached data table */
         if (object.getRefCount() <= 0) {
             // mark for dropping when reference count reduce
-            Identity identity = session.getIdentity();
-            identity = new Identity(userName, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
-            Session newSession = session.withUpdatedIdentity(identity);
-            Optional<TableHandle> tableHandle = metadata.getTableHandle(newSession, QualifiedObjectName.valueOf(object.getDataTable()));
-            if (tableHandle.isPresent()) {
-                metadata.dropTable(newSession, tableHandle.get());
-            }
             invalidate(ImmutableSet.of(key), session);
         }
         return false;
@@ -171,15 +225,32 @@ public class CachedDataManager
         if (dataCache.isPresent()) { /* Add invalidators for storage as cacheWalker */
             cacheWalk(keySet, ((key, cds) -> {
                 monitor.stopTableMonitorForModification(cds, session);
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(cds.getDataTable()));
+                if (tableHandle.isPresent()) {
+                    metadata.dropTable(session, tableHandle.get());
+                }
+
                 return null;
             }));
             dataCache.get().invalidateAll(keySet);
         }
     }
 
-    public void invalidateAll()
+    public void invalidateAll(Session session)
     {
         if (dataCache.isPresent()) { /* Add invalidators for storage as cacheWalker */
+            cacheWalkAll(((key, cds) -> {
+                monitor.stopTableMonitorForModification(cds, session);
+                Identity identity = session.getIdentity();
+                identity = new Identity(userName, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
+                Session newSession = session.withUpdatedIdentity(identity);
+                Optional<TableHandle> tableHandle = metadata.getTableHandle(newSession, QualifiedObjectName.valueOf(cds.getDataTable()));
+                if (tableHandle.isPresent()) {
+                    metadata.dropTable(newSession, tableHandle.get());
+                }
+
+                return null;
+            }));
             dataCache.get().invalidateAll();
         }
     }
@@ -196,5 +267,10 @@ public class CachedDataManager
         if (dataCache.isPresent() && walker != null) {
             dataCache.get().getAllPresent(keySet).forEach((key, value) -> walker.apply(key, value));
         }
+    }
+
+    public void setReady()
+    {
+        this.isReady.set(true);
     }
 }

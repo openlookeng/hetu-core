@@ -295,4 +295,10 @@ public class TpcdsMetadata
     {
         return true;
     }
+
+    @Override
+    public boolean isSupportTableMonitoring(ConnectorSession session)
+    {
+        return true;
+    }
 }

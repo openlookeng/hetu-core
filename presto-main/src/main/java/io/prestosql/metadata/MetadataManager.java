@@ -1872,4 +1872,11 @@ public final class MetadataManager
         ConnectorMetadata metadata = getMetadata(session, catalogName);
         return metadata.isTableModified(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
     }
+
+    @Override
+    public boolean isSupportTableMonitoring(Session session, CatalogName catalogName)
+    {
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        return metadata.isSupportTableMonitoring(session.toConnectorSession());
+    }
 }

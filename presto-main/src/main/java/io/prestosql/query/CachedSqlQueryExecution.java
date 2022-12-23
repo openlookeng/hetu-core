@@ -268,7 +268,9 @@ public class CachedSqlQueryExecution
                 CachedDataKey.Builder keyBuilder = super.getCachedDataKeyBuilder(cteName)
                         .addRules(optimizers.toArray(new String[0]))
                         .setQuery(analysis.getNamedQueryByRef(cteRef)); // Check how can identify and assign TableName and Column Names here!
-                validateAndExtractTableAndColumnsByCTE(analysis, metadata, session, new CTEReference(QualifiedName.of(cteName)), keyBuilder);
+                if (!validateAndExtractTableAndColumnsByCTE(analysis, metadata, session, new CTEReference(QualifiedName.of(cteName)), keyBuilder)) {
+                    return CachedDataKey.builder(); // empty key, considered as failed key gen
+                }
                 return keyBuilder;
             }
 
@@ -303,7 +305,7 @@ public class CachedSqlQueryExecution
                     addStateChangeListener(newState -> {
                         if (newState == QueryState.FINISHED && finalCds.isNonCachable() && finalCacheable) {
                             cache.get().invalidate(finalKey);
-                            dataCache.done(finalCreateKey, cdsTime);
+                            dataCache.commit(finalCreateKey, session, cdsTime);
                         }
                         if (newState == QueryState.FAILED) {
                             /* In case some CTEs got committed even on failed query is useful */
@@ -313,7 +315,7 @@ public class CachedSqlQueryExecution
                                 // Todo: Ensure materialized table is also dropped here!
                             }
                             else {
-                                dataCache.done(finalCreateKey, cdsTime);
+                                dataCache.commit(finalCreateKey, session, cdsTime);
                             }
                             if (finalCacheable) {
                                 cache.get().invalidate(finalKey);
@@ -440,6 +442,10 @@ public class CachedSqlQueryExecution
             CachedDataKey.Builder builder)
     {
         for (TableHandle tableHandle : analysis.getTablesByNamedQuery(namedQuery)) {
+            if (!metadata.isSupportTableMonitoring(session, tableHandle.getCatalogName())) {
+                return false;
+            }
+
             builder.addTableName(tableHandle.getFullyQualifiedName());
             Map<String, ColumnHandle> columnHandles = metadata.getColumnHandles(session, tableHandle);
             for (ColumnHandle columnHandle : columnHandles.values()) {

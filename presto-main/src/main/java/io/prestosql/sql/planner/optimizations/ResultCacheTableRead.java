@@ -96,10 +96,13 @@ public class ResultCacheTableRead
                 return node;
             }
 
-            CachedDataKey.Builder keyBuilder = cachedDataStorageProvider.getCachedDataKeyBuilder(node.getCteRefName());
+            CachedDataKey dataKey = cachedDataStorageProvider.getCachedDataKeyBuilder(node.getCteRefName()).build();
+            if (dataKey.equals(CachedDataKey.NULL_KEY)) {
+                return node;
+            }
 
             /* use Cache provider for cache entry lookup */
-            CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(keyBuilder.build());
+            CachedDataStorage cds = cachedDataStorageProvider.getOrCreateCachedDataKey(dataKey);
             if (cds == null || !cds.isCommitted()) {
                 return node;
             }

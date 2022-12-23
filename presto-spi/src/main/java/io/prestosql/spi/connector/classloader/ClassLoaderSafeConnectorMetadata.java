@@ -1163,4 +1163,12 @@ public class ClassLoaderSafeConnectorMetadata
             return delegate.isTableModified(session, tableHandle);
         }
     }
+
+    @Override
+    public boolean isSupportTableMonitoring(ConnectorSession session)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isSupportTableMonitoring(session);
+        }
+    }
 }
