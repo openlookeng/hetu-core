@@ -22,6 +22,7 @@ import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.security.Identity;
 import io.prestosql.utils.HetuConfig;
 
 import java.util.List;
@@ -39,19 +40,22 @@ public class CacheStorageMonitor
     private final Metadata metadata;
     private final Map<CachedDataStorage.TableInfo, List<CachedDataKey>> monitoredTables = new ConcurrentHashMap<>();
     private final AtomicBoolean tableCount = new AtomicBoolean();
+    private final String userName;
 
     @Inject
     public CacheStorageMonitor(HetuConfig hetuConfig, Metadata metadata)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.userName = requireNonNull(hetuConfig, "hetuConfig is null").getCachingUserName();
     }
 
     public boolean checkTableValidity(CachedDataStorage cachedDataStorage, Session session)
     {
+        Session newSession = updateIdentity(session);
         AtomicBoolean found = new AtomicBoolean(false);
         cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
             TableHandle age = es.getValue().getTableHandle();
-            if (metadata.isTableModified(session, age)) {
+            if (metadata.isTableModified(newSession, age)) {
                 found.set(true);
             }
         });
@@ -60,10 +64,11 @@ public class CacheStorageMonitor
 
     public void monitorTableForModification(CachedDataStorage cachedDataStorage, Session session)
     {
+        Session newSession = updateIdentity(session);
         cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
-            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation()));
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(newSession, QualifiedObjectName.valueOf(es.getValue().getLocation()));
             if (tableHandle.isPresent()) {
-                TableHandle th = metadata.watchTableForModifications(session, tableHandle.get());
+                TableHandle th = metadata.watchTableForModifications(newSession, tableHandle.get());
                 es.getValue().setTableHandle(th);
             }
         });
@@ -71,11 +76,19 @@ public class CacheStorageMonitor
 
     public void stopTableMonitorForModification(CachedDataStorage cachedDataStorage, Session session)
     {
+        Session newSession = updateIdentity(session);
         cachedDataStorage.getTableInfoMap().entrySet().forEach(es -> {
-            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(es.getValue().getLocation()));
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(newSession, QualifiedObjectName.valueOf(es.getValue().getLocation()));
             if (tableHandle.isPresent()) {
-                metadata.unwatchTableForModifications(session, tableHandle.get());
+                metadata.unwatchTableForModifications(newSession, tableHandle.get());
             }
         });
+    }
+
+    public Session updateIdentity(Session session)
+    {
+        Identity identity = session.getIdentity();
+        identity = new Identity(userName, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
+        return session.withUpdatedIdentity(identity);
     }
 }

@@ -156,7 +156,7 @@ public class CachedSqlQueryExecution
                                    PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory, TaskExecutionStats taskExecutionStats,
                                    QueryResourceManagerService queryResourceManager,
                                    TableExecuteContextManager tableExecuteContextManager,
-                                   CachedDataManager dataCache, boolean isMultiCoordinatorEnabled)
+                                   CachedDataManager dataCache, boolean isMultiCoordinatorEnabled, String cachingUserName)
     {
         super(tableExecuteContextManager, preparedQuery, stateMachine, slug, metadata, cubeManager, accessControl, sqlParser, splitManager,
                 nodePartitioningManager, nodeScheduler, planOptimizers, planFragmenter, remoteTaskFactory, locationFactory,
@@ -164,10 +164,10 @@ public class CachedSqlQueryExecution
                 executionPolicy, schedulerStats, statsCalculator, costCalculator, warningCollector, dynamicFilterService,
                 heuristicIndexerManager, stateStoreProvider, recoveryUtils, exchangeManagerRegistry, coordinatorTaskManager,
                 taskSourceFactory, taskDescriptorStorage, nodeAllocatorService, partitionMemoryEstimatorFactory, taskExecutionStats,
-                queryResourceManager, isMultiCoordinatorEnabled);
+                queryResourceManager, isMultiCoordinatorEnabled, cachingUserName);
         this.cache = cache;
         this.dataCache = dataCache;
-        this.beginTableWrite = new BeginTableWrite(metadata);
+        this.beginTableWrite = new BeginTableWrite(metadata, cachingUserName);
         this.resultCacheTableRead = new ResultCacheTableRead(metadata);
     }
 
@@ -297,12 +297,13 @@ public class CachedSqlQueryExecution
                             null);
                     dataCache.put(createKey, cds, session);
                     CachedDataStorage finalCds = cds;
+                    long cdsTime = cds.getCreateTime();
                     CachedDataKey finalCachedDataKey = createKey;
                     CachedDataKey finalCreateKey = createKey;
                     addStateChangeListener(newState -> {
                         if (newState == QueryState.FINISHED && finalCds.isNonCachable() && finalCacheable) {
                             cache.get().invalidate(finalKey);
-                            dataCache.done(finalCreateKey);
+                            dataCache.done(finalCreateKey, cdsTime);
                         }
                         if (newState == QueryState.FAILED) {
                             /* In case some CTEs got committed even on failed query is useful */
@@ -312,7 +313,7 @@ public class CachedSqlQueryExecution
                                 // Todo: Ensure materialized table is also dropped here!
                             }
                             else {
-                                dataCache.done(finalCreateKey);
+                                dataCache.done(finalCreateKey, cdsTime);
                             }
                             if (finalCacheable) {
                                 cache.get().invalidate(finalKey);
@@ -324,10 +325,11 @@ public class CachedSqlQueryExecution
                 if (cds.inProgress() || cds.isNonCachable()) {
                     return null;
                 }
+                long cdsTime = cds.getCreateTime();
                 CachedDataKey finalCreateKey1 = createKey;
                 addStateChangeListener(newState -> {
                     if (newState == QueryState.FINISHED || newState == QueryState.FAILED) {
-                        dataCache.done(finalCreateKey1);
+                        dataCache.done(finalCreateKey1, cdsTime);
                     }
                 });
                 return cds;

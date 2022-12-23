@@ -304,6 +304,7 @@ public class LocalQueryRunner
     private final CubeManager cubeManager;
     private boolean printPlan;
     private final CachedDataManager cachedDataManager;
+    private final HetuConfig hetuConfig;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -396,7 +397,7 @@ public class LocalQueryRunner
         this.hetuMetaStoreManager = new HetuMetaStoreManager();
         heuristicIndexerManager = new HeuristicIndexerManager(fileSystemClientManager, hetuMetaStoreManager);
         this.cubeManager = new CubeManager(featuresConfig, hetuMetaStoreManager);
-        HetuConfig hetuConfig = new HetuConfig();
+        this.hetuConfig = new HetuConfig();
         this.cachedDataManager = new CachedDataManager(hetuConfig, new CacheStorageMonitor(hetuConfig, metadata), metadata, null, new SessionPropertyManager());
         this.connectorManager = new ConnectorManager(
                 materializedViewPropertyManager,
@@ -860,7 +861,8 @@ public class LocalQueryRunner
                 cubeManager,
                 exchangeManagerRegistry,
                 tableExecuteContextManager,
-                cachedDataManager);
+                cachedDataManager,
+                hetuConfig);
 
         // plan query
         StageExecutionDescriptor stageExecutionDescriptor = subplan.getFragment().getStageExecutionDescriptor();
@@ -976,7 +978,7 @@ public class LocalQueryRunner
                 estimatedExchangesCostCalculator,
                 new CostComparator(featuresConfig),
                 taskCountEstimator,
-                cubeManager).get();
+                cubeManager, hetuConfig).get();
     }
 
     public Plan createPlan(Session session, @Language("SQL") String sql, List<PlanOptimizer> optimizers, WarningCollector warningCollector)

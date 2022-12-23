@@ -70,6 +70,7 @@ public class HetuConfig
     private long executionDataCacheMaxItems = 1024L * 1024L * 1024L * 2;
     private String cachingSchemaName = "cache";
     private String cachingConnectorName = "hive";
+    private String cachingUserName = "hive";
 
     public HetuConfig()
     {
@@ -515,6 +516,19 @@ public class HetuConfig
     public HetuConfig setCachingConnectorName(String connector)
     {
         this.cachingConnectorName = connector;
+        return this;
+    }
+
+    public String getCachingUserName()
+    {
+        return cachingUserName;
+    }
+
+    @Config("hetu.execution.data-cache.user-name")
+    @ConfigDescription("User name for data cache storage")
+    public HetuConfig setCachingUserName(String user)
+    {
+        this.cachingUserName = user;
         return this;
     }
 }

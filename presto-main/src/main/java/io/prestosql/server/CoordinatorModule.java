@@ -35,6 +35,7 @@ import io.prestosql.cost.CostComparator;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.cost.StatsCalculatorModule;
 import io.prestosql.cost.TaskCountEstimator;
+import io.prestosql.ctematerialization.CteMaterializationScanner;
 import io.prestosql.discovery.server.HetuEmbeddedDiscoveryModule;
 import io.prestosql.dispatcher.DispatchExecutor;
 import io.prestosql.dispatcher.DispatchManager;
@@ -134,6 +135,7 @@ import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.security.SelectedRole;
+import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.planner.PlanFragmenter;
 import io.prestosql.sql.planner.PlanOptimizers;
@@ -395,6 +397,11 @@ public class CoordinatorModule
                 AutoVacuumConfig.class,
                 config -> config.isAutoVacuumEnabled(),
                 binder1 -> binder1.bind(AutoVacuumScanner.class).in(Scopes.SINGLETON)));
+
+        install(installModuleIf(
+                FeaturesConfig.class,
+                config -> config.isCTEResultCacheEnabled(),
+                binder1 -> binder1.bind(CteMaterializationScanner.class).in(Scopes.SINGLETON)));
 
         // query execution
         binder.bind(ExecutorService.class).annotatedWith(ForQueryExecution.class)

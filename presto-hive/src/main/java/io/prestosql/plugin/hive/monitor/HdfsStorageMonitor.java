@@ -49,7 +49,7 @@ public class HdfsStorageMonitor
 
     private final HdfsEnvironment hdfsEnvironment;
     private final ListeningExecutorService executorService;
-    private final HdfsEnvironment.HdfsContext context = new HdfsEnvironment.HdfsContext(new ConnectorIdentity("openLooKeng", Optional.empty(), Optional.empty()));
+    private final HdfsEnvironment.HdfsContext context = new HdfsEnvironment.HdfsContext(new ConnectorIdentity("hive", Optional.empty(), Optional.empty()));
 
     private final Map<String, Monitor> monitoredTables = new ConcurrentHashMap<>();
     private final Map<String, ListenableFuture<Monitor>> waitingWatchers = new ConcurrentHashMap<>();
@@ -125,14 +125,18 @@ public class HdfsStorageMonitor
                     switch (event.getEventType()) {
                         case CREATE:
                             Event.CreateEvent createEvent = (Event.CreateEvent) event;
-                            log.debug("file added: %s", createEvent.getPath());
-                            refCount.incrementAndGet();
+                            if (createEvent.getPath().contains(path)) {
+                                log.debug("file added: %s", createEvent.getPath());
+                                refCount.incrementAndGet();
+                            }
                             break;
 
                         case RENAME:
                             Event.RenameEvent renameEvent = (Event.RenameEvent) event;
-                            log.debug("file renamed: %s", renameEvent.getDstPath());
-                            refCount.incrementAndGet();
+                            if (renameEvent.getSrcPath().contains(path)) {
+                                log.debug("file renamed: %s", renameEvent.getDstPath());
+                                refCount.incrementAndGet();
+                            }
                             break;
 
                         /* Todo: TRUNCATE, UNLINK : disambiguate Vacuum from normal operations */
@@ -158,10 +162,10 @@ public class HdfsStorageMonitor
                 monitorForTable();
             }
             catch (ExecutionException e) {
-                log.info("Exception in starting monitor! exception: %s", e.getMessage());
+                log.info("Exception in starting monitor! exception: %s", e.getStackTrace());
             }
             catch (InterruptedException e) {
-                log.info("Exception in starting monitor! exception: %s", e.getMessage());
+                log.info("Exception in starting monitor! exception: %s", e.getStackTrace());
             }
         });
     }
@@ -236,12 +240,16 @@ public class HdfsStorageMonitor
             }
             synchronized (this) {
                 Future<Monitor> finished = whenAnyComplete(waitingWatchers.values());
-                Monitor monitor = finished.get();
-                if (monitoredTables.containsKey(monitor.getPath())) {
-                    waitingWatchers.put(monitor.getPath(), executorService.submit(monitor));
-                }
-                else {
-                    waitingWatchers.remove(monitor.getPath());
+                if (finished != null && finished.isDone()) {
+                    Monitor monitor = finished.get();
+                    if (monitor != null) {
+                        if (monitoredTables.containsKey(monitor.getPath())) {
+                            waitingWatchers.put(monitor.getPath(), executorService.submit(monitor));
+                        }
+                        else {
+                            waitingWatchers.remove(monitor.getPath());
+                        }
+                    }
                 }
             }
         }

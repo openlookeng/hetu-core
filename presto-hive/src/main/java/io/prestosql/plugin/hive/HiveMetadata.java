@@ -3415,6 +3415,6 @@ public class HiveMetadata
         String location = table.getStorage().getLocation();
         long age = hdfsStorageMonitor.getAgeForLocation(location);
 
-        return tableState.basicEquals(new HiveTableState(currentTable, age));
+        return !tableState.basicEquals(new HiveTableState(currentTable, age));
     }
 }

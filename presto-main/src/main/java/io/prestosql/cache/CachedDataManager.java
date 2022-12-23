@@ -46,6 +46,7 @@ public class CachedDataManager
     private final Optional<Cache<CachedDataKey, CachedDataStorage>> dataCache;
     private final CacheStorageMonitor monitor;
     private final Metadata metadata;
+    private final String userName;
 
     @Inject
     public CachedDataManager(HetuConfig hetuConfig,
@@ -56,7 +57,7 @@ public class CachedDataManager
     {
         if (hetuConfig.isExecutionDataCacheEnabled()) {
             Session.SessionBuilder sessionBuilder = Session.builder(sessionPropertyManager)
-                    .setIdentity(new Identity("openLooKeng", Optional.empty()))
+                    .setIdentity(new Identity(hetuConfig.getCachingUserName(), Optional.empty()))
                     .setSource("auto-vacuum");
             RemovalListener<CachedDataKey, CachedDataStorage> listener = new RemovalListener<CachedDataKey, CachedDataStorage>()
             {
@@ -89,6 +90,7 @@ public class CachedDataManager
 
         this.monitor = requireNonNull(monitor, "monitor is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
+        this.userName = requireNonNull(hetuConfig, "hetuConfig is null").getCachingUserName();
     }
 
     public boolean isDataCachedEnabled()
@@ -112,14 +114,14 @@ public class CachedDataManager
         return null;
     }
 
-    public void done(CachedDataKey dataKey)
+    public void done(CachedDataKey dataKey, long cdsTime)
     {
         if (!dataCache.isPresent()) {
             return;
         }
 
         CachedDataStorage object = get(dataKey);
-        if (object != null) {
+        if (object != null && object.getCreateTime() == cdsTime) {
             /* decrement listener count */
             object.release();
         }
@@ -143,9 +145,12 @@ public class CachedDataManager
         /* Drop the cached data table */
         if (object.getRefCount() <= 0) {
             // mark for dropping when reference count reduce
-            Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(object.getDataTable()));
+            Identity identity = session.getIdentity();
+            identity = new Identity(userName, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
+            Session newSession = session.withUpdatedIdentity(identity);
+            Optional<TableHandle> tableHandle = metadata.getTableHandle(newSession, QualifiedObjectName.valueOf(object.getDataTable()));
             if (tableHandle.isPresent()) {
-                metadata.dropTable(session, tableHandle.get());
+                metadata.dropTable(newSession, tableHandle.get());
             }
             invalidate(ImmutableSet.of(key), session);
         }

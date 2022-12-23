@@ -1326,7 +1326,7 @@ public interface ConnectorMetadata
     default ConnectorTableHandle watchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         // no op
-        return null;
+        return tableHandle;
     }
 
     default void unwatchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
