@@ -36,8 +36,8 @@ Common Table expressions are common sub-plans under the query plan which are use
 openLooKeng engine assesses the usage of such CTE plan nodes for feasibility of reuse based optimization. This optimization is applied in 2 scenarios: - 
 
 > #### Reuse Execution Pipeline 
-> Given the configuration [optimizer.cte-reuse-enabled](./properties.md#optimizercte-reuse-enabled) is enabled: Same CTE nodes in a given query are arranged in the stage pip eline such that only 1 executes and other reuse the output from the first node wiz. deemed as producer and reset as consumers.
-> Its important to node that CTE pipeline cannot be used if CTE is used in Self join with the same CTE.
+> Given the configuration [optimizer.cte-reuse-enabled](./properties.md#optimizercte-reuse-enabled) is enabled: Same CTE nodes in a given query are arranged in the stage pipeline such that only 1 executes and other reuse the output from the first node wiz. deemed as producer and reset as consumers.
+> Its important to note that CTE pipeline cannot be used if CTE is used in Self join with the same CTE.
 > Pipeline mode execution reduces the duplicate scanning and processing of the operations, thereby reducing the round trip time for the query.
  
 > #### Materialize and Reused

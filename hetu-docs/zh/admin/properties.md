@@ -700,6 +700,83 @@
 >
 > **注意：** 仅适用于Hive连接器。
 
+### `optimizer.transform-self-join-to-window`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `true`
+>
+> 使用带有lead/lag方法的窗口函数消除自连接（self join）。
+
+### `optimizer.transform-self-join-aggregates-to-window`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `true`
+>
+> 使用带有lead/lag方法的窗口聚合函数消除自连接（self join）。
+
+### `optimizer.join-partitioned-build-min-row-count`
+
+> -   **类型：** `long`
+> -   **默认值：** `1,000,000`
+>
+> 当需要交换的数据行数少于该值时使用gathering exchange，否则使用partitioning exchange。
+
+### `optimizer.use-exact-partitioning`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 启用后，如果上游阶段的分区不能精准地匹配到下游阶段的分区，则强制对数据重新分区。
+
+### `enable-cte-result-cache`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `false`
+>
+> 将CTE结果物化到缓存中。
+
+### `cte-result-cache-threshold-size`
+
+> -   **类型：** `Data Size`
+> -   **默认值：** `128MB`
+>
+> 每个查询每个CTE可以物化到缓存的最大大小。
+
+### `adaptive-partial-aggregation.enabled`
+
+> -   **类型：** `boolean`
+> -   **默认值：** `true`
+>
+> 启用自适应部分聚合特性。
+
+### `adaptive-partial-aggregation.min-rows`
+
+> -   **类型：** `long`
+> -   **默认值：** `100,000`
+>
+> 部分聚合可能自适应关闭的最小处理数据行数。
+
+### `adaptive-partial-aggregation.unique-rows-ratio-threshold`
+
+> -   **类型：** `double`
+> -   **默认值：** `0.8`
+>
+> 部分聚合可能自适应关闭的聚合输出、输入数据行数的比值。
+
+### `optimizer.join-multi-clause-independence-factor`
+
+> -   **类型：** `double`
+> -   **默认值：** `0.25`
+>
+> 多子句连接的选择率估计的数据独立性假设因子。
+
+### `optimizer.filter-conjunction-independence-factor`
+
+> -   **类型：** `double`
+> -   **默认值：** `0.75`
+>
+> 多过滤条件的选择率估计的数据独立性假设因子。
+
 ## 正则表达式函数属性
 
 下列属性允许调优[正则表达式函数](../functions/regexp.md)。
@@ -825,6 +902,34 @@
 > 
 > 上次访问后使缓存的执行计划失效的时间（以毫秒为单位）
 
+### `hetu.execution.data-cache.enabled`
+>
+> - **类型：** `boolean`
+> - **默认值：** `false`
+>
+> 启用缓存CTE结果，从而避免频繁执行子执行计划。
+
+### `hetu.execution.data-cache.max-size`
+>
+> - **类型：** `long`
+> - **默认值：** `2147483648`
+>
+> CTE结果可以物化的最大数据量大小。
+
+### `hetu.execution.data-cache.schema-name`
+>
+> - **类型：** `string`
+> - **默认值：** `cache`
+>
+> 用来物化缓存CTE结果的模式名字。
+
+### `hetu.execution.data-cache.connector-name`
+>
+> - **类型：** `string`
+> - **默认值：** `hive`
+>
+> 用来物化缓存CTE结果的目录名字。
+
 ## SplitCacheMap属性
 
 必须启用SplitCacheMap以支持缓存行数据。 启用后，协调器将存储表，分区和分片调度元数据 帮助进行缓存亲和力调度。
@@ -908,10 +1013,20 @@
 
 ### `query.remote-task.max-error-duration`
 
-> - 类型：`duration`
-> - **默认值**：`5m`
+> - **类型：** `duration`
+> - **默认值: ** `5m`
 > 
 > 远程任务错误最大缓冲时间，超过该时限则查询失败。
+
+### `query.execution-policy`
+> -   **类型：** `string`
+> -   **默认值：** `all-at-once`
+>
+> 指定调度器实施的执行策略。可以配置以下一组执行策略：
+> 1. _**all-at-once**_：该策略下调度器启动和处理所有的阶段。
+> 2. _**phased**_：该策略下调度器调度遵循阶段间生产者源这样的依赖关系，可以将所有独立的阶段一起调度。
+> 3. _**prioritize-utilization**_：该策略下调度器调度除了遵循生产者源这样的阶段依赖关系以外，它还查看动态过滤生产者的依赖路径。
+>
 
 ## 查询恢复
 
