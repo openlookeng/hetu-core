@@ -222,6 +222,7 @@ headless: true
     - [任务资源]({{< relref "./docs/rest/task.md" >}})
 
 - [发行说明]("#")
+    - [1.9.0 (2022年12月30日)]({{< relref "./docs/releasenotes/releasenotes-1.9.0.md" >}})
     - [1.8.0 (2022年9月30日)]({{< relref "./docs/releasenotes/releasenotes-1.8.0.md" >}})
     - [1.7.0 (2022年6月30日)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})
     - [1.6.1 (2022年4月27日)]({{< relref "./docs/releasenotes/releasenotes-1.6.1.md" >}})
