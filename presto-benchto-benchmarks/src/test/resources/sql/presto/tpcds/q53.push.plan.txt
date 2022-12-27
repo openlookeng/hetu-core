@@ -7,16 +7,16 @@ local exchange (GATHER, SINGLE, [])
                         remote exchange (REPARTITION, HASH, ["d_qoy", "i_manufact_id"])
                             partial hashaggregation over (d_qoy, i_manufact_id)
                                 join (INNER, PARTITIONED):
-                                    remote exchange (REPARTITION, HASH, ["ss_sold_date_sk"])
-                                        join (INNER, REPLICATED):
+                                    remote exchange (REPARTITION, HASH, ["d_date_sk"])
+                                        scan date_dim (pushdown = true)
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPARTITION, HASH, ["ss_sold_date_sk"])
                                             join (INNER, REPLICATED):
-                                                scan store_sales
+                                                join (INNER, REPLICATED):
+                                                    scan store_sales
+                                                    local exchange (GATHER, SINGLE, [])
+                                                        remote exchange (REPLICATE, BROADCAST, [])
+                                                            scan item (pushdown = true)
                                                 local exchange (GATHER, SINGLE, [])
                                                     remote exchange (REPLICATE, BROADCAST, [])
-                                                        scan item (pushdown = true)
-                                            local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPLICATE, BROADCAST, [])
-                                                    scan store
-                                    local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPARTITION, HASH, ["d_date_sk"])
-                                            scan date_dim (pushdown = true)
+                                                        scan store

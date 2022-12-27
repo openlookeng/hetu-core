@@ -4,9 +4,9 @@ local exchange (GATHER, SINGLE, [])
             remote exchange (REPARTITION, HASH, ["ss_customer_sk"])
                 final hashaggregation over (ca_city, ss_addr_sk, ss_customer_sk, ss_ticket_number)
                     local exchange (GATHER, SINGLE, [])
-                        partial hashaggregation over (ca_city, ss_addr_sk, ss_customer_sk, ss_ticket_number)
-                            join (INNER, PARTITIONED):
-                                remote exchange (REPARTITION, HASH, ["ss_addr_sk"])
+                        remote exchange (REPARTITION, HASH, ["ca_city", "ss_addr_sk", "ss_customer_sk", "ss_ticket_number"])
+                            partial hashaggregation over (ca_city, ss_addr_sk, ss_customer_sk, ss_ticket_number)
+                                join (INNER, REPLICATED):
                                     join (INNER, REPLICATED):
                                         join (INNER, REPLICATED):
                                             join (INNER, REPLICATED):
@@ -20,9 +20,9 @@ local exchange (GATHER, SINGLE, [])
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
                                                 scan store (pushdown = true)
-                                local exchange (GATHER, SINGLE, [])
-                                    remote exchange (REPARTITION, HASH, ["ca_address_sk"])
-                                        scan customer_address
+                                    local exchange (GATHER, SINGLE, [])
+                                        remote exchange (REPLICATE, BROADCAST, [])
+                                            scan customer_address
             local exchange (GATHER, SINGLE, [])
                 remote exchange (REPARTITION, HASH, ["c_customer_sk"])
                     join (INNER, PARTITIONED):

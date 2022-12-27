@@ -53,6 +53,7 @@ import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
+import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeManager;
 import io.prestosql.sql.DynamicFilters;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
@@ -120,6 +121,9 @@ import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
 import static io.prestosql.spi.relation.SpecialForm.Form.OR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.IntegerType.INTEGER;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.sql.DynamicFilters.createDynamicFilterRowExpression;
 import static io.prestosql.sql.DynamicFilters.extractDynamicFilterExpression;
 import static io.prestosql.sql.DynamicFilters.extractStaticFilters;
@@ -149,6 +153,8 @@ public class PredicatePushDown
     private final boolean useTableProperties;
     private final boolean dynamicFiltering;
     private final boolean pushdownForCTE;
+
+    private static final Set<Type> supportedDynamicFilterTypes = ImmutableSet.of(BIGINT, TINYINT, SMALLINT, INTEGER);
 
     public PredicatePushDown(Metadata metadata, TypeAnalyzer typeAnalyzer, CostCalculationHandle costCalculationHandle, boolean useTableProperties, boolean dynamicFiltering, boolean pushdownForCTE)
     {
@@ -494,7 +500,7 @@ public class PredicatePushDown
             }
 
             return dependencies.entrySet().stream()
-                    .allMatch(entry -> entry.getValue() == maxOccurance.get() || node.getAssignments().get(toSymbol(entry.getKey())) instanceof ConstantExpression);
+                    .allMatch(entry -> entry.getValue() == maxOccurance.get() || node.getAssignments().get(toSymbol(entry.getKey())) instanceof ConstantExpression || node.getAssignments().get(toSymbol(entry.getKey())) instanceof VariableReferenceExpression);
         }
 
         @Override
@@ -820,7 +826,7 @@ public class PredicatePushDown
                             FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
                             if (functionMetadata.getOperatorType().isPresent() && functionMetadata.getOperatorType().get().isDynamicFilterComparisonOperator()) {
                                 if (call.getArguments().stream().allMatch(VariableReferenceExpression.class::isInstance)) {
-                                    if (call.getArguments().get(0).getType() != BIGINT) {
+                                    if (!isDynamicFilteringSupportedType(call.getArguments().get(0).getType())) {
                                         continue;
                                     }
 
@@ -867,6 +873,14 @@ public class PredicatePushDown
                 predicates = predicatesBuilder.build();
             }
             return new DynamicFiltersResult(dynamicFilters, predicates);
+        }
+
+        private boolean isDynamicFilteringSupportedType(Type type)
+        {
+            if (supportedDynamicFilterTypes.contains(type)) {
+                return true;
+            }
+            return false;
         }
 
         private static class DynamicFiltersResult

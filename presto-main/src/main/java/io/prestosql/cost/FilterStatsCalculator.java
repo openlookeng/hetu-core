@@ -17,6 +17,7 @@ import com.google.common.base.VerifyException;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
+import io.prestosql.FullConnectorSession;
 import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.expressions.LogicalRowExpressions;
@@ -811,32 +812,51 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate estimateLogicalAnd(RowExpression left, RowExpression right)
         {
-            // first try to estimate in the fair way
-            PlanNodeStatsEstimate leftEstimate = process(left);
-            if (!leftEstimate.isOutputRowCountUnknown()) {
-                PlanNodeStatsEstimate logicalAndEstimate = newEstimate(leftEstimate).process(right);
-                if (!logicalAndEstimate.isOutputRowCountUnknown()) {
-                    return logicalAndEstimate;
-                }
-            }
-
-            // If some of the filters cannot be estimated, take the smallest estimate.
-            // Apply 0.9 filter factor as "unknown filter" factor.
-            PlanNodeStatsEstimate rightEstimate = process(right);
-            PlanNodeStatsEstimate smallestKnownEstimate;
-            if (leftEstimate.isOutputRowCountUnknown()) {
-                smallestKnownEstimate = rightEstimate;
-            }
-            else if (rightEstimate.isOutputRowCountUnknown()) {
-                smallestKnownEstimate = leftEstimate;
-            }
-            else {
-                smallestKnownEstimate = leftEstimate.getOutputRowCount() <= rightEstimate.getOutputRowCount() ? leftEstimate : rightEstimate;
-            }
-            if (smallestKnownEstimate.isOutputRowCountUnknown()) {
+            double filterConjunctionIndependenceFactor = getFilterConjunctionIndependenceFactor(((FullConnectorSession) session).getSession());
+            List<PlanNodeStatsEstimate> estimates = estimateCorrelatedExpressions(ImmutableList.of(left, right), filterConjunctionIndependenceFactor);
+            double outputRowCount = estimateCorrelatedConjunctionRowCount(
+                    input,
+                    estimates,
+                    filterConjunctionIndependenceFactor);
+            if (isNaN(outputRowCount)) {
                 return PlanNodeStatsEstimate.unknown();
             }
-            return smallestKnownEstimate.mapOutputRowCount(rowCount -> rowCount * UNKNOWN_FILTER_COEFFICIENT);
+            return normalizer.normalize(new PlanNodeStatsEstimate(outputRowCount, intersectCorrelatedStats(estimates)), types);
+        }
+
+        private List<PlanNodeStatsEstimate> estimateCorrelatedExpressions(ImmutableList<RowExpression> terms, double filterConjunctionIndependenceFactor)
+        {
+            List<List<RowExpression>> extractedCorrelatedGroups = extractCorrelatedGroupsRE(terms, filterConjunctionIndependenceFactor);
+            ImmutableList.Builder<PlanNodeStatsEstimate> estimatesBuilder = ImmutableList.builderWithExpectedSize(extractedCorrelatedGroups.size());
+            boolean hasUnestimatedTerm = false;
+            for (List<RowExpression> correlatedExpressions : extractedCorrelatedGroups) {
+                PlanNodeStatsEstimate combinedEstimate = PlanNodeStatsEstimate.unknown();
+                for (RowExpression expression : correlatedExpressions) {
+                    PlanNodeStatsEstimate estimate;
+                    // combinedEstimate is unknown until the 1st known estimated term
+                    if (combinedEstimate.isOutputRowCountUnknown()) {
+                        estimate = process(expression);
+                    }
+                    else {
+                        estimate = new FilterRowExpressionStatsCalculatingVisitor(combinedEstimate, session, types, layout)
+                                .process(expression);
+                    }
+
+                    if (estimate.isOutputRowCountUnknown()) {
+                        hasUnestimatedTerm = true;
+                    }
+                    else {
+                        // update combinedEstimate only when the term estimate is known so that all the known estimates
+                        // can be applied progressively through FilterExpressionStatsCalculatingVisitor calls.
+                        combinedEstimate = estimate;
+                    }
+                }
+                estimatesBuilder.add(combinedEstimate);
+            }
+            if (hasUnestimatedTerm) {
+                estimatesBuilder.add(PlanNodeStatsEstimate.unknown());
+            }
+            return estimatesBuilder.build();
         }
 
         private PlanNodeStatsEstimate estimateLogicalOr(RowExpression left, RowExpression right)
@@ -1039,6 +1059,55 @@ public class FilterStatsCalculator
         checkState(symbolPartitions.size() <= terms.size(), "symbolPartitions size exceeds number of expressions");
         ListMultimap<Integer, Expression> expressionPartitions = ArrayListMultimap.create();
         for (Expression term : terms) {
+            List<Symbol> expressionSymbols = expressionUniqueSymbols.get(term);
+            int expressionPartitionId;
+            if (expressionSymbols.isEmpty()) {
+                expressionPartitionId = symbolPartitions.size(); // For expressions with no symbols
+            }
+            else {
+                Symbol symbol = expressionSymbols.get(0); // Lookup any symbol to find the partition id
+                expressionPartitionId = IntStream.range(0, symbolPartitions.size())
+                        .filter(partition -> symbolPartitions.get(partition).contains(symbol))
+                        .findFirst()
+                        .orElseThrow(() -> new PrestoException(GENERIC_INTERNAL_ERROR, "Requested symbol not found"));
+            }
+            expressionPartitions.put(expressionPartitionId, term);
+        }
+
+        return expressionPartitions.keySet().stream()
+                .map(expressionPartitions::get)
+                .collect(toImmutableList());
+    }
+
+    private static List<List<RowExpression>> extractCorrelatedGroupsRE(List<RowExpression> terms, double filterConjunctionIndependenceFactor)
+    {
+        if (filterConjunctionIndependenceFactor == 1) {
+            // Allows the filters to be estimated as if there is no correlation between any of the terms
+            return ImmutableList.of(terms);
+        }
+
+        ListMultimap<RowExpression, Symbol> expressionUniqueSymbols = ArrayListMultimap.create();
+        terms.forEach(expression -> expressionUniqueSymbols.putAll(expression, extractUnique(expression)));
+        // Partition symbols into disjoint sets such that the symbols belonging to different disjoint sets
+        // do not appear together in any expression.
+        DisjointSet<Symbol> symbolsPartitioner = new DisjointSet<>();
+        for (RowExpression term : terms) {
+            List<Symbol> expressionSymbols = expressionUniqueSymbols.get(term);
+            if (expressionSymbols.isEmpty()) {
+                continue;
+            }
+            // Ensure that symbol is added to DisjointSet when there is only one symbol in the list
+            symbolsPartitioner.find(expressionSymbols.get(0));
+            for (int i = 1; i < expressionSymbols.size(); i++) {
+                symbolsPartitioner.findAndUnion(expressionSymbols.get(0), expressionSymbols.get(i));
+            }
+        }
+
+        // Use disjoint sets of symbols to partition the given list of expressions
+        List<Set<Symbol>> symbolPartitions = ImmutableList.copyOf(symbolsPartitioner.getEquivalentClasses());
+        checkState(symbolPartitions.size() <= terms.size(), "symbolPartitions size exceeds number of expressions");
+        ListMultimap<Integer, RowExpression> expressionPartitions = ArrayListMultimap.create();
+        for (RowExpression term : terms) {
             List<Symbol> expressionSymbols = expressionUniqueSymbols.get(term);
             int expressionPartitionId;
             if (expressionSymbols.isEmpty()) {

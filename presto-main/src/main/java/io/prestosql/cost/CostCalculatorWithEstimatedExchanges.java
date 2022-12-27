@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A wrapper around CostCalculator that estimates ExchangeNodes cost.
  * <p>
- * Certain rules (e.g. {@link ReorderJoins} and {@link DetermineJoinDistributionType}) are run before exchanges
+ * Certain rules (e.g. {@link io.prestosql.sql.planner.iterative.rule.ReorderJoins} and {@link DetermineJoinDistributionType}) are run before exchanges
  * are added to a plan. This cost calculator adds the implied costs for the exchanges that will be added later.
  * It is needed to account for the differences in exchange costs for different types of joins.
  */
@@ -211,6 +211,16 @@ public class CostCalculatorWithEstimatedExchanges
                 types,
                 replicated,
                 estimatedSourceDistributedTaskCount);
+
+        // TODO: Remove once traits (https://gitee.com/openlookeng/hetu-core/issues/I68CXF) are used to correctly estimate
+        // local exchange cost for replicated join in CostCalculatorUsingExchanges#visitExchange
+        LocalCostEstimate adjustedLocalExchangeCost = adjustReplicatedJoinLocalExchangeCost(
+                build,
+                stats,
+                types,
+                replicated,
+                estimatedSourceDistributedTaskCount);
+
         LocalCostEstimate inputCost = calculateJoinInputCost(
                 probe,
                 build,
@@ -218,7 +228,38 @@ public class CostCalculatorWithEstimatedExchanges
                 types,
                 replicated,
                 estimatedSourceDistributedTaskCount);
-        return addPartialComponents(exchangesCost, inputCost);
+        return addPartialComponents(exchangesCost, adjustedLocalExchangeCost, inputCost);
+    }
+
+    public static LocalCostEstimate adjustReplicatedJoinLocalExchangeCost(
+            PlanNode build,
+            StatsProvider stats,
+            TypeProvider types,
+            boolean replicated,
+            int estimatedSourceDistributedTaskCount)
+    {
+        if (!replicated) {
+            return LocalCostEstimate.zero();
+        }
+
+        /*
+         * HACK!
+         *
+         * Stats model doesn't multiply the number of rows by the number of tasks for replicated
+         * exchange to avoid misestimation of the JOIN output.
+         *
+         * Thus the cost estimation for the operations that come after a replicated exchange is
+         * underestimated. And the cost of operations over the replicated copies must be explicitly
+         * added here.
+         */
+
+        // Add the cost of a local repartitioning of build side copies.
+        // Cost of the repartitioning of a single data copy has been already added in
+        // CostCalculatorWithEstimatedExchanges#calculateJoinExchangeCost or in CostCalculatorUsingExchanges#visitExchange
+        PlanNodeStatsEstimate buildStats = stats.getStats(build);
+        double buildSideSize = buildStats.getOutputSizeInBytes(build.getOutputSymbols(), types);
+        double cpuCost = buildSideSize * (estimatedSourceDistributedTaskCount - 1);
+        return LocalCostEstimate.of(cpuCost, 0, 0);
     }
 
     private static LocalCostEstimate calculateJoinExchangeCost(
@@ -263,22 +304,6 @@ public class CostCalculatorWithEstimatedExchanges
         double probeSideSize = probeStats.getOutputSizeInBytes(probe.getOutputSymbols(), types);
 
         double cpuCost = probeSideSize + buildSideSize * buildSizeMultiplier;
-
-        /*
-         * HACK!
-         *
-         * Stats model doesn't multiply the number of rows by the number of tasks for replicated
-         * exchange to avoid misestimation of the JOIN output.
-         *
-         * Thus the cost estimation for the operations that come after a replicated exchange is
-         * underestimated. And the cost of operations over the replicated copies must be explicitly
-         * added here.
-         */
-        if (replicated) {
-            // add the cost of a local repartitioning of build side copies
-            // cost of the repartitioning of a single data copy has been already added in calculateExchangeCost
-            cpuCost += buildSideSize * (buildSizeMultiplier - 1);
-        }
 
         double memoryCost = buildSideSize * buildSizeMultiplier;
 

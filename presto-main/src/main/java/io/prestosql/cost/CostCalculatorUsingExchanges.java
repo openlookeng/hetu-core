@@ -53,6 +53,7 @@ import java.util.stream.Stream;
 
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.adjustReplicatedJoinLocalExchangeCost;
 import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateJoinInputCost;
 import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateLocalRepartitionCost;
 import static io.prestosql.cost.CostCalculatorWithEstimatedExchanges.calculateRemoteGatherCost;
@@ -246,15 +247,24 @@ public class CostCalculatorUsingExchanges
 
         private LocalCostEstimate calculateJoinCost(PlanNode join, PlanNode probe, PlanNode build, boolean replicated)
         {
+            int estimatedSourceDistributedTaskCount = taskCountEstimator.estimateSourceDistributedTaskCount();
             LocalCostEstimate joinInputCost = calculateJoinInputCost(
                     probe,
                     build,
                     stats,
                     types,
                     replicated,
-                    taskCountEstimator.estimateSourceDistributedTaskCount());
+                    estimatedSourceDistributedTaskCount);
+            // TODO: Use traits (https://gitee.com/openlookeng/hetu-core/issues/I68CXF) instead, to correctly estimate
+            // local exchange cost for replicated join in CostCalculatorUsingExchanges#visitExchange
+            LocalCostEstimate adjustedLocalExchangeCost = adjustReplicatedJoinLocalExchangeCost(
+                    build,
+                    stats,
+                    types,
+                    replicated,
+                    estimatedSourceDistributedTaskCount);
             LocalCostEstimate joinOutputCost = calculateJoinOutputCost(join);
-            return addPartialComponents(joinInputCost, joinOutputCost);
+            return addPartialComponents(joinInputCost, adjustedLocalExchangeCost, joinOutputCost);
         }
 
         private LocalCostEstimate calculateJoinOutputCost(PlanNode join)
