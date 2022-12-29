@@ -1,4 +1,4 @@
-# Iceberg connector
+Iceberg Connector
 ==============
 
 ## Overview
