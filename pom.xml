@@ -1910,4 +1910,8 @@
             </build>
         </profile>
     </profiles>
+
+  <scm>
+    <tag>branch-1.9</tag>
+  </scm>
 </project>
