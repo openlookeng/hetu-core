@@ -733,7 +733,7 @@
 > -   **类型：** `boolean`
 > -   **默认值：** `false`
 >
-> 将CTE结果物化到缓存中。
+> 将CTE结果物化到缓存中。也可以使用enable_cte_result_cache会话属性在每个查询基础上指定。
 
 ### `cte-result-cache-threshold-size`
 

@@ -70,10 +70,14 @@ Support matrix for pushdown for different datatypes is as follows:
 | `integer`      | INTEGER     | Yes                            | Yes                          |
 | `long`         | BIGINT      | Yes                            | Yes                          |
 | `keyword`      | VARCHAR     | Yes                            | Yes                          |
-| `text`         | VARCHAR     | Yes                            | Yes                          |
+| `text`         | VARCHAR     | No                             | Yes                          |
 | `date`         | TIMESTAMP   | Yes                            | Yes                          |
 | `ip`           | IPADDRESS   | Yes                            | Yes                          |
 | `(all others)` |             | No                             | No                           |
+
+**Note**
+
+Due to functional limitations of Elasticsearch on aggregations for TEXT field types, the type of pushdown will always fail with an error message returned.
 
 ### `elasticsearch.scroll-size`
 

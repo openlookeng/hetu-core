@@ -64,10 +64,14 @@ elasticsearch.pushdown.enabled=true
 | `integer`        | INTEGER     | 是   | 是   |
 | `long`           | BIGINT      | 是   | 是   |
 | `keyword`        | VARCHAR     | 是   | 是   |
-| `text`           | VARCHAR     | 是   | 是   |
+| `text`           | VARCHAR     | 否   | 是   |
 | `date`           | TIMESTAMP   | 是   | 是   |
 | `ip`             | IPADDRESS   | 是   | 是   |
 | `(其他类型)`         |             | 否   | 否   |
+
+**说明**
+
+由于Elasticsearch不支持针对text类型字段的聚合，因此该类型聚合下推无法成功。
 
 ### `elasticsearch.scroll-size`
 

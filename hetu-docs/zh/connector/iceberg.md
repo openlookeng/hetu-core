@@ -36,7 +36,7 @@ Iceberg 通用配置属性
 |hive.metastore.uri    | thrift://localhost:9083|是 | hive连接地址                             |
 |iceberg.file-format              | ORC         |否            | 为Iceberg表定义数据存储文件格式。可能的值是PARQUET、ORC  |
 |iceberg.compression-codec| ZSTD|否|写入文件时要使用的压缩编解码器 可能的值是( NONE SNAPPY LZ4 ZSTD GZIP)
-|iceberg.use-file-size-from-metadata|true|否|从元数据而不是文件系统中读取文件大小。此属性应仅设置为此问题的解决方法。此问题已在冰山版本 0.11.0 中修复。
+|iceberg.use-file-size-from-metadata|true|否|从元数据而不是文件系统中读取文件大小。此属性应仅设置为此问题的解决方法。此问题已在Iceberg版本0.11.0 中修复。
 |iceberg.max-partitions-per-writer|100|否|每个写入器处理的最大分区数。
 |iceberg.unique-table-location|true|否|使用随机的唯一表位置。
 |iceberg.dynamic-filtering.wait-timeout|0s|否|在拆分生成期间等待动态筛选器完成的最大持续时间。
