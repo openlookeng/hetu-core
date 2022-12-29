@@ -82,6 +82,7 @@ headless: true
     - [Hive连接器GCS教程]({{< relref "./docs/connector/hive-gcs-tutorial.md" >}})
     - [Hive安全配置]({{< relref "./docs/connector/hive-security.md" >}})
     - [Hudi]({{< relref "./docs/connector/Hudi.md" >}})
+    - [Iceberg]({{< relref "./docs/connector/iceberg.md" >}})
     - [JMX]({{< relref "./docs/connector/jmx.md" >}})
     - [Kafka]({{< relref "./docs/connector/kafka.md" >}})
     - [Kafka连接器教程]({{< relref "./docs/connector/kafka-tutorial.md" >}})
