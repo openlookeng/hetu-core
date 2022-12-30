@@ -45,7 +45,7 @@ import org.apache.shardingsphere.readwritesplitting.rule.ReadwriteSplittingDataS
 import org.apache.shardingsphere.readwritesplitting.rule.ReadwriteSplittingRule;
 import org.apache.shardingsphere.sharding.rule.ShardingRule;
 import org.apache.shardingsphere.singletable.rule.SingleTableRule;
-import org.apache.shardingsphere.transaction.core.TransactionType;
+import org.apache.shardingsphere.transaction.api.TransactionType;
 import org.apache.shardingsphere.transaction.core.TransactionTypeHolder;
 
 import javax.inject.Inject;
@@ -94,8 +94,7 @@ public class ShardingSphereAdaptor
                         shardingSphereConfig.getType(),
                         shardingSphereConfig.getNamespace(),
                         shardingSphereConfig.getServerLists(),
-                        properties),
-                false);
+                        properties));
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             loadDrivers();
             this.dataSource = (ShardingSphereDataSource) ShardingSphereDataSourceFactory
@@ -125,7 +124,7 @@ public class ShardingSphereAdaptor
     public Connection openResourceConnection(String resourceName)
     {
         try (ShardingSphereConnection connection = (ShardingSphereConnection) openConnection()) {
-            Map<String, DataSource> resourceMap = getShardingSphereDatabase(connection).getResource().getDataSources();
+            Map<String, DataSource> resourceMap = getShardingSphereDatabase(connection).getResourceMetaData().getDataSources();
             if (resourceMap.containsKey(resourceName)) {
                 return resourceMap.get(resourceName).getConnection();
             }
@@ -278,7 +277,7 @@ public class ShardingSphereAdaptor
 
         return new QueryContext(
             SQLStatementContextFactory.newInstance(
-                metaData.getDatabases(),
+                metaData,
                 metaData.getGlobalRuleMetaData()
                         .getSingleRule(SQLParserRule.class)
                         .getSQLParserEngine(DATABASE_TYPE.getType())

@@ -16,59 +16,64 @@
 package io.hetu.core.plugin.singledata.tidrange;
 
 import io.airlift.configuration.Config;
-import io.airlift.units.DataSize;
-import io.airlift.units.MaxDataSize;
-import io.airlift.units.MinDataSize;
 
 import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
-
-import static io.airlift.units.DataSize.Unit.KILOBYTE;
-import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class TidRangeConfig
 {
-    private long maxSplitCount = 100;
-    private DataSize pageSize = new DataSize(8, KILOBYTE);
-    private DataSize defaultSplitSize = new DataSize(32, MEGABYTE);
+    private int maxConnectionCountPerNode = 100;
+    private int maxTableSplitCountPerNode = 50;
+    private long connectionTimeout;
+    private long maxLifetime = 1800000L;
 
     @Min(1)
-    public long getMaxSplitCount()
+    public int getMaxConnectionCountPerNode()
     {
-        return maxSplitCount;
+        return maxConnectionCountPerNode;
     }
 
-    @Config("tidrange.max-split-count")
-    public TidRangeConfig setMaxSplitCount(long maxSplitCount)
+    @Config("tidrange.max-connection-count-per-node")
+    public TidRangeConfig setMaxConnectionCountPerNode(int maxConnectionCountPerNode)
     {
-        this.maxSplitCount = maxSplitCount;
+        this.maxConnectionCountPerNode = maxConnectionCountPerNode;
         return this;
     }
 
-    @NotNull
-    public DataSize getPageSize()
+    @Min(1)
+    public int getMaxTableSplitCountPerNode()
     {
-        return pageSize;
+        return maxTableSplitCountPerNode;
     }
 
-    @Config("tidrange.page-size")
-    public TidRangeConfig setPageSize(DataSize pageSize)
+    @Config("tidrange.max-table-split-count-per-node")
+    public TidRangeConfig setMaxTableSplitCountPerNode(int maxTableSplitCountPerNode)
     {
-        this.pageSize = pageSize;
+        this.maxTableSplitCountPerNode = maxTableSplitCountPerNode;
         return this;
     }
 
-    @MinDataSize("1MB")
-    @MaxDataSize("1GB")
-    public DataSize getDefaultSplitSize()
+    public long getConnectionTimeout()
     {
-        return defaultSplitSize;
+        return connectionTimeout;
     }
 
-    @Config("tidrange.default-split-size")
-    public TidRangeConfig setDefaultSplitSize(DataSize defaultSplitSize)
+    @Config("tidrange.connection-timeout")
+    public TidRangeConfig setConnectionTimeout(long connectionTimeout)
     {
-        this.defaultSplitSize = defaultSplitSize;
+        this.connectionTimeout = connectionTimeout;
+        return this;
+    }
+
+    @Min(30000L)
+    public long getMaxLifetime()
+    {
+        return maxLifetime;
+    }
+
+    @Config("tidrange.max-lifetime")
+    public TidRangeConfig setMaxLifetime(long maxLifetime)
+    {
+        this.maxLifetime = maxLifetime;
         return this;
     }
 }

@@ -34,6 +34,21 @@ public class TidRangeUtils
         return "SELECT * FROM pg_indexes WHERE tablename = '" + tableName + "'";
     }
 
+    public static String getBlockSizeSql()
+    {
+        return "SHOW block_size";
+    }
+
+    public static String getMaxConnectionsSql()
+    {
+        return "SHOW max_connections";
+    }
+
+    public static String getPluginStatusSql()
+    {
+        return "SHOW enable_tidrangescan";
+    }
+
     public static String getSplitSqlFromContext(SingleDataPushDownContext context, String splitFilter)
     {
         StringBuilder sqlBuilder = new StringBuilder("SELECT ")

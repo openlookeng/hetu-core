@@ -58,6 +58,7 @@ public class TestShardingSphereIntegrationSmokeTest
                 .row("information_schema")
                 .row("pg_catalog")
                 .row("public")
+                .row("shardingsphere")
                 .build();
         assertEquals(expected, actual);
     }

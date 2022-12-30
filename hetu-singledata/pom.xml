@@ -14,16 +14,16 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <dep.shardingsphere.version>5.2.0</dep.shardingsphere.version>
+        <dep.shardingsphere.version>5.3.0</dep.shardingsphere.version>
         <dep.curator.version>5.1.0</dep.curator.version>
         <dep.zookeeper.verison>3.6.0</dep.zookeeper.verison>
         <dep.calcite.version>1.27.0</dep.calcite.version>
         <dep.antlr4.version>4.9.2</dep.antlr4.version>
-        <dep.zaxxer.version>3.4.2</dep.zaxxer.version>
+        <dep.hikari.version>4.0.3</dep.hikari.version>
         <dep.testng.version>6.10</dep.testng.version>
         <dep.findbugs.version>3.0.2</dep.findbugs.version>
         <dep.caffeine.version>2.9.2</dep.caffeine.version>
-        <dep.slf4j.version>1.7.29</dep.slf4j.version>
+        <dep.slf4j.version>1.7.36</dep.slf4j.version>
         <dep.h2.version>2.1.214</dep.h2.version>
     </properties>
 
@@ -79,6 +79,11 @@
         </dependency>
 
         <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>concurrent</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>javax.inject</groupId>
             <artifactId>javax.inject</artifactId>
         </dependency>
@@ -113,6 +118,11 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>units</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
         </dependency>
 
         <dependency>
@@ -201,6 +211,10 @@
                     <artifactId>guava</artifactId>
                 </exclusion>
                 <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
+                </exclusion>
+                <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
@@ -248,6 +262,10 @@
                 <exclusion>
                     <groupId>commons-logging</groupId>
                     <artifactId>commons-logging</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-lang3</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>com.google.guava</groupId>
@@ -316,6 +334,22 @@
                 <exclusion>
                     <groupId>com.h2database</groupId>
                     <artifactId>h2</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.shardingsphere</groupId>
+            <artifactId>shardingsphere-transaction-api</artifactId>
+            <version>${dep.shardingsphere.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>jul-to-slf4j</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -414,7 +448,7 @@
 
         <dependency>
             <groupId>org.apache.shardingsphere</groupId>
-            <artifactId>shardingsphere-cluster-mode-repository-zookeeper-curator</artifactId>
+            <artifactId>shardingsphere-cluster-mode-repository-zookeeper</artifactId>
             <version>${dep.shardingsphere.version}</version>
             <scope>runtime</scope>
             <exclusions>
@@ -561,6 +595,10 @@
                     <groupId>org.slf4j</groupId>
                     <artifactId>jul-to-slf4j</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-transport-native-unix-common</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
@@ -665,7 +703,7 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>${dep.zaxxer.version}</version>
+            <version>${dep.hikari.version}</version>
             <scope>compile</scope>
         </dependency>
 

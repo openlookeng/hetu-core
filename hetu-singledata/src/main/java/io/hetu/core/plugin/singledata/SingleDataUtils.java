@@ -42,7 +42,7 @@ public class SingleDataUtils
         else {
             selectClause.append(columns.stream().map(JdbcColumnHandle::getColumnName).map(SingleDataUtils::quote).collect(joining(", ")));
         }
-        selectClause.append(" FROM (").append(query).append(") AS temp_table");
+        selectClause.append(" FROM (").append(query).append(") AS hetu_temp_table");
         return selectClause.toString();
     }
 

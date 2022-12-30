@@ -21,7 +21,6 @@ import io.hetu.core.plugin.opengauss.OpenGaussClientConfig;
 import io.hetu.core.plugin.singledata.SingleDataSplit;
 import io.hetu.core.plugin.singledata.optimization.SingleDataPushDownContext;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
-import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.connector.ColumnHandle;
@@ -32,6 +31,7 @@ import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.testing.TestingTypeManager;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.sql.Connection;
@@ -53,6 +53,7 @@ import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.type.JsonType.JSON;
 import static io.prestosql.type.UuidType.UUID;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -61,8 +62,15 @@ import static org.testng.Assert.assertTrue;
 
 public class TestTidRangeClient
 {
-    private final TidRangeClient testingClient = new TidRangeClient(new BaseJdbcConfig(), new OpenGaussClientConfig(),
-            new TidRangeConfig(), new TestingConnectionFactory(), new SingleDataTypeManager());
+    private TidRangeClient testingClient;
+
+    @BeforeClass
+    public void initClient()
+            throws SQLException
+    {
+        testingClient = new TidRangeClient(new BaseJdbcConfig(), new OpenGaussClientConfig(), new TidRangeConfig(),
+                mockConnectionFactory(), new SingleDataTypeManager());
+    }
 
     @Test
     public void testTryGetSplits()
@@ -100,39 +108,52 @@ public class TestTidRangeClient
         assertTrue(splits.isFinished());
     }
 
-    private static class TestingConnectionFactory
-            implements ConnectionFactory
+    private TidRangeConnectionFactory mockConnectionFactory()
+            throws SQLException
     {
-        @Override
-        public Connection openConnection(JdbcIdentity identity)
-                throws SQLException
-        {
-            Connection connection = mock(Connection.class);
+        TidRangeConnectionFactory connectionFactory = mock(TidRangeConnectionFactory.class);
+        Connection connection = mockConnection();
+        when(connectionFactory.openConnection(any())).thenReturn(connection);
+        when(connectionFactory.getAvailableConnections(any())).thenReturn(ImmutableList.of(1));
 
-            PreparedStatement emptyStatement = mock(PreparedStatement.class);
-            ResultSet emptyResultSet = mock(ResultSet.class);
-            when(emptyResultSet.next()).thenReturn(false);
-            when(emptyStatement.executeQuery()).thenReturn(emptyResultSet);
+        return connectionFactory;
+    }
 
-            PreparedStatement defaultSplitStatement = mock(PreparedStatement.class);
-            ResultSet defaultSplitResultSet = mock(ResultSet.class);
-            when(defaultSplitResultSet.next()).thenReturn(true);
-            when(defaultSplitResultSet.getLong(1)).thenReturn(10000L);
-            when(defaultSplitStatement.executeQuery()).thenReturn(defaultSplitResultSet);
+    private Connection mockConnection()
+            throws SQLException
+    {
+        Connection connection = mock(Connection.class);
 
-            PreparedStatement maxSplitStatement = mock(PreparedStatement.class);
-            ResultSet maxSplitResultSet = mock(ResultSet.class);
-            when(maxSplitResultSet.next()).thenReturn(true);
-            when(maxSplitResultSet.getLong(1)).thenReturn(1000000000L);
-            when(maxSplitStatement.executeQuery()).thenReturn(maxSplitResultSet);
+        PreparedStatement emptyStatement = mock(PreparedStatement.class);
+        ResultSet emptyResultSet = mock(ResultSet.class);
+        when(emptyResultSet.next()).thenReturn(false);
+        when(emptyStatement.executeQuery()).thenReturn(emptyResultSet);
 
-            when(connection.prepareStatement("SELECT * FROM pg_indexes WHERE tablename = 'test'")).thenReturn(emptyStatement);
-            when(connection.prepareStatement("SELECT * FROM pg_indexes WHERE tablename = 'test0'")).thenReturn(emptyStatement);
-            when(connection.prepareStatement("SELECT pg_relation_size('test')")).thenReturn(defaultSplitStatement);
-            when(connection.prepareStatement("SELECT pg_relation_size('test0')")).thenReturn(maxSplitStatement);
+        PreparedStatement defaultSplitStatement = mock(PreparedStatement.class);
+        ResultSet defaultSplitResultSet = mock(ResultSet.class);
+        when(defaultSplitResultSet.next()).thenReturn(true);
+        when(defaultSplitResultSet.getLong(1)).thenReturn(10000L);
+        when(defaultSplitStatement.executeQuery()).thenReturn(defaultSplitResultSet);
 
-            return connection;
-        }
+        PreparedStatement maxSplitStatement = mock(PreparedStatement.class);
+        ResultSet maxSplitResultSet = mock(ResultSet.class);
+        when(maxSplitResultSet.next()).thenReturn(true);
+        when(maxSplitResultSet.getLong(1)).thenReturn(1000000000L);
+        when(maxSplitStatement.executeQuery()).thenReturn(maxSplitResultSet);
+
+        PreparedStatement blockSizeStatement = mock(PreparedStatement.class);
+        ResultSet blockSizeResultSet = mock(ResultSet.class);
+        when(blockSizeResultSet.next()).thenReturn(true);
+        when(blockSizeResultSet.getLong(1)).thenReturn(8192L);
+        when(blockSizeStatement.executeQuery()).thenReturn(blockSizeResultSet);
+
+        when(connection.prepareStatement("SELECT * FROM pg_indexes WHERE tablename = 'test'")).thenReturn(emptyStatement);
+        when(connection.prepareStatement("SELECT * FROM pg_indexes WHERE tablename = 'test0'")).thenReturn(emptyStatement);
+        when(connection.prepareStatement("SHOW block_size")).thenReturn(blockSizeStatement);
+        when(connection.prepareStatement("SELECT pg_relation_size('test')")).thenReturn(defaultSplitStatement);
+        when(connection.prepareStatement("SELECT pg_relation_size('test0')")).thenReturn(maxSplitStatement);
+
+        return connection;
     }
 
     private static class SingleDataTypeManager
