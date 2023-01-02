@@ -980,8 +980,7 @@ public class PruneUnreferencedOutputs
         public PlanNode visitCTEScan(CTEScanNode node, SimplePlanRewriter.RewriteContext<Set<Symbol>> context)
         {
             PlanNode source = context.rewrite(node.getSource(), ImmutableSet.copyOf(node.getOutputSymbols()));
-            node.replaceChildren(ImmutableList.of(source));
-            return node;
+            return node.replaceChildren(ImmutableList.of(source));
         }
     }
 }
