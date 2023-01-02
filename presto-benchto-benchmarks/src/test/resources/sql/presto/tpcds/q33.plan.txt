@@ -52,19 +52,18 @@ local exchange (GATHER, SINGLE, [])
                             remote exchange (REPARTITION, HASH, ["i_manufact_id_206"])
                                 partial hashaggregation over (i_manufact_id_206)
                                     semijoin (REPLICATED):
-                                        join (INNER, PARTITIONED):
-                                            remote exchange (REPARTITION, HASH, ["ws_item_sk"])
+                                        join (INNER, REPLICATED):
+                                            join (INNER, REPLICATED):
                                                 join (INNER, REPLICATED):
-                                                    join (INNER, REPLICATED):
-                                                        scan web_sales
-                                                        local exchange (GATHER, SINGLE, [])
-                                                            remote exchange (REPLICATE, BROADCAST, [])
-                                                                scan date_dim
+                                                    scan web_sales
                                                     local exchange (GATHER, SINGLE, [])
                                                         remote exchange (REPLICATE, BROADCAST, [])
-                                                            scan customer_address
+                                                            scan date_dim
+                                                local exchange (GATHER, SINGLE, [])
+                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                        scan customer_address
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["i_item_sk_193"])
+                                                remote exchange (REPLICATE, BROADCAST, [])
                                                     scan item
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])

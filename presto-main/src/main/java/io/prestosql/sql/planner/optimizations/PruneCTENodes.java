@@ -18,6 +18,7 @@ import io.prestosql.Session;
 import io.prestosql.execution.warnings.WarningCollector;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.metadata.TableHandle;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
@@ -117,12 +118,13 @@ public class PruneCTENodes
         {
             Integer left = getChildCTERefNum(node.getLeft());
             Integer right = getChildCTERefNum(node.getRight());
+
             if (pruneCTEWithCrossJoin && node.isCrossJoin()) {
-                if (left != null && right != null && left.equals(right)) {
+                if (left != null && right != null && left.equals(right) && checkCTELevel(node)) {
                     cTEWithCrossJoinList.add(left);
                 }
             }
-            if (left != null && right != null && left.equals(right)) {
+            if (left != null && right != null && left.equals(right) && checkCTELevel(node)) {
                 if (!isNodeAlreadyVisited) {
                     PlanNodeId probeCteNodeId = getProbeCTENodeId(node.getLeft());
                     if (probeCteNodeId != null) {
@@ -131,6 +133,19 @@ public class PruneCTENodes
                 }
             }
             return context.defaultRewrite(node, context.get());
+        }
+
+        private boolean checkCTELevel(JoinNode node)
+        {
+            int leftLevel = getChildCTELevel(node.getLeft(), 0);
+            int rightLevel = getChildCTELevel(node.getRight(), 0);
+            if (leftLevel == 0 || rightLevel == 0) {
+                return true;
+            }
+            else if (leftLevel == rightLevel) {
+                return false;
+            }
+            return true;
         }
 
         private PlanNodeId getProbeCTENodeId(PlanNode node)
@@ -147,6 +162,13 @@ public class PruneCTENodes
             else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
                 return getProbeCTENodeId(node.getSources().get(0));
             }
+            else if (node instanceof AggregationNode) {
+                return getProbeCTENodeId(((AggregationNode) node).getSource());
+            }
+            else if (node instanceof JoinNode) {
+                return getProbeCTENodeId(((JoinNode) node).getLeft());
+            }
+
             return null;
         }
 
@@ -181,7 +203,41 @@ public class PruneCTENodes
             else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
                 return getChildCTERefNum(node.getSources().get(0));
             }
+            else if (node instanceof AggregationNode) {
+                return getChildCTERefNum(((AggregationNode) node).getSource());
+            }
+            else if (node instanceof JoinNode) {
+                PlanNode joinNode = ((JoinNode) node).getLeft();
+                return getChildCTERefNum(joinNode);
+            }
             return null;
+        }
+
+        private int getChildCTELevel(PlanNode node, int levelVal)
+        {
+            int level = levelVal;
+            if (node instanceof CTEScanNode) {
+                return level;
+            }
+            else if (node instanceof ProjectNode) {
+                return getChildCTELevel(((ProjectNode) node).getSource(), level);
+            }
+            else if (node instanceof FilterNode) {
+                return getChildCTELevel(((FilterNode) node).getSource(), level);
+            }
+            else if (node.getSources().size() == 1 && node instanceof ExchangeNode) {
+                return getChildCTELevel(node.getSources().get(0), level);
+            }
+            else if (node instanceof AggregationNode) {
+                level++;
+                return getChildCTELevel(((AggregationNode) node).getSource(), level);
+            }
+            else if (node instanceof JoinNode) {
+                PlanNode joinNode = ((JoinNode) node).getLeft();
+                level++;
+                return getChildCTELevel(joinNode, level);
+            }
+            return level;
         }
 
         @Override

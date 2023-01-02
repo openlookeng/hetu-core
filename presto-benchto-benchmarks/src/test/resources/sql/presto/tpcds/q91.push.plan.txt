@@ -6,29 +6,29 @@ remote exchange (GATHER, SINGLE, [])
                     remote exchange (REPARTITION, HASH, ["cc_call_center_id", "cc_manager", "cc_name", "cd_education_status", "cd_marital_status"])
                         partial hashaggregation over (cc_call_center_id, cc_manager, cc_name, cd_education_status, cd_marital_status)
                             join (INNER, REPLICATED):
-                                join (INNER, REPLICATED):
-                                    scan customer_demographics (pushdown = true)
+                                join (INNER, PARTITIONED):
+                                    remote exchange (REPARTITION, HASH, ["cr_returning_customer_sk"])
+                                        join (INNER, REPLICATED):
+                                            scan catalog_returns
+                                            local exchange (GATHER, SINGLE, [])
+                                                remote exchange (REPLICATE, BROADCAST, [])
+                                                    scan date_dim (pushdown = true)
                                     local exchange (GATHER, SINGLE, [])
-                                        remote exchange (REPLICATE, BROADCAST, [])
-                                            join (INNER, PARTITIONED):
-                                                remote exchange (REPARTITION, HASH, ["hd_demo_sk"])
-                                                    scan household_demographics (pushdown = true)
+                                        remote exchange (REPARTITION, HASH, ["c_customer_sk"])
+                                            join (INNER, REPLICATED):
+                                                scan customer_demographics (pushdown = true)
                                                 local exchange (GATHER, SINGLE, [])
-                                                    remote exchange (REPARTITION, HASH, ["c_current_hdemo_sk"])
+                                                    remote exchange (REPLICATE, BROADCAST, [])
                                                         join (INNER, PARTITIONED):
-                                                            remote exchange (REPARTITION, HASH, ["c_customer_sk"])
-                                                                join (INNER, REPLICATED):
-                                                                    scan customer
-                                                                    local exchange (GATHER, SINGLE, [])
-                                                                        remote exchange (REPLICATE, BROADCAST, [])
-                                                                            scan customer_address (pushdown = true)
+                                                            remote exchange (REPARTITION, HASH, ["hd_demo_sk"])
+                                                                scan household_demographics (pushdown = true)
                                                             local exchange (GATHER, SINGLE, [])
-                                                                remote exchange (REPARTITION, HASH, ["cr_returning_customer_sk"])
+                                                                remote exchange (REPARTITION, HASH, ["c_current_hdemo_sk"])
                                                                     join (INNER, REPLICATED):
-                                                                        scan catalog_returns
+                                                                        scan customer
                                                                         local exchange (GATHER, SINGLE, [])
                                                                             remote exchange (REPLICATE, BROADCAST, [])
-                                                                                scan date_dim (pushdown = true)
+                                                                                scan customer_address (pushdown = true)
                                 local exchange (GATHER, SINGLE, [])
                                     remote exchange (REPLICATE, BROADCAST, [])
                                         scan call_center

@@ -8,15 +8,14 @@ local exchange (GATHER, SINGLE, [])
                             join (INNER, PARTITIONED):
                                 remote exchange (REPARTITION, HASH, ["ss_addr_sk"])
                                     join (INNER, REPLICATED):
-                                        join (INNER, PARTITIONED):
-                                            remote exchange (REPARTITION, HASH, ["ss_hdemo_sk"])
-                                                join (INNER, REPLICATED):
-                                                    scan store_sales
-                                                    local exchange (GATHER, SINGLE, [])
-                                                        remote exchange (REPLICATE, BROADCAST, [])
-                                                            scan date_dim (pushdown = true)
+                                        join (INNER, REPLICATED):
+                                            join (INNER, REPLICATED):
+                                                scan store_sales
+                                                local exchange (GATHER, SINGLE, [])
+                                                    remote exchange (REPLICATE, BROADCAST, [])
+                                                        scan date_dim (pushdown = true)
                                             local exchange (GATHER, SINGLE, [])
-                                                remote exchange (REPARTITION, HASH, ["hd_demo_sk"])
+                                                remote exchange (REPLICATE, BROADCAST, [])
                                                     scan household_demographics (pushdown = true)
                                         local exchange (GATHER, SINGLE, [])
                                             remote exchange (REPLICATE, BROADCAST, [])
