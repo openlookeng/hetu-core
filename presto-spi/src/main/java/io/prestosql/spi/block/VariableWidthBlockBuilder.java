@@ -13,7 +13,6 @@
  */
 package io.prestosql.spi.block;
 
-import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
@@ -56,7 +55,7 @@ public class VariableWidthBlockBuilder
     private int initialEntryCount;
     private int initialSliceOutputSize;
 
-    private SliceOutput sliceOutput = new DynamicSliceOutput(0);
+    private SliceOutput sliceOutput = new CustomSliceOutput(0);
 
     private boolean hasNullValue;
     // it is assumed that the offsets array is one position longer than the valueIsNull array
@@ -293,7 +292,7 @@ public class VariableWidthBlockBuilder
         initialized = true;
         valueIsNull = new boolean[initialEntryCount];
         offsets = new int[initialEntryCount + 1];
-        sliceOutput = new DynamicSliceOutput(initialSliceOutputSize);
+        sliceOutput = new CustomSliceOutput(initialSliceOutputSize);
         updateArraysDataSize();
     }
 
