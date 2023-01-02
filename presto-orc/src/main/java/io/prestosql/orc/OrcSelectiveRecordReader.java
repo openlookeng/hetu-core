@@ -278,7 +278,6 @@ public class OrcSelectiveRecordReader
          */
         BitSet accumulator = new BitSet();
         if (colReaderWithORFilter.size() > 0 && positionCount > 0) {
-            int localPositionCount = positionCount;
             for (Integer columnIdx : colReaderWithORFilter) {
                 if (columnIdx < 0) {
                     if (matchConstantWithPredicate(includedColumns.get(columnIdx), constantValues.get(columnIdx), disjuctFilters.get(columnIdx).get(0))) {
@@ -293,7 +292,7 @@ public class OrcSelectiveRecordReader
                     }
                 }
                 else if (columnReaders[columnIdx] != null) {
-                    localPositionCount += columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, disjuctFilters.get(columnIdx), accumulator);
+                    columnReaders[columnIdx].readOr(getNextRowInGroup(), positionsToRead, positionCount, disjuctFilters.get(columnIdx), accumulator);
                 }
             }
 
@@ -336,8 +335,9 @@ public class OrcSelectiveRecordReader
             else {
                 Block block = getColumnReaders()[columnIndex].getBlock(positionsToRead, positionCount);
                 updateMaxCombinedBytesPerRow(columnIndex, block);
-                if (coercers.containsKey(i)) {
-                    block = coercers.get(i).apply(block);
+                Function<Block, Block> blockBlockFunction = coercers.get(i);
+                if (blockBlockFunction != null) {
+                    block = blockBlockFunction.apply(block);
                 }
                 blocks[i] = block;
             }
@@ -367,10 +367,10 @@ public class OrcSelectiveRecordReader
         // currentPosition to currentBatchSize
         StripeInformation stripe = stripes.get(currentStripe);
 
-        if (matchingRowsInBatchArray == null && stripeMatchingRows.containsKey(stripe)) {
+        PeekingIterator<Integer> matchingRows = stripeMatchingRows.get(stripe);
+        if (matchingRowsInBatchArray == null && matchingRows != null) {
             long currentPositionInStripe = currentPosition - currentStripePosition;
 
-            PeekingIterator<Integer> matchingRows = stripeMatchingRows.get(stripe);
             List<Integer> matchingRowsInBlock = new ArrayList<>();
 
             while (matchingRows.hasNext()) {
@@ -471,7 +471,8 @@ public class OrcSelectiveRecordReader
 
         for (int i = 0; i < fieldCount; i++) {
             // create column reader only for columns which are part of projection and filter.
-            if (includedColumns.containsKey(i)) {
+            Type includedColType = includedColumns.get(i);
+            if (includedColType != null) {
                 int columnIndex = i;
                 OrcColumn column = fileColumns.get(columnIndex);
                 boolean outputRequired = outputColumns.contains(i);
@@ -479,7 +480,7 @@ public class OrcSelectiveRecordReader
 
                 if (useDataCache && orcCacheProperties.isRowDataCacheEnabled()) {
                     ColumnReader cr = ColumnReaders.createColumnReader(
-                            includedColumns.get(i),
+                            includedColType,
                             column,
                             systemMemoryContext,
                             blockFactory.createNestedBlockFactory(block -> blockLoaded(columnIndex, block)));
@@ -490,7 +491,7 @@ public class OrcSelectiveRecordReader
                             orcTypes.get(column.getColumnId()),
                             column,
                             Optional.ofNullable(filters.get(i)),
-                            outputRequired ? Optional.of(includedColumns.get(i)) : Optional.empty(),
+                            outputRequired ? Optional.of(includedColType) : Optional.empty(),
                             hiveStorageTimeZone,
                             systemMemoryContext);
                     if (orcCacheProperties.isRowDataCacheEnabled()) {

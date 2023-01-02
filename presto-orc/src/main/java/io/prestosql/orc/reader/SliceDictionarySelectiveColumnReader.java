@@ -32,6 +32,7 @@ import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.VariableWidthBlock;
 import io.prestosql.spi.type.Type;
+import org.apache.commons.lang3.ArrayUtils;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -62,7 +63,7 @@ public class SliceDictionarySelectiveColumnReader
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDictionarySelectiveColumnReader.class).instanceSize();
 
-    private static final byte[] EMPTY_DICTIONARY_DATA = new byte[0];
+    private static final byte[] EMPTY_DICTIONARY_DATA = ArrayUtils.EMPTY_BYTE_ARRAY;
     // add one extra entry for null after stripe/rowGroup dictionary
     private static final int[] EMPTY_DICTIONARY_OFFSETS = new int[2];
 
@@ -78,7 +79,6 @@ public class SliceDictionarySelectiveColumnReader
     private int[] stripeDictionaryOffsetVector = EMPTY_DICTIONARY_OFFSETS;
     private byte[] currentDictionaryData = EMPTY_DICTIONARY_DATA;
     private int[] stripeDictionaryLength = new int[0];
-    private int[] rowGroupDictionaryLength = new int[0];
 
     private int readOffset;
 
@@ -514,7 +514,6 @@ public class SliceDictionarySelectiveColumnReader
         values = null;
         outputPositions = null;
         currentDictionaryData = null;
-        rowGroupDictionaryLength = null;
         stripeDictionaryData = null;
         stripeDictionaryLength = null;
         systemMemoryContext.close();

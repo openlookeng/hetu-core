@@ -205,7 +205,7 @@ public class TimestampSelectiveColumnReader
     {
         int streamPosition = 0;
         outputPositionCount = 0;
-        boolean checkNulls = filters != null && filters.stream().anyMatch(f -> f.testNull());
+        boolean checkNulls = filters != null && filters.stream().anyMatch(TupleDomainFilter::testNull);
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             if (position > streamPosition) {
@@ -438,7 +438,7 @@ public class TimestampSelectiveColumnReader
     public Block mergeBlocks(List<Block<Long>> blocks, int positionCount)
     {
         LongArrayBlockBuilder blockBuilder = new LongArrayBlockBuilder(null, positionCount);
-        blocks.stream().forEach(block -> {
+        blocks.forEach(block -> {
             for (int i = 0; i < block.getPositionCount(); i++) {
                 if (block.isNull(i)) {
                     blockBuilder.appendNull();

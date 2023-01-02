@@ -205,12 +205,10 @@ public class OrcRecordReader
     {
         // currentPosition to currentBatchSize
         StripeInformation stripe = stripes.get(currentStripe);
-
-        if (matchingRowsInBatchArray == null && stripeMatchingRows.containsKey(
-                stripe) && block.getPositionCount() != 0) {
+        PeekingIterator<Integer> matchingRows = stripeMatchingRows.get(stripe);
+        if (matchingRowsInBatchArray == null && matchingRows != null && block.getPositionCount() != 0) {
             long currentPositionInStripe = currentPosition - currentStripePosition;
 
-            PeekingIterator<Integer> matchingRows = stripeMatchingRows.get(stripe);
             List<Integer> matchingRowsInBlock = new ArrayList<>();
 
             while (matchingRows.hasNext()) {

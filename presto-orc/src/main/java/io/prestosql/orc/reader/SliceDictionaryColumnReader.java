@@ -28,6 +28,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.block.VariableWidthBlock;
+import org.apache.commons.lang3.ArrayUtils;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -57,7 +58,7 @@ public class SliceDictionaryColumnReader
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SliceDictionaryColumnReader.class).instanceSize();
 
-    private static final byte[] EMPTY_DICTIONARY_DATA = new byte[0];
+    private static final byte[] EMPTY_DICTIONARY_DATA = ArrayUtils.EMPTY_BYTE_ARRAY;
     // add one extra entry for null after strip/rowGroup dictionary
     private static final int[] EMPTY_DICTIONARY_OFFSETS = new int[2];
 

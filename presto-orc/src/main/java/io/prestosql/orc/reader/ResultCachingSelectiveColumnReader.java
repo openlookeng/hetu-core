@@ -200,7 +200,7 @@ public class ResultCachingSelectiveColumnReader<T>
     {
         /* Fixme(Nitin): merge all accumulated blocks in single array */
         if (accumulatedBlocks.size() > 0) {
-            return new BlockListBlock(accumulatedBlocks.toArray(new Block[accumulatedBlocks.size()]),
+            return new BlockListBlock(accumulatedBlocks.toArray(new Block[0]),
                     accumulatedBlocks.size(),
                     totalPositionCount);
         }

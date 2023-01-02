@@ -27,6 +27,7 @@ import io.prestosql.spi.block.ByteArrayBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
 import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.Type;
+import org.apache.commons.lang3.ArrayUtils;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -68,7 +69,7 @@ public class BooleanColumnReader
 
     private boolean rowGroupOpen;
 
-    private byte[] nonNullValueTemp = new byte[0];
+    private byte[] nonNullValueTemp = ArrayUtils.EMPTY_BYTE_ARRAY;
 
     private final LocalMemoryContext systemMemoryContext;
 

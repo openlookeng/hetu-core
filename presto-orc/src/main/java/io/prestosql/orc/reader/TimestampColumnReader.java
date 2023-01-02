@@ -47,6 +47,7 @@ import static io.prestosql.orc.metadata.Stream.StreamKind.SECONDARY;
 import static io.prestosql.orc.reader.ReaderUtils.verifyStreamType;
 import static io.prestosql.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
+import static io.prestosql.spi.type.Timestamps.POWERS_OF_TEN;
 import static java.util.Objects.requireNonNull;
 
 public class TimestampColumnReader
@@ -289,9 +290,7 @@ public class TimestampColumnReader
         int zeros = ((int) serialized) & 0b111;
         int result = (int) (serialized >>> 3);
         if (zeros != 0) {
-            for (int i = 0; i <= zeros; ++i) {
-                result *= 10;
-            }
+            result *= (int) POWERS_OF_TEN[zeros + 1];
         }
         return result;
     }

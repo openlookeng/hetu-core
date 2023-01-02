@@ -13,6 +13,8 @@
  */
 package io.prestosql.orc.reader;
 
+import static io.prestosql.spi.type.Timestamps.POWERS_OF_TEN;
+
 final class ApacheHiveTimestampDecoder
 {
     private ApacheHiveTimestampDecoder() {}
@@ -44,9 +46,7 @@ final class ApacheHiveTimestampDecoder
         int zeros = ((int) serialized) & 0b111;
         int result = (int) (serialized >>> 3);
         if (zeros != 0) {
-            for (int i = 0; i <= zeros; ++i) {
-                result *= 10;
-            }
+            result *= (int) POWERS_OF_TEN[zeros + 1];
         }
         return result;
     }

@@ -26,6 +26,7 @@ import io.prestosql.orc.metadata.Stream.StreamKind;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -35,7 +36,6 @@ import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.find
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.getClosestAlignedFixedBits;
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.getClosestFixedBits;
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.isSafeSubtract;
-import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.percentileBits;
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.writeVslong;
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.writeVulong;
 import static io.prestosql.orc.stream.LongOutputStreamV2.SerializationUtils.zigzagEncode;
@@ -77,7 +77,7 @@ public class LongOutputStreamV2
     private final long[] literals = new long[MAX_SCOPE];
     private final boolean signed;
     private int numLiterals;
-    private final long[] zigzagLiterals = new long[MAX_SCOPE];
+    private final long[] zigzagLiterals;
     private final long[] baseReducedLiterals = new long[MAX_SCOPE];
     private final long[] adjDeltas = new long[MAX_SCOPE];
     private long fixedDelta;
@@ -101,6 +101,7 @@ public class LongOutputStreamV2
         this.streamKind = requireNonNull(streamKind, "streamKind is null");
         this.buffer = new OrcOutputBuffer(compression, bufferSize);
         this.signed = signed;
+        this.zigzagLiterals = signed ? new long[MAX_SCOPE] : null;
     }
 
     @Override
@@ -162,7 +163,8 @@ public class LongOutputStreamV2
 
             // if fixed runs reached max repeat length then write values
             if (fixedRunLength == MAX_SCOPE) {
-                writeValues(determineEncoding());
+                isFixedDelta = true;
+                writeValues(EncodingType.DELTA);
             }
             return;
         }
@@ -224,11 +226,9 @@ public class LongOutputStreamV2
                 zigzagLiterals[i1] = zigzagEncode(literals[i1]);
             }
         }
-        else {
-            System.arraycopy(literals, 0, zigzagLiterals, 0, numLiterals);
-        }
 
-        zzBits100p = percentileBits(zigzagLiterals, 0, numLiterals, 1.0);
+        long[] currentZigzagLiterals = signed ? zigzagLiterals : literals;
+        zzBits100p = utils.percentileBits(currentZigzagLiterals, 0, numLiterals, 1.0);
 
         // not a big win for shorter runs to determine encoding
         if (numLiterals <= MIN_REPEAT) {
@@ -306,7 +306,7 @@ public class LongOutputStreamV2
         // number of bit requirement between 90th and 100th percentile varies
         // beyond a threshold, then we need to patch the values. if the variation
         // is not significant then we can use direct encoding
-        zzBits90p = percentileBits(zigzagLiterals, 0, numLiterals, 0.9);
+        zzBits90p = utils.percentileBits(currentZigzagLiterals, 0, numLiterals, 0.9);
 
         // if difference in bits between 95th percentile and 100th percentile
         // of zigzag encoded values is 0 or 1, then the patch length will be 0,
@@ -323,10 +323,10 @@ public class LongOutputStreamV2
 
         // 95th percentile width is used to determine max allowed value
         // after which patching will be done
-        brBits95p = percentileBits(baseReducedLiterals, 0, numLiterals, 0.95);
+        brBits95p = utils.percentileBits(baseReducedLiterals, 0, numLiterals, 0.95);
 
         // 100th percentile is used to compute the max patch width
-        brBits100p = percentileBits(baseReducedLiterals, 0, numLiterals, 1.0);
+        brBits100p = utils.percentileBits(baseReducedLiterals, 0, numLiterals, 1.0);
 
         // check again if patching will be effective using base reduced values.
         if (brBits100p == brBits95p) {
@@ -425,7 +425,8 @@ public class LongOutputStreamV2
         buffer.write(headerSecondByte);
 
         // bit packing the zigzag encoded literals
-        utils.writeInts(zigzagLiterals, 0, numLiterals, fixedBits, buffer);
+        long[] currentZigzagLiterals = signed ? zigzagLiterals : literals;
+        utils.writeInts(currentZigzagLiterals, 0, numLiterals, fixedBits, buffer);
 
         // reset run length
         variableRunLength = 0;
@@ -723,7 +724,7 @@ public class LongOutputStreamV2
             return;
         }
 
-        if (fixedRunLength >= MIN_REPEAT && fixedRunLength <= MAX_SHORT_REPEAT_LENGTH) {
+        if (fixedRunLength <= MAX_SHORT_REPEAT_LENGTH) {
             writeValues(EncodingType.SHORT_REPEAT);
             return;
         }
@@ -792,6 +793,14 @@ public class LongOutputStreamV2
     // this entire class should be rewritten
     static final class SerializationUtils
     {
+        /**
+         * Buffer for histogram that store the encoded bit requirement for each bit
+         * size. Maximum number of discrete bits that can encoded is ordinal of
+         * FixedBitSizes.
+         *
+         * @see FixedBitSizes
+         */
+        private final int[] histBuffer = new int[32];
         private static final int BUFFER_SIZE = 64;
         private final byte[] writeBuffer = new byte[BUFFER_SIZE];
 
@@ -820,13 +829,12 @@ public class LongOutputStreamV2
          */
         static int findClosestNumBits(long inputValue)
         {
-            long value = inputValue;
-            int count = 0;
-            while (value != 0) {
-                count++;
-                value = value >>> 1;
-            }
-            return getClosestFixedBits(count);
+            return getClosestFixedBits(findNumBits(inputValue));
+        }
+
+        private static int findNumBits(long value)
+        {
+            return 64 - Long.numberOfLeadingZeros(value);
         }
 
         /**
@@ -840,25 +848,23 @@ public class LongOutputStreamV2
         /**
          * Compute the bits required to represent pth percentile value
          */
-        static int percentileBits(long[] data, int offset, int length, double percentile)
+        int percentileBits(long[] data, int offset, int length, double percentile)
         {
             checkArgument(percentile <= 1.0 && percentile > 0.0);
 
-            // histogram that store the encoded bit requirement for each values.
-            // maximum number of bits that can encoded is 32 (refer FixedBitSizes)
-            int[] hist = new int[32];
+            Arrays.fill(this.histBuffer, 0);
 
             // compute the histogram
             for (int i = offset; i < (offset + length); i++) {
-                int idx = encodeBitWidth(findClosestNumBits(data[i]));
-                hist[idx] += 1;
+                int idx = encodeBitWidth(findNumBits(data[i]));
+                this.histBuffer[idx] += 1;
             }
 
             int perLen = (int) (length * (1.0 - percentile));
 
             // return the bits required by pth percentile length
-            for (int i = hist.length - 1; i >= 0; i--) {
-                perLen -= hist[i];
+            for (int i = this.histBuffer.length - 1; i >= 0; i--) {
+                perLen -= this.histBuffer[i];
                 if (perLen < 0) {
                     return decodeBitWidth(i);
                 }
@@ -879,30 +885,29 @@ public class LongOutputStreamV2
             if (n >= 1 && n <= 24) {
                 return n;
             }
-            else if (n > 24 && n <= 26) {
+            else if (n <= 26) {
                 return 26;
             }
-            else if (n > 26 && n <= 28) {
+            else if (n <= 28) {
                 return 28;
             }
-            else if (n > 28 && n <= 30) {
+            else if (n <= 30) {
                 return 30;
             }
-            else if (n > 30 && n <= 32) {
+            else if (n <= 32) {
                 return 32;
             }
-            else if (n > 32 && n <= 40) {
+            else if (n <= 40) {
                 return 40;
             }
-            else if (n > 40 && n <= 48) {
+            else if (n <= 48) {
                 return 48;
             }
-            else if (n > 48 && n <= 56) {
+            else if (n <= 56) {
                 return 56;
             }
-            else {
-                return 64;
-            }
+
+            return 64;
         }
 
         public static int getClosestAlignedFixedBits(int n)
@@ -910,36 +915,35 @@ public class LongOutputStreamV2
             if (n == 0 || n == 1) {
                 return 1;
             }
-            else if (n > 1 && n <= 2) {
+            else if (n == 2) {
                 return 2;
             }
-            else if (n > 2 && n <= 4) {
+            else if (n <= 4) {
                 return 4;
             }
-            else if (n > 4 && n <= 8) {
+            else if (n <= 8) {
                 return 8;
             }
-            else if (n > 8 && n <= 16) {
+            else if (n <= 16) {
                 return 16;
             }
-            else if (n > 16 && n <= 24) {
+            else if (n <= 24) {
                 return 24;
             }
-            else if (n > 24 && n <= 32) {
+            else if (n <= 32) {
                 return 32;
             }
-            else if (n > 32 && n <= 40) {
+            else if (n <= 40) {
                 return 40;
             }
-            else if (n > 40 && n <= 48) {
+            else if (n <= 48) {
                 return 48;
             }
-            else if (n > 48 && n <= 56) {
+            else if (n <= 56) {
                 return 56;
             }
-            else {
-                return 64;
-            }
+
+            return 64;
         }
 
         enum FixedBitSizes
@@ -965,30 +969,29 @@ public class LongOutputStreamV2
             if (n >= 1 && n <= 24) {
                 return n - 1;
             }
-            else if (n > 24 && n <= 26) {
+            else if (n <= 26) {
                 return FixedBitSizes.TWENTY_SIX.ordinal();
             }
-            else if (n > 26 && n <= 28) {
+            else if (n <= 28) {
                 return FixedBitSizes.TWENTY_EIGHT.ordinal();
             }
-            else if (n > 28 && n <= 30) {
+            else if (n <= 30) {
                 return FixedBitSizes.THIRTY.ordinal();
             }
-            else if (n > 30 && n <= 32) {
+            else if (n <= 32) {
                 return FixedBitSizes.THIRTY_TWO.ordinal();
             }
-            else if (n > 32 && n <= 40) {
+            else if (n <= 40) {
                 return FixedBitSizes.FORTY.ordinal();
             }
-            else if (n > 40 && n <= 48) {
+            else if (n <= 48) {
                 return FixedBitSizes.FORTY_EIGHT.ordinal();
             }
-            else if (n > 48 && n <= 56) {
+            else if (n <= 56) {
                 return FixedBitSizes.FIFTY_SIX.ordinal();
             }
-            else {
-                return FixedBitSizes.SIXTY_FOUR.ordinal();
-            }
+
+            return FixedBitSizes.SIXTY_FOUR.ordinal();
         }
 
         /**

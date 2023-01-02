@@ -28,8 +28,8 @@ public class Timestamps
 {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
 
-    static final long[] POWERS_OF_TEN = {
-            1L,
+    public static final long[] POWERS_OF_TEN = {
+            1L,             //0
             10L,
             100L,
             1000L,
@@ -37,7 +37,7 @@ public class Timestamps
             100_000L,
             1_000_000L,
             10_000_000L,
-            100_000_000L,
+            100_000_000L,   //8
             1_000_000_000L,
             10_000_000_000L,
             100_000_000_000L,
