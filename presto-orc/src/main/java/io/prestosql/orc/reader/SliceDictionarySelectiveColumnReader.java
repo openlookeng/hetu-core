@@ -360,7 +360,9 @@ public class SliceDictionarySelectiveColumnReader
         }
 
         if (positionCount == outputPositionCount) {
-            return new DictionaryBlock(positionCount, dictionaryBlock, values);
+            DictionaryBlock dictBlock = new DictionaryBlock(positionCount, dictionaryBlock, values);
+            values = null;
+            return dictBlock;
         }
 
         int[] valuesCopy = new int[positionCount];
