@@ -50,7 +50,7 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-main</artifactId>
-            <scope>provided</scope>
+            <scope>test</scope>
             <exclusions>
                 <exclusion>
                     <groupId>io.hetu.core</groupId>

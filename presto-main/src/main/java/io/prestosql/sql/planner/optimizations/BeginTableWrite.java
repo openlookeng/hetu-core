@@ -27,6 +27,7 @@ import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.spi.plan.UnionNode;
+import io.prestosql.spi.security.Identity;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.CacheTableFinishNode;
@@ -81,10 +82,12 @@ public class BeginTableWrite
         implements PlanOptimizer
 {
     private final Metadata metadata;
+    private final String cachingUserName;
 
-    public BeginTableWrite(Metadata metadata)
+    public BeginTableWrite(Metadata metadata, String cachingUserName)
     {
         this.metadata = metadata;
+        this.cachingUserName = cachingUserName;
     }
 
     @Override
@@ -244,7 +247,7 @@ public class BeginTableWrite
             PlanNode child = node.getSource();
 
             WriterTarget originalTarget = getTarget(child);
-            WriterTarget newTarget = createWriterTarget(originalTarget);
+            WriterTarget newTarget = createWriterTarget(originalTarget, cachingUserName);
 
             context.get().addCacheMaterializedHandle(originalTarget, newTarget);
             child = child.accept(this, context);
@@ -316,10 +319,21 @@ public class BeginTableWrite
 
         private WriterTarget createWriterTarget(WriterTarget target)
         {
+            return createWriterTarget(target, null);
+        }
+
+        private WriterTarget createWriterTarget(WriterTarget target, String user)
+        {
             // TODO: begin these operations in pre-execution step, not here
             // TODO: we shouldn't need to store the schemaTableName in the handles, but there isn't a good way to pass this around with the current architecture
             if (target instanceof CreateReference) {
                 CreateReference create = (CreateReference) target;
+                if (user != null) {
+                    Identity identity = session.getIdentity();
+                    identity = new Identity(user, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
+                    Session newSession = session.withUpdatedIdentity(identity);
+                    return new CreateTarget(metadata.beginCreateTable(newSession, create.getCatalog(), create.getTableMetadata(), create.getLayout()), create.getTableMetadata().getTable());
+                }
                 return new CreateTarget(metadata.beginCreateTable(session, create.getCatalog(), create.getTableMetadata(), create.getLayout()), create.getTableMetadata().getTable());
             }
             if (target instanceof InsertReference) {

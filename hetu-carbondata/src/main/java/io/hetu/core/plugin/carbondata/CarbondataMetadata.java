@@ -288,7 +288,7 @@ public class CarbondataMetadata
                 writesToNonManagedTablesEnabled, createsOfNonManagedTablesEnabled, tableCreatesWithLocationAllowed,
                 typeManager, locationService, partitionUpdateCodec, typeTranslator, hetuVersion,
                 hiveStatisticsProvider, accessControlMetadata, false, 2, 0.0, executorService,
-                Optional.of(new Duration(5, TimeUnit.MINUTES)), hiveMetastoreClientService);
+                Optional.of(new Duration(5, TimeUnit.MINUTES)), hiveMetastoreClientService, null);
         this.carbondataTableReader = carbondataTableReader;
         this.carbondataTableStore = carbondataTableStore;
         this.metadataLock = null;

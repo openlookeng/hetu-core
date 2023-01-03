@@ -11,16 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.cache;
+package io.hetu.core.common.cache;
 
-import com.google.common.cache.Cache;
+import com.google.common.cache.LoadingCache;
 
 // package-private. The interface provides deprecation and javadoc to help at call sites
-final class NonEvictableCacheImpl<K, V>
-        extends NonKeyEvictableCacheImpl<K, V>
-        implements NonEvictableCache<K, V>
+final class NonEvictableLoadingCacheImpl<K, V>
+        extends NonKeyEvictableLoadingCacheImpl<K, V>
+        implements NonEvictableLoadingCache<K, V>
 {
-    NonEvictableCacheImpl(Cache<K, V> delegate)
+    NonEvictableLoadingCacheImpl(LoadingCache<K, V> delegate)
     {
         super(delegate);
     }
@@ -29,7 +29,7 @@ final class NonEvictableCacheImpl<K, V>
     public void invalidateAll()
     {
         throw new UnsupportedOperationException("invalidateAll does not invalidate ongoing loads, so a stale value may remain in the cache for ever. " +
-                "Use EvictableCache if you need invalidation, or use SafeCaches.buildNonEvictableCacheWithWeakInvalidateAll() " +
+                "Use EvictableCacheBuilder if you need invalidation, or use SafeCaches.buildNonEvictableCacheWithWeakInvalidateAll() " +
                 "if invalidateAll is not required for correctness");
     }
 }

@@ -1139,4 +1139,28 @@ public class ClassLoaderSafeConnectorMetadata
     {
         return delegate.getSchemaOwner(session, schemaName);
     }
+
+    @Override
+    public ConnectorTableHandle watchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.watchTableForModifications(session, tableHandle);
+        }
+    }
+
+    @Override
+    public void unwatchTableForModifications(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            delegate.unwatchTableForModifications(session, tableHandle);
+        }
+    }
+
+    @Override
+    public boolean isTableModified(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
+            return delegate.isTableModified(session, tableHandle);
+        }
+    }
 }

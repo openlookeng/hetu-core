@@ -11,25 +11,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.cache;
+package io.hetu.core.common.cache;
 
-import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Cache;
 
 /**
- * A {@link com.google.common.cache.LoadingCache} that does not support key-based eviction.
+ * A {@link com.google.common.cache.Cache} that does not support key-based eviction.
  */
-public interface NonKeyEvictableLoadingCache<K, V>
-        extends LoadingCache<K, V>
+public interface NonKeyEvictableCache<K, V>
+        extends Cache<K, V>
 {
     /**
-     * @deprecated Not supported. Use {@link EvictableCacheBuilder} to build a cache instead.
+     * @deprecated Not supported. Use {@link EvictableCache} cache implementation instead.
      */
     @Deprecated
     @Override
     void invalidate(Object key);
 
     /**
-     * @deprecated Not supported. Use {@link EvictableCacheBuilder} to build a cache instead.
+     * @deprecated Not supported. Use {@link EvictableCache} cache implementation instead.
      */
     @Deprecated
     @Override

@@ -180,6 +180,7 @@ import io.prestosql.spi.relation.LambdaDefinitionExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.relation.VariableToChannelTranslator;
+import io.prestosql.spi.security.Identity;
 import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpillerFactory;
@@ -237,6 +238,7 @@ import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import io.prestosql.sql.tree.SymbolReference;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
+import io.prestosql.utils.HetuConfig;
 
 import javax.inject.Inject;
 
@@ -397,6 +399,7 @@ public class LocalExecutionPlanner
     protected final TableExecuteContextManager tableExecuteContextManager;
     private final PositionsAppenderFactory positionsAppenderFactory = new PositionsAppenderFactory();
     private final CachedDataManager cachedDataManager;
+    private final String userName;
 
     public Metadata getMetadata()
     {
@@ -578,7 +581,8 @@ public class LocalExecutionPlanner
             CubeManager cubeManager,
             ExchangeManagerRegistry exchangeManagerRegistry,
             TableExecuteContextManager tableExecuteContextManager,
-            CachedDataManager cachedDataManager)
+            CachedDataManager cachedDataManager,
+            HetuConfig hetuConfig)
     {
         this.explainAnalyzeContext = requireNonNull(explainAnalyzeContext, "explainAnalyzeContext is null");
         this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
@@ -615,6 +619,7 @@ public class LocalExecutionPlanner
         this.exchangeManagerRegistry = requireNonNull(exchangeManagerRegistry, "exchangeManagerRegistry is null");
         this.tableExecuteContextManager = requireNonNull(tableExecuteContextManager, "tableExecuteContextManager is null");
         this.cachedDataManager = requireNonNull(cachedDataManager, "cachedDataManager is null");
+        this.userName = requireNonNull(hetuConfig, "hetuConfig is null").getCachingUserName();
     }
 
     public LocalExecutionPlan plan(
@@ -3129,10 +3134,14 @@ public class LocalExecutionPlanner
 
             long thresholdSize = getCteResultCacheThresholdSize(session).toBytes();
 
+            Identity identity = session.getIdentity();
+            identity = new Identity(userName, identity.getGroups(), identity.getPrincipal(), identity.getRoles(), identity.getExtraCredentials());
+            Session newSession = session.withUpdatedIdentity(identity);
+
             OperatorFactory operatorFactory = new CacheTableFinishOperator.CacheTableFinishOperatorFactory(
                     context.getNextOperatorId(),
                     node.getId(),
-                    createTableFinisher(session, node, metadata),
+                    createTableFinisher(newSession, node, metadata),
                     descriptor,
                     tableExecuteContextManager,
                     session,

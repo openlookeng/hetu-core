@@ -1840,4 +1840,36 @@ public final class MetadataManager
         ConnectorMetadata metadata = getMetadata(session, catalogName);
         return metadata.supportsReportingWrittenBytes(session.toConnectorSession(catalogName), tableName.asSchemaTableName(), tableProperties);
     }
+
+    @Override
+    public TableHandle watchTableForModifications(Session session, TableHandle tableHandle)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        CatalogMetadata catalogMetadata = getCatalogMetadata(session, catalogName);
+        ConnectorMetadata metadata = catalogMetadata.getMetadataFor(catalogName);
+
+        ConnectorTableHandle connectorTableHandle = metadata.watchTableForModifications(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+
+        return new TableHandle(
+                    catalogName,
+                    connectorTableHandle,
+                    catalogMetadata.getTransactionHandleFor(catalogName),
+                    Optional.empty());
+    }
+
+    @Override
+    public void unwatchTableForModifications(Session session, TableHandle tableHandle)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        metadata.unwatchTableForModifications(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+    }
+
+    @Override
+    public boolean isTableModified(Session session, TableHandle tableHandle)
+    {
+        CatalogName catalogName = tableHandle.getCatalogName();
+        ConnectorMetadata metadata = getMetadata(session, catalogName);
+        return metadata.isTableModified(session.toConnectorSession(catalogName), tableHandle.getConnectorHandle());
+    }
 }

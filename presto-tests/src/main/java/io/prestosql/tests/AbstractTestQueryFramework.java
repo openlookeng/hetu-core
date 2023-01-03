@@ -52,6 +52,7 @@ import io.prestosql.testing.MaterializedResult;
 import io.prestosql.testing.QueryRunner;
 import io.prestosql.testing.TestingAccessControlManager.TestingPrivilege;
 import io.prestosql.util.FinalizerService;
+import io.prestosql.utils.HetuConfig;
 import org.intellij.lang.annotations.Language;
 import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
@@ -396,7 +397,7 @@ public abstract class AbstractTestQueryFramework
                 new CostCalculatorWithEstimatedExchanges(costCalculator, taskCountEstimator),
                 new CostComparator(featuresConfig),
                 taskCountEstimator,
-                new CubeManager(featuresConfig, hetuMetaStoreManager)).get();
+                new CubeManager(featuresConfig, hetuMetaStoreManager), new HetuConfig()).get();
         return new QueryExplainer(
                 optimizers,
                 new PlanFragmenter(metadata, queryRunner.getNodePartitioningManager(), new QueryManagerConfig()),

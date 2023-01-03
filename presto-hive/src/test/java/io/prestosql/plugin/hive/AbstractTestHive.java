@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HostAndPort;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
@@ -46,6 +47,7 @@ import io.prestosql.plugin.hive.metastore.thrift.MetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.TestingMetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreConfig;
+import io.prestosql.plugin.hive.monitor.HdfsStorageMonitor;
 import io.prestosql.plugin.hive.orc.OrcConcatPageSource;
 import io.prestosql.plugin.hive.orc.OrcPageSource;
 import io.prestosql.plugin.hive.parquet.ParquetPageSource;
@@ -759,7 +761,8 @@ public abstract class AbstractTestHive
                 TEST_SERVER_VERSION,
                 SqlStandardAccessControlMetadata::new,
                 10, 0.1, false,
-                Optional.of(Duration.valueOf("5m")), hiveConfig.getMetastoreWriteBatchSize());
+                Optional.of(Duration.valueOf("5m")), hiveConfig.getMetastoreWriteBatchSize(),
+                new HdfsStorageMonitor(hdfsEnvironment, MoreExecutors.listeningDecorator(newCachedThreadPool(daemonThreadsNamed("hdfs-monitor-" + "test" + "-%s")))));
         transactionManager = new HiveTransactionManager();
         splitManager = new HiveSplitManager(
                 transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore(),

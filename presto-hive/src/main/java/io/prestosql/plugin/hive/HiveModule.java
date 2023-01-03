@@ -14,6 +14,8 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.cache.CacheLoader;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;
@@ -29,6 +31,7 @@ import io.prestosql.orc.RowDataCacheStatsLister;
 import io.prestosql.orc.RowIndexCacheStatsLister;
 import io.prestosql.orc.StripeFooterCacheStatsLister;
 import io.prestosql.plugin.hive.metastore.SemiTransactionalHiveMetastore;
+import io.prestosql.plugin.hive.monitor.HdfsStorageMonitor;
 import io.prestosql.plugin.hive.orc.OrcPageSourceFactory;
 import io.prestosql.plugin.hive.orc.OrcSelectivePageSourceFactory;
 import io.prestosql.plugin.hive.parquet.ParquetPageSourceFactory;
@@ -94,6 +97,7 @@ public class HiveModule
         newExporter(binder).export(HiveWriterStats.class).withGeneratedName();
 
         newSetBinder(binder, EventClient.class).addBinding().to(HiveEventClient.class).in(Scopes.SINGLETON);
+        binder.bind(HdfsStorageMonitor.class).in(Scopes.SINGLETON);
         binder.bind(HivePartitionManager.class).in(Scopes.SINGLETON);
         binder.bind(LocationService.class).to(HiveLocationService.class).in(Scopes.SINGLETON);
         binder.bind(HiveMetadataFactory.class).in(Scopes.SINGLETON);
@@ -148,6 +152,14 @@ public class HiveModule
     public ExecutorService createHiveClientExecutor(HiveCatalogName catalogName)
     {
         return newCachedThreadPool(daemonThreadsNamed("hive-" + catalogName + "-%s"));
+    }
+
+    @ForHdfsMonitor
+    @Singleton
+    @Provides
+    public ListeningExecutorService createHdfsFsMonitorExecutor(HiveCatalogName catalogName)
+    {
+        return MoreExecutors.listeningDecorator(newCachedThreadPool(daemonThreadsNamed("hdfs-monitor-" + catalogName + "-%s")));
     }
 
     @ForHiveVacuum

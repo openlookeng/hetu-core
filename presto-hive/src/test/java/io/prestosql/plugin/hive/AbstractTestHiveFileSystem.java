@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.net.HostAndPort;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
@@ -38,6 +39,7 @@ import io.prestosql.plugin.hive.metastore.thrift.MetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.TestingMetastoreLocator;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastore;
 import io.prestosql.plugin.hive.metastore.thrift.ThriftHiveMetastoreConfig;
+import io.prestosql.plugin.hive.monitor.HdfsStorageMonitor;
 import io.prestosql.plugin.hive.security.SqlStandardAccessControlMetadata;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -203,7 +205,8 @@ public abstract class AbstractTestHiveFileSystem
                 partitionUpdateCodec,
                 new HiveTypeTranslator(),
                 new NodeVersion("test_version"),
-                SqlStandardAccessControlMetadata::new);
+                SqlStandardAccessControlMetadata::new,
+                new HdfsStorageMonitor(hdfsEnvironment, MoreExecutors.listeningDecorator(newCachedThreadPool(daemonThreadsNamed("hdfs-monitor-" + "test" + "-%s")))));
         transactionManager = new HiveTransactionManager();
         splitManager = new HiveSplitManager(
                 transactionHandle -> ((HiveMetadata) transactionManager.get(transactionHandle)).getMetastore(),

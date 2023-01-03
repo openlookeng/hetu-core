@@ -62,7 +62,8 @@ public class TestHetuConfig
                 .setExecutionDataCacheEnabled(false)
                 .setExecutionDataCacheMaxSize(1024L * 1024L * 1024L * 2)
                 .setCachingConnectorName("hive")
-                .setCachingSchemaName("cache"));
+                .setCachingSchemaName("cache")
+                .setCachingUserName("hive"));
     }
 
     @Test
@@ -101,6 +102,7 @@ public class TestHetuConfig
                 .put("hetu.execution.data-cache.max-size", "10")
                 .put("hetu.execution.data-cache.schema-name", "memCache")
                 .put("hetu.execution.data-cache.connector-name", "memory")
+                .put("hetu.execution.data-cache.user-name", "test")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -135,7 +137,8 @@ public class TestHetuConfig
                 .setExecutionDataCacheMaxSize(10)
                 .setExecutionDataCacheEnabled(true)
                 .setCachingConnectorName("memory")
-                .setCachingSchemaName("memCache");
+                .setCachingSchemaName("memCache")
+                .setCachingUserName("test");
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

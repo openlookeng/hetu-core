@@ -641,4 +641,21 @@ public interface Metadata
     default void finishTableExecute(Session session, TableExecuteHandle handle, Collection<Slice> fragments, List<Object> tableExecuteState)
     {
     }
+
+    default TableHandle watchTableForModifications(Session session, TableHandle tableHandle)
+    {
+        // no op
+        return null;
+    }
+
+    default void unwatchTableForModifications(Session session, TableHandle tableHandle)
+    {
+        // no op
+        return;
+    }
+
+    default boolean isTableModified(Session session, TableHandle tableHandle)
+    {
+        return false;
+    }
 }

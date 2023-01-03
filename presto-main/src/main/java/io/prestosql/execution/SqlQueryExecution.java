@@ -244,7 +244,8 @@ public class SqlQueryExecution
             PartitionMemoryEstimatorFactory partitionMemoryEstimatorFactory,
             TaskExecutionStats taskExecutionStats,
             QueryResourceManagerService queryResourceManager,
-            boolean isMultiCoordinatorEnabled)
+            boolean isMultiCoordinatorEnabled,
+            String cachingUserName)
     {
         try (SetThreadName ignored = new SetThreadName("Query-%s", stateMachine.getQueryId())) {
             this.slug = requireNonNull(slug, "slug is null");
@@ -1254,6 +1255,7 @@ public class SqlQueryExecution
         private final QueryResourceManagerService queryResourceManagerService;
         private final CachedDataManager dataCache;
         private final boolean isMultiCoordinatorEnabled;
+        private final String cachingUserName;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -1341,6 +1343,7 @@ public class SqlQueryExecution
             this.partitionMemoryEstimatorFactory = requireNonNull(partitionMemoryEstimatorFactory, "partitionMemoryEstimatorFactory is null");
             this.taskExecutionStats = requireNonNull(taskExecutionStats, "taskExecutionStats is null");
             this.isMultiCoordinatorEnabled = hetuConfig.isMultipleCoordinatorEnabled();
+            this.cachingUserName = hetuConfig.getCachingUserName();
         }
 
         // Loading properties into PropertyService for later reference
@@ -1402,7 +1405,8 @@ public class SqlQueryExecution
                     queryResourceManagerService,
                     tableExecuteContextManager,
                     this.dataCache,
-                    isMultiCoordinatorEnabled);
+                    isMultiCoordinatorEnabled,
+                    cachingUserName);
         }
     }
 

@@ -20,7 +20,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import io.airlift.json.JsonCodec;
 import io.airlift.units.Duration;
-import io.prestosql.cache.NonEvictableCache;
+import io.hetu.core.common.cache.NonEvictableCache;
 import io.prestosql.plugin.hive.PartitionStatistics;
 import io.prestosql.plugin.hive.RecordingMetastoreConfig;
 import io.prestosql.plugin.hive.metastore.Database;
@@ -53,7 +53,7 @@ import java.util.function.Supplier;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
-import static io.prestosql.cache.SafeCaches.buildNonEvictableCache;
+import static io.hetu.core.common.cache.SafeCaches.buildNonEvictableCache;
 import static io.prestosql.spi.StandardErrorCode.NOT_FOUND;
 import static java.nio.file.Files.readAllBytes;
 import static java.util.Objects.requireNonNull;

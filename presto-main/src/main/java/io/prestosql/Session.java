@@ -430,6 +430,14 @@ public final class Session
         return session;
     }
 
+    public Session withUpdatedIdentity(Identity identity)
+    {
+        return new Session(queryId, transactionId, clientTransactionSupport, identity, source, catalog, schema,
+                path, traceToken, timeZoneKey, locale, remoteUserAddress, userAgent, clientInfo, clientTags, clientCapabilities,
+                resourceEstimates, startTime, systemProperties, connectorProperties, unprocessedCatalogProperties,
+                sessionPropertyManager, preparedStatements, pageMetadataEnabled);
+    }
+
     public Session withDefaultProperties(Map<String, String> systemPropertyDefaults, Map<String, Map<String, String>> catalogPropertyDefaults)
     {
         requireNonNull(systemPropertyDefaults, "systemPropertyDefaults is null");
