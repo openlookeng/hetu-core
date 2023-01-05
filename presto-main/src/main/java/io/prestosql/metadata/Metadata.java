@@ -658,4 +658,9 @@ public interface Metadata
     {
         return false;
     }
+
+    default boolean isSupportTableMonitoring(Session session, CatalogName catalogName)
+    {
+        return false;
+    }
 }

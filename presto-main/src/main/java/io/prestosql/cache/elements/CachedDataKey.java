@@ -31,6 +31,7 @@ import static java.util.stream.Collectors.toMap;
 
 public class CachedDataKey
 {
+    public static final CachedDataKey NULL_KEY = CachedDataKey.builder().build();
     private final String name;
     private final String query;
     //private final Query query;

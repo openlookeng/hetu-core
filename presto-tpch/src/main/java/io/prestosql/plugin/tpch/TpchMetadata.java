@@ -592,4 +592,10 @@ public class TpchMetadata
     {
         return true;
     }
+
+    @Override
+    public boolean isSupportTableMonitoring(ConnectorSession session)
+    {
+        return true;
+    }
 }

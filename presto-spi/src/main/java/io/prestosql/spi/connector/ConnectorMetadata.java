@@ -1339,4 +1339,9 @@ public interface ConnectorMetadata
     {
         return false;
     }
+
+    default boolean isSupportTableMonitoring(ConnectorSession session)
+    {
+        return false;
+    }
 }

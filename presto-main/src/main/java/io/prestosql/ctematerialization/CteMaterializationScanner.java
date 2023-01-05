@@ -24,6 +24,7 @@ import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
+import io.prestosql.cache.CachedDataManager;
 import io.prestosql.datacenter.DataCenterStatementResource;
 import io.prestosql.dispatcher.DispatchManager;
 import io.prestosql.dispatcher.DispatchQuery;
@@ -86,18 +87,20 @@ public class CteMaterializationScanner
     private final String cachingConnectorName;
     private final String cachingSchemaName;
     private final String cachingUserName;
+    private final CachedDataManager cacheDataManager;
 
     @Inject
     public CteMaterializationScanner(FeaturesConfig featuresConfig,
-            HetuConfig hetuConfig,
-            CatalogManager catalogManager,
-            DispatchManager dispatchManager,
-            SessionPropertyManager sessionPropertyManager,
-            QueryManager queryManager,
-            ExchangeClientSupplier exchangeClientSupplier,
-            BlockEncodingSerde blockEncodingSerde,
-            @ForStatementResource BoundedExecutor responseExecutor,
-            @ForStatementResource ScheduledExecutorService timeoutExecutor)
+                                     HetuConfig hetuConfig,
+                                     CatalogManager catalogManager,
+                                     DispatchManager dispatchManager,
+                                     SessionPropertyManager sessionPropertyManager,
+                                     QueryManager queryManager,
+                                     ExchangeClientSupplier exchangeClientSupplier,
+                                     BlockEncodingSerde blockEncodingSerde,
+                                     @ForStatementResource BoundedExecutor responseExecutor,
+                                     @ForStatementResource ScheduledExecutorService timeoutExecutor,
+                                     CachedDataManager cachedDataManager)
     {
         this.isCteMaterializationEnabled = featuresConfig.isCTEResultCacheEnabled();
         this.isMultiCoordinatorEnabled = hetuConfig.isMultipleCoordinatorEnabled();
@@ -113,6 +116,7 @@ public class CteMaterializationScanner
         this.cachingConnectorName = hetuConfig.getCachingConnectorName();
         this.cachingSchemaName = hetuConfig.getCachingSchemaName();
         this.cachingUserName = hetuConfig.getCachingUserName();
+        this.cacheDataManager = requireNonNull(cachedDataManager);
     }
 
     @PostConstruct
@@ -128,6 +132,7 @@ public class CteMaterializationScanner
                             .filter(catalog -> catalog.equalsIgnoreCase(cachingConnectorName)).collect(Collectors.toList());
                     if (catalogs.size() > 0) {
                         createCteMaterializationSchemaIfNotExists();
+                        cacheDataManager.setReady();
                         cteMaterializationScanService.shutdown();
                     }
                 }
@@ -135,18 +140,6 @@ public class CteMaterializationScanner
                     log.error(e, "Start the cte materialization scanner failed.");
                 }
             }, 10000, 5000, MILLISECONDS);
-        }
-    }
-
-    public void initialize()
-    {
-        if (!isMultiCoordinatorEnabled && isCteMaterializationEnabled) {
-            try {
-                createCteMaterializationSchemaIfNotExists();
-            }
-            catch (PrestoException e) {
-                log.error(e, "Cte materialization schema creation failed.");
-            }
         }
     }
 
