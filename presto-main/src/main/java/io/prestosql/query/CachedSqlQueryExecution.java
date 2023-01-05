@@ -303,7 +303,7 @@ public class CachedSqlQueryExecution
                     CachedDataKey finalCachedDataKey = createKey;
                     CachedDataKey finalCreateKey = createKey;
                     addStateChangeListener(newState -> {
-                        if (newState == QueryState.FINISHED && finalCds.isNonCachable() && finalCacheable) {
+                        if (newState == QueryState.FINISHED && !finalCds.isNonCachable() && finalCacheable) {
                             cache.get().invalidate(finalKey);
                             dataCache.commit(finalCreateKey, session, cdsTime);
                         }
@@ -325,13 +325,14 @@ public class CachedSqlQueryExecution
                     return cds;
                 }
                 if (cds.inProgress() || cds.isNonCachable()) {
+                    dataCache.done(createKey, session, cds.getCreateTime());
                     return null;
                 }
                 long cdsTime = cds.getCreateTime();
                 CachedDataKey finalCreateKey1 = createKey;
                 addStateChangeListener(newState -> {
                     if (newState == QueryState.FINISHED || newState == QueryState.FAILED) {
-                        dataCache.done(finalCreateKey1, cdsTime);
+                        dataCache.done(finalCreateKey1, session, cdsTime);
                     }
                 });
                 return cds;

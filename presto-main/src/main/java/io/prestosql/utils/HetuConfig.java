@@ -66,8 +66,8 @@ public class HetuConfig
     private String extensionExecutionPlannerClassPath;
     private boolean extensionExecutionPlannerEnabled;
     private int noResourceRetryCount = 5;
-    private boolean isExecutionDataCacheEnabled;
-    private long executionDataCacheMaxItems = 1024L * 1024L * 1024L * 2;
+    private boolean isCteMaterializationEnabled;
+    private DataSize cteMaterializationTotalStorage = new DataSize(2, GIGABYTE);
     private String cachingSchemaName = "cache";
     private String cachingConnectorName = "hive";
     private String cachingUserName = "hive";
@@ -467,29 +467,29 @@ public class HetuConfig
         return this;
     }
 
-    public boolean isExecutionDataCacheEnabled()
+    public boolean isCteMaterializationEnabled()
     {
-        return this.isExecutionDataCacheEnabled;
+        return this.isCteMaterializationEnabled;
     }
 
-    @Config("hetu.execution.data-cache.enabled")
+    @Config("hetu.execution.cte-materialization.enabled")
     @ConfigDescription("Enable data cache for query output results")
-    public HetuConfig setExecutionDataCacheEnabled(boolean flag)
+    public HetuConfig setCteMaterializationEnabled(boolean flag)
     {
-        this.isExecutionDataCacheEnabled = flag;
+        this.isCteMaterializationEnabled = flag;
         return this;
     }
 
-    public long getExecutionDataCacheMaxSize()
+    public DataSize getExecutionDataCacheMaxSize()
     {
-        return executionDataCacheMaxItems;
+        return cteMaterializationTotalStorage;
     }
 
-    @Config("hetu.execution.data-cache.max-size") /* Todo: add size based logic for cache conformation instead of number alone.. */
-    @ConfigDescription("Max number of items in the cache")
-    public HetuConfig setExecutionDataCacheMaxSize(long maxItems)
+    @Config("hetu.execution.cte-materialization.max-size")
+    @ConfigDescription("Max total size of items in the cache")
+    public HetuConfig setExecutionDataCacheMaxSize(DataSize maxItems)
     {
-        this.executionDataCacheMaxItems = maxItems;
+        this.cteMaterializationTotalStorage = maxItems;
         return this;
     }
 
@@ -498,7 +498,7 @@ public class HetuConfig
         return cachingSchemaName;
     }
 
-    @Config("hetu.execution.data-cache.schema-name")
+    @Config("hetu.execution.cte-materialization.schema-name")
     @ConfigDescription("Target schema name for data cache storage")
     public HetuConfig setCachingSchemaName(String schema)
     {
@@ -511,7 +511,7 @@ public class HetuConfig
         return cachingConnectorName;
     }
 
-    @Config("hetu.execution.data-cache.connector-name")
+    @Config("hetu.execution.cte-materialization.connector-name")
     @ConfigDescription("Target connector name for data cache storage")
     public HetuConfig setCachingConnectorName(String connector)
     {
@@ -524,7 +524,7 @@ public class HetuConfig
         return cachingUserName;
     }
 
-    @Config("hetu.execution.data-cache.user-name")
+    @Config("hetu.execution.cte-materialization.user-name")
     @ConfigDescription("User name for data cache storage")
     public HetuConfig setCachingUserName(String user)
     {

@@ -141,7 +141,7 @@ import static io.prestosql.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
 import static io.prestosql.spi.StandardErrorCode.NOT_SUPPORTED;
-import static io.prestosql.spi.connector.StandardWarningCode.CTE_RESULT_CACHE_NOT_SUPPORTED;
+import static io.prestosql.spi.connector.StandardWarningCode.CTE_MATERIALIZATION_NOT_SUPPORTED;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.NORMAL;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.RESUME;
 import static io.prestosql.sql.planner.DistributedExecutionPlanner.Mode.SNAPSHOT;
@@ -859,7 +859,7 @@ public class SqlQueryExecution
         if (!reasons.isEmpty() && isCTEResultCacheEnabled(session)) {
             session.disableCteResultCache();
             String reasonsMessage = String.join(". \n", reasons);
-            warningCollector.add(new PrestoWarning(CTE_RESULT_CACHE_NOT_SUPPORTED, reasonsMessage));
+            warningCollector.add(new PrestoWarning(CTE_MATERIALIZATION_NOT_SUPPORTED, reasonsMessage));
         }
     }
 

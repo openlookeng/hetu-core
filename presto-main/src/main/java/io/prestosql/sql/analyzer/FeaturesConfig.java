@@ -152,7 +152,7 @@ public class FeaturesConfig
     private boolean reuseTableScanEnabled;
     private boolean spillReuseTableScan;
     private int spillOperatorThresholdReuseExchange = 10;
-    private boolean cteResultCacheEnabled;
+    private boolean cteMaterializationEnabled;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
     private boolean enableDynamicFiltering = true;
@@ -935,15 +935,15 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isCTEResultCacheEnabled()
+    public boolean isCTEMaterializationEnabled()
     {
-        return cteResultCacheEnabled;
+        return cteMaterializationEnabled;
     }
 
-    @Config("enable-cte-result-cache")
-    public FeaturesConfig setCTEResultCacheEnabled(boolean cteResultCacheEnabled)
+    @Config("cte-materialization-enabled")
+    public FeaturesConfig setCTEMaterializationEnabled(boolean cteMaterializationEnabled)
     {
-        this.cteResultCacheEnabled = cteResultCacheEnabled;
+        this.cteMaterializationEnabled = cteMaterializationEnabled;
         return this;
     }
 

@@ -59,8 +59,8 @@ public class TestHetuConfig
                 .setExtensionExecutionPlannerJarPath(null)
                 .setExtensionExecutionPlannerClassPath(null)
                 .setNoResourceRetryCount(5)
-                .setExecutionDataCacheEnabled(false)
-                .setExecutionDataCacheMaxSize(1024L * 1024L * 1024L * 2)
+                .setCteMaterializationEnabled(false)
+                .setExecutionDataCacheMaxSize(new DataSize(2, GIGABYTE))
                 .setCachingConnectorName("hive")
                 .setCachingSchemaName("cache")
                 .setCachingUserName("hive"));
@@ -98,11 +98,11 @@ public class TestHetuConfig
                 .put("extension_execution_planner_jar_path", "")
                 .put("extension_execution_planner_class_path", "")
                 .put("query-no-resource-retry-count", "15")
-                .put("hetu.execution.data-cache.enabled", "true")
-                .put("hetu.execution.data-cache.max-size", "10")
-                .put("hetu.execution.data-cache.schema-name", "memCache")
-                .put("hetu.execution.data-cache.connector-name", "memory")
-                .put("hetu.execution.data-cache.user-name", "test")
+                .put("hetu.execution.cte-materialization.enabled", "true")
+                .put("hetu.execution.cte-materialization.max-size", "1GB")
+                .put("hetu.execution.cte-materialization.schema-name", "memCache")
+                .put("hetu.execution.cte-materialization.connector-name", "memory")
+                .put("hetu.execution.cte-materialization.user-name", "test")
                 .build();
 
         HetuConfig expected = new HetuConfig()
@@ -134,8 +134,8 @@ public class TestHetuConfig
                 .setExtensionExecutionPlannerJarPath("")
                 .setExtensionExecutionPlannerClassPath("")
                 .setNoResourceRetryCount(15)
-                .setExecutionDataCacheMaxSize(10)
-                .setExecutionDataCacheEnabled(true)
+                .setExecutionDataCacheMaxSize(new DataSize(1, GIGABYTE))
+                .setCteMaterializationEnabled(true)
                 .setCachingConnectorName("memory")
                 .setCachingSchemaName("memCache")
                 .setCachingUserName("test");

@@ -40,7 +40,7 @@ openLooKeng分析引擎评估CTE计划节点的使用情况，以确定CTE重用
 > 管道模式执行减少了重复的数据扫描和数据处理，从而减少了查询的执行时间。
  
 > #### 物化和重用
-> 如果配置 [enable-cte-result-cache](./properties.md#enable-cte-result-cache)：CTE结果将物化到用户指定的存储位置(由[数据缓存配置](./properties.md#hetuexecutiondata-cacheschema-name)指定)。这里缓存了CTE节点的输出结果，物化成功后，可被后续的查询读取和重用。
+> 如果配置 [cte-materialization-enabled](./properties.md#cte-materialization-enabled)：CTE结果将物化到用户指定的存储位置(由[数据缓存配置](./properties.md#hetuexecutiondata-cacheschema-name)指定)。这里缓存了CTE节点的输出结果，物化成功后，可被后续的查询读取和重用。
 
 ### 执行计划优化
 * **使用精确的分区**：启用后，除非上游阶段的分区精确地匹配到下游阶段的分区，否则强制对数据重新分区（参考: [精准分区](./properties.md#optimizeruse-exact-partitioning)）。

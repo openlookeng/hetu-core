@@ -41,7 +41,7 @@ openLooKeng engine assesses the usage of such CTE plan nodes for feasibility of 
 > Pipeline mode execution reduces the duplicate scanning and processing of the operations, thereby reducing the round trip time for the query.
  
 > #### Materialize and Reused
-> Given the configuration [enable-cte-result-cache](./properties.md#enable-cte-result-cache) is enabled: CTE results are materialized to user's choice of storage(refer [data-cache configuration](./properties.md#hetuexecutiondata-cacheschema-name)). This approach caches the output of the CTE node which is read and reused for subsequent queries after materialization succeeds.
+> Given the configuration [cte-materialization-enabled](./properties.md#cte-materialization-enabled) is enabled: CTE results are materialized to user's choice of storage(refer [data-cache configuration](./properties.md#hetuexecutiondata-cacheschema-name)). This approach caches the output of the CTE node which is read and reused for subsequent queries after materialization succeeds.
 
 ### Plan optimizations
 * **Use exact partitioning**: When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects (refer: [exact partitioning](./properties.md#optimizeruse-exact-partitioning)).

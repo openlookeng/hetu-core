@@ -83,6 +83,7 @@ public class CachedDataStorage
     private long runtime;
     private boolean isNonCachable;
     private AtomicInteger refCount = new AtomicInteger(0);
+    private AtomicInteger accessCount = new AtomicInteger(0);
     private AtomicBoolean isCommitted = new AtomicBoolean(false);
     private AtomicBoolean inProgress = new AtomicBoolean(true);
 
@@ -157,6 +158,11 @@ public class CachedDataStorage
         return refCount.get();
     }
 
+    public int getAccessCount()
+    {
+        return accessCount.get();
+    }
+
     public boolean inProgress()
     {
         return inProgress.get();
@@ -200,6 +206,7 @@ public class CachedDataStorage
     public int grab()
     {
         this.lastAccessTime = currentTimeMillis();
+        this.accessCount.incrementAndGet();
         return this.refCount.incrementAndGet();
     }
 

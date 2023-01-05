@@ -728,12 +728,12 @@
 >
 > 启用后，如果上游阶段的分区不能精准地匹配到下游阶段的分区，则强制对数据重新分区。
 
-### `enable-cte-result-cache`
+### `cte-materialization-enabled`
 
 > -   **类型：** `boolean`
 > -   **默认值：** `false`
 >
-> 将CTE结果物化到缓存中。也可以使用enable_cte_result_cache会话属性在每个查询基础上指定。
+> 将CTE结果物化到缓存中。也可以使用cte_materialization_enabled会话属性在每个查询基础上指定。
 
 ### `cte-result-cache-threshold-size`
 
@@ -902,28 +902,28 @@
 > 
 > 上次访问后使缓存的执行计划失效的时间（以毫秒为单位）
 
-### `hetu.execution.data-cache.enabled`
+### `hetu.execution.cte-materialization.enabled`
 >
 > - **类型：** `boolean`
 > - **默认值：** `false`
 >
 > 启用缓存CTE结果，从而避免频繁执行子执行计划。
 
-### `hetu.execution.data-cache.max-size`
+### `hetu.execution.cte-materialization.max-size`
 >
 > - **类型：** `long`
 > - **默认值：** `2147483648`
 >
 > CTE结果可以物化的最大数据量大小。
 
-### `hetu.execution.data-cache.schema-name`
+### `hetu.execution.cte-materialization.schema-name`
 >
 > - **类型：** `string`
 > - **默认值：** `cache`
 >
 > 用来物化缓存CTE结果的模式名字。
 
-### `hetu.execution.data-cache.connector-name`
+### `hetu.execution.cte-materialization.connector-name`
 >
 > - **类型：** `string`
 > - **默认值：** `hive`

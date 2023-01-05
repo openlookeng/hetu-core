@@ -135,7 +135,6 @@ import io.prestosql.server.remotetask.RemoteTaskStats;
 import io.prestosql.spi.memory.ClusterMemoryPoolManager;
 import io.prestosql.spi.resourcegroups.QueryType;
 import io.prestosql.spi.security.SelectedRole;
-import io.prestosql.sql.analyzer.FeaturesConfig;
 import io.prestosql.sql.analyzer.QueryExplainer;
 import io.prestosql.sql.planner.PlanFragmenter;
 import io.prestosql.sql.planner.PlanOptimizers;
@@ -183,6 +182,7 @@ import io.prestosql.transaction.ForTransactionManager;
 import io.prestosql.transaction.InMemoryTransactionManager;
 import io.prestosql.transaction.TransactionManager;
 import io.prestosql.transaction.TransactionManagerConfig;
+import io.prestosql.utils.HetuConfig;
 import io.prestosql.vacuum.AutoVacuumConfig;
 import io.prestosql.vacuum.AutoVacuumScanner;
 
@@ -399,8 +399,8 @@ public class CoordinatorModule
                 binder1 -> binder1.bind(AutoVacuumScanner.class).in(Scopes.SINGLETON)));
 
         install(installModuleIf(
-                FeaturesConfig.class,
-                config -> config.isCTEResultCacheEnabled(),
+                HetuConfig.class,
+                config -> config.isCteMaterializationEnabled(),
                 binder1 -> binder1.bind(CteMaterializationScanner.class).in(Scopes.SINGLETON)));
 
         // query execution
