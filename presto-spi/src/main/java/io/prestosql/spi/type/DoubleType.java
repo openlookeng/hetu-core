@@ -19,18 +19,24 @@ import io.prestosql.spi.block.BlockBuilderStatus;
 import io.prestosql.spi.block.LongArrayBlockBuilder;
 import io.prestosql.spi.block.PageBuilderStatus;
 import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.function.ScalarOperator;
 
 import java.util.Optional;
 
+import static io.prestosql.spi.function.OperatorType.COMPARISON_UNORDERED_LAST;
+import static io.prestosql.spi.type.TypeOperatorDeclaration.extractOperatorDeclaration;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Double.longBitsToDouble;
+import static java.lang.invoke.MethodHandles.lookup;
 
 public final class DoubleType
         extends AbstractType
         implements FixedWidthType
 {
     public static final DoubleType DOUBLE = new DoubleType();
+
+    private static final TypeOperatorDeclaration TYPE_OPERATOR_DECLARATION = extractOperatorDeclaration(DoubleType.class, lookup(), double.class);
 
     private DoubleType()
     {
@@ -159,5 +165,17 @@ public final class DoubleType
         // The range for double is undefined because NaN is a special value that
         // is *not* in any reasonable definition of a range for this type.
         return Optional.empty();
+    }
+
+    @ScalarOperator(COMPARISON_UNORDERED_LAST)
+    private static long comparisonUnorderedLastOperator(double left, double right)
+    {
+        return Double.compare(left, right);
+    }
+
+    @Override
+    public TypeOperatorDeclaration getTypeOperatorDeclaration(TypeOperators typeOperators)
+    {
+        return TYPE_OPERATOR_DECLARATION;
     }
 }
