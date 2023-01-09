@@ -154,6 +154,23 @@ public final class PropertyMetadata<T>
                 object -> object);
     }
 
+    public static PropertyMetadata<Boolean> booleanProperty(String name, String description, Boolean defaultValue, Consumer<Boolean> validation, boolean hidden)
+    {
+        return new PropertyMetadata<>(
+                name,
+                description,
+                BOOLEAN,
+                Boolean.class,
+                defaultValue,
+                hidden,
+                object -> {
+                    Boolean value = (Boolean) object;
+                    validation.accept(value);
+                    return value;
+                },
+                object -> object);
+    }
+
     public static PropertyMetadata<Integer> integerProperty(String name, String description, Integer defaultValue, boolean hidden)
     {
         return new PropertyMetadata<>(

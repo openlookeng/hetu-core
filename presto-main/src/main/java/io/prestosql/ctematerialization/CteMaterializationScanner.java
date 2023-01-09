@@ -102,7 +102,7 @@ public class CteMaterializationScanner
                                      @ForStatementResource ScheduledExecutorService timeoutExecutor,
                                      CachedDataManager cachedDataManager)
     {
-        this.isCteMaterializationEnabled = featuresConfig.isCTEResultCacheEnabled();
+        this.isCteMaterializationEnabled = featuresConfig.isCTEMaterializationEnabled();
         this.isMultiCoordinatorEnabled = hetuConfig.isMultipleCoordinatorEnabled();
         this.catalogManager = requireNonNull(catalogManager, "catalogManager is null");
         this.dispatchManager = requireNonNull(dispatchManager, "dispatchManager is null");

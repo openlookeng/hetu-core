@@ -168,8 +168,8 @@ public final class SystemSessionProperties
     public static final String SORT_BASED_AGGREGATION_ENABLED = "sort_based_aggregation_enabled";
     public static final String PRCNT_DRIVERS_FOR_PARTIAL_AGGR = "prcnt_drivers_for_partial_aggr";
     public static final String SPILL_TO_HDFS_ENABLED = "spill_to_hdfs_enabled";
-    public static final String ENABLE_CTE_RESULT_CACHE = "enable_cte_result_cache";
-    public static final String CTE_RESULT_CACHE_THRESHOLD_SIZE = "cte_result_cache_threshold_size";
+    public static final String CTE_MATERIALIZATION_ENABLED = "cte_materialization_enabled";
+    public static final String CTE_MATERIALIZATION_THRESHOLD_SIZE = "cte_materialization_threshold_size";
     // CTE Optimization configurations
     public static final String CTE_REUSE_ENABLED = "cte_reuse_enabled";
     public static final String CTE_MAX_QUEUE_SIZE = "cte_max_queue_size";
@@ -222,8 +222,8 @@ public final class SystemSessionProperties
 
     public static final String USE_EXACT_PARTITIONING = "use_exact_partitioning";
 
-    public static final String DATA_CACHE_CATALOG_NAME = "data_cache_catalog_name";
-    public static final String DATA_CACHE_SCHEMA_NAME = "data_cache_schema_name";
+    public static final String CTE_MATERIALIZATION_CATALOG_NAME = "cte_materialization_catalog_name";
+    public static final String CTE_MATERIALIZATION_SCHEMA_NAME = "cte_materialization_schema_name";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -924,9 +924,10 @@ public final class SystemSessionProperties
                         },
                         value -> value),
                 booleanProperty(
-                        ENABLE_CTE_RESULT_CACHE,
+                        CTE_MATERIALIZATION_ENABLED,
                         "Enable CTE result cache",
-                        featuresConfig.isCTEResultCacheEnabled(),
+                        hetuConfig.isCteMaterializationEnabled(),
+                        value -> validateFeatureDisable(value, hetuConfig.isCteMaterializationEnabled(), CTE_MATERIALIZATION_ENABLED),
                         false),
                 booleanProperty(
                         ELIMINATE_DUPLICATE_SPILL_FILES,
@@ -1073,20 +1074,29 @@ public final class SystemSessionProperties
                         "When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects",
                         featuresConfig.isUseExactPartitioning(),
                         false),
-                dataSizeProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE,
+                dataSizeProperty(CTE_MATERIALIZATION_THRESHOLD_SIZE,
                         "Maximum allowed size to be stored as part of cte result cache per CTE per query",
                         featuresConfig.getCteResultCacheThresholdSize(),
                         false),
                 stringProperty(
-                        DATA_CACHE_CATALOG_NAME,
+                        CTE_MATERIALIZATION_CATALOG_NAME,
                         "Name of the Connector to store cached result data",
                         hetuConfig.getCachingConnectorName(),
                         false),
                 stringProperty(
-                        DATA_CACHE_SCHEMA_NAME,
+                        CTE_MATERIALIZATION_SCHEMA_NAME,
                         "Name of the table schema to store cached result data",
                         hetuConfig.getCachingSchemaName(),
                         false));
+    }
+
+    private static boolean validateFeatureDisable(boolean inputValue, boolean configValue, String name)
+    {
+        if (configValue == false && inputValue == true) {
+            throw new PrestoException(INVALID_SESSION_PROPERTY, format("%s can only be disabled for a session (if enabled in startup config); to enable first enable in the startup config", name));
+        }
+
+        return inputValue;
     }
 
     private static void validateNonNegativeLongValue(Object value, String property)
@@ -1900,21 +1910,21 @@ public final class SystemSessionProperties
 
     public static boolean isCTEResultCacheEnabled(Session session)
     {
-        return session.getSystemProperty(ENABLE_CTE_RESULT_CACHE, Boolean.class);
+        return session.getSystemProperty(CTE_MATERIALIZATION_ENABLED, Boolean.class);
     }
 
     public static String getDataCacheSchemaName(Session session)
     {
-        return session.getSystemProperty(DATA_CACHE_SCHEMA_NAME, String.class);
+        return session.getSystemProperty(CTE_MATERIALIZATION_SCHEMA_NAME, String.class);
     }
 
     public static String getDataCacheCatalogName(Session session)
     {
-        return session.getSystemProperty(DATA_CACHE_CATALOG_NAME, String.class);
+        return session.getSystemProperty(CTE_MATERIALIZATION_CATALOG_NAME, String.class);
     }
 
     public static DataSize getCteResultCacheThresholdSize(Session session)
     {
-        return session.getSystemProperty(CTE_RESULT_CACHE_THRESHOLD_SIZE, DataSize.class);
+        return session.getSystemProperty(CTE_MATERIALIZATION_THRESHOLD_SIZE, DataSize.class);
     }
 }

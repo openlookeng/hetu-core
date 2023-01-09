@@ -170,7 +170,7 @@ public class TestFeaturesConfig
                 .setJoinPartitionedBuildMinRowCount(1_000_000L)
                 .setUseExactPartitioning(false)
                 .setCteResultCacheThresholdSize(new DataSize(128, MEGABYTE))
-                .setCTEResultCacheEnabled(false));
+                .setCTEMaterializationEnabled(false));
     }
 
     @Test
@@ -290,7 +290,7 @@ public class TestFeaturesConfig
                 .put("optimizer.join-partitioned-build-min-row-count", "100000")
                 .put("optimizer.use-exact-partitioning", "true")
                 .put("cte-result-cache-threshold-size", "512MB")
-                .put("enable-cte-result-cache", "true")
+                .put("cte-materialization-enabled", "true")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -408,7 +408,7 @@ public class TestFeaturesConfig
                 .setJoinPartitionedBuildMinRowCount(1_000_00L)
                 .setUseExactPartitioning(true)
                 .setCteResultCacheThresholdSize(new DataSize(512, MEGABYTE))
-                .setCTEResultCacheEnabled(true);
+                .setCTEMaterializationEnabled(true);
 
         assertFullMapping(properties, expected);
     }

@@ -36,8 +36,10 @@ import io.prestosql.utils.HetuConfig;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -50,6 +52,7 @@ public class CachedDataManager
     private static final Logger LOG = Logger.get(CachedDataManager.class);
 
     private final Optional<Cache<CachedDataKey, CachedDataStorage>> dataCache;
+    private final Optional<Map<CachedDataKey, Map<Long, CachedDataStorage>>> waitingDelete;
     private final CacheStorageMonitor monitor;
     private final Metadata metadata;
     private final AtomicLong currentSize = new AtomicLong();
@@ -64,10 +67,10 @@ public class CachedDataManager
                              QueryIdGenerator queryIdGenerator,
                              SessionPropertyManager sessionPropertyManager)
     {
-        if (hetuConfig.isExecutionDataCacheEnabled()) {
+        if (hetuConfig.isCteMaterializationEnabled()) {
             Session.SessionBuilder sessionBuilder = Session.builder(sessionPropertyManager)
                     .setIdentity(new Identity(hetuConfig.getCachingUserName(), Optional.empty()))
-                    .setSource("auto-vacuum");
+                    .setSource("cache-manager");
             RemovalListener<CachedDataKey, CachedDataStorage> listener = new RemovalListener<CachedDataKey, CachedDataStorage>()
             {
                 @Override
@@ -75,14 +78,29 @@ public class CachedDataManager
                 {
                     if (notification.wasEvicted()) {
                         LOG.info("CTE Materialized entry evicted, Cause: %s", notification.getCause().name());
-                        monitor.stopTableMonitorForModification(notification.getValue(),
-                                sessionBuilder.setQueryId(queryIdGenerator.createNextQueryId()).build());
+                        if (notification.getValue().getRefCount() <= 0) {
+                            Session session = sessionBuilder.setQueryId(queryIdGenerator.createNextQueryId()).build();
+                            monitor.stopTableMonitorForModification(notification.getValue(), session);
+                            cacheWalk(ImmutableSet.of(notification.getKey()), ((key, cds) -> {
+                                Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(cds.getDataTable()));
+                                if (tableHandle.isPresent()) {
+                                    metadata.dropTable(session, tableHandle.get());
+                                }
+                                return null;
+                            }));
+                        }
+                        else {
+                            // mark for dropping when reference count reduce
+                            waitingDelete.get()
+                                    .computeIfAbsent(notification.getKey(), k -> new ConcurrentHashMap<>())
+                                    .put(notification.getValue().getCreateTime(), notification.getValue());
+                        }
                     }
                 }
             };
 
             this.dataCache = Optional.of(CacheBuilder.newBuilder()
-                    .maximumWeight(hetuConfig.getExecutionDataCacheMaxSize())
+                    .maximumWeight(hetuConfig.getExecutionDataCacheMaxSize().toBytes())
                     .weigher(new Weigher<CachedDataKey, CachedDataStorage>() {
                         @Override
                         public int weigh(CachedDataKey key, CachedDataStorage value)
@@ -92,14 +110,17 @@ public class CachedDataManager
                     })
                     .removalListener(listener)
                     .build());
+
+            this.waitingDelete = Optional.of(new ConcurrentHashMap<>());
         }
         else {
             this.dataCache = Optional.empty();
+            this.waitingDelete = Optional.empty();
         }
 
         this.monitor = requireNonNull(monitor, "monitor is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
-        this.cachedDataMaxSize = hetuConfig.getExecutionDataCacheMaxSize();
+        this.cachedDataMaxSize = hetuConfig.getExecutionDataCacheMaxSize().toBytes();
         this.userName = requireNonNull(hetuConfig, "hetuConfig is null").getCachingUserName();
     }
 
@@ -124,7 +145,7 @@ public class CachedDataManager
         return null;
     }
 
-    public CachedDataStorage done(CachedDataKey dataKey, long cdsTime)
+    public CachedDataStorage done(CachedDataKey dataKey, Session session, long cdsTime)
     {
         if (!dataCache.isPresent()) {
             return null;
@@ -134,6 +155,26 @@ public class CachedDataManager
         if (object != null && object.getCreateTime() == cdsTime) {
             /* decrement listener count */
             object.release();
+        }
+
+        if (object == null && waitingDelete.get().containsKey(dataKey)) {
+            CachedDataStorage deletedCds = waitingDelete.get().get(dataKey).get(cdsTime);
+            if (deletedCds != null) {
+                deletedCds.release();
+                /* Drop the cached data table */
+                if (deletedCds.getRefCount() <= 0) {
+                    // mark for dropping when reference count reduce
+                    monitor.stopTableMonitorForModification(deletedCds, session);
+                    Optional<TableHandle> tableHandle = metadata.getTableHandle(session, QualifiedObjectName.valueOf(deletedCds.getDataTable()));
+                    if (tableHandle.isPresent()) {
+                        metadata.dropTable(session, tableHandle.get());
+                    }
+                    waitingDelete.get().get(dataKey).remove(cdsTime);
+                    if (waitingDelete.get().get(dataKey).isEmpty()) {
+                        waitingDelete.get().remove(dataKey);
+                    }
+                }
+            }
         }
 
         return object;
@@ -146,7 +187,7 @@ public class CachedDataManager
         }
 
         LOG.debug("Cache materialization completed for key: %s", dataKey.toString());
-        CachedDataStorage data = done(dataKey, cdsTime);
+        CachedDataStorage data = done(dataKey, session, cdsTime);
 
         /* Prune the cache if needed */
         if (!isSizeAvailableForCacheLimits(data.getDataSize())) {
@@ -166,8 +207,9 @@ public class CachedDataManager
         /* get candidate keys for elimination */
         List<CachedDataStorage> evictionCandidates = ImmutableList.copyOf(dataCache.get().asMap().values())
                 .stream()
+                .filter(cds -> cds.isCommitted() && cds.getRefCount() <= 0)
                 .sorted(Comparator.comparing(CachedDataStorage::getRuntime)
-                        .thenComparing(CachedDataStorage::getRefCount)
+                        .thenComparing(CachedDataStorage::getAccessCount)
                         .thenComparing(CachedDataStorage::getDataSize)
                         .thenComparing(CachedDataStorage::getLastAccessTime)
                         .reversed())
@@ -207,6 +249,10 @@ public class CachedDataManager
         if (object.getRefCount() <= 0) {
             // mark for dropping when reference count reduce
             invalidate(ImmutableSet.of(key), session);
+        }
+        else {
+            dataCache.get().invalidate(key);
+            waitingDelete.get().computeIfAbsent(key, k -> new ConcurrentHashMap<>()).put(object.getCreateTime(), object);
         }
         return false;
     }

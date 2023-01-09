@@ -769,12 +769,12 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > When enabled this forces data repartitioning unless the partitioning of upstream stage matches exactly what downstream stage expects.
 
-### `enable-cte-result-cache`
+### `cte-materialization-enabled`
 
 > -   **Type:** `boolean`
 > -   **Default value:** `false`
 >
-> Enable CTE materialization cache feature. This can also be specified on a per-query basis using the enable_cte_result_cache session property. 
+> Enable CTE materialization cache feature. This can also be specified on a per-query basis using the cte_materialization_enabled session property. 
 
 ### `cte-result-cache-threshold-size`
 
@@ -945,28 +945,28 @@ of constructing another execution plan, thus reducing the amount of query pre-pr
 >
 > Time in milliseconds to expire cached execution plans after the last access
 
-### `hetu.execution.data-cache.enabled`
+### `hetu.execution.cte-materialization.enabled`
 >
 > - **Type:** `boolean`
 > - **Default value:** `false`
 >
 > Enable caching materialization of _Common Table Execution_(**CTE**) thereby, by-passing frequently executed sub-plans.
 
-### `hetu.execution.data-cache.max-size`
+### `hetu.execution.cte-materialization.max-size`
 >
 > - **Type:** `long`
 > - **Default value:** `2147483648`
 >
 > Maximum size of the total data stored in CTE materialization storage cache.  
 
-### `hetu.execution.data-cache.schema-name`
+### `hetu.execution.cte-materialization.schema-name`
 >
 > - **Type:** `string`
 > - **Default value:** `cache`
 >
 > Schema which shall include the materialized cache tables.
 
-### `hetu.execution.data-cache.connector-name`
+### `hetu.execution.cte-materialization.connector-name`
 >
 > - **Type:** `string`
 > - **Default value:** `hive`
