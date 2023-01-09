@@ -39,7 +39,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ScheduledExecutorService;
@@ -184,10 +183,10 @@ public class TestSqlTask
         assertEquals(info.getOutputBuffers().getState(), BufferState.FINISHED);
 
         taskInfo = sqlTask.getTaskInfo(taskInfo.getTaskStatus().getState()).get(1, SECONDS);
-        assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
 
         taskInfo = sqlTask.getTaskInfo();
-        assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+        assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
     }
 
     @Test

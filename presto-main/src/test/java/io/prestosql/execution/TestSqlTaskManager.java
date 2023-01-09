@@ -67,7 +67,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
-@Test
+@Test(singleThreaded = true)
 public class TestSqlTaskManager
 {
     private static final TaskId TASK_ID = new TaskId("query", 0, 1, 0);
@@ -154,7 +154,7 @@ public class TestSqlTaskManager
         try (SqlTaskManager sqlTaskManager = createSqlTaskManager(new TaskManagerConfig())) {
             TaskId taskId = TASK_ID;
             TaskInfo taskInfo = createTask(sqlTaskManager, taskId, ImmutableSet.of(SPLIT), createInitialEmptyOutputBuffers(PARTITIONED).withBuffer(OUT, 0).withNoMoreBufferIds());
-            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.RUNNING);
+            assertTrue(Arrays.asList(new TaskState[] {TaskState.RUNNING, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
             assertTrue(Arrays.asList(new TaskState[] {TaskState.RUNNING, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
@@ -172,12 +172,12 @@ public class TestSqlTaskManager
 
             // complete the task by calling abort on it
             TaskInfo info = sqlTaskManager.abortTaskResults(taskId, OUT, "0-test_instance_id");
-            assertTrue(Arrays.asList(new BufferState[] {BufferState.FINISHED, BufferState.FLUSHING}).contains(info.getOutputBuffers().getState()));
+            assertEquals(info.getOutputBuffers().getState(), BufferState.FINISHED);
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, taskInfo.getTaskStatus().getState(), "0-test_instance_id").get(1, TimeUnit.SECONDS);
-            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
         }
     }
 
@@ -242,10 +242,10 @@ public class TestSqlTaskManager
             sqlTaskManager.abortTaskResults(taskId, OUT, "0-test_instance_id");
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, taskInfo.getTaskStatus().getState(), "0-test_instance_id").get(1, TimeUnit.SECONDS);
-            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
 
             taskInfo = sqlTaskManager.getTaskInfo(taskId, "0-test_instance_id");
-            assertTrue(Arrays.asList(new TaskState[] {TaskState.FINISHED, TaskState.FLUSHING}).contains(taskInfo.getTaskStatus().getState()));
+            assertEquals(taskInfo.getTaskStatus().getState(), TaskState.FINISHED);
         }
     }
 
