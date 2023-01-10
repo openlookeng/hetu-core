@@ -45,7 +45,7 @@ public class SingleDataSplit
             @JsonProperty("timeStamp") long timeStamp,
             @JsonProperty("scanNodes") int scanNodes,
             @JsonProperty("additionalPredicate") Optional<String> additionalPredicate,
-            @JsonProperty("dataSourceName") @Nullable String dataSourceName,
+            @JsonProperty("dataSourceName") String dataSourceName,
             @JsonProperty("sql") String sql)
     {
         super(catalogName, schemaName, tableName, splitField, rangeStart, rangEnd, timeStamp, scanNodes, additionalPredicate);
@@ -54,7 +54,6 @@ public class SingleDataSplit
     }
 
     @JsonProperty
-    @Nullable
     public String getDataSourceName()
     {
         return dataSourceName;

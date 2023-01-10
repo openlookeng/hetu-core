@@ -55,7 +55,7 @@ shardingsphere.server-list=localhost:2181
 
 ****Note:****
 
-- SingleData connector only supports ShardingSphere 5.2.0 now
+- SingleData connector only supports ShardingSphere 5.3.0 now
 
 ## TidRange Mode
 
@@ -69,28 +69,22 @@ To obtain the tidrangescan plugin, please visit: [Plugin](https://gitee.com/open
 
 To configure the singleData Connector for tidRange mode, create a catalog properties file `etc/catalog` named, for example, `tidrange.properties`. Create the file with the following contents, replacing the connection properties as appropriate for your setup:
 ```properties
-connection.name=singledata
-connection.mode=TID_RANGE
+connector.name=singledata
+singledata.mode=TID_RANGE
 connection-url=jdbc:opengauss://master-host:port/database;jdbc:opengauss://slave-host:port/database
 connection-user=user
 connection-password=password
 ```
+- connection-url can be configured multiple JDBC connection addresses. The addresses are separated by `;`.
 
-- connection-url can be configured multiple JDBC connection addresses. The addresses are separated by `;`. During query, each segment randomly selects a connection address for connection.
-- For other connection configurations, see the openGauss connector
+### Optional Configuration
 
-### Split Configuration
-
-| Property Name               | Description                                                                                                                                                        | Required | Default |
-|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
-| tidrange.max-split-count    | Max count of split, that is, the maximum number of JDBC connections. The value must be less than or equal to the value of max_connections in openGauss             | No       | 100     |
-| tidrange.page-size          | Page size of the openGauss. Ensure that the value is same as the value of block_size of the openGauss. Otherwise, the query result may be incorrect                | No       | 8kB     |
-| tidrange.default-split-size | Default size of each split. When the data size is small, the singleData connector fragments the data bases on this configuration. The value ranges from 1MB to 1GB | No       | 32MB    |
-
-****NOTE:****
-
-- TidRange mode needs to be used with tidrangescan plugin of the openGauss, without tidrangescan plugin, the singledata connector can be used for query, but the performance deteriorates greatly.
-- TidRange will be not enabled when an index exists in the table
+| Property Name                           | Description                                                                                                                                                                          | Default |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| tidrange.max-connection-count-per-node  | Maximum number of connections on each openGauss node. The minimum value is 1. The sum of the values of all workers cannot be greater than the value of max_connections of openGauss. | 100     |
+| tidrange.max-table-split-count-per-node | Maximum table split count of per openGauss node, The minimum value is 1                                                                                                              | 50      |
+| tidrange.connection-timeout             | Maximum waiting time for open connection. The unit is ms. If the value is 0, the connection never times out. If the value is not 0, the minimum value is 250ms.                      | 0       |
+| tidrange.max-lifetime                   | Maximum connection lifetime, in milliseconds. The minimum value is 30000ms.The default value is 30 minutes                                                                           | 1800000 |
 
 ## Limitations
 - SingleData Connector only support select statement now, statement such as INSERT/UPDATE/DELETE that modify data or data structures are not supported.

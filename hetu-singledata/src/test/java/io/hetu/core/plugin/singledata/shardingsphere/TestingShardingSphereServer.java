@@ -29,6 +29,7 @@ import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.mode.ModeConfiguration;
 import org.apache.shardingsphere.mode.repository.cluster.ClusterPersistRepositoryConfiguration;
 import org.apache.shardingsphere.sharding.api.config.ShardingRuleConfiguration;
+import org.apache.shardingsphere.sharding.api.config.rule.ShardingTableReferenceRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.rule.ShardingTableRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.strategy.sharding.StandardShardingStrategyConfiguration;
 
@@ -143,7 +144,7 @@ public class TestingShardingSphereServer
     private DataSource createDataSource() throws SQLException
     {
         ClusterPersistRepositoryConfiguration clusterPersistRepositoryConfiguration = new ClusterPersistRepositoryConfiguration("ZooKeeper", "test", curatorServer.getConnectString(), new Properties());
-        ModeConfiguration modeConfiguration = new ModeConfiguration("Cluster", clusterPersistRepositoryConfiguration, true);
+        ModeConfiguration modeConfiguration = new ModeConfiguration("Cluster", clusterPersistRepositoryConfiguration);
         return ShardingSphereDataSourceFactory.createDataSource("test", modeConfiguration, createDataSourceMap(), Collections.singleton(createShardingRuleConfiguration()), new Properties());
     }
 
@@ -152,7 +153,7 @@ public class TestingShardingSphereServer
         ShardingRuleConfiguration result = new ShardingRuleConfiguration();
         result.getTables().add(getTableAConfiguration());
         result.getTables().add(getTableBRuleConfiguration());
-        result.getBindingTableGroups().add("table_a, table_b");
+        result.getBindingTableGroups().add(new ShardingTableReferenceRuleConfiguration("table_a", "table_b"));
         result.setDefaultDatabaseShardingStrategy(new StandardShardingStrategyConfiguration("col_database", "database_inline"));
         Properties databaseProperties = new Properties();
         databaseProperties.put("algorithm-expression", "ds_${col_database %2}");

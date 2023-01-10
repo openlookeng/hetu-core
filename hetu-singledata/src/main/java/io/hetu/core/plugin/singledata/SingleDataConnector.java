@@ -58,7 +58,7 @@ public class SingleDataConnector
     private static final Logger LOGGER = Logger.get(SingleDataConnector.class);
 
     private final JdbcClient jdbcClient;
-    private final JdbcPageSourceProvider jdbcPageSourceProvider;
+    private final SingleDataPageSourceProvider singleDataPageSourceProvider;
     private final Set<Procedure> procedures;
     private final LifeCycleManager lifeCycleManager;
     private final JdbcMetadataConfig jdbcMetadataConfig;
@@ -70,6 +70,7 @@ public class SingleDataConnector
     @Inject
     public SingleDataConnector(
             JdbcClient jdbcClient,
+            SingleDataPageSourceProvider singleDataPageSourceProvider,
             JdbcPageSourceProvider jdbcPageSourceProvider,
             Set<Procedure> procedures,
             LifeCycleManager lifeCycleManager,
@@ -79,7 +80,7 @@ public class SingleDataConnector
             SingleDataPlanOptimizerProvider planOptimizerProvider)
     {
         this.jdbcClient = requireNonNull(jdbcClient, "jdbcClient is null");
-        this.jdbcPageSourceProvider = requireNonNull(jdbcPageSourceProvider, "jdbcPageSourceProvider is null");
+        this.singleDataPageSourceProvider = requireNonNull(singleDataPageSourceProvider, "SingleDataPageSourceProvider is null");
         this.procedures = ImmutableSet.copyOf(requireNonNull(procedures, "procedures is null"));
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
         this.jdbcMetadataConfig = requireNonNull(jdbcMetadataConfig, "config is null");
@@ -97,7 +98,7 @@ public class SingleDataConnector
     @Override
     public ConnectorPageSourceProvider getPageSourceProvider()
     {
-        return jdbcPageSourceProvider;
+        return singleDataPageSourceProvider;
     }
 
     @Override

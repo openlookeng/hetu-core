@@ -23,7 +23,6 @@ import io.prestosql.plugin.jdbc.ConnectionFactory;
 import io.prestosql.plugin.jdbc.JdbcColumnHandle;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
 import io.prestosql.plugin.jdbc.JdbcOutputTableHandle;
-import io.prestosql.plugin.jdbc.JdbcSplit;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ColumnMetadata;
@@ -33,9 +32,6 @@ import io.prestosql.spi.connector.ConnectorTableMetadata;
 import io.prestosql.spi.connector.SchemaTableName;
 import io.prestosql.spi.type.TypeManager;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,13 +47,6 @@ public abstract class BaseSingleDataClient
     }
 
     public abstract Optional<List<SingleDataSplit>> tryGetSplits(ConnectorSession session, SingleDataPushDownContext context);
-
-    @Override
-    public abstract Connection getConnection(JdbcIdentity identity, JdbcSplit split) throws SQLException;
-
-    @Override
-    public abstract PreparedStatement buildSql(ConnectorSession session, Connection connection, JdbcSplit split,
-            JdbcTableHandle tableHandle, List<JdbcColumnHandle> columns) throws SQLException;
 
     @Override
     public abstract ConnectorSplitSource getSplits(JdbcIdentity identity, JdbcTableHandle tableHandle);

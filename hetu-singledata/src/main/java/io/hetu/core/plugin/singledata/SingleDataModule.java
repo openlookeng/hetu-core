@@ -60,6 +60,7 @@ public class SingleDataModule
         binder.bind(SingleDataConnector.class).in(Scopes.SINGLETON);
         binder.bind(ConnectorPlanOptimizer.class).to(SingleDataPlanOptimizer.class).in(Scopes.SINGLETON);
         binder.bind(SingleDataPlanOptimizerProvider.class).in(Scopes.SINGLETON);
+        binder.bind(SingleDataPageSourceProvider.class).in(Scopes.SINGLETON);
 
         configBinder(binder).bindConfig(JdbcMetadataConfig.class);
         configBinder(binder).bindConfig(OpenGaussClientConfig.class);

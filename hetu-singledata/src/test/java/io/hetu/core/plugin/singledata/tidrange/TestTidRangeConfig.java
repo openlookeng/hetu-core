@@ -16,7 +16,6 @@
 package io.hetu.core.plugin.singledata.tidrange;
 
 import com.google.common.collect.ImmutableMap;
-import io.airlift.units.DataSize;
 import org.testng.annotations.Test;
 
 import java.util.Map;
@@ -30,24 +29,27 @@ public class TestTidRangeConfig
     public void testDefaultConfig()
     {
         TidRangeConfig defaultConfig = new TidRangeConfig();
-        assertEquals(defaultConfig.getMaxSplitCount(), 100);
-        assertEquals(defaultConfig.getPageSize(), new DataSize(8, DataSize.Unit.KILOBYTE));
-        assertEquals(defaultConfig.getDefaultSplitSize(), new DataSize(32, DataSize.Unit.MEGABYTE));
+        assertEquals(defaultConfig.getConnectionTimeout(), 0);
+        assertEquals(defaultConfig.getMaxLifetime(), 1800000L);
+        assertEquals(defaultConfig.getMaxConnectionCountPerNode(), 100);
+        assertEquals(defaultConfig.getMaxTableSplitCountPerNode(), 50);
     }
 
     @Test
     public void testTidRangeConfig()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("tidrange.max-split-count", "50")
-                .put("tidrange.page-size", "10kB")
-                .put("tidrange.default-split-size", "50MB")
+                .put("tidrange.max-connection-count-per-node", "10")
+                .put("tidrange.max-table-split-count-per-node", "5")
+                .put("tidrange.connection-timeout", "600")
+                .put("tidrange.max-lifetime", "50000")
                 .build();
 
         TidRangeConfig expected = new TidRangeConfig()
-                .setMaxSplitCount(50)
-                .setPageSize(new DataSize(10, DataSize.Unit.KILOBYTE))
-                .setDefaultSplitSize(new DataSize(50, DataSize.Unit.MEGABYTE));
+                .setMaxConnectionCountPerNode(10)
+                .setMaxTableSplitCountPerNode(5)
+                .setConnectionTimeout(600L)
+                .setMaxLifetime(50000L);
 
         assertFullMapping(properties, expected);
     }

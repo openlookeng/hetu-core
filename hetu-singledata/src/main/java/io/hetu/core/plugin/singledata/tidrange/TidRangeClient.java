@@ -16,16 +16,16 @@
 package io.hetu.core.plugin.singledata.tidrange;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.log.Logger;
+import io.airlift.units.DataSize;
 import io.hetu.core.plugin.opengauss.OpenGaussClientConfig;
 import io.hetu.core.plugin.singledata.BaseSingleDataClient;
 import io.hetu.core.plugin.singledata.SingleDataSplit;
 import io.hetu.core.plugin.singledata.optimization.SingleDataPushDownContext;
 import io.prestosql.plugin.jdbc.BaseJdbcConfig;
 import io.prestosql.plugin.jdbc.ConnectionFactory;
-import io.prestosql.plugin.jdbc.JdbcColumnHandle;
 import io.prestosql.plugin.jdbc.JdbcIdentity;
-import io.prestosql.plugin.jdbc.JdbcSplit;
 import io.prestosql.plugin.jdbc.JdbcTableHandle;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -39,7 +39,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -48,7 +47,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static io.hetu.core.plugin.singledata.SingleDataUtils.buildPushDownSql;
 import static io.hetu.core.plugin.singledata.SingleDataUtils.buildQueryByTableHandle;
 import static io.hetu.core.plugin.singledata.SingleDataUtils.getSingleDataSplit;
-import static io.hetu.core.plugin.singledata.SingleDataUtils.rewriteQueryWithColumns;
+import static io.hetu.core.plugin.singledata.tidrange.TidRangeUtils.getBlockSizeSql;
 import static io.hetu.core.plugin.singledata.tidrange.TidRangeUtils.getIndexSql;
 import static io.hetu.core.plugin.singledata.tidrange.TidRangeUtils.getRelationSizeSql;
 import static io.hetu.core.plugin.singledata.tidrange.TidRangeUtils.getSplitSqlFromContext;
@@ -60,32 +59,31 @@ public class TidRangeClient
         extends BaseSingleDataClient
 {
     private static final Logger LOGGER = Logger.get(TidRangeClient.class);
-    private static final String ENABLE_TIDRANGESCAN = "set enable_tidrangescan=on";
 
-    private final long pageSize;
-    private final long maxSplitCount;
-    private final long defaultSplitSize;
+    private static final DataSize DEFAULT_SPLIT_SIZE = new DataSize(64, DataSize.Unit.MEGABYTE);
+
+    private final int maxTableSplitCountPerNode;
+    private final TidRangeConnectionFactory tidRangeConnectionFactory;
 
     @Inject
     public TidRangeClient(BaseJdbcConfig config, OpenGaussClientConfig openGaussConfig, TidRangeConfig tidRangeConfig, ConnectionFactory connectionFactory, TypeManager typeManager)
     {
         super(config, openGaussConfig, connectionFactory, typeManager);
-        pageSize = tidRangeConfig.getPageSize().toBytes();
-        maxSplitCount = tidRangeConfig.getMaxSplitCount();
-        defaultSplitSize = tidRangeConfig.getDefaultSplitSize().toBytes();
+        this.maxTableSplitCountPerNode = tidRangeConfig.getMaxTableSplitCountPerNode();
+        this.tidRangeConnectionFactory = (TidRangeConnectionFactory) connectionFactory;
     }
 
     @Override
     public Optional<List<SingleDataSplit>> tryGetSplits(ConnectorSession session, SingleDataPushDownContext context)
     {
-        List<String> tidRangeFilters = getTidRangeFilters(context.getTableHandle().getTableName(), JdbcIdentity.from(session));
-        if (tidRangeFilters.isEmpty()) {
-            return Optional.of(ImmutableList.of(getSingleDataSplit(null, buildPushDownSql(context))));
+        List<TidRangeSplit> tidRangeSplits = getTidRangeSplits(context.getTableHandle().getTableName(), JdbcIdentity.from(session));
+        if (tidRangeSplits.isEmpty()) {
+            return Optional.of(getSingleSplit(buildPushDownSql(context)));
         }
         else {
             ImmutableList.Builder<SingleDataSplit> splits = new ImmutableList.Builder<>();
-            for (String filter : tidRangeFilters) {
-                splits.add(getSingleDataSplit(null, getSplitSqlFromContext(context, filter)));
+            for (TidRangeSplit split : tidRangeSplits) {
+                splits.add(getSingleDataSplit(split.dataSourceId, getSplitSqlFromContext(context, split.splitFilter)));
             }
             return Optional.of(splits.build());
         }
@@ -94,81 +92,89 @@ public class TidRangeClient
     @Override
     public ConnectorSplitSource getSplits(JdbcIdentity identity, JdbcTableHandle tableHandle)
     {
-        List<String> tidRangeFilters = getTidRangeFilters(tableHandle.getTableName(), identity);
+        List<TidRangeSplit> tidRangeSplits = getTidRangeSplits(tableHandle.getTableName(), identity);
         String query = buildQueryByTableHandle(tableHandle);
-        if (tidRangeFilters.isEmpty()) {
-            return new FixedSplitSource(ImmutableList.of(getSingleDataSplit(null, query)));
+        if (tidRangeSplits.isEmpty()) {
+            return new FixedSplitSource(getSingleSplit(query));
         }
         else {
             ImmutableList.Builder<SingleDataSplit> splits = new ImmutableList.Builder<>();
-            for (String filter : tidRangeFilters) {
-                splits.add(getSingleDataSplit(null, addTidRangeFilter(query, filter)));
+            for (TidRangeSplit split : tidRangeSplits) {
+                splits.add(getSingleDataSplit(split.dataSourceId, addTidRangeFilter(query, split.splitFilter)));
             }
             return new FixedSplitSource(splits.build());
         }
     }
 
-    @Override
-    public Connection getConnection(JdbcIdentity identity, JdbcSplit split) throws SQLException
+    private List<SingleDataSplit> getSingleSplit(String query)
     {
-        return connectionFactory.openConnection(identity);
+        String dataSourceId = String.valueOf(tidRangeConnectionFactory.getLastFactoryId());
+        return ImmutableList.of(getSingleDataSplit(dataSourceId, query));
     }
 
-    @Override
-    public PreparedStatement buildSql(
-            ConnectorSession session,
-            Connection connection,
-            JdbcSplit split,
-            JdbcTableHandle tableHandle,
-            List<JdbcColumnHandle> columns) throws SQLException
+    public ListenableFuture<Connection> openConnectionSync(int id)
     {
-        checkState(split instanceof SingleDataSplit, "Need SingleDataSplit");
-        try {
-            Statement statement = connection.createStatement();
-            statement.execute(ENABLE_TIDRANGESCAN);
-        }
-        catch (Exception e) {
-            LOGGER.warn("TidRangeScan plugin is unavailable. The performance may deteriorate.");
-        }
-        String query = rewriteQueryWithColumns(((SingleDataSplit) split).getSql(), columns);
-        LOGGER.debug("Actual SQL: [%s]", query);
-        return connection.prepareStatement(query);
+        return tidRangeConnectionFactory.openConnectionSync(id);
     }
 
-    private List<String> getTidRangeFilters(String tableName, JdbcIdentity identity)
+    private List<TidRangeSplit> getTidRangeSplits(String tableName, JdbcIdentity identity)
     {
         try (Connection connection = connectionFactory.openConnection(identity)) {
             // check whether index exists. If yes, do not use tid_range
             try (PreparedStatement statement = connection.prepareStatement(getIndexSql(tableName));
-                    ResultSet resultSet = statement.executeQuery()) {
+                     ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
-                    LOGGER.info("Table %s has an index, tidRange is not used", tableName);
+                    LOGGER.info("Table [%s] has an index, tidRange will not be enabled", tableName);
                     return ImmutableList.of();
                 }
             }
-            try (PreparedStatement statement = connection.prepareStatement(getRelationSizeSql(tableName));
+
+            long blockSize;
+            try (PreparedStatement statement = connection.prepareStatement(getBlockSizeSql());
                     ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
-                    long relationSize = resultSet.getLong(1);
-                    long defaultSplitCount = getSplitSize(relationSize, defaultSplitSize);
-                    long splitCount = Long.min(defaultSplitCount, maxSplitCount);
-                    long lastPage = getSplitSize(relationSize, pageSize);
-                    long pageCountPerSplit = getSplitSize(lastPage, splitCount);
+                    blockSize = resultSet.getLong(1);
+                }
+                else {
+                    throw new PrestoException(JDBC_ERROR, "Get block_size from openGauss failed.");
+                }
+            }
 
-                    LOGGER.debug("Table %s relation size is %s, will be divided into %s splits, %s pages per split",
-                            tableName, relationSize, splitCount, pageCountPerSplit);
-                    List<String> tidRangeFilters = new ArrayList<>();
-                    for (int i = 0; i < splitCount; i++) {
-                        long start = i * pageCountPerSplit;
-                        long end = Long.min((i + 1) * pageCountPerSplit, lastPage);
-                        tidRangeFilters.add(getTidRangeFilter(start, end));
+            long relationSize;
+            try (PreparedStatement statement = connection.prepareStatement(getRelationSizeSql(tableName));
+                     ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    relationSize = resultSet.getLong(1);
+                    if (relationSize == 0) {
+                        return ImmutableList.of();
                     }
-                    return tidRangeFilters;
                 }
                 else {
                     throw new PrestoException(JDBC_ERROR, format("Failed to get relation size : %s", tableName));
                 }
             }
+
+            List<Integer> availableFactoryIds = tidRangeConnectionFactory.getAvailableConnections(identity);
+            int nodeCount = availableFactoryIds.size();
+            long maxSplitCount = (long) maxTableSplitCountPerNode * nodeCount;
+            long defaultSplitCount = getSplitSize(relationSize, DEFAULT_SPLIT_SIZE.toBytes());
+            long splitCount = Long.min(maxSplitCount, defaultSplitCount);
+            checkState(splitCount > 0, "splitCount must greater than 0");
+
+            long lastPage = getSplitSize(relationSize, blockSize);
+            long pageCountPerSplit = getSplitSize(lastPage, splitCount);
+
+            LOGGER.debug("Table %s relation size is %s, will be divided into %s splits, %s pages per split",
+                    tableName, relationSize, splitCount, pageCountPerSplit);
+
+            List<TidRangeSplit> tidRangeSplits = new ArrayList<>();
+            for (int i = 0; i < splitCount; i++) {
+                long start = i * pageCountPerSplit;
+                long end = Long.min((i + 1) * pageCountPerSplit, lastPage);
+                String dataSourceId = String.valueOf(availableFactoryIds.get(i % nodeCount));
+                tidRangeSplits.add(new TidRangeSplit(dataSourceId, getTidRangeFilter(start, end)));
+            }
+            return tidRangeSplits;
         }
         catch (SQLException e) {
             throw new PrestoException(JDBC_ERROR, e.getMessage());
@@ -187,5 +193,17 @@ public class TidRangeClient
     private String addTidRangeFilter(String query, String tidRangeFilter)
     {
         return query + " WHERE " + tidRangeFilter;
+    }
+
+    private static class TidRangeSplit
+    {
+        private final String dataSourceId;
+        private final String splitFilter;
+
+        public TidRangeSplit(String id, String filter)
+        {
+            this.dataSourceId = id;
+            this.splitFilter = filter;
+        }
     }
 }
