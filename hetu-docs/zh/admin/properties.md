@@ -735,7 +735,7 @@
 >
 > 将CTE结果物化到缓存中。也可以使用cte_materialization_enabled会话属性在每个查询基础上指定。
 
-### `cte-result-cache-threshold-size`
+### `cte-materialization-threshold-size`
 
 > -   **类型：** `Data Size`
 > -   **默认值：** `128MB`

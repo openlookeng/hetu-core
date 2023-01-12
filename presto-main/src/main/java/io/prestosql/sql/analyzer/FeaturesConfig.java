@@ -195,7 +195,7 @@ public class FeaturesConfig
     private double adaptivePartialAggregationUniqueRowsRatioThreshold = 0.8;
     private boolean transformSelfJoinToWindow = true;
     private boolean transformSelfJoinAggregateToWindow = true;
-    private DataSize cteResultCacheThresholdSize = new DataSize(128, MEGABYTE);
+    private DataSize cteMaterializationThresholdSize = new DataSize(128, MEGABYTE);
 
     private long joinPartitionedBuildMinRowCount = 1_000_000L;
 
@@ -1661,16 +1661,16 @@ public class FeaturesConfig
         return this;
     }
 
-    public DataSize getCteResultCacheThresholdSize()
+    public DataSize getCteMaterializationThresholdSize()
     {
-        return cteResultCacheThresholdSize;
+        return cteMaterializationThresholdSize;
     }
 
-    @Config("cte-result-cache-threshold-size")
-    @ConfigDescription("Maximum allowed size to be stored as part of cte result cache per CTE per query")
-    public FeaturesConfig setCteResultCacheThresholdSize(DataSize cteResultCacheThresholdSize)
+    @Config("cte-materialization-threshold-size")
+    @ConfigDescription("Maximum allowed size to be stored as part of cte materialization cache per CTE per query")
+    public FeaturesConfig setCteMaterializationThresholdSize(DataSize cteMaterializationThresholdSize)
     {
-        this.cteResultCacheThresholdSize = cteResultCacheThresholdSize;
+        this.cteMaterializationThresholdSize = cteMaterializationThresholdSize;
         return this;
     }
 }

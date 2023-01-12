@@ -169,7 +169,7 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinAggregatesToWindow(true)
                 .setJoinPartitionedBuildMinRowCount(1_000_000L)
                 .setUseExactPartitioning(false)
-                .setCteResultCacheThresholdSize(new DataSize(128, MEGABYTE))
+                .setCteMaterializationThresholdSize(new DataSize(128, MEGABYTE))
                 .setCTEMaterializationEnabled(false));
     }
 
@@ -289,7 +289,7 @@ public class TestFeaturesConfig
                 .put("optimizer.transform-self-join-aggregates-to-window", "false")
                 .put("optimizer.join-partitioned-build-min-row-count", "100000")
                 .put("optimizer.use-exact-partitioning", "true")
-                .put("cte-result-cache-threshold-size", "512MB")
+                .put("cte-materialization-threshold-size", "512MB")
                 .put("cte-materialization-enabled", "true")
                 .build();
 
@@ -407,7 +407,7 @@ public class TestFeaturesConfig
                 .setTransformSelfJoinAggregatesToWindow(false)
                 .setJoinPartitionedBuildMinRowCount(1_000_00L)
                 .setUseExactPartitioning(true)
-                .setCteResultCacheThresholdSize(new DataSize(512, MEGABYTE))
+                .setCteMaterializationThresholdSize(new DataSize(512, MEGABYTE))
                 .setCTEMaterializationEnabled(true);
 
         assertFullMapping(properties, expected);
