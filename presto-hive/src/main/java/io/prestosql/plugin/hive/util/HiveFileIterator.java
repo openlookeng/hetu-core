@@ -19,10 +19,10 @@ import io.airlift.stats.TimeStat;
 import io.prestosql.plugin.hive.DirectoryLister;
 import io.prestosql.plugin.hive.HiveErrorCode;
 import io.prestosql.plugin.hive.NamenodeStats;
+import io.prestosql.plugin.hive.PrestoFileStatus;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.PrestoException;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -37,7 +37,7 @@ import java.util.Iterator;
 import static java.util.Objects.requireNonNull;
 
 public class HiveFileIterator
-        extends AbstractIterator<LocatedFileStatus>
+        extends AbstractIterator<PrestoFileStatus>
 {
     public enum NestedDirectoryPolicy
     {
@@ -54,7 +54,7 @@ public class HiveFileIterator
     private final NestedDirectoryPolicy nestedDirectoryPolicy;
     private final PathFilter pathFilter;
 
-    private Iterator<LocatedFileStatus> remoteIterator = Collections.emptyIterator();
+    private Iterator<PrestoFileStatus> remoteIterator = Collections.emptyIterator();
 
     public HiveFileIterator(
             Table table,
@@ -75,11 +75,11 @@ public class HiveFileIterator
     }
 
     @Override
-    protected LocatedFileStatus computeNext()
+    protected PrestoFileStatus computeNext()
     {
         while (true) {
             while (remoteIterator.hasNext()) {
-                LocatedFileStatus status = getLocatedFileStatus(remoteIterator);
+                PrestoFileStatus status = getLocatedFileStatus(remoteIterator);
 
                 // Ignore hidden files and directories. Hive ignores files starting with _ and . as well.
                 String fileName = status.getPath().getName();
@@ -109,14 +109,14 @@ public class HiveFileIterator
         }
     }
 
-    private Iterator<LocatedFileStatus> getLocatedFileStatusRemoteIterator(Path path, PathFilter pathFilter)
+    private Iterator<PrestoFileStatus> getLocatedFileStatusRemoteIterator(Path path, PathFilter pathFilter)
     {
         try (TimeStat.BlockTimer ignored = namenodeStats.getListLocatedStatus().time()) {
             return Iterators.filter(new FileStatusIterator(table, path, fileSystem, directoryLister, namenodeStats), input -> pathFilter.accept(input.getPath()));
         }
     }
 
-    private LocatedFileStatus getLocatedFileStatus(Iterator<LocatedFileStatus> iterator)
+    private PrestoFileStatus getLocatedFileStatus(Iterator<PrestoFileStatus> iterator)
     {
         try (TimeStat.BlockTimer ignored = namenodeStats.getRemoteIteratorNext().time()) {
             return iterator.next();
@@ -124,11 +124,11 @@ public class HiveFileIterator
     }
 
     private static class FileStatusIterator
-            implements Iterator<LocatedFileStatus>
+            implements Iterator<PrestoFileStatus>
     {
         private final Path path;
         private final NamenodeStats namenodeStats;
-        private final RemoteIterator<LocatedFileStatus> fileStatusIterator;
+        private final RemoteIterator<PrestoFileStatus> fileStatusIterator;
 
         private FileStatusIterator(Table table, Path path, FileSystem fileSystem, DirectoryLister directoryLister, NamenodeStats namenodeStats)
         {
@@ -154,7 +154,7 @@ public class HiveFileIterator
         }
 
         @Override
-        public LocatedFileStatus next()
+        public PrestoFileStatus next()
         {
             try {
                 return fileStatusIterator.next();

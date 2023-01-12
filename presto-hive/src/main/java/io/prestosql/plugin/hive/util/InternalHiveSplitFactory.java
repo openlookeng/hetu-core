@@ -15,27 +15,25 @@ package io.prestosql.plugin.hive.util;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.prestosql.plugin.hive.BlockLocation;
 import io.prestosql.plugin.hive.DeleteDeltaLocations;
 import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePartitionKey;
 import io.prestosql.plugin.hive.HiveSplit.BucketConversion;
 import io.prestosql.plugin.hive.HiveTypeName;
 import io.prestosql.plugin.hive.InternalHiveSplit;
+import io.prestosql.plugin.hive.PrestoFileStatus;
 import io.prestosql.plugin.hive.S3SelectPushdown;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.TupleDomain;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputFormat;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -93,25 +91,25 @@ public class InternalHiveSplitFactory
         return partitionName;
     }
 
-    public Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, boolean splittable, Optional<DeleteDeltaLocations> deleteDeltaLocations, Optional<Long> startRowOffsetOfFile)
+    public Optional<InternalHiveSplit> createInternalHiveSplit(PrestoFileStatus status, boolean splittable, Optional<DeleteDeltaLocations> deleteDeltaLocations, Optional<Long> startRowOffsetOfFile)
     {
         return createInternalHiveSplit(status, OptionalInt.empty(), splittable, deleteDeltaLocations, startRowOffsetOfFile);
     }
 
-    public Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, int bucketNumber, Optional<DeleteDeltaLocations> deleteDeltaLocations)
+    public Optional<InternalHiveSplit> createInternalHiveSplit(PrestoFileStatus status, int bucketNumber, Optional<DeleteDeltaLocations> deleteDeltaLocations)
     {
         return createInternalHiveSplit(status, OptionalInt.of(bucketNumber), false, deleteDeltaLocations, Optional.empty());
     }
 
-    private Optional<InternalHiveSplit> createInternalHiveSplit(LocatedFileStatus status, OptionalInt bucketNumber, boolean splittable, Optional<DeleteDeltaLocations> deleteDeltaLocations, Optional<Long> startRowOffsetOfFile)
+    private Optional<InternalHiveSplit> createInternalHiveSplit(PrestoFileStatus status, OptionalInt bucketNumber, boolean splittable, Optional<DeleteDeltaLocations> deleteDeltaLocations, Optional<Long> startRowOffsetOfFile)
     {
         boolean tmpSplittable = splittable && isSplittable(inputFormat, fileSystem, status.getPath());
         return createInternalHiveSplit(
                 status.getPath(),
                 status.getBlockLocations(),
                 0,
-                status.getLen(),
-                status.getLen(),
+                status.getLength(),
+                status.getLength(),
                 status.getModificationTime(),
                 bucketNumber,
                 tmpSplittable,
@@ -127,7 +125,7 @@ public class InternalHiveSplitFactory
         Map<String, String> customSplitInfo = extractCustomSplitInfo(split);
         return createInternalHiveSplit(
                 split.getPath(),
-                fileSystem.getFileBlockLocations(file, split.getStart(), split.getLength()),
+                BlockLocation.fromHiveBlockLocations(fileSystem.getFileBlockLocations(file, split.getStart(), split.getLength())),
                 split.getStart(),
                 split.getLength(),
                 file.getLen(),
@@ -141,7 +139,7 @@ public class InternalHiveSplitFactory
 
     private Optional<InternalHiveSplit> createInternalHiveSplit(
             Path path,
-            BlockLocation[] blockLocations,
+            List<BlockLocation> blockLocations,
             long start,
             long length,
             long fileSize,
@@ -162,15 +160,14 @@ public class InternalHiveSplitFactory
         // For empty files, some filesystem (e.g. LocalFileSystem) produce one empty block
         // while others (e.g. hdfs.DistributedFileSystem) produces no block.
         // Synthesize an empty block if one does not already exist.
-        BlockLocation[] tmpBlockLocations = blockLocations;
-        if (fileSize == 0 && tmpBlockLocations.length == 0) {
-            tmpBlockLocations = new BlockLocation[] {new BlockLocation()};
+        if (fileSize == 0 && blockLocations.size() == 0) {
+            blockLocations.add(new BlockLocation());
             // Turn off force local scheduling because hosts list doesn't exist.
             tmpForceLocalScheduling = false;
         }
 
         ImmutableList.Builder<InternalHiveSplit.InternalHiveBlock> blockBuilder = ImmutableList.builder();
-        for (BlockLocation blockLocation : tmpBlockLocations) {
+        for (BlockLocation blockLocation : blockLocations) {
             // clamp the block range
             long blockStart = Math.max(start, blockLocation.getOffset());
             long blockEnd = Math.min(start + length, blockLocation.getOffset() + blockLocation.getLength());
@@ -234,20 +231,10 @@ public class InternalHiveSplitFactory
     private static List<HostAddress> getHostAddresses(BlockLocation blockLocation)
     {
         // Hadoop FileSystem returns "localhost" as a default
-        return Arrays.stream(getBlockHosts(blockLocation))
+        return blockLocation.getHosts().stream()
                 .map(HostAddress::fromString)
                 .filter(address -> !address.getHostText().equals("localhost"))
                 .collect(toImmutableList());
-    }
-
-    private static String[] getBlockHosts(BlockLocation blockLocation)
-    {
-        try {
-            return blockLocation.getHosts();
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     private static Optional<Domain> getPathDomain(TupleDomain<HiveColumnHandle> effectivePredicate)

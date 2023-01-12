@@ -45,7 +45,6 @@ import io.prestosql.spi.type.TypeManager;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.hive.common.ValidCompactorWriteIdList;
@@ -681,7 +680,7 @@ public class BackgroundHiveSplitLoader
         int bucketCount = max(readBucketCount, partitionBucketCount);
 
         // list all files in the partition
-        List<LocatedFileStatus> files = new ArrayList<>(partitionBucketCount);
+        List<PrestoFileStatus> files = new ArrayList<>(partitionBucketCount);
         try {
             Iterators.addAll(files, new HiveFileIterator(table, path, fileSystem, directoryLister, namenodeStats, FAIL, pathFilter));
         }
@@ -695,8 +694,8 @@ public class BackgroundHiveSplitLoader
         }
 
         // build mapping of file name to bucket
-        ListMultimap<Integer, LocatedFileStatus> bucketFiles = ArrayListMultimap.create();
-        for (LocatedFileStatus file : files) {
+        ListMultimap<Integer, PrestoFileStatus> bucketFiles = ArrayListMultimap.create();
+        for (PrestoFileStatus file : files) {
             String fileName = file.getPath().getName();
             OptionalInt bucket = getBucketNumber(fileName);
             if (bucket.isPresent()) {
@@ -758,7 +757,7 @@ public class BackgroundHiveSplitLoader
                                 "partition bucket count: " + partitionBucketCount + ", effective reading bucket count: " + readBucketCount + ")");
             }
             if (containsEligibleTableBucket) {
-                for (LocatedFileStatus file : bucketFiles.get(partitionBucketNumber)) {
+                for (PrestoFileStatus file : bucketFiles.get(partitionBucketNumber)) {
                     // OrcDeletedRows will load only delete delta files matching current bucket (same file name),
                     // so we can pass all delete delta locations here, without filtering.
                     splitFactory.createInternalHiveSplit(file, readBucketNumber, deleteDeltaLocations)
