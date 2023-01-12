@@ -776,7 +776,7 @@ Exchanges transfer data between openLooKeng nodes for different stages of a quer
 >
 > Enable CTE materialization cache feature. This can also be specified on a per-query basis using the cte_materialization_enabled session property. 
 
-### `cte-result-cache-threshold-size`
+### `cte-materialization-threshold-size`
 
 > -   **Type:** `Data Size`
 > -   **Default value:** `128MB`

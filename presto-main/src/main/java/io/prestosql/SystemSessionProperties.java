@@ -1076,7 +1076,7 @@ public final class SystemSessionProperties
                         false),
                 dataSizeProperty(CTE_MATERIALIZATION_THRESHOLD_SIZE,
                         "Maximum allowed size to be stored as part of cte result cache per CTE per query",
-                        featuresConfig.getCteResultCacheThresholdSize(),
+                        featuresConfig.getCteMaterializationThresholdSize(),
                         false),
                 stringProperty(
                         CTE_MATERIALIZATION_CATALOG_NAME,
