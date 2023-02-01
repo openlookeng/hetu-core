@@ -63,6 +63,8 @@ public class StatsCalculatorModule
         rules.add(new MarkDistinctStatsRule(normalizer));
         rules.add(new WindowStatsRule(normalizer));
         rules.add(new CTEScanStatsRule(normalizer));
+        rules.add(new CacheTableWriterStatsRule(normalizer));
+        rules.add(new CacheTableFinishStatsRule(normalizer));
 
         return new ComposableStatsCalculator(rules.build());
     }

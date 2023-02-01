@@ -34,6 +34,8 @@ import io.prestosql.spi.plan.ValuesNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.AssignUniqueId;
+import io.prestosql.sql.planner.plan.CacheTableFinishNode;
+import io.prestosql.sql.planner.plan.CacheTableWriterNode;
 import io.prestosql.sql.planner.plan.EnforceSingleRowNode;
 import io.prestosql.sql.planner.plan.ExchangeNode;
 import io.prestosql.sql.planner.plan.InternalPlanVisitor;
@@ -370,6 +372,20 @@ public class CostCalculatorUsingExchanges
 
         @Override
         public PlanCostEstimate visitCTEScan(CTEScanNode node, Void context)
+        {
+            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node).getOutputSizeInBytes(node.getOutputSymbols(), types));
+            return costForStreaming(node, localCost);
+        }
+
+        @Override
+        public PlanCostEstimate visitCacheTableWriter(CacheTableWriterNode node, Void context)
+        {
+            LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node).getOutputSizeInBytes(node.getOutputSymbols(), types));
+            return costForStreaming(node, localCost);
+        }
+
+        @Override
+        public PlanCostEstimate visitCacheTableFinish(CacheTableFinishNode node, Void context)
         {
             LocalCostEstimate localCost = LocalCostEstimate.ofCpu(getStats(node).getOutputSizeInBytes(node.getOutputSymbols(), types));
             return costForStreaming(node, localCost);

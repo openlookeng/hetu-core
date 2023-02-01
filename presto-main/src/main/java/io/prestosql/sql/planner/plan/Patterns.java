@@ -244,6 +244,16 @@ public class Patterns
         return typeOf(CTEScanNode.class);
     }
 
+    public static Pattern<CacheTableFinishNode> cacheTableFinishNodePattern()
+    {
+        return typeOf(CacheTableFinishNode.class);
+    }
+
+    public static Pattern<CacheTableWriterNode> cacheTableWriterNodePattern()
+    {
+        return typeOf(CacheTableWriterNode.class);
+    }
+
     public static Property<PlanNode, Lookup, PlanNode> source()
     {
         return optionalProperty(
