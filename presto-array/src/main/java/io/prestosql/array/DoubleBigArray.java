@@ -85,6 +85,16 @@ public final class DoubleBigArray
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     */
+    public void reset(long index)
+    {
+        array[BigArrays.segment(index)][BigArrays.offset(index)] = initialValue;
+    }
+
+    /**
      * Adds the specified value to the specified element of this big array.
      *
      * @param index a position in this big array.

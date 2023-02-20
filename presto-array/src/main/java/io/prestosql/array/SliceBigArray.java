@@ -74,6 +74,29 @@ public final class SliceBigArray
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     */
+    public void reset(long index)
+    {
+        Slice currentValue = array.get(index);
+        if (currentValue != null) {
+            int baseReferenceCount = trackedSlices.decrementAndGet(currentValue.getBase());
+            int sliceReferenceCount = trackedSlices.decrementAndGet(currentValue);
+            if (baseReferenceCount == 0) {
+                // it is the last referenced base
+                sizeOfSlices -= currentValue.getRetainedSize();
+            }
+            else if (sliceReferenceCount == 0) {
+                // it is the last referenced slice
+                sizeOfSlices -= SLICE_INSTANCE_SIZE;
+            }
+        }
+        array.reset(index);
+    }
+
+    /**
      * Ensures this big array is at least the specified length.  If the array is smaller, segments
      * are added until the array is larger then the specified length.
      */

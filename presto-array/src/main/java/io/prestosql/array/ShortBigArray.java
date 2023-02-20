@@ -85,6 +85,16 @@ public final class ShortBigArray
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     */
+    public void reset(long index)
+    {
+        array[BigArrays.segment(index)][BigArrays.offset(index)] = initialValue;
+    }
+
+    /**
      * Increments the element of this big array at specified index.
      *
      * @param index a position in this big array.

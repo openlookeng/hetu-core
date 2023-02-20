@@ -97,6 +97,30 @@ public final class BlockBigArray
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     */
+    public <T> void reset(long index, Block<T> value)
+    {
+        Block<T> currentValue = array.get(index);
+        if (currentValue != null) {
+            currentValue.retainedBytesForEachPart((object, size) -> {
+                if (currentValue == object) {
+                    // track instance size separately as the reference count for an instance is always 1
+                    sizeOfBlocks -= size;
+                    return;
+                }
+                if (trackedObjects.decrementAndGet(object) == 0) {
+                    // decrement the size only when it is the last reference
+                    sizeOfBlocks -= size;
+                }
+            });
+        }
+        array.reset(index);
+    }
+
+    /**
      * Ensures this big array is at least the specified length.  If the array is smaller, segments
      * are added until the array is larger then the specified length.
      */

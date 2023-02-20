@@ -82,6 +82,16 @@ public final class BooleanBigArray
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     */
+    public void reset(long index)
+    {
+        array[BigArrays.segment(index)][BigArrays.offset(index)] = initialValue;
+    }
+
+    /**
      * Ensures this big array is at least the specified length.  If the array is smaller, segments
      * are added until the array is larger then the specified length.
      */

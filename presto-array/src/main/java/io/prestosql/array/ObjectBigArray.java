@@ -106,6 +106,17 @@ public final class ObjectBigArray<T>
     }
 
     /**
+     * Resets the element of this big array at specified index.
+     *
+     * @param index a position in this big array.
+     * @return true if the previous value was null
+     */
+    public void reset(long index)
+    {
+        array[BigArrays.segment(index)][offset(index)] = initialValue;
+    }
+
+    /**
      * Replaces the element of this big array at specified index.
      *
      * @param index a position in this big array.
