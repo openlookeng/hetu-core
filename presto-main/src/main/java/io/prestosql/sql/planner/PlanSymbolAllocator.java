@@ -166,4 +166,9 @@ public class PlanSymbolAllocator
     {
         return nextId++;
     }
+
+    public void updateSymbolType(Symbol symbol, Type type)
+    {
+        symbols.put(symbol, type);
+    }
 }

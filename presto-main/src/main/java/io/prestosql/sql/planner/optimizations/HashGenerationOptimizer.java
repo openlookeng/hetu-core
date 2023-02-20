@@ -14,6 +14,7 @@
 package io.prestosql.sql.planner.optimizations;
 
 import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
@@ -36,6 +37,8 @@ import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode.JoinInternalAggregation;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
@@ -53,6 +56,7 @@ import io.prestosql.sql.planner.FunctionCallBuilder;
 import io.prestosql.sql.planner.Partitioning.ArgumentBinding;
 import io.prestosql.sql.planner.PartitioningScheme;
 import io.prestosql.sql.planner.PlanSymbolAllocator;
+import io.prestosql.sql.planner.SymbolsExtractor;
 import io.prestosql.sql.planner.TypeProvider;
 import io.prestosql.sql.planner.plan.ApplyNode;
 import io.prestosql.sql.planner.plan.DistinctLimitNode;
@@ -97,6 +101,7 @@ import static io.prestosql.spi.connector.CatalogSchemaName.DEFAULT_NAMESPACE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.function.Signature.mangleOperatorName;
 import static io.prestosql.spi.operator.ReuseExchangeOperator.STRATEGY.REUSE_STRATEGY_DEFAULT;
+import static io.prestosql.spi.plan.AggregationNode.singleGroupingSet;
 import static io.prestosql.spi.plan.JoinNode.Type.INNER;
 import static io.prestosql.spi.plan.JoinNode.Type.LEFT;
 import static io.prestosql.spi.plan.JoinNode.Type.RIGHT;
@@ -412,6 +417,197 @@ public class HashGenerationOptimizer
         }
 
         @Override
+        public PlanWithProperties visitJoinOnAggregation(JoinOnAggregationNode node, HashComputationSet parentPreference)
+        {
+            List<JoinNode.EquiJoinClause> clauses = node.getCriteria();
+
+            // join does not pass through preferred hash symbols since they take more memory and since
+            // the join node filters, may take more compute
+            Optional<HashComputation> leftHashComputation = computeHash(metadata, planSymbolAllocator, Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft));
+            Optional<HashComputation> rightHashComputation = computeHash(metadata, planSymbolAllocator, Lists.transform(clauses, JoinNode.EquiJoinClause::getRight));
+
+            // build map of all hash symbols
+            // NOTE: Full outer join doesn't use hash symbols
+            BiMap<HashComputation, Symbol> allHashSymbols = HashBiMap.create();
+            PlanWithProperties left;
+            PlanWithProperties right;
+            Optional<Symbol> leftHashSymbol;
+            Optional<Symbol> rightHashSymbol;
+
+            Optional<Symbol> leftHashSymbolAggr;
+            Optional<Symbol> rightHashSymbolAggr;
+
+            List<Symbol> leftGrpByKeys = node.getLeftAggr().getGroupingKeys();
+            List<Symbol> rightGrpByKeys = node.getRightAggr().getGroupingKeys();
+            List<Symbol> aggrOnLeftGrpByKeys = node.getAggrOnLeft().getGroupingKeys();
+            List<Symbol> aggrOnRightGrpByKeys = node.getAggrOnRight().getGroupingKeys();
+
+            // Update Hash Symbol in Left and Right Aggregation of Join
+            // If Join Keys and Grouping Keys are same, then only join hash symbol can be re-used, otherwise need to calculate for grouping keys
+            if (!canJoinHashSymbolBeUsedForJoinInternalAggregation(Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft), leftGrpByKeys)) {
+                left = planAndEnforce(node.getLeft(), new HashComputationSet(leftHashComputation), true, new HashComputationSet(leftHashComputation));
+                leftHashSymbol = Optional.of(left.getRequiredHashSymbol(leftHashComputation.get()));
+
+                List<Symbol> groupingKeys = node.getLeftAggr().getGroupingKeys();
+                leftGrpByKeys = ImmutableList.<Symbol>builder()
+                        .addAll(groupingKeys.subList(0, node.getCriteria().size()))
+                        .add(leftHashSymbol.get())
+                        .addAll(groupingKeys.subList(node.getCriteria().size(), groupingKeys.size()))
+                        .build();
+
+                groupingKeys = node.getAggrOnLeft().getGroupingKeys();
+                aggrOnLeftGrpByKeys = ImmutableList.<Symbol>builder()
+                        .addAll(groupingKeys.subList(0, node.getCriteria().size()))
+                        .add(leftHashSymbol.get())
+                        .addAll(groupingKeys.subList(node.getCriteria().size(), groupingKeys.size()))
+                        .build();
+
+                Optional<HashComputation> leftAggrHashComputation = computeHash(metadata, planSymbolAllocator, leftGrpByKeys);
+                ImmutableSetMultimap.Builder<HashComputation, HashComputation> builder = ImmutableSetMultimap.builder();
+                builder.put(leftAggrHashComputation.get(), leftAggrHashComputation.get());
+                left = planAndEnforce(left.getNode(), new HashComputationSet(builder.build()), true, new HashComputationSet(builder.build()));
+                leftHashSymbolAggr = Optional.ofNullable(left.getRequiredHashSymbol(leftAggrHashComputation.get()));
+            }
+            else {
+                left = planAndEnforce(node.getLeft(), new HashComputationSet(leftHashComputation), true, new HashComputationSet(leftHashComputation));
+                leftHashSymbol = Optional.of(left.getRequiredHashSymbol(leftHashComputation.get()));
+                leftHashSymbolAggr = leftHashSymbol;
+            }
+
+            if (!canJoinHashSymbolBeUsedForJoinInternalAggregation(Lists.transform(clauses, JoinNode.EquiJoinClause::getRight), rightGrpByKeys)) {
+                right = planAndEnforce(node.getRight(), new HashComputationSet(rightHashComputation), true, new HashComputationSet(rightHashComputation));
+                rightHashSymbol = Optional.of(right.getRequiredHashSymbol(rightHashComputation.get()));
+
+                List<Symbol> groupingKeys = node.getRightAggr().getGroupingKeys();
+                rightGrpByKeys = ImmutableList.<Symbol>builder()
+                        .addAll(groupingKeys.subList(0, node.getCriteria().size()))
+                        .add(rightHashSymbol.get())
+                        .addAll(groupingKeys.subList(node.getCriteria().size(), groupingKeys.size()))
+                        .build();
+
+                groupingKeys = node.getAggrOnRight().getGroupingKeys();
+                aggrOnRightGrpByKeys = ImmutableList.<Symbol>builder()
+                        .addAll(groupingKeys.subList(0, node.getCriteria().size()))
+                        .add(rightHashSymbol.get())
+                        .addAll(groupingKeys.subList(node.getCriteria().size(), groupingKeys.size()))
+                        .build();
+
+                Optional<HashComputation> rightAggrHashComputation = computeHash(metadata, planSymbolAllocator, rightGrpByKeys);
+                ImmutableSetMultimap.Builder<HashComputation, HashComputation> builder = ImmutableSetMultimap.builder();
+                builder.put(rightAggrHashComputation.get(), rightAggrHashComputation.get());
+                right = planAndEnforce(left.getNode(), new HashComputationSet(builder.build()), true, new HashComputationSet(builder.build()));
+                rightHashSymbolAggr = Optional.ofNullable(left.getRequiredHashSymbol(rightAggrHashComputation.get()));
+            }
+            else {
+                right = planAndEnforce(node.getRight(), new HashComputationSet(rightHashComputation), true, new HashComputationSet(rightHashComputation));
+                rightHashSymbol = Optional.of(right.getRequiredHashSymbol(rightHashComputation.get()));
+                rightHashSymbolAggr = rightHashSymbol;
+            }
+
+            if (node.getType() == INNER || node.getType() == LEFT) {
+                allHashSymbols.putAll(left.getHashSymbols());
+            }
+            if (node.getType() == INNER || node.getType() == RIGHT) {
+                allHashSymbols.putAll(right.getHashSymbols());
+            }
+
+            // retain only hash symbols preferred by parent nodes
+            Map<HashComputation, Symbol> hashSymbolsWithParentPreferences =
+                    allHashSymbols.entrySet()
+                            .stream()
+                            .filter(entry -> parentPreference.getHashes().contains(entry.getKey()))
+                            .collect(toImmutableMap(Entry::getKey, Entry::getValue));
+
+            JoinInternalAggregation leftAggr = new JoinInternalAggregation(node.getLeftAggr().getId(),
+                    left.getNode(),
+                    node.getLeftAggr().getAggregations(),
+                    singleGroupingSet(leftGrpByKeys),
+                    ImmutableList.of(),
+                    node.getLeftAggr().getStep(),
+                    leftHashSymbolAggr,
+                    node.getLeftAggr().getGroupIdSymbol(),
+                    node.getLeftAggr().getAggregationType(),
+                    node.getLeftAggr().getFinalizeSymbol());
+
+            JoinInternalAggregation rightAggr = new JoinInternalAggregation(node.getRightAggr().getId(),
+                    right.getNode(),
+                    node.getRightAggr().getAggregations(),
+                    singleGroupingSet(rightGrpByKeys),
+                    ImmutableList.of(),
+                    node.getRightAggr().getStep(),
+                    rightHashSymbolAggr,
+                    node.getRightAggr().getGroupIdSymbol(),
+                    node.getRightAggr().getAggregationType(),
+                    node.getRightAggr().getFinalizeSymbol());
+
+            JoinInternalAggregation aggrOnLeftAggr = new JoinInternalAggregation(node.getAggrOnLeft().getId(),
+                    leftAggr,
+                    node.getAggrOnLeft().getAggregations(),
+                    singleGroupingSet(aggrOnLeftGrpByKeys),
+                    ImmutableList.of(),
+                    node.getAggrOnLeft().getStep(),
+                    leftHashSymbolAggr,
+                    node.getAggrOnLeft().getGroupIdSymbol(),
+                    node.getAggrOnLeft().getAggregationType(),
+                    node.getAggrOnLeft().getFinalizeSymbol());
+
+            JoinInternalAggregation aggrOnRightAggr = new JoinInternalAggregation(node.getAggrOnRight().getId(),
+                    rightAggr,
+                    node.getAggrOnRight().getAggregations(),
+                    singleGroupingSet(aggrOnRightGrpByKeys),
+                    ImmutableList.of(),
+                    node.getAggrOnRight().getStep(),
+                    rightHashSymbolAggr,
+                    node.getAggrOnRight().getGroupIdSymbol(),
+                    node.getAggrOnRight().getAggregationType(),
+                    node.getAggrOnRight().getFinalizeSymbol());
+
+            ImmutableList.Builder<Symbol> newOutputSymbolBuilder = ImmutableList.builder();
+            newOutputSymbolBuilder
+                    .addAll(aggrOnLeftAggr.getOutputSymbols())
+                    .addAll(aggrOnRightAggr.getOutputSymbols());
+            return new PlanWithProperties(
+                    new JoinOnAggregationNode(
+                            node.getId(),
+                            node.getType(),
+                            node.getCriteria(),
+                            node.getFilter(),
+                            leftHashSymbol,
+                            rightHashSymbol,
+                            node.getDistributionType(),
+                            node.isSpillable(),
+                            node.getDynamicFilters(),
+                            leftAggr,
+                            rightAggr,
+                            aggrOnLeftAggr,
+                            aggrOnRightAggr,
+                            newOutputSymbolBuilder.build()),
+                    hashSymbolsWithParentPreferences);
+        }
+
+        private boolean canJoinHashSymbolBeUsedForJoinInternalAggregation(List<Symbol> joinSymbols,
+                List<Symbol> groupingKeys)
+        {
+            if (joinSymbols.size() == groupingKeys.size() && joinSymbols.containsAll(groupingKeys)) {
+                return true;
+            }
+            return false;
+        }
+
+        private boolean canHashSymbolUseForJoinInternalAggregation(Optional<Symbol> hashSymbol,
+                List<Symbol> groupingKeys,
+                BiMap<HashComputation, Symbol> allHashSymbols)
+        {
+            if (hashSymbol.isPresent()) {
+                HashComputation hashComputation = allHashSymbols.inverse().get(hashSymbol.get());
+                if (hashComputation.getFields().size() == groupingKeys.size() && hashComputation.getFields().containsAll(groupingKeys)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
         public PlanWithProperties visitSemiJoin(SemiJoinNode node, HashComputationSet parentPreference)
         {
             Optional<HashComputation> sourceHashComputation = computeHash(metadata, planSymbolAllocator, ImmutableList.of(node.getSourceJoinSymbol()));
@@ -685,27 +881,58 @@ public class HashGenerationOptimizer
 
             // create a new project node with all assignments from the original node
             Assignments.Builder newAssignments = Assignments.builder();
-            newAssignments.putAll(node.getAssignments());
+            Assignments assignments = node.getAssignments();
+            Map<HashComputationSet, Symbol> hashSymbolMap = new HashMap<>();
+            for (Symbol symbol : assignments.getOutputs()) {
+                if (symbol.getName().startsWith("$hashvalue")) {
+                    HashComputationSet hashComputationSet = new HashComputationSet(Optional.of(new HashComputation(metadata, planSymbolAllocator, SymbolsExtractor.extractAll(assignments.get(symbol)))));
+                    hashSymbolMap.put(hashComputationSet, symbol);
+                    newAssignments.put(symbol, assignments.get(symbol));
+                }
+                else {
+                    newAssignments.put(symbol, assignments.get(symbol));
+                }
+            }
 
             // and all hash symbols that could be translated to the source symbols
             Map<HashComputation, Symbol> allHashSymbols = new HashMap<>();
             for (HashComputation hashComputation : sourceContext.getHashes()) {
-                Symbol hashSymbol = child.getHashSymbols().get(hashComputation);
-                RowExpression hashExpression;
-                if (hashSymbol == null) {
-                    hashSymbol = planSymbolAllocator.newHashSymbol();
-                    hashExpression = hashComputation.getHashExpression();
+                List<Symbol> fields = hashComputation.getFields();
+                Symbol symbol = canComputeWith(fields, hashSymbolMap);
+                if (symbol == null) {
+                    Symbol hashSymbol = child.getHashSymbols().get(hashComputation);
+                    RowExpression hashExpression;
+                    if (hashSymbol == null) {
+                        hashSymbol = planSymbolAllocator.newHashSymbol();
+                        hashExpression = hashComputation.getHashExpression();
+                    }
+                    else {
+                        hashExpression = toVariableReference(hashSymbol, planSymbolAllocator.getTypes().get(hashSymbol));
+                    }
+                    newAssignments.put(hashSymbol, hashExpression);
+                    for (HashComputation sourceHashComputation : sourceContext.lookup(hashComputation)) {
+                        allHashSymbols.put(sourceHashComputation, hashSymbol);
+                    }
                 }
                 else {
-                    hashExpression = toVariableReference(hashSymbol, planSymbolAllocator.getTypes().get(hashSymbol));
-                }
-                newAssignments.put(hashSymbol, hashExpression);
-                for (HashComputation sourceHashComputation : sourceContext.lookup(hashComputation)) {
-                    allHashSymbols.put(sourceHashComputation, hashSymbol);
+                    for (HashComputation sourceHashComputation : sourceContext.lookup(hashComputation)) {
+                        allHashSymbols.put(sourceHashComputation, symbol);
+                    }
                 }
             }
 
             return new PlanWithProperties(new ProjectNode(node.getId(), child.getNode(), newAssignments.build()), allHashSymbols);
+        }
+
+        private Symbol canComputeWith(List<Symbol> fields, Map<HashComputationSet, Symbol> hashSymbolMap)
+        {
+            for (Map.Entry<HashComputationSet, Symbol> entry : hashSymbolMap.entrySet()) {
+                boolean anyMatch = entry.getKey().getHashes().stream().anyMatch(hashComputation -> fields.size() == hashComputation.getFields().size() && fields.containsAll(hashComputation.getFields()));
+                if (anyMatch) {
+                    return entry.getValue();
+                }
+            }
+            return null;
         }
 
         @Override

@@ -44,6 +44,8 @@ import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.IntersectNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode.JoinInternalAggregation;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.OrderingScheme;
@@ -465,6 +467,43 @@ public class PlanPrinter
             node.getLeft().accept(this, context);
             node.getRight().accept(this, context);
 
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
+        {
+            List<String> joinExpressions = new ArrayList<>();
+            for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
+                joinExpressions.add(JoinNodeUtils.toExpression(clause).toString());
+            }
+            node.getFilter().map(formatter::apply).ifPresent(joinExpressions::add);
+
+            NodeRepresentation nodeOutput;
+            nodeOutput = addNode(node,
+                    "Group" + node.getType().getJoinLabel(),
+                    format("[%s]%s", Joiner.on(" AND ").join(joinExpressions), formatHash(node.getLeftHashSymbol(), node.getRightHashSymbol())));
+
+            node.getDistributionType().ifPresent(distributionType -> nodeOutput.appendDetailsLine("Distribution: %s", distributionType));
+            if (!node.getDynamicFilters().isEmpty()) {
+                nodeOutput.appendDetailsLine("dynamicFilterAssignments = %s", printDynamicFilterAssignments(node.getDynamicFilters()));
+            }
+
+            Optional<SortExpressionContext> sortExpressionContext = node.getFilter().flatMap(filter -> SortExpressionExtractor.extractSortExpression(metadata, node.getRightOutputSymbols(), filter));
+            sortExpressionContext.ifPresent(sortContext -> nodeOutput.appendDetailsLine("SortExpression[%s]", formatter.apply(sortContext.getSortExpression())));
+
+            JoinInternalAggregation aggrOnLeft = node.getAggrOnLeft();
+            JoinInternalAggregation aggrOnRight = node.getAggrOnRight();
+            nodeOutput.appendDetailsLine("AggrOnAggrLeft = {%s}", getJoinInternalAggregationDetails(aggrOnLeft));
+            nodeOutput.appendDetailsLine("AggrOnAggrRight = {%s}", getJoinInternalAggregationDetails(aggrOnRight));
+
+            JoinInternalAggregation leftAggr = node.getLeftAggr();
+            JoinInternalAggregation rightAggr = node.getRightAggr();
+            nodeOutput.appendDetailsLine("AggrLeft = {%s}", getJoinInternalAggregationDetails(leftAggr));
+            nodeOutput.appendDetailsLine("AggrRight = {%s}", getJoinInternalAggregationDetails(rightAggr));
+
+            node.getLeft().accept(this, context);
+            node.getRight().accept(this, context);
             return null;
         }
 
@@ -1476,6 +1515,36 @@ public class PlanPrinter
 
             representation.addNode(nodeOutput);
             return nodeOutput;
+        }
+
+        private String getJoinInternalAggregationDetails(JoinInternalAggregation node)
+        {
+            String type = "";
+            if (node.getStep() != AggregationNode.Step.SINGLE) {
+                type = format("(%s)", node.getStep().toString());
+            }
+            String key = "";
+            if (!node.getGroupingKeys().isEmpty()) {
+                key = node.getGroupingKeys().toString();
+            }
+            String value = "";
+            if (node.getAggregationType().equals(AggregationNode.AggregationType.HASH)) {
+                value = format("hashAggregate%s%s%s", type, key, formatHash(node.getHashSymbol()));
+            }
+            StringBuilder builder = new StringBuilder(value);
+            if (node.getAggregations().size() > 0) {
+                node.getAggregations().forEach((symbol, aggregation) -> builder.append(format("%s := %s", symbol, formatAggregation(aggregation))));
+                // to remove the last: ", "
+                builder.setLength(builder.length() - 2);
+            }
+            else {
+                builder.setLength(builder.length() > 0 ? builder.length() - 1 : 0);
+            }
+            String columns = node.getOutputSymbols().stream()
+                    .map(symbol -> symbol + ":" + types.get(symbol).getDisplayName())
+                    .collect(joining(", "));
+            builder.append(" Layout: [").append(columns).append("]");
+            return builder.toString();
         }
     }
 

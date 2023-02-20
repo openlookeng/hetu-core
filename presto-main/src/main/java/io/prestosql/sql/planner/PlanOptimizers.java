@@ -63,6 +63,8 @@ import io.prestosql.sql.planner.iterative.rule.MergeLimitWithDistinct;
 import io.prestosql.sql.planner.iterative.rule.MergeLimitWithSort;
 import io.prestosql.sql.planner.iterative.rule.MergeLimitWithTopN;
 import io.prestosql.sql.planner.iterative.rule.MergeLimits;
+import io.prestosql.sql.planner.iterative.rule.MergePartialAggregationWithJoin;
+import io.prestosql.sql.planner.iterative.rule.MergePartialAggregationWithJoinPushProject;
 import io.prestosql.sql.planner.iterative.rule.MultipleDistinctAggregationToMarkDistinct;
 import io.prestosql.sql.planner.iterative.rule.PruneAggregationColumns;
 import io.prestosql.sql.planner.iterative.rule.PruneAggregationSourceColumns;
@@ -762,7 +764,9 @@ public class PlanOptimizers
                 ImmutableSet.of(
                         new PushPartialAggregationThroughJoin(),
                         new PushPartialAggregationThroughExchange(metadata),
-                        new PruneJoinColumns())));
+                        new PruneJoinColumns(),
+                        new MergePartialAggregationWithJoin(metadata),
+                        new MergePartialAggregationWithJoinPushProject(metadata))));
 
         builder.add(new IterativeOptimizer(
                 ruleStats,

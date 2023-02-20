@@ -47,6 +47,11 @@ public abstract class PlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitJoinOnAggregation(JoinOnAggregationNode node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
     public R visitLimit(LimitNode node, C context)
     {
         return visitPlan(node, context);

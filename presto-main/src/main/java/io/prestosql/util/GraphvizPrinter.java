@@ -23,6 +23,7 @@ import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -106,6 +107,7 @@ public final class GraphvizPrinter
         INDEX_SOURCE,
         UNNEST,
         ANALYZE_FINISH,
+        GROUPJOIN,
     }
 
     private static final Map<NodeType, String> NODE_COLORS = immutableEnumMap(ImmutableMap.<NodeType, String>builder()
@@ -130,6 +132,7 @@ public final class GraphvizPrinter
             .put(NodeType.UNNEST, "crimson")
             .put(NodeType.SAMPLE, "goldenrod4")
             .put(NodeType.ANALYZE_FINISH, "plum")
+            .put(NodeType.GROUPJOIN, "green")
             .build());
 
     static {
@@ -470,6 +473,23 @@ public final class GraphvizPrinter
 
             String criteria = Joiner.on(" AND ").join(joinExpressions);
             printNode(node, node.getType().getJoinLabel(), criteria, NODE_COLORS.get(NodeType.JOIN));
+
+            node.getLeft().accept(this, context);
+            node.getRight().accept(this, context);
+
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
+        {
+            List<Expression> joinExpressions = new ArrayList<>();
+            for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
+                joinExpressions.add(JoinNodeUtils.toExpression(clause));
+            }
+
+            String criteria = Joiner.on(" AND ").join(joinExpressions);
+            printNode(node, "GROUP" + node.getType().getJoinLabel(), criteria, NODE_COLORS.get(NodeType.GROUPJOIN));
 
             node.getLeft().accept(this, context);
             node.getRight().accept(this, context);

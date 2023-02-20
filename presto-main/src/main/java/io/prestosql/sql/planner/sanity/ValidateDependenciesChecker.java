@@ -26,6 +26,7 @@ import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.IntersectNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -396,6 +397,43 @@ public final class ValidateDependenciesChecker
 
         @Override
         public Void visitJoin(JoinNode node, Set<Symbol> boundSymbols)
+        {
+            node.getLeft().accept(this, boundSymbols);
+            node.getRight().accept(this, boundSymbols);
+
+            Set<Symbol> leftInputs = createInputs(node.getLeft(), boundSymbols);
+            Set<Symbol> rightInputs = createInputs(node.getRight(), boundSymbols);
+            Set<Symbol> allInputs = ImmutableSet.<Symbol>builder()
+                    .addAll(leftInputs)
+                    .addAll(rightInputs)
+                    .build();
+
+            for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
+                checkArgument(leftInputs.contains(clause.getLeft()), "Symbol from join clause (%s) not in left source (%s)", clause.getLeft(), node.getLeft().getOutputSymbols());
+                checkArgument(rightInputs.contains(clause.getRight()), "Symbol from join clause (%s) not in right source (%s)", clause.getRight(), node.getRight().getOutputSymbols());
+            }
+
+            node.getFilter().ifPresent(predicate -> {
+                Set<Symbol> predicateSymbols;
+                if (isExpression(predicate)) {
+                    predicateSymbols = SymbolsExtractor.extractUnique(castToExpression(predicate));
+                }
+                else {
+                    predicateSymbols = SymbolsExtractor.extractUnique(predicate);
+                }
+                checkArgument(
+                        allInputs.containsAll(predicateSymbols),
+                        "Symbol from filter (%s) not in sources (%s)",
+                        predicateSymbols,
+                        allInputs);
+            });
+
+            checkLeftOutputSymbolsBeforeRight(node.getLeft().getOutputSymbols(), node.getOutputSymbols());
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Set<Symbol> boundSymbols)
         {
             node.getLeft().accept(this, boundSymbols);
             node.getRight().accept(this, boundSymbols);
