@@ -14,6 +14,7 @@
 package io.prestosql.operator;
 
 import io.airlift.units.DataSize;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import it.unimi.dsi.fastutil.HashCommon;
@@ -168,6 +169,21 @@ public final class DefaultPagesHash
             pos = (pos + 1) & mask;
         }
         return -1;
+    }
+
+    @Override
+    public long getCountForJoinPosition(long position, int channel)
+    {
+        long pageAddress = addresses.getLong(toIntExact(position));
+        int blockIndex = decodeSliceIndex(pageAddress);
+        int blockPosition = decodePosition(pageAddress);
+        return pagesHashStrategy.getCountForJoinPosition(blockIndex, blockPosition, channel);
+    }
+
+    @Override
+    public AggregationBuilder getAggregationBuilder()
+    {
+        return pagesHashStrategy.getAggregationBuilder();
     }
 
     public void appendTo(long position, PageBuilder pageBuilder, int outputChannelOffset)

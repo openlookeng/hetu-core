@@ -15,6 +15,7 @@ package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -256,6 +257,21 @@ public final class BigintPagesHash
         }
 
         return result;
+    }
+
+    @Override
+    public long getCountForJoinPosition(long position, int channel)
+    {
+        long pageAddress = addresses.getLong(toIntExact(position));
+        int blockIndex = decodeSliceIndex(pageAddress);
+        int blockPosition = decodePosition(pageAddress);
+        return pagesHashStrategy.getCountForJoinPosition(blockIndex, blockPosition, channel);
+    }
+
+    @Override
+    public AggregationBuilder getAggregationBuilder()
+    {
+        return pagesHashStrategy.getAggregationBuilder();
     }
 
     @Override

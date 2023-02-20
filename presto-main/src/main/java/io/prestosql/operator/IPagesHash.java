@@ -13,8 +13,13 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+
+import static io.prestosql.operator.SyntheticAddress.decodePosition;
+import static io.prestosql.operator.SyntheticAddress.decodeSliceIndex;
+import static java.lang.Math.toIntExact;
 
 public interface IPagesHash
 {
@@ -48,6 +53,16 @@ public interface IPagesHash
             result[i] = getAddressIndex(positions[i], hashChannelsPage, rawHashes[positions[i]]);
         }
         return result;
+    }
+
+    default long getCountForJoinPosition(long position, int channel)
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join usage");
+    }
+
+    default AggregationBuilder getAggregationBuilder()
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join usage");
     }
 
     void appendTo(long position, PageBuilder pageBuilder, int outputChannelOffset);

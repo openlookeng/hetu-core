@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.metadata.FunctionAndTypeManager;
 import io.prestosql.metadata.Metadata;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -46,6 +47,7 @@ public class SimplePagesHashStrategy
     private final List<Block> precomputedHashChannel;
     private final Optional<Integer> sortChannel;
     private final List<MethodHandle> distinctFromMethodHandles;
+    private final AggregationBuilder aggregationBuilder;
 
     public SimplePagesHashStrategy(
             List<Type> types,
@@ -54,6 +56,7 @@ public class SimplePagesHashStrategy
             List<Integer> hashChannels,
             OptionalInt precomputedHashChannel,
             Optional<Integer> sortChannel,
+            Optional<AggregationBuilder> aggregationBuilder,
             Metadata metadata)
     {
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
@@ -69,6 +72,8 @@ public class SimplePagesHashStrategy
             this.precomputedHashChannel = null;
         }
         this.sortChannel = requireNonNull(sortChannel, "sortChannel is null");
+        requireNonNull(aggregationBuilder, "aggregationBuilder is null");
+        this.aggregationBuilder = aggregationBuilder.orElse(null);
         requireNonNull(metadata, "metadata is null");
         FunctionAndTypeManager functionAndTypeManager = metadata.getFunctionAndTypeManager();
         requireNonNull(metadata, "functionManager is null");
@@ -93,6 +98,18 @@ public class SimplePagesHashStrategy
                 .flatMap(List::stream)
                 .mapToLong(Block::getRetainedSizeInBytes)
                 .sum();
+    }
+
+    @Override
+    public long getCountForJoinPosition(int blockIndex, int blockPosition, int channel)
+    {
+        return BIGINT.getLong(channels.get(channel).get(blockIndex), blockPosition);
+    }
+
+    @Override
+    public AggregationBuilder getAggregationBuilder()
+    {
+        return aggregationBuilder;
     }
 
     @Override

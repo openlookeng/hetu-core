@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 
@@ -37,6 +38,16 @@ public interface LookupSource
     long getJoinPosition(int position, Page hashChannelsPage, Page allChannelsPage);
 
     long getNextJoinPosition(long currentJoinPosition, int probePosition, Page allProbeChannelsPage);
+
+    default long getCountForJoinPosition(long position, int channel)
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join usage");
+    }
+
+    default AggregationBuilder getAggregationBuilder()
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join usage");
+    }
 
     void appendTo(long position, PageBuilder pageBuilder, int outputChannelOffset);
 

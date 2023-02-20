@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import org.openjdk.jol.info.ClassLayout;
@@ -117,6 +118,18 @@ public final class JoinHash
     public boolean isJoinPositionEligible(long currentJoinPosition, int probePosition, Page allProbeChannelsPage)
     {
         return filterFunction == null || filterFunction.filter(toIntExact(currentJoinPosition), probePosition, allProbeChannelsPage);
+    }
+
+    @Override
+    public long getCountForJoinPosition(long position, int channel)
+    {
+        return pagesHash.getCountForJoinPosition(position, channel);
+    }
+
+    @Override
+    public AggregationBuilder getAggregationBuilder()
+    {
+        return pagesHash.getAggregationBuilder();
     }
 
     @Override

@@ -13,6 +13,7 @@
  */
 package io.prestosql.operator;
 
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 
@@ -110,4 +111,14 @@ public interface PagesHashStrategy
      * Checks if sort channel is null at the specified position
      */
     boolean isSortChannelPositionNull(int blockIndex, int blockPosition);
+
+    /**
+     * Gets the aggregation builder for build side. Used in GroupJoin
+     */
+    AggregationBuilder getAggregationBuilder();
+
+    /**
+     * Gets the count (occurrence) of record from build side of the record.
+     */
+    long getCountForJoinPosition(int blockIndex, int blockPosition, int channel);
 }

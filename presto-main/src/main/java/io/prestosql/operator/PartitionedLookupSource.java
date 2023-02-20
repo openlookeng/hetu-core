@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -262,6 +263,20 @@ public class PartitionedLookupSource
         long joinPosition = decodeJoinPosition(currentJoinPosition);
         LookupSource lookupSource = lookupSources[partition];
         return lookupSource.isJoinPositionEligible(joinPosition, probePosition, allProbeChannelsPage);
+    }
+
+    @Override
+    public long getCountForJoinPosition(long partitionedJoinPosition, int channel)
+    {
+        int partition = decodePartition(partitionedJoinPosition);
+        long joinPosition = decodeJoinPosition(partitionedJoinPosition);
+        return lookupSources[partition].getCountForJoinPosition(joinPosition, channel);
+    }
+
+    @Override
+    public AggregationBuilder getAggregationBuilder()
+    {
+        return lookupSources[0].getAggregationBuilder();
     }
 
     @Override

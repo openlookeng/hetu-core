@@ -45,4 +45,14 @@ public interface AggregationBuilder
     ListenableFuture<?> startMemoryRevoke();
 
     void finishMemoryRevoke();
+
+    default AggregationBuilder duplicate()
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join flow");
+    }
+
+    default int getAggregationCount()
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join flow");
+    }
 }
