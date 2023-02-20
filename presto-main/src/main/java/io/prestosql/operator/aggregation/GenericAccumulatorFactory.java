@@ -447,6 +447,12 @@ public class GenericAccumulatorFactory
         }
 
         @Override
+        public void reset(int groupId)
+        {
+            accumulator.reset(groupId);
+        }
+
+        @Override
         public void prepareFinal()
         {
         }
@@ -649,6 +655,12 @@ public class GenericAccumulatorFactory
         public void evaluateFinal(int groupId, BlockBuilder output)
         {
             accumulator.evaluateFinal(groupId, output);
+        }
+
+        @Override
+        public void reset(int groupId)
+        {
+            accumulator.reset(groupId);
         }
 
         @Override

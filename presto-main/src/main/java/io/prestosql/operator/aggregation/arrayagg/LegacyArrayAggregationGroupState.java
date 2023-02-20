@@ -90,4 +90,10 @@ public class LegacyArrayAggregationGroupState
         verify(blockBuilder.getPositionCount() != 0);
         return false;
     }
+
+    @Override
+    public void reset()
+    {
+        ArrayAggregationState.super.reset();
+    }
 }

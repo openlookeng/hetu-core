@@ -38,4 +38,6 @@ public interface GroupedAccumulator
     void evaluateFinal(int groupId, BlockBuilder output);
 
     void prepareFinal();
+
+    void reset(int groupId);
 }

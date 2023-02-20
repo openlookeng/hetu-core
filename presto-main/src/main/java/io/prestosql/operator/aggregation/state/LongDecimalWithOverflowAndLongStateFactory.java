@@ -80,6 +80,13 @@ public class LongDecimalWithOverflowAndLongStateFactory
         }
 
         @Override
+        public void reset()
+        {
+            super.reset();
+            longs.reset(getGroupId());
+        }
+
+        @Override
         public long getEstimatedSize()
         {
             return INSTANCE_SIZE + isNotNull.sizeOf() + unscaledDecimals.sizeOf() + (overflows == null ? 0 : overflows.sizeOf());

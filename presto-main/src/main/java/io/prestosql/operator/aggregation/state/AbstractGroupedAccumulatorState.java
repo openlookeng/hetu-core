@@ -33,6 +33,10 @@ public abstract class AbstractGroupedAccumulatorState
         return groupId;
     }
 
+    protected void reset()
+    {
+    }
+
     @Override
     public Object capture(BlockEncodingSerdeProvider serdeProvider)
     {

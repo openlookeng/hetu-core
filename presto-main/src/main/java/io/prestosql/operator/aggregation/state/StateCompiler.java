@@ -517,14 +517,17 @@ public class StateCompiler
         // Create ensureCapacity
         MethodDefinition ensureCapacity = definition.declareMethod(a(PUBLIC), "ensureCapacity", type(void.class), arg("size", long.class));
 
+        MethodDefinition reset = definition.declareMethod(a(PUBLIC), "reset", type(void.class));
+
         // Generate fields, constructor, and ensureCapacity
         List<FieldDefinition> fieldDefinitions = new ArrayList<>();
         for (StateField field : fields) {
-            fieldDefinitions.add(generateGroupedField(definition, constructor, ensureCapacity, field));
+            fieldDefinitions.add(generateGroupedField(definition, constructor, ensureCapacity, field, reset));
         }
 
         constructor.getBody().ret();
         ensureCapacity.getBody().ret();
+        reset.getBody().ret();
 
         // Generate getEstimatedSize
         MethodDefinition getEstimatedSize = definition.declareMethod(a(PUBLIC), "getEstimatedSize", type(long.class));
@@ -592,7 +595,7 @@ public class StateCompiler
                 .append(constructor.getThis().setField(field, stateField.initialValueExpression()));
     }
 
-    private static FieldDefinition generateGroupedField(ClassDefinition definition, MethodDefinition constructor, MethodDefinition ensureCapacity, StateField stateField)
+    private static FieldDefinition generateGroupedField(ClassDefinition definition, MethodDefinition constructor, MethodDefinition ensureCapacity, StateField stateField, MethodDefinition reset)
     {
         Class<?> bigArrayType = getBigArrayType(stateField.getType());
         FieldDefinition field = definition.declareField(a(PRIVATE), UPPER_CAMEL.to(LOWER_CAMEL, stateField.getName()) + "Values", bigArrayType);
@@ -620,6 +623,9 @@ public class StateCompiler
         Scope ensureCapacityScope = ensureCapacity.getScope();
         ensureCapacity.getBody()
                 .append(ensureCapacity.getThis().getField(field).invoke("ensureCapacity", void.class, ensureCapacityScope.getVariable("size")));
+
+        reset.getBody()
+                .append(reset.getThis().getField(field).invoke("reset", void.class, reset.getThis().invoke("getGroupId", long.class)));
 
         // Initialize field in constructor
         constructor.getBody()

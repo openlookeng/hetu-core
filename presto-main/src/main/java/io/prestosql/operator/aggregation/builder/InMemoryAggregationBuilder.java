@@ -324,6 +324,11 @@ public abstract class InMemoryAggregationBuilder
             }
         }
 
+        public void reset(int groupId)
+        {
+            aggregation.reset(groupId);
+        }
+
         public void setOutputPartial()
         {
             step = AggregationNode.Step.partialOutput(step);
@@ -388,6 +393,10 @@ public abstract class InMemoryAggregationBuilder
     public WorkProcessor<Page> buildResult()
     {
         throw new UnsupportedOperationException();
+    }
+
+    protected void resetGroupBy()
+    {
     }
 
     private static class InMemoryAggregationBuilderState

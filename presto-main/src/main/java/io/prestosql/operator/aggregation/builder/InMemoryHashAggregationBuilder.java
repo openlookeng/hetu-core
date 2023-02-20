@@ -179,7 +179,12 @@ public class InMemoryHashAggregationBuilder
                 }
             }
 
-            return WorkProcessor.ProcessState.ofResult(pageBuilder.build());
+            try {
+                return WorkProcessor.ProcessState.ofResult(pageBuilder.build());
+            }
+            finally {
+                resetGroupBy();
+            }
         });
     }
 

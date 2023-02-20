@@ -199,6 +199,7 @@ public class AccumulatorCompiler
 
         if (grouped) {
             generateGroupedEvaluateFinal(definition, stateFields, metadata.getOutputFunction(), callSiteBinder);
+            generateReset(definition, stateFields);
         }
         else {
             generateEvaluateFinal(definition, stateFields, metadata.getOutputFunction(), callSiteBinder);
@@ -914,6 +915,30 @@ public class AccumulatorCompiler
         body.append(out);
         body.append(invoke(callSiteBinder.bind(outputFunction), "output"));
 
+        body.ret();
+    }
+
+    private static void generateReset(ClassDefinition definition, List<FieldDefinition> stateFields)
+    {
+        Parameter groupId = arg("groupId", int.class);
+        MethodDefinition method = definition.declareMethod(a(PUBLIC), "reset", type(void.class), groupId);
+
+        BytecodeBlock body = method.getBody();
+        Variable thisVariable = method.getThis();
+
+        List<BytecodeExpression> states = new ArrayList<>();
+
+        for (FieldDefinition stateField : stateFields) {
+            BytecodeExpression state = thisVariable.getField(stateField);
+            body.append(state.invoke("setGroupId", void.class, groupId.cast(long.class)));
+            states.add(state);
+        }
+        for (FieldDefinition stateField : stateFields) {
+            BytecodeExpression state = thisVariable.getField(stateField);
+            body.append(state.invoke("reset", void.class));
+            states.add(state);
+        }
+        states.forEach(body::append);
         body.ret();
     }
 

@@ -91,6 +91,19 @@ public class LongDecimalWithOverflowStateFactory
         }
 
         @Override
+        public void reset()
+        {
+            isNotNull.reset(getGroupId());
+            long[] decimalArray = getDecimalArray();
+            int decimalArrayOffset = getDecimalArrayOffset();
+            decimalArray[decimalArrayOffset] = 0;
+            decimalArray[decimalArrayOffset + 1] = 0;
+            if (overflows != null) {
+                overflows.reset(getGroupId());
+            }
+        }
+
+        @Override
         public long[] getDecimalArray()
         {
             return unscaledDecimals.getSegment(getGroupId() * 2);

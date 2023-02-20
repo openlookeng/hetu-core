@@ -41,6 +41,12 @@ public final class GroupedMultimapAggregationState
     }
 
     @Override
+    public void reset()
+    {
+        MultimapAggregationState.super.reset();
+    }
+
+    @Override
     protected final void accept(MultimapAggregationStateConsumer consumer, PageBuilder pageBuilder, int currentPosition)
     {
         consumer.accept(pageBuilder.getBlockBuilder(KEY_CHANNEL), pageBuilder.getBlockBuilder(VALUE_CHANNEL), currentPosition);

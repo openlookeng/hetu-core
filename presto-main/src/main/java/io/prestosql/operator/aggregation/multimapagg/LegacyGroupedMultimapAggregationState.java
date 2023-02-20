@@ -92,6 +92,12 @@ public class LegacyGroupedMultimapAggregationState
     }
 
     @Override
+    public void reset()
+    {
+        MultimapAggregationState.super.reset();
+    }
+
+    @Override
     public long getEstimatedSize()
     {
         return INSTANCE_SIZE + keyBlockBuilders.sizeOf() + valueBlockBuilders.sizeOf() + size;
