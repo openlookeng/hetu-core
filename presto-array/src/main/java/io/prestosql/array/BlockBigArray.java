@@ -101,7 +101,7 @@ public final class BlockBigArray
      *
      * @param index a position in this big array.
      */
-    public <T> void reset(long index, Block<T> value)
+    public <T> void reset(long index)
     {
         Block<T> currentValue = array.get(index);
         if (currentValue != null) {

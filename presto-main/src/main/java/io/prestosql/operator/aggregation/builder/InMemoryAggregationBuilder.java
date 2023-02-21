@@ -55,11 +55,12 @@ import static java.util.Objects.requireNonNull;
 public abstract class InMemoryAggregationBuilder
         implements AggregationBuilder, Restorable
 {
-    protected final GroupBy groupBy;
     protected final List<Aggregator> aggregators;
     protected final boolean partial;
     protected final OptionalLong maxPartialMemory;
     protected final UpdateMemory updateMemory;
+
+    protected GroupBy groupBy;
     protected boolean full;
 
     public InMemoryAggregationBuilder(

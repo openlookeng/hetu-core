@@ -115,10 +115,16 @@ public interface PagesHashStrategy
     /**
      * Gets the aggregation builder for build side. Used in GroupJoin
      */
-    AggregationBuilder getAggregationBuilder();
+    default AggregationBuilder getAggregationBuilder()
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join");
+    }
 
     /**
      * Gets the count (occurrence) of record from build side of the record.
      */
-    long getCountForJoinPosition(int blockIndex, int blockPosition, int channel);
+    default long getCountForJoinPosition(int blockIndex, int blockPosition, int channel)
+    {
+        throw new UnsupportedOperationException("Only supported for Group Join");
+    }
 }
