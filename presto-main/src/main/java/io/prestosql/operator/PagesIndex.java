@@ -514,7 +514,8 @@ public class PagesIndex
                         hashChannel,
                         filterFunctionFactory,
                         sortChannel,
-                        searchFunctionFactories);
+                        searchFunctionFactories,
+                        aggregationBuilder);
             }
             catch (Exception e) {
                 log.error(e, "Lookup source compile failed for types=%s error=%s", types, e);

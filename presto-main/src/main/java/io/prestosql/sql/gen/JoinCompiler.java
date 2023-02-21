@@ -311,7 +311,8 @@ public class JoinCompiler
             FieldDefinition instanceSizeField,
             List<FieldDefinition> channelFields,
             List<FieldDefinition> joinChannelFields,
-            FieldDefinition hashChannelField, FieldDefinition aggregationBuilderField)
+            FieldDefinition hashChannelField,
+            FieldDefinition aggregationBuilderField)
     {
         Parameter channels = arg("channels", type(List.class, type(List.class, Block.class)));
         Parameter hashChannel = arg("hashChannel", type(OptionalInt.class));
@@ -998,9 +999,10 @@ public class JoinCompiler
                 OptionalInt hashChannel,
                 Optional<JoinFilterFunctionFactory> filterFunctionFactory,
                 Optional<Integer> sortChannel,
-                List<JoinFilterFunctionFactory> searchFunctionFactories)
+                List<JoinFilterFunctionFactory> searchFunctionFactories,
+                Optional<AggregationBuilder> aggregationBuilder)
         {
-            PagesHashStrategy pagesHashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel);
+            PagesHashStrategy pagesHashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel, aggregationBuilder);
             try {
                 return constructor.newInstance(session, pagesHashStrategy, addresses, channels, filterFunctionFactory, sortChannel, searchFunctionFactories, singleBigintJoinChannel);
             }
@@ -1017,7 +1019,7 @@ public class JoinCompiler
         public PagesHashStrategyFactory(Class<? extends PagesHashStrategy> pagesHashStrategyClass)
         {
             try {
-                constructor = pagesHashStrategyClass.getConstructor(List.class, OptionalInt.class);
+                constructor = pagesHashStrategyClass.getConstructor(List.class, OptionalInt.class, Optional.class);
             }
             catch (NoSuchMethodException e) {
                 throw new RuntimeException(e);
@@ -1027,7 +1029,17 @@ public class JoinCompiler
         public PagesHashStrategy createPagesHashStrategy(List<? extends List<Block>> channels, OptionalInt hashChannel)
         {
             try {
-                return constructor.newInstance(channels, hashChannel);
+                return constructor.newInstance(channels, hashChannel, Optional.empty());
+            }
+            catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        public PagesHashStrategy createPagesHashStrategy(List<? extends List<Block>> channels, OptionalInt hashChannel, Optional<AggregationBuilder> aggregationBuilder)
+        {
+            try {
+                return constructor.newInstance(channels, hashChannel, aggregationBuilder);
             }
             catch (ReflectiveOperationException e) {
                 throw new RuntimeException(e);
