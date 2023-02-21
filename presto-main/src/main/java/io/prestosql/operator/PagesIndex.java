@@ -25,6 +25,7 @@ import io.prestosql.Session;
 import io.prestosql.geospatial.Rectangle;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.SpatialIndexBuilderOperator.SpatialPredicate;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -445,6 +446,7 @@ public class PagesIndex
                 joinChannels,
                 hashChannel,
                 Optional.empty(),
+                Optional.empty(),
                 metadata);
     }
 
@@ -483,6 +485,20 @@ public class PagesIndex
             List<JoinFilterFunctionFactory> searchFunctionFactories,
             Optional<List<Integer>> outputChannels)
     {
+        return createLookupSourceSupplier(session, joinChannels, hashChannel, filterFunctionFactory, sortChannel, searchFunctionFactories, outputChannels, Optional.empty(), Optional.empty());
+    }
+
+    public LookupSourceSupplier createLookupSourceSupplier(
+            Session session,
+            List<Integer> joinChannels,
+            OptionalInt hashChannel,
+            Optional<JoinFilterFunctionFactory> filterFunctionFactory,
+            Optional<Integer> sortChannel,
+            List<JoinFilterFunctionFactory> searchFunctionFactories,
+            Optional<List<Integer>> outputChannels,
+            Optional<Integer> countChannel,
+            Optional<AggregationBuilder> aggregationBuilder)
+    {
         List<List<Block>> channelLists = ImmutableList.copyOf(this.channels);
         if (!joinChannels.isEmpty()) {
             // todo compiled implementation of lookup join does not support when we are joining with empty join channelLists.
@@ -490,7 +506,7 @@ public class PagesIndex
             //        OUTER joins into NestedLoopsJoin and remove "type == INNER" condition in LocalExecutionPlanner.visitJoin()
 
             try {
-                LookupSourceSupplierFactory lookupSourceFactory = joinCompiler.compileLookupSourceFactory(types, joinChannels, sortChannel, outputChannels);
+                LookupSourceSupplierFactory lookupSourceFactory = joinCompiler.compileLookupSourceFactory(types, joinChannels, sortChannel, outputChannels, countChannel, aggregationBuilder);
                 return lookupSourceFactory.createLookupSourceSupplier(
                         session,
                         valueAddresses,
@@ -513,6 +529,7 @@ public class PagesIndex
                 joinChannels,
                 hashChannel,
                 sortChannel,
+                aggregationBuilder,
                 metadata);
 
         return new JoinHashSupplier(

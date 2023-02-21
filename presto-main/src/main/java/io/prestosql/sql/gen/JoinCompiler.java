@@ -42,6 +42,7 @@ import io.prestosql.operator.JoinHash;
 import io.prestosql.operator.JoinHashSupplier;
 import io.prestosql.operator.LookupSourceSupplier;
 import io.prestosql.operator.PagesHashStrategy;
+import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -100,18 +101,18 @@ public class JoinCompiler
             .recordStats()
             .maximumSize(1000)
             .build(CacheLoader.from(key ->
-                    internalCompileLookupSourceFactory(key.getTypes(), key.getOutputChannels(), key.getJoinChannels(), key.getSortChannel())));
+                    internalCompileLookupSourceFactory(key.getTypes(), key.getOutputChannels(), key.getJoinChannels(), key.getSortChannel(), key.getCountChannel(), key.getAggregationBuilder())));
 
     private final LoadingCache<CacheKey, Class<? extends PagesHashStrategy>> hashStrategies = CacheBuilder.newBuilder()
             .recordStats()
             .maximumSize(1000)
             .build(CacheLoader.from(key ->
-                    internalCompileHashStrategy(key.getTypes(), key.getOutputChannels(), key.getJoinChannels(), key.getSortChannel())));
+                    internalCompileHashStrategy(key.getTypes(), key.getOutputChannels(), key.getJoinChannels(), key.getSortChannel(), key.getCountChannel(), key.getAggregationBuilder())));
     private final boolean enableSingleChannelBigintLookupSource;
 
     public LookupSourceSupplierFactory compileLookupSourceFactory(List<? extends Type> types, List<Integer> joinChannels, Optional<Integer> sortChannel)
     {
-        return compileLookupSourceFactory(types, joinChannels, sortChannel, Optional.empty());
+        return compileLookupSourceFactory(types, joinChannels, sortChannel, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     @Inject
@@ -141,13 +142,16 @@ public class JoinCompiler
         return new CacheStatsMBean(hashStrategies);
     }
 
-    public LookupSourceSupplierFactory compileLookupSourceFactory(List<? extends Type> types, List<Integer> joinChannels, Optional<Integer> sortChannel, Optional<List<Integer>> outputChannels)
+    public LookupSourceSupplierFactory compileLookupSourceFactory(List<? extends Type> types, List<Integer> joinChannels, Optional<Integer> sortChannel, Optional<List<Integer>> outputChannels,
+            Optional<Integer> countChannel, Optional<AggregationBuilder> aggregationBuilder)
     {
         return lookupSourceFactories.getUnchecked(new CacheKey(
                 types,
                 outputChannels.orElse(rangeList(types.size())),
                 joinChannels,
-                sortChannel));
+                sortChannel,
+                countChannel,
+                aggregationBuilder));
     }
 
     public PagesHashStrategyFactory compilePagesHashStrategyFactory(List<Type> types, List<Integer> joinChannels)
@@ -165,6 +169,8 @@ public class JoinCompiler
                 types,
                 outputChannels.orElse(rangeList(types.size())),
                 joinChannels,
+                Optional.empty(),
+                Optional.empty(),
                 Optional.empty())));
     }
 
@@ -175,9 +181,10 @@ public class JoinCompiler
                 .collect(toImmutableList());
     }
 
-    private LookupSourceSupplierFactory internalCompileLookupSourceFactory(List<Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel)
+    private LookupSourceSupplierFactory internalCompileLookupSourceFactory(List<Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel,
+            Optional<Integer> countChannel, Optional<AggregationBuilder> aggregationBuilder)
     {
-        Class<? extends PagesHashStrategy> pagesHashStrategyClass = internalCompileHashStrategy(types, outputChannels, joinChannels, sortChannel);
+        Class<? extends PagesHashStrategy> pagesHashStrategyClass = internalCompileHashStrategy(types, outputChannels, joinChannels, sortChannel, countChannel, aggregationBuilder);
 
         OptionalInt singleBigintJoinChannel = OptionalInt.empty();
         if (enableSingleChannelBigintLookupSource
@@ -213,7 +220,8 @@ public class JoinCompiler
         return instanceSize;
     }
 
-    private Class<? extends PagesHashStrategy> internalCompileHashStrategy(List<Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel)
+    private Class<? extends PagesHashStrategy> internalCompileHashStrategy(List<Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel,
+            Optional<Integer> countChannel, Optional<AggregationBuilder> aggregationBuilder)
     {
         CallSiteBinder callSiteBinder = new CallSiteBinder();
 
@@ -238,10 +246,13 @@ public class JoinCompiler
             joinChannelFields.add(channelField);
         }
         FieldDefinition hashChannelField = classDefinition.declareField(a(PRIVATE, FINAL), "hashChannel", type(List.class, Block.class));
+        FieldDefinition aggregationBuilderField = classDefinition.declareField(a(PRIVATE, FINAL), "aggregationBuilder", type(AggregationBuilder.class));
 
-        generateConstructor(classDefinition, joinChannels, sizeField, instanceSizeField, channelFields, joinChannelFields, hashChannelField);
+        generateConstructor(classDefinition, joinChannels, sizeField, instanceSizeField, channelFields, joinChannelFields, hashChannelField, aggregationBuilderField);
         generateGetChannelCountMethod(classDefinition, outputChannels.size());
+        generateGetterAggregationBuilder(classDefinition, aggregationBuilderField);
         generateGetSizeInBytesMethod(classDefinition, sizeField);
+        generateGetCountForJoinPosition(classDefinition, callSiteBinder, channelFields, countChannel);
         generateAppendToMethod(classDefinition, callSiteBinder, types, outputChannels, channelFields);
         generateHashPositionMethod(classDefinition, callSiteBinder, joinChannelTypes, joinChannelFields, hashChannelField);
         generateHashRowMethod(classDefinition, callSiteBinder, joinChannelTypes);
@@ -259,17 +270,53 @@ public class JoinCompiler
         return defineClass(classDefinition, PagesHashStrategy.class, callSiteBinder.getBindings(), getClass().getClassLoader());
     }
 
+    private void generateGetCountForJoinPosition(ClassDefinition classDefinition, CallSiteBinder callSiteBinder, List<FieldDefinition> channelFields, Optional<Integer> countChannel)
+    {
+        Parameter blockIndex = arg("blockIndex", int.class);
+        Parameter blockPosition = arg("blockPosition", int.class);
+        Parameter channel = arg("channel", int.class);
+        MethodDefinition getCountForJoinPosition = classDefinition.declareMethod(
+                a(PUBLIC),
+                "getCountForJoinPosition",
+                type(long.class),
+                blockIndex,
+                blockPosition,
+                channel);
+
+        if (!countChannel.isPresent()) {
+            getCountForJoinPosition.getBody()
+                    .append(newInstance(UnsupportedOperationException.class))
+                    .throwObject();
+            return;
+        }
+        Variable thisVariable = getCountForJoinPosition.getThis();
+        BytecodeBlock body = getCountForJoinPosition.getBody();
+        BytecodeExpression block = thisVariable
+                .getField(channelFields.get(countChannel.get()))
+                .invoke("get", Object.class, blockIndex)
+                .cast(Block.class);
+        BytecodeExpression bigintType = constantType(callSiteBinder, BIGINT);
+        BytecodeExpression getLong = bigintType.invoke(
+                "getLong",
+                long.class,
+                block,
+                blockPosition)
+                .ret();
+        body.append(getLong);
+    }
+
     private static void generateConstructor(ClassDefinition classDefinition,
             List<Integer> joinChannels,
             FieldDefinition sizeField,
             FieldDefinition instanceSizeField,
             List<FieldDefinition> channelFields,
             List<FieldDefinition> joinChannelFields,
-            FieldDefinition hashChannelField)
+            FieldDefinition hashChannelField, FieldDefinition aggregationBuilderField)
     {
         Parameter channels = arg("channels", type(List.class, type(List.class, Block.class)));
         Parameter hashChannel = arg("hashChannel", type(OptionalInt.class));
-        MethodDefinition constructorDefinition = classDefinition.declareConstructor(a(PUBLIC), channels, hashChannel);
+        Parameter aggregationBuilder = arg("aggregationBuilder", type(Optional.class, AggregationBuilder.class));
+        MethodDefinition constructorDefinition = classDefinition.declareConstructor(a(PUBLIC), channels, hashChannel, aggregationBuilder);
 
         Variable thisVariable = constructorDefinition.getThis();
         Variable blockIndex = constructorDefinition.getScope().declareVariable(int.class, "blockIndex");
@@ -331,6 +378,16 @@ public class JoinCompiler
                 .ifFalse(thisVariable.setField(
                         hashChannelField,
                         constantNull(hashChannelField.getType()))));
+
+        constructor.comment("Set aggregationBuilder");
+        constructor.append(new IfStatement()
+                .condition(aggregationBuilder.invoke("isPresent", boolean.class))
+                        .ifTrue(thisVariable.setField(
+                                aggregationBuilderField,
+                                aggregationBuilder.invoke("get", Object.class).cast(AggregationBuilder.class)))
+                        .ifFalse(thisVariable.setField(
+                                aggregationBuilderField,
+                                constantNull(aggregationBuilderField.getType()))));
         constructor.ret();
     }
 
@@ -343,6 +400,19 @@ public class JoinCompiler
                 .getBody()
                 .push(outputChannelCount)
                 .retInt();
+    }
+
+    private static void generateGetterAggregationBuilder(ClassDefinition classDefinition, FieldDefinition aggregationBuilder)
+    {
+        MethodDefinition getAggregationBuilder = classDefinition.declareMethod(
+                a(PUBLIC),
+                "getAggregationBuilder",
+                type(AggregationBuilder.class));
+        Variable thisVariable = getAggregationBuilder.getThis();
+        getAggregationBuilder
+                .getBody()
+                .append(thisVariable.getField(aggregationBuilder))
+                .ret(AggregationBuilder.class);
     }
 
     private static void generateGetSizeInBytesMethod(ClassDefinition classDefinition, FieldDefinition sizeField)
@@ -971,13 +1041,17 @@ public class JoinCompiler
         private final List<Integer> outputChannels;
         private final List<Integer> joinChannels;
         private final Optional<Integer> sortChannel;
+        private final Optional<Integer> countChannel;
+        private final Optional<AggregationBuilder> aggregationBuilder;
 
-        private CacheKey(List<? extends Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel)
+        private CacheKey(List<? extends Type> types, List<Integer> outputChannels, List<Integer> joinChannels, Optional<Integer> sortChannel, Optional<Integer> countChannel, Optional<AggregationBuilder> aggregationBuilder)
         {
             this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
             this.outputChannels = ImmutableList.copyOf(requireNonNull(outputChannels, "outputChannels is null"));
             this.joinChannels = ImmutableList.copyOf(requireNonNull(joinChannels, "joinChannels is null"));
             this.sortChannel = requireNonNull(sortChannel, "sortChannel is null");
+            this.countChannel = requireNonNull(countChannel, "countChannel is null");
+            this.aggregationBuilder = requireNonNull(aggregationBuilder, "aggregationBuilder is null");
         }
 
         private List<Type> getTypes()
@@ -1000,10 +1074,20 @@ public class JoinCompiler
             return sortChannel;
         }
 
+        private Optional<Integer> getCountChannel()
+        {
+            return countChannel;
+        }
+
+        private Optional<AggregationBuilder> getAggregationBuilder()
+        {
+            return aggregationBuilder;
+        }
+
         @Override
         public int hashCode()
         {
-            return Objects.hash(types, outputChannels, joinChannels, sortChannel);
+            return Objects.hash(types, outputChannels, joinChannels, sortChannel, countChannel, aggregationBuilder);
         }
 
         @Override
@@ -1019,7 +1103,9 @@ public class JoinCompiler
             return Objects.equals(this.types, other.types) &&
                     Objects.equals(this.outputChannels, other.outputChannels) &&
                     Objects.equals(this.joinChannels, other.joinChannels) &&
-                    Objects.equals(this.sortChannel, other.sortChannel);
+                    Objects.equals(this.sortChannel, other.sortChannel) &&
+                    Objects.equals(this.countChannel, other.countChannel) &&
+                    Objects.equals(this.aggregationBuilder, other.aggregationBuilder);
         }
     }
 }
