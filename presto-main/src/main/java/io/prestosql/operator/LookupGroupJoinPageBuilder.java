@@ -17,17 +17,13 @@ import com.google.common.collect.ImmutableList;
 import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.block.Block;
 import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
 import io.prestosql.spi.snapshot.Restorable;
 import io.prestosql.spi.type.Type;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 
-import java.io.Serializable;
 import java.util.List;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Verify.verify;
 import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
 import static java.util.Objects.requireNonNull;
 
@@ -85,37 +81,17 @@ public class LookupGroupJoinPageBuilder
         // probe side
         Page probeFinalPage = null;
         if (outputProbeChannels.size() != 0) {
-            AggregationBuilder probeAggregationBuilder = probe.getProbeAggregationBuilder();
-            if (probeAggregationBuilder.getAggregationCount() == 0) {
-                buildCount = 1;
-            }
-            for (int i = 0; i < buildCount; i++) {
-                Work<?> work = probeAggregationBuilder.processPage(probePage);
-                // Knowingly kept empty while loop
-                while (!work.process());
-            }
-            WorkProcessor<Page> probePageWorkProcessor = probeAggregationBuilder.buildResult();
-            while (!probePageWorkProcessor.process());
-            probeAggregationBuilder.updateMemory();
-            probeFinalPage = probePageWorkProcessor.getResult();
+            probeFinalPage = processAggregationOnPage(probe.getProbeAggregationBuilder().getAggregationCount() == 0 ? 1 : buildCount,
+                    probePage,
+                    probe.getProbeAggregationBuilder());
         }
 
         // build side
         Page buildFinalPage = null;
         if (outputBuildChannels.size() != 0) {
-            AggregationBuilder buildAggregationBuilder = probe.getBuildAggregationBuilder();
-            if (buildAggregationBuilder.getAggregationCount() == 0) {
-                probeCount = 1;
-            }
-            for (int i = 0; i < probeCount; i++) {
-                Work<?> work = buildAggregationBuilder.processPage(buildPage);
-                // Knowingly kept empty while loop
-                while (!work.process());
-            }
-            WorkProcessor<Page> buildPageWorkProcessor = buildAggregationBuilder.buildResult();
-            while (!buildPageWorkProcessor.process());
-            buildAggregationBuilder.updateMemory();
-            buildFinalPage = buildPageWorkProcessor.getResult();
+            buildFinalPage = processAggregationOnPage(probe.getBuildAggregationBuilder().getAggregationCount() == 0 ? 1 : probeCount,
+                    buildPage,
+                    probe.getBuildAggregationBuilder());
         }
 
         int probeChannelLength = outputProbeChannels.size();
@@ -135,6 +111,26 @@ public class LookupGroupJoinPageBuilder
             buildFinalPage.getBlock(outputBuildChannels.get(i)).writePositionTo(0, finalPageBuilder.getBlockBuilder(i + probeChannelLength));
         }
         buildPageBuilderTmp.reset();
+    }
+
+    private static Page processAggregationOnPage(long count, Page sourcePage, AggregationBuilder aggregationBuilder)
+    {
+        // TODO Vineet check on how to convert into future object and relate in normal code flow.
+        Page finalPage;
+        for (int i = 0; i < count; i++) {
+            Work<?> work = aggregationBuilder.processPage(sourcePage);
+            // Knowingly kept empty while loop
+            while (!work.process()) {
+                i = i;
+            }
+        }
+        WorkProcessor<Page> pageWorkProcessor = aggregationBuilder.buildResult();
+        while (!pageWorkProcessor.process()) {
+            finalPage = null;
+        }
+        aggregationBuilder.updateMemory();
+        finalPage = pageWorkProcessor.getResult();
+        return finalPage;
     }
 
     public Page build(GroupJoinProbe probe)

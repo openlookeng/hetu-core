@@ -17,10 +17,6 @@ import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 
-import static io.prestosql.operator.SyntheticAddress.decodePosition;
-import static io.prestosql.operator.SyntheticAddress.decodeSliceIndex;
-import static java.lang.Math.toIntExact;
-
 public interface IPagesHash
 {
     int getChannelCount();

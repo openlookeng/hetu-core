@@ -42,8 +42,7 @@ public class GroupJoinProbe
         }
 
         public GroupJoinProbe createGroupJoinProbe(Page page, boolean isSpilled, LookupSourceProvider lookupSourceProvider,
-                AggregationBuilder probeAggregationBuilder,
-                AggregationBuilder buildAggregationBuilder  )
+                AggregationBuilder probeAggregationBuilder, AggregationBuilder buildAggregationBuilder)
         {
             LookupSource lookupSource = lookupSourceProvider.withLease((lookupSourceLease -> lookupSourceLease.getLookupSource()));
             if (isSpilled || !(lookupSource instanceof JoinHash || lookupSource instanceof OuterLookupSource)) {
@@ -51,7 +50,7 @@ public class GroupJoinProbe
             }
             else {
                 Page loadedProbePage = page.getLoadedPage(probeJoinChannels.stream().mapToInt(i -> i).toArray());
-                return new UnSpilledGroupJoinProbe(probeOutputChannels, page, probeJoinChannels, probeHashChannel, loadedProbePage, lookupSource, (probeHashChannel.isPresent() ? (probeHashChannel.getAsInt() >= 0 ? page.getBlock(probeHashChannel.getAsInt()).getLoadedBlock() : null) : null), probeAggregationBuilder, buildAggregationBuilder);
+                return new UnSpilledGroupJoinProbe(probeOutputChannels, page, probeJoinChannels, probeHashChannel, loadedProbePage, lookupSource, (probeHashChannel.isPresent() ? (probeHashChannel.getAsInt() >= 0 ? page.getBlock(probeHashChannel.getAsInt()).getLoadedBlock() : null) : null), probeCountChannel, probeAggregationBuilder, buildAggregationBuilder);
             }
         }
     }

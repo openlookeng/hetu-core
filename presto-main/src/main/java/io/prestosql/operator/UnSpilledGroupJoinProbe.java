@@ -43,9 +43,9 @@ public class UnSpilledGroupJoinProbe
     private final long[] joinPositionCache;
     private int position = -1;
 
-    public UnSpilledGroupJoinProbe(int[] probeOutputChannels, Page page, List<Integer> probeJoinChannels, OptionalInt probeHashChannel, Page probePage, LookupSource lookupSource, @Nullable Block probeHashBlock, AggregationBuilder probeAggregationBuilder, AggregationBuilder buildAggregationBuilder)
+    public UnSpilledGroupJoinProbe(int[] probeOutputChannels, Page page, List<Integer> probeJoinChannels, OptionalInt probeHashChannel, Page probePage, LookupSource lookupSource, @Nullable Block probeHashBlock, OptionalInt probeCountChannel, AggregationBuilder probeAggregationBuilder, AggregationBuilder buildAggregationBuilder)
     {
-        super(probeOutputChannels, page, probeJoinChannels, probeHashChannel, probeAggregationBuilder, buildAggregationBuilder);
+        super(probeOutputChannels, page, probeJoinChannels, probeHashChannel, probeCountChannel, probeAggregationBuilder, buildAggregationBuilder);
 
         this.probeOutputChannels = requireNonNull(probeOutputChannels, "probeOutputChannels is null");
         this.page = requireNonNull(page, "page is null");
