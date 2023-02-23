@@ -22,6 +22,7 @@ import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.IntersectNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -112,6 +113,11 @@ public class Patterns
     public static Pattern<JoinNode> join()
     {
         return typeOf(JoinNode.class);
+    }
+
+    public static Pattern<JoinOnAggregationNode> joinOnAggregation()
+    {
+        return typeOf(JoinOnAggregationNode.class);
     }
 
     public static Pattern<SpatialJoinNode> spatialJoin()
