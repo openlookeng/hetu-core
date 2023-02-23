@@ -22,6 +22,7 @@ import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.PlanNode;
@@ -238,6 +239,17 @@ public class CostCalculatorUsingExchanges
 
         @Override
         public PlanCostEstimate visitJoin(JoinNode node, Void context)
+        {
+            LocalCostEstimate localCost = calculateJoinCost(
+                    node,
+                    node.getLeft(),
+                    node.getRight(),
+                    Objects.equals(node.getDistributionType(), Optional.of(JoinNode.DistributionType.REPLICATED)));
+            return costForLookupJoin(node, localCost);
+        }
+
+        @Override
+        public PlanCostEstimate visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
         {
             LocalCostEstimate localCost = calculateJoinCost(
                     node,

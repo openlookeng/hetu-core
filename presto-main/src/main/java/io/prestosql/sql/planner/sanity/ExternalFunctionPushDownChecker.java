@@ -25,6 +25,7 @@ import io.prestosql.spi.connector.CatalogSchemaName;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.ValuesNode;
@@ -157,6 +158,16 @@ public class ExternalFunctionPushDownChecker
 
         @Override
         public Void visitJoin(JoinNode node, Set<String> context)
+        {
+            for (PlanNode planNode : node.getSources()) {
+                planNode.accept(this, context);
+            }
+            node.getFilter().ifPresent(rowExpression -> visitRowExpressions(context, rowExpression));
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Set<String> context)
         {
             for (PlanNode planNode : node.getSources()) {
                 planNode.accept(this, context);

@@ -40,6 +40,7 @@ import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
 import io.prestosql.spi.plan.JoinNode.DistributionType;
 import io.prestosql.spi.plan.JoinNode.EquiJoinClause;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeIdAllocator;
 import io.prestosql.spi.plan.Symbol;
@@ -905,6 +906,19 @@ public class HintedReorderJoins
 
             @Override
             public Void visitJoin(JoinNode node, StringBuilder context)
+            {
+                PlanNode left = lookup.resolve(node.getLeft());
+                PlanNode right = lookup.resolve(node.getRight());
+                context.append('(');
+                left.accept(this, context);
+                context.append(',');
+                right.accept(this, context);
+                context.append(')');
+                return null;
+            }
+
+            @Override
+            public Void visitJoinOnAggregation(JoinOnAggregationNode node, StringBuilder context)
             {
                 PlanNode left = lookup.resolve(node.getLeft());
                 PlanNode right = lookup.resolve(node.getRight());

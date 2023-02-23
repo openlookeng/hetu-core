@@ -20,6 +20,7 @@ import com.google.common.collect.Ordering;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageState;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.PlanFragment;
@@ -134,6 +135,14 @@ public class AllAtOnceExecutionSchedule
 
         @Override
         public Void visitJoin(JoinNode node, Void context)
+        {
+            node.getRight().accept(this, context);
+            node.getLeft().accept(this, context);
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
         {
             node.getRight().accept(this, context);
             node.getLeft().accept(this, context);

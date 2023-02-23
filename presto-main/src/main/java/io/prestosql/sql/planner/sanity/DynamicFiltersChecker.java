@@ -20,6 +20,7 @@ import io.prestosql.expressions.LogicalRowExpressions;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.sql.DynamicFilters;
@@ -67,7 +68,7 @@ public class DynamicFiltersChecker
             public Set<String> visitOutput(OutputNode node, List<String> context)
             {
                 Set<String> unmatched = visitPlan(node, context);
-                verify(unmatched.isEmpty(), "All consumed dynamic filters could not be matched with a join/semi-join.");
+                verify(unmatched.isEmpty(), "All consumed dynamic filters could not be matched with a join/semi-join/group-join.");
                 return unmatched;
             }
 
@@ -79,6 +80,25 @@ public class DynamicFiltersChecker
                 Set<String> consumedProbeSide = node.getLeft().accept(this, context);
                 verify(difference(currentJoinDynamicFilters, consumedProbeSide).isEmpty(),
                         "Dynamic filters present in join were not fully consumed by it's probe side.");
+
+                context.removeAll(currentJoinDynamicFilters);
+                Set<String> consumedBuildSide = node.getRight().accept(this, context);
+                verify(intersection(currentJoinDynamicFilters, consumedBuildSide).isEmpty());
+
+                Set<String> unmatched = new HashSet<>(consumedBuildSide);
+                unmatched.addAll(consumedProbeSide);
+                unmatched.removeAll(currentJoinDynamicFilters);
+                return ImmutableSet.copyOf(unmatched);
+            }
+
+            @Override
+            public Set<String> visitJoinOnAggregation(JoinOnAggregationNode node, List<String> context)
+            {
+                Set<String> currentJoinDynamicFilters = node.getDynamicFilters().keySet();
+                context.addAll(currentJoinDynamicFilters);
+                Set<String> consumedProbeSide = node.getLeft().accept(this, context);
+                verify(difference(currentJoinDynamicFilters, consumedProbeSide).isEmpty(),
+                        "Dynamic filters present in group-join were not fully consumed by it's probe side.");
 
                 context.removeAll(currentJoinDynamicFilters);
                 Set<String> consumedBuildSide = node.getRight().accept(this, context);

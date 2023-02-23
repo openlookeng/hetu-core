@@ -19,6 +19,7 @@ import com.google.common.collect.Multimap;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.ProjectNode;
@@ -257,6 +258,25 @@ public class JoinGraph
 
         @Override
         public JoinGraph visitJoin(JoinNode node, Context context)
+        {
+            //TODO: add support for non inner joins
+            if (node.getType() != INNER) {
+                return visitPlan(node, context);
+            }
+
+            JoinGraph left = node.getLeft().accept(this, context);
+            JoinGraph right = node.getRight().accept(this, context);
+
+            JoinGraph graph = left.joinWith(right, node.getCriteria(), context, node.getId());
+
+            if (node.getFilter().isPresent()) {
+                return graph.withFilter(node.getFilter().get());
+            }
+            return graph;
+        }
+
+        @Override
+        public JoinGraph visitJoinOnAggregation(JoinOnAggregationNode node, Context context)
         {
             //TODO: add support for non inner joins
             if (node.getType() != INNER) {

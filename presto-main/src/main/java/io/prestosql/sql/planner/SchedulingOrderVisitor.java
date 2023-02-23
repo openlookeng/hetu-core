@@ -16,6 +16,7 @@ package io.prestosql.sql.planner;
 
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.TableScanNode;
@@ -53,6 +54,14 @@ public class SchedulingOrderVisitor
 
         @Override
         public Void visitJoin(JoinNode node, Consumer<PlanNodeId> schedulingOrder)
+        {
+            node.getRight().accept(this, schedulingOrder);
+            node.getLeft().accept(this, schedulingOrder);
+            return null;
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Consumer<PlanNodeId> schedulingOrder)
         {
             node.getRight().accept(this, schedulingOrder);
             node.getLeft().accept(this, schedulingOrder);

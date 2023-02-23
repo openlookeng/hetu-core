@@ -30,6 +30,7 @@ import io.prestosql.spi.plan.Assignments;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.OrderingScheme;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
@@ -588,6 +589,13 @@ public class TransformUncorrelatedSubquerySelfJoinAggregatesToWindowFunction
         {
             context.joinClauses.addAll(node.getCriteria());
             return super.visitJoin(node, context);
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Details context)
+        {
+            context.joinClauses.addAll(node.getCriteria());
+            return super.visitJoinOnAggregation(node, context);
         }
 
         @Override

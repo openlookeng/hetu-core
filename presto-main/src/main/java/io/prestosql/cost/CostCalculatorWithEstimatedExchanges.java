@@ -18,6 +18,7 @@ import io.prestosql.Session;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.TypeProvider;
@@ -125,6 +126,18 @@ public class CostCalculatorWithEstimatedExchanges
 
         @Override
         public LocalCostEstimate visitJoin(JoinNode node, Void context)
+        {
+            return calculateJoinExchangeCost(
+                    node.getLeft(),
+                    node.getRight(),
+                    stats,
+                    types,
+                    Objects.equals(node.getDistributionType(), Optional.of(JoinNode.DistributionType.REPLICATED)),
+                    taskCountEstimator.estimateSourceDistributedTaskCount());
+        }
+
+        @Override
+        public LocalCostEstimate visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
         {
             return calculateJoinExchangeCost(
                     node.getLeft(),

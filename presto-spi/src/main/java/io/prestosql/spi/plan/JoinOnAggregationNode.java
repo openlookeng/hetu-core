@@ -24,7 +24,7 @@ import io.prestosql.spi.relation.RowExpression;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,7 +69,6 @@ public class JoinOnAggregationNode
             @JsonProperty("distributionType") Optional<JoinNode.DistributionType> distributionType,
             @JsonProperty("spillable") Optional<Boolean> spillable,
             @JsonProperty("dynamicFilters") Map<String, Symbol> dynamicFilters,
-
             @JsonProperty("leftAggr") JoinInternalAggregation leftAggr,
             @JsonProperty("rightAggr") JoinInternalAggregation rightAggr,
             @JsonProperty("aggrOnAggrLeft") JoinInternalAggregation aggrOnAggrLeft,
@@ -96,11 +95,11 @@ public class JoinOnAggregationNode
         this.spillable = spillable;
         this.dynamicFilters = ImmutableMap.copyOf(requireNonNull(dynamicFilters, "dynamicFilters is null"));
 
-        Set<Symbol> inputSymbols = ImmutableSet.<Symbol>builder()
+        /*Set<Symbol> inputSymbols = ImmutableSet.<Symbol>builder()
                 .addAll(leftAggr.getSource().getOutputSymbols())
                 .addAll(rightAggr.getSource().getOutputSymbols())
-                .build();
-        checkArgument(new HashSet<>(inputSymbols).containsAll(outputSymbols), "Left and right join inputs do not contain all output symbols");
+                .build();*/
+        /*checkArgument(new HashSet<>(inputSymbols).containsAll(outputSymbols), "Left and right join inputs do not contain all output symbols");*/
 
         checkArgument(!(criteria.isEmpty() && leftHashSymbol.isPresent()), "Left hash symbol is only valid in an equijoin");
         checkArgument(!(criteria.isEmpty() && rightHashSymbol.isPresent()), "Right hash symbol is only valid in an equijoin");
@@ -241,7 +240,26 @@ public class JoinOnAggregationNode
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        throw new UnsupportedOperationException("replaceChildren is not supported");
+        checkArgument(newChildren.size() == 2, "expected newChildren to contain 2 nodes");
+        JoinInternalAggregation leftAggr = (JoinInternalAggregation) this.leftAggr.replaceChildren(newChildren.subList(0, 1));
+        JoinInternalAggregation rightAggr = (JoinInternalAggregation) this.rightAggr.replaceChildren(newChildren.subList(1, 2));
+        JoinInternalAggregation aggrOnAggrLeft = (JoinInternalAggregation) this.aggrOnAggrLeft.replaceChildren(Collections.singletonList(leftAggr));
+        JoinInternalAggregation aggrOnAggrRight = (JoinInternalAggregation) this.aggrOnAggrRight.replaceChildren(Collections.singletonList(rightAggr));
+
+        return new JoinOnAggregationNode(getId(),
+                type,
+                criteria,
+                filter,
+                leftHashSymbol,
+                rightHashSymbol,
+                distributionType,
+                spillable,
+                dynamicFilters,
+                leftAggr,
+                rightAggr,
+                aggrOnAggrLeft,
+                aggrOnAggrRight,
+                outputSymbols);
     }
 
     @Override
@@ -342,7 +360,16 @@ public class JoinOnAggregationNode
         @Override
         public PlanNode replaceChildren(List<PlanNode> newChildren)
         {
-            return null;
+            return new JoinInternalAggregation(getId(),
+                    newChildren.get(0),
+                    aggregations,
+                    groupingSets,
+                    preGroupedSymbols,
+                    step,
+                    hashSymbol,
+                    groupIdSymbol,
+                    aggregationType,
+                    finalizeSymbol);
         }
 
         @JsonProperty("step")

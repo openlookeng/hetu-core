@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableSet;
 import io.prestosql.execution.SqlStageExecution;
 import io.prestosql.execution.StageState;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.UnionNode;
 import io.prestosql.sql.planner.PlanFragment;
@@ -201,6 +202,12 @@ public class PhasedExecutionSchedule
 
         @Override
         public Set<PlanFragmentId> visitJoin(JoinNode node, PlanFragmentId currentFragmentId)
+        {
+            return processJoin(node.getRight(), node.getLeft(), currentFragmentId);
+        }
+
+        @Override
+        public Set<PlanFragmentId> visitJoinOnAggregation(JoinOnAggregationNode node, PlanFragmentId currentFragmentId)
         {
             return processJoin(node.getRight(), node.getLeft(), currentFragmentId);
         }

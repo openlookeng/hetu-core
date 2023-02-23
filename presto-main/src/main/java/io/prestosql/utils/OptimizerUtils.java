@@ -19,6 +19,7 @@ import io.prestosql.Session;
 import io.prestosql.SystemSessionProperties;
 import io.prestosql.spi.HetuConstant;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig;
@@ -214,6 +215,17 @@ public class OptimizerUtils
                 return null;
             }
             return super.visitJoin(node, context);
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
+        {
+            count++;
+            if (count >= maxLimit) {
+                // Break once reached the maximum count
+                return null;
+            }
+            return super.visitJoinOnAggregation(node, context);
         }
 
         public boolean isMaxCountReached()

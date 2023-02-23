@@ -33,6 +33,7 @@ import io.prestosql.spi.metadata.TableHandle;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.plan.ProjectNode;
@@ -698,6 +699,71 @@ public class PlanFragmenter
 
         @Override
         public GroupedExecutionProperties visitJoin(JoinNode node, Void context)
+        {
+            GroupedExecutionProperties left = node.getLeft().accept(this, null);
+            GroupedExecutionProperties right = node.getRight().accept(this, null);
+
+            if (!node.getDistributionType().isPresent()) {
+                // This is possible when the optimizers is invoked with `forceSingleNode` set to true.
+                return GroupedExecutionProperties.notCapable();
+            }
+
+            if ((node.getType() == JoinNode.Type.RIGHT || node.getType() == JoinNode.Type.FULL) && !right.currentNodeCapable) {
+                // For a plan like this, if the fragment participates in grouped execution,
+                // the LookupOuterOperator corresponding to the RJoin will not work execute properly.
+                //
+                // * The operator has to execute as not-grouped because it can only look at the "used" flags in
+                //   join build after all probe has finished.
+                // * The operator has to execute as grouped the subsequent LJoin expects that incoming
+                //   operators are grouped. Otherwise, the LJoin won't be able to throw out the build side
+                //   for each group as soon as the group completes.
+                //
+                //       LJoin
+                //       /   \
+                //   RJoin   Scan
+                //   /   \
+                // Scan Remote
+                //
+                // TODO:
+                // The RJoin can still execute as grouped if there is no subsequent operator that depends
+                // on the RJoin being executed in a grouped manner. However, this is not currently implemented.
+                // Support for this scenario is already implemented in the execution side.
+                return GroupedExecutionProperties.notCapable();
+            }
+
+            switch (node.getDistributionType().get()) {
+                case REPLICATED:
+                    // Broadcast join maintains partitioning for the left side.
+                    // Right side of a broadcast is not capable of grouped execution because it always comes from a remote exchange.
+                    checkState(!right.currentNodeCapable);
+                    return left;
+                case PARTITIONED:
+                    if (left.currentNodeCapable && right.currentNodeCapable) {
+                        return new GroupedExecutionProperties(
+                                true,
+                                true,
+                                ImmutableList.<PlanNodeId>builder()
+                                        .addAll(left.capableTableScanNodes)
+                                        .addAll(right.capableTableScanNodes)
+                                        .build());
+                    }
+                    // right.subTreeUseful && !left.currentNodeCapable:
+                    //   It's not particularly helpful to do grouped execution on the right side
+                    //   because the benefit is likely cancelled out due to required buffering for hash build.
+                    //   In theory, it could still be helpful (e.g. when the underlying aggregation's intermediate group state maybe larger than aggregation output).
+                    //   However, this is not currently implemented. JoinBridgeManager need to support such a lifecycle.
+                    // !right.currentNodeCapable:
+                    //   The build/right side needs to buffer fully for this JOIN, but the probe/left side will still stream through.
+                    //   As a result, there is no reason to change currentNodeCapable or subTreeUseful to false.
+                    //
+                    return left;
+                default:
+                    throw new UnsupportedOperationException("Unknown distribution type: " + node.getDistributionType());
+            }
+        }
+
+        @Override
+        public GroupedExecutionProperties visitJoinOnAggregation(JoinOnAggregationNode node, Void context)
         {
             GroupedExecutionProperties left = node.getLeft().accept(this, null);
             GroupedExecutionProperties right = node.getRight().accept(this, null);

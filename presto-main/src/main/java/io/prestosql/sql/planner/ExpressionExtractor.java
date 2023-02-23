@@ -19,6 +19,7 @@ import io.prestosql.spi.plan.AggregationNode.Aggregation;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupReference;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.ProjectNode;
 import io.prestosql.spi.plan.ValuesNode;
@@ -119,6 +120,13 @@ public final class ExpressionExtractor
         {
             node.getFilter().ifPresent(context);
             return super.visitJoin(node, context);
+        }
+
+        @Override
+        public Void visitJoinOnAggregation(JoinOnAggregationNode node, Consumer<RowExpression> context)
+        {
+            node.getFilter().ifPresent(context);
+            return super.visitJoinOnAggregation(node, context);
         }
 
         @Override

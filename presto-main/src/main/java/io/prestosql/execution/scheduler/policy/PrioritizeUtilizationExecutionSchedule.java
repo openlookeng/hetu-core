@@ -27,6 +27,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.sql.planner.PlanFragment;
 import io.prestosql.sql.planner.plan.CacheTableWriterNode;
@@ -359,6 +360,16 @@ public class PrioritizeUtilizationExecutionSchedule
 
         @Override
         public FragmentSubGraph visitJoin(JoinNode node, PlanFragmentId currentFragmentId)
+        {
+            return processJoin(
+                    node.getDistributionType().orElseThrow(() -> new NoSuchElementException("No Value Present")) == JoinNode.DistributionType.REPLICATED,
+                    node.getLeft(),
+                    node.getRight(),
+                    currentFragmentId);
+        }
+
+        @Override
+        public FragmentSubGraph visitJoinOnAggregation(JoinOnAggregationNode node, PlanFragmentId currentFragmentId)
         {
             return processJoin(
                     node.getDistributionType().orElseThrow(() -> new NoSuchElementException("No Value Present")) == JoinNode.DistributionType.REPLICATED,
