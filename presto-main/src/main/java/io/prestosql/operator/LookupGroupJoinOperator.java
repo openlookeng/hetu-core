@@ -313,11 +313,6 @@ public class LookupGroupJoinOperator
         checkState(probe == null, "Current page has not been completely processed yet");
 
         checkState(tryFetchLookupSourceProvider(), "Not ready to handle input yet");
-        addInput2(page);
-    }
-
-    private void addInput2(Page page)
-    {
         // create Aggregators and pass page to them for process
         checkState(!aggregationFinishing, "Operator is already finishing");
         aggregationInputProcessed = true;

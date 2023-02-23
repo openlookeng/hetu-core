@@ -2912,7 +2912,7 @@ public class LocalExecutionPlanner
                 ImmutableList.Builder<Type> finalOutputBuildTypes,
                 ImmutableList.Builder<Integer> buildFinalOutputChannelsBuilder)
         {
-            JoinInternalAggregation aggregationBuild = node.getAggrOnRight();
+            JoinInternalAggregation aggregationBuild = node.getRightAggr();
             LocalExecutionPlanContext buildContext = context.createSubContext();
             PhysicalOperation buildSource = buildNode.accept(this, buildContext);
             if (buildSource.getPipelineExecutionStrategy() == GROUPED_EXECUTION) {
@@ -3035,7 +3035,7 @@ public class LocalExecutionPlanner
                     .collect(toImmutableList());
             List<Integer> buildFinalOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(buildFinalOutputSymbols, finalOutputMappings.build()));
             buildFinalOutputChannelsBuilder.addAll(buildFinalOutputChannels);
-
+            finalOutputBuildTypes.addAll(toTypes(buildFinalOutputSymbols, buildContext));
             HashBuilderGroupJoinOperatorFactory hashBuilderOperatorFactory = new HashBuilderGroupJoinOperatorFactory(
                     buildContext.getNextOperatorId(),
                     node.getId(),

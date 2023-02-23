@@ -95,6 +95,7 @@ public class LookupGroupJoinPageBuilder
         }
 
         int probeChannelLength = outputProbeChannels.size();
+        finalPageBuilder.declarePosition();
         for (int i = 0; i < probeChannelLength; i++) {
             if (probeFinalPage.getBlock(outputProbeChannels.get(i)).isNull(0)) {
                 finalPageBuilder.getBlockBuilder(i).appendNull();

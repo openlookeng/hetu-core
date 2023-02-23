@@ -329,9 +329,9 @@ public class HashBuilderGroupJoinOperator
             }
 
             // only flush if we are finishing or the aggregation builder is full
-            if (!aggregationBuilder.isFull()) {
+            /*if (!aggregationBuilder.isFull()) {
                 return null;
-            }
+            }*/
 
             outputPages = aggregationBuilder.buildResult();
         }
