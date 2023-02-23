@@ -57,8 +57,6 @@ public class HashBuilderGroupJoinOperatorFactory
     private boolean spillToHdfsEnabled;
     private final GroupJoinAggregator aggrOnAggrfactory;
     private final GroupJoinAggregator aggrfactory;
-    private final List<Symbol> buildFinalOutputSymbols;
-    private final List<Integer> buildFinalOutputChannels;
 
     public static Builder builder()
     {
@@ -81,9 +79,7 @@ public class HashBuilderGroupJoinOperatorFactory
             boolean spillEnabled,
             boolean spillToHdfsEnabled,
             GroupJoinAggregator aggrfactory,
-            GroupJoinAggregator aggrOnAggrfactory,
-            List<Symbol> buildFinalOutputSymbols,
-            List<Integer> buildFinalOutputChannels)
+            GroupJoinAggregator aggrOnAggrfactory)
     {
         this.operatorId = operatorId;
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -106,9 +102,6 @@ public class HashBuilderGroupJoinOperatorFactory
 
         this.aggrfactory = aggrfactory;
         this.aggrOnAggrfactory = aggrOnAggrfactory;
-
-        this.buildFinalOutputSymbols = buildFinalOutputSymbols;
-        this.buildFinalOutputChannels = buildFinalOutputChannels;
     }
 
     @Override
@@ -141,9 +134,7 @@ public class HashBuilderGroupJoinOperatorFactory
                 spillEnabled,
                 spillToHdfsEnabled,
                 aggrfactory,
-                aggrOnAggrfactory,
-                buildFinalOutputSymbols,
-                buildFinalOutputChannels);
+                aggrOnAggrfactory);
     }
 
     @Override
@@ -167,9 +158,6 @@ public class HashBuilderGroupJoinOperatorFactory
     {
         private GroupJoinAggregator aggrOnAggrfactory;
         private GroupJoinAggregator aggrfactory;
-        private List<Symbol> buildFinalOutputSymbols;
-        private List<Integer> buildFinalOutputChannels;
-
         private int operatorId;
         private PlanNodeId planNodeId;
         private JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager;
@@ -222,14 +210,6 @@ public class HashBuilderGroupJoinOperatorFactory
             this.spillEnabled = spillEnabled;
             this.spillToHdfsEnabled = spillToHdfsEnabled;
             this.expectedPositions = expectedPositions;
-            return this;
-        }
-
-        public Builder withBuildOutputInfo(List<Symbol> buildFinalOutputSymbols,
-                List<Integer> buildFinalOutputChannels)
-        {
-            this.buildFinalOutputChannels = ImmutableList.copyOf(buildFinalOutputChannels);
-            this.buildFinalOutputSymbols = ImmutableList.copyOf(buildFinalOutputSymbols);
             return this;
         }
 
@@ -297,7 +277,6 @@ public class HashBuilderGroupJoinOperatorFactory
         {
             requireNonNull(aggrfactory, "aggrfactory is null");
             requireNonNull(aggrOnAggrfactory, "aggrOnAggrfactory is null");
-            requireNonNull(buildFinalOutputChannels, "buildFinalOutputChannels is null");
             requireNonNull(hashChannels, "hashChannels is null");
             return new HashBuilderGroupJoinOperatorFactory(
                     operatorId,
@@ -315,9 +294,8 @@ public class HashBuilderGroupJoinOperatorFactory
                     spillEnabled,
                     spillToHdfsEnabled,
                     aggrfactory,
-                    aggrOnAggrfactory,
-                    buildFinalOutputSymbols,
-                    buildFinalOutputChannels);
+                    aggrOnAggrfactory
+            );
         }
     }
 }

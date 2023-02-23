@@ -332,8 +332,6 @@ public class LookupGroupJoinOperator
         }
         aggregationBuilder.updateMemory();
         numberOfInputRowsProcessed += page.getPositionCount();
-
-        //createProbe(page);
     }
 
     private void createProbe(Page page)

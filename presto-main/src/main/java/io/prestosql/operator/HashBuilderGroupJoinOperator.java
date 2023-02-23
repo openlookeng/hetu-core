@@ -100,20 +100,12 @@ public class HashBuilderGroupJoinOperator
     protected LocalMemoryContext memoryContext;
     protected WorkProcessor<Page> outputPages;
 
-    /*protected SettableFuture<?> aggrFinishInProgress;*/
-    //protected boolean aggregationFinishing;
-    //private boolean aggregationFinished;
-    //protected boolean aggregationInputProcessed;
-
     // for yield when memory is not available
     protected Work<?> unfinishedAggrWork;
     protected long numberOfInputRowsProcessed;
     protected long numberOfUniqueRowsProduced;
     private final GroupJoinAggregator aggregator;
     private final GroupJoinAggregator aggrOnAggregator;
-
-    private final List<Symbol> buildFinalOutputSymbols;
-    private final List<Integer> buildFinalOutputChannels;
 
     public HashBuilderGroupJoinOperator(
             OperatorContext operatorContext,
@@ -131,9 +123,7 @@ public class HashBuilderGroupJoinOperator
             boolean spillEnabled,
             boolean spillToHdfsEnabled,
             GroupJoinAggregator aggregator,
-            GroupJoinAggregator aggrOnAggregator,
-            List<Symbol> buildFinalOutputSymbols,
-            List<Integer> buildFinalOutputChannels)
+            GroupJoinAggregator aggrOnAggregator)
     {
         requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
         this.operatorContext = operatorContext;
@@ -167,8 +157,6 @@ public class HashBuilderGroupJoinOperator
 
         this.aggregator = aggregator;
         this.aggrOnAggregator = aggrOnAggregator;
-        this.buildFinalOutputSymbols = buildFinalOutputSymbols;
-        this.buildFinalOutputChannels = buildFinalOutputChannels;
     }
 
     @Override
@@ -327,11 +315,6 @@ public class HashBuilderGroupJoinOperator
                 state = State.AGGR_FINISHED;
                 return null;
             }
-
-            // only flush if we are finishing or the aggregation builder is full
-            /*if (!aggregationBuilder.isFull()) {
-                return null;
-            }*/
 
             outputPages = aggregationBuilder.buildResult();
         }

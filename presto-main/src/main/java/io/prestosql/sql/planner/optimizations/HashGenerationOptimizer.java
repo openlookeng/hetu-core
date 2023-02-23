@@ -495,8 +495,8 @@ public class HashGenerationOptimizer
                 Optional<HashComputation> rightAggrHashComputation = computeHash(metadata, planSymbolAllocator, rightGrpByKeys);
                 ImmutableSetMultimap.Builder<HashComputation, HashComputation> builder = ImmutableSetMultimap.builder();
                 builder.put(rightAggrHashComputation.get(), rightAggrHashComputation.get());
-                right = planAndEnforce(left.getNode(), new HashComputationSet(builder.build()), true, new HashComputationSet(builder.build()));
-                rightHashSymbolAggr = Optional.ofNullable(left.getRequiredHashSymbol(rightAggrHashComputation.get()));
+                right = planAndEnforce(right.getNode(), new HashComputationSet(builder.build()), true, new HashComputationSet(builder.build()));
+                rightHashSymbolAggr = Optional.ofNullable(right.getRequiredHashSymbol(rightAggrHashComputation.get()));
             }
             else {
                 right = planAndEnforce(node.getRight(), new HashComputationSet(rightHashComputation), true, new HashComputationSet(rightHashComputation));

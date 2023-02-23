@@ -3052,9 +3052,8 @@ public class LocalExecutionPlanner
                     taskCount > 1,
                     isSpillToHdfsEnabled(context.getSession()),
                     aggrfactory,
-                    aggrOnAggrfactory,
-                    buildFinalOutputSymbols,
-                    buildFinalOutputChannels);
+                    aggrOnAggrfactory
+            );
 
             factoriesBuilder.add(hashBuilderOperatorFactory);
 
@@ -3122,42 +3121,7 @@ public class LocalExecutionPlanner
 
             int startOutputChannel = 0;
             ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
-            /*List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();*/
-
-            /*Optional<Integer> groupIdChannel = getOutputMappingAndGroupIdChannel(aggregationProbe.getAggregations(),
-                    aggregationProbe.getGroupingKeys(),
-                    aggregationProbe.getHashSymbol(),
-                    aggregationProbe.getGroupIdSymbol(),
-                    probeSource,
-                    startOutputChannel,
-                    outputMappings,
-                    accumulatorFactories,
-                    Optional.empty(),
-                    Optional.empty());*/
-            /*List<Integer> probeGroupByChannels = getChannelsForSymbols(aggregationProbe.getGroupingKeys(), probeSource.getLayout());*/
-            /*List<Type> probeGroupbyTypes = probeGroupByChannels.stream()
-                    .map(entry -> probeSource.getTypes().get(entry))
-                    .collect(toImmutableList());
-            Optional<Integer> probeAggrHashChannel = aggregationProbe.getHashSymbol().map(channelGetter(probeSource));*/
-            /*JoinInternalAggregation aggregationOnLeftProbe = node.getAggrOnLeft();*/
             ImmutableMap.Builder<Symbol, Integer> finalOutputMappings = ImmutableMap.builder();
-            /*List<AccumulatorFactory> finalAccumulatorFactories = new ArrayList<>();
-            List<Integer> finalGroupByChannels = getChannelsForSymbols(aggregationOnLeftProbe.getGroupingKeys(), probeAggrLayout);*/
-            /*List<Type> finalGroupByTypes = finalGroupByChannels.stream()
-                                                   .map(probeAggrTypes::get)
-                                                   .collect(toImmutableList());
-            Optional<Integer> finalHashChannel = aggregationOnLeftProbe.getHashSymbol().map(channelGetter(probeAggrLayout));
-            Optional<Integer> finalGroupIdChannel = getOutputMappingAndGroupIdChannel(aggregationOnLeftProbe.getAggregations(),
-                    aggregationOnLeftProbe.getGroupingKeys(),
-                    aggregationOnLeftProbe.getHashSymbol(),
-                    aggregationOnLeftProbe.getGroupIdSymbol(),
-                    probeAggrLayout,
-                    probeAggrTypes,
-                    startOutputChannel,
-                    outputMappings,
-                    finalAccumulatorFactories,
-                    Optional.empty(),
-                    Optional.empty());*/
 
             GroupJoinAggregator aggrfactory = prepareGroupJoinAggregator(aggregationProbe,
                     probeSource.getLayout(),
@@ -4415,13 +4379,13 @@ public class LocalExecutionPlanner
 
         public static List<Type> toTypes(List<Symbol> symbols, LocalExecutionPlanContext context)
         {
-            ImmutableList.Builder<Type> types = ImmutableList.builder();
+            ImmutableList.Builder<Type> builder = ImmutableList.builder();
             symbols.forEach(symbol -> {
                 Type type = context.getTypes().get(symbol);
                 checkArgument(type != null, "Layout does not have a symbol for every output channel: %s", symbol);
-                types.add(type);
+                builder.add(type);
             });
-            return types.build();
+            return builder.build();
         }
 
         public static List<Type> toTypes(Map<Symbol, Integer> layout, LocalExecutionPlanContext context)

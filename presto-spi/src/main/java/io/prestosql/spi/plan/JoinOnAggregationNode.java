@@ -95,12 +95,6 @@ public class JoinOnAggregationNode
         this.spillable = spillable;
         this.dynamicFilters = ImmutableMap.copyOf(requireNonNull(dynamicFilters, "dynamicFilters is null"));
 
-        /*Set<Symbol> inputSymbols = ImmutableSet.<Symbol>builder()
-                .addAll(leftAggr.getSource().getOutputSymbols())
-                .addAll(rightAggr.getSource().getOutputSymbols())
-                .build();*/
-        /*checkArgument(new HashSet<>(inputSymbols).containsAll(outputSymbols), "Left and right join inputs do not contain all output symbols");*/
-
         checkArgument(!(criteria.isEmpty() && leftHashSymbol.isPresent()), "Left hash symbol is only valid in an equijoin");
         checkArgument(!(criteria.isEmpty() && rightHashSymbol.isPresent()), "Right hash symbol is only valid in an equijoin");
 
@@ -241,10 +235,10 @@ public class JoinOnAggregationNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         checkArgument(newChildren.size() == 2, "expected newChildren to contain 2 nodes");
-        JoinInternalAggregation leftAggr = (JoinInternalAggregation) this.leftAggr.replaceChildren(newChildren.subList(0, 1));
-        JoinInternalAggregation rightAggr = (JoinInternalAggregation) this.rightAggr.replaceChildren(newChildren.subList(1, 2));
-        JoinInternalAggregation aggrOnAggrLeft = (JoinInternalAggregation) this.aggrOnAggrLeft.replaceChildren(Collections.singletonList(leftAggr));
-        JoinInternalAggregation aggrOnAggrRight = (JoinInternalAggregation) this.aggrOnAggrRight.replaceChildren(Collections.singletonList(rightAggr));
+        JoinInternalAggregation leftAggrLocal = (JoinInternalAggregation) this.leftAggr.replaceChildren(newChildren.subList(0, 1));
+        JoinInternalAggregation rightAggrLocal = (JoinInternalAggregation) this.rightAggr.replaceChildren(newChildren.subList(1, 2));
+        JoinInternalAggregation aggrOnAggrLeftLocal = (JoinInternalAggregation) this.aggrOnAggrLeft.replaceChildren(Collections.singletonList(leftAggrLocal));
+        JoinInternalAggregation aggrOnAggrRightLocal = (JoinInternalAggregation) this.aggrOnAggrRight.replaceChildren(Collections.singletonList(rightAggrLocal));
 
         return new JoinOnAggregationNode(getId(),
                 type,
@@ -255,10 +249,10 @@ public class JoinOnAggregationNode
                 distributionType,
                 spillable,
                 dynamicFilters,
-                leftAggr,
-                rightAggr,
-                aggrOnAggrLeft,
-                aggrOnAggrRight,
+                leftAggrLocal,
+                rightAggrLocal,
+                aggrOnAggrLeftLocal,
+                aggrOnAggrRightLocal,
                 outputSymbols);
     }
 
