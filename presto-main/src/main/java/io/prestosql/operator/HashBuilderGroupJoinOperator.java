@@ -411,9 +411,13 @@ public class HashBuilderGroupJoinOperator
 
     private void finishAggregation()
     {
+        DriverYieldSignal yieldSignal = operatorContext.getDriverContext().getYieldSignal();
         Page page = processAggregation();
         while (page != null) {
             updateIndex(page);
+            if (yieldSignal.isSet()) {
+                break;
+            }
             page = processAggregation();
         }
     }

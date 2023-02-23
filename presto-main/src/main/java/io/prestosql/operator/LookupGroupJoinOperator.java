@@ -551,11 +551,43 @@ public class LookupGroupJoinOperator
             // The reference must be set to null afterwards to avoid unaccounted memory.
             aggregationBuilder = null;
         }
-        memoryContext.setBytes(0);
+        //memoryContext.setBytes(0);
         aggregator.getPartialAggregationController().ifPresent(
                 controller -> controller.onFlush(numberOfInputRowsProcessed, numberOfUniqueRowsProduced));
         numberOfInputRowsProcessed = 0;
         numberOfUniqueRowsProduced = 0;
+    }
+
+    protected void closeProbeAggrOnAggregationBuilder()
+    {
+        if (probeAggregationBuilder != null) {
+            probeAggregationBuilder.recordHashCollisions(hashCollisionsCounter);
+            probeAggregationBuilder.close();
+            // aggregationBuilder.close() will release all memory reserved in memory accounting.
+            // The reference must be set to null afterwards to avoid unaccounted memory.
+            probeAggregationBuilder = null;
+        }
+        //memoryContext.setBytes(0);
+        /*aggrOnAggregator.getPartialAggregationController().ifPresent(
+                controller -> controller.onFlush(numberOfInputRowsProcessed, numberOfUniqueRowsProduced));
+        numberOfInputRowsProcessed = 0;
+        numberOfUniqueRowsProduced = 0;*/
+    }
+
+    protected void closeBuildAggrOnAggregationBuilder()
+    {
+        if (buildAggregationBuilder != null) {
+            buildAggregationBuilder.recordHashCollisions(hashCollisionsCounter);
+            buildAggregationBuilder.close();
+            // aggregationBuilder.close() will release all memory reserved in memory accounting.
+            // The reference must be set to null afterwards to avoid unaccounted memory.
+            buildAggregationBuilder = null;
+        }
+        //memoryContext.setBytes(0);
+        /*aggrOnAggregator.getPartialAggregationController().ifPresent(
+                controller -> controller.onFlush(numberOfInputRowsProcessed, numberOfUniqueRowsProduced));
+        numberOfInputRowsProcessed = 0;
+        numberOfUniqueRowsProduced = 0;*/
     }
 
     private void processProbe()
@@ -650,6 +682,9 @@ public class LookupGroupJoinOperator
         }
         closed = true;
         probe = null;
+        if (state == State.CONSUMING_INPUT) {
+            closeAggregationBuilder();
+        }
 
         try (Closer closer = Closer.create()) {
             // `afterClose` must be run last.
@@ -669,6 +704,9 @@ public class LookupGroupJoinOperator
         catch (IOException e) {
             throw new RuntimeException(e);
         }
+        closeProbeAggrOnAggregationBuilder();
+        closeBuildAggrOnAggregationBuilder();
+        memoryContext.setBytes(0);
     }
 
     /**
