@@ -134,8 +134,7 @@ public class HashBuilderGroupJoinOperator
             GroupJoinAggregator aggregator,
             GroupJoinAggregator aggrOnAggregator,
             List<Symbol> buildFinalOutputSymbols,
-            List<Integer> buildFinalOutputChannels,
-            ListeningExecutorService executor)
+            List<Integer> buildFinalOutputChannels)
     {
         requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
         this.operatorContext = operatorContext;
@@ -161,9 +160,6 @@ public class HashBuilderGroupJoinOperator
         this.spillToHdfsEnabled = spillToHdfsEnabled;
         this.expectedValues = expectedPositions * 10L;
 
-        /*this.aggrFinishInProgress = SettableFuture.create();
-        this.aggrFinishInProgress.set(null);*/
-
         requireNonNull(operatorContext, "operatorContext is null");
         this.memoryContext = operatorContext.localUserMemoryContext();
         if (aggregator.isUseSystemMemory()) {
@@ -186,13 +182,13 @@ public class HashBuilderGroupJoinOperator
     public boolean needsInput()
     {
         if (state == State.CONSUMING_INPUT) {
-            if (/*aggregationFinishing || */outputPages != null) {
+            if (outputPages != null) {
                 return false;
             }
             else if (aggregationBuilder != null && aggregationBuilder.isFull()) {
                 return false;
             }
-            else if (lookupSourceFactoryDestroyed.isDone()/*aggrFinishInProgress.isDone()*/) {
+            else if (lookupSourceFactoryDestroyed.isDone()) {
                 return false;
             }
             else {
@@ -215,11 +211,8 @@ public class HashBuilderGroupJoinOperator
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
-
         checkState(unfinishedAggrWork == null, "Operator has unfinished work");
-        //checkState(!aggregationFinishing, "Operator is already finishing");
         checkState(state == State.CONSUMING_INPUT, "Operator is not in Consuming Input state");
-        /*aggregationInputProcessed = true;*/
 
         if (aggregationBuilder == null) {
             createAggregationBuilder();
@@ -325,21 +318,19 @@ public class HashBuilderGroupJoinOperator
         }
 
         if (outputPages == null) {
-            //if (state == State.AGGR_FINISHING/*aggregationFinishing*/) {
-            if (/*!aggregationInputProcessed && */aggregator.isProduceDefaultOutput()) {
+            if (aggregator.isProduceDefaultOutput()) {
                 // global aggregations always generate an output row with the default aggregation output (e.g. 0 for COUNT, NULL for SUM)
-                state = State.AGGR_FINISHED; //aggregationFinished = true;
+                state = State.AGGR_FINISHED;
                 return aggregator.getGlobalAggregationOutput();
             }
 
             if (aggregationBuilder == null) {
-                state = State.AGGR_FINISHED; //aggregationFinished = true;
+                state = State.AGGR_FINISHED;
                 return null;
             }
-            //}
 
             // only flush if we are finishing or the aggregation builder is full
-            if (/*!aggregationFinishing && */(/*aggregationBuilder == null || */!aggregationBuilder.isFull())) {
+            if (!aggregationBuilder.isFull()) {
                 return null;
             }
 
@@ -380,7 +371,6 @@ public class HashBuilderGroupJoinOperator
     @Override
     public void finish()
     {
-        /*aggregationFinishing = true;*/
         if (state == State.CONSUMING_INPUT) {
             state = State.AGGR_FINISHING;
         }

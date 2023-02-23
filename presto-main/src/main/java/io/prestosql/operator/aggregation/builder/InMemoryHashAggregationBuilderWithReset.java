@@ -32,7 +32,7 @@ import static io.prestosql.operator.GroupByHash.createGroupByHash;
 public class InMemoryHashAggregationBuilderWithReset
         extends InMemoryHashAggregationBuilder
 {
-    private final List<AccumulatorFactory> accumulatorFactoriesm;
+    private final List<AccumulatorFactory> accumulatorFactories;
     private final AggregationNode.Step step;
     private final int expectedGroups;
     private final List<Type> groupByTypes;
@@ -66,7 +66,7 @@ public class InMemoryHashAggregationBuilderWithReset
                 joinCompiler,
                 updateMemory,
                 AggregationNode.AggregationType.HASH);
-        this.accumulatorFactoriesm = accumulatorFactories;
+        this.accumulatorFactories = accumulatorFactories;
         this.step = AggregationNode.Step.partialInput(step);
         this.expectedGroups = expectedGroups;
         this.groupByTypes = groupByTypes;
@@ -101,14 +101,14 @@ public class InMemoryHashAggregationBuilderWithReset
     @Override
     public int getAggregationCount()
     {
-        return accumulatorFactoriesm.size();
+        return accumulatorFactories.size();
     }
 
     @Override
     public AggregationBuilder duplicate()
     {
         return new InMemoryHashAggregationBuilderWithReset(
-                accumulatorFactoriesm,
+                accumulatorFactories,
                 step,
                 expectedGroups,
                 groupByTypes,

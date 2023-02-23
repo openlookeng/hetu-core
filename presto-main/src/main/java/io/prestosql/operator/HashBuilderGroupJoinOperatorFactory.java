@@ -61,8 +61,6 @@ public class HashBuilderGroupJoinOperatorFactory
     private final List<Symbol> buildFinalOutputSymbols;
     private final List<Integer> buildFinalOutputChannels;
 
-    private final ListeningExecutorService executor;
-
     public static Builder builder()
     {
         return new Builder();
@@ -86,8 +84,7 @@ public class HashBuilderGroupJoinOperatorFactory
             GroupJoinAggregator aggrfactory,
             GroupJoinAggregator aggrOnAggrfactory,
             List<Symbol> buildFinalOutputSymbols,
-            List<Integer> buildFinalOutputChannels,
-            ListeningExecutorService executor)
+            List<Integer> buildFinalOutputChannels)
     {
         this.operatorId = operatorId;
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -113,7 +110,6 @@ public class HashBuilderGroupJoinOperatorFactory
 
         this.buildFinalOutputSymbols = buildFinalOutputSymbols;
         this.buildFinalOutputChannels = buildFinalOutputChannels;
-        this.executor = executor;
     }
 
     @Override
@@ -148,8 +144,8 @@ public class HashBuilderGroupJoinOperatorFactory
                 aggrfactory,
                 aggrOnAggrfactory,
                 buildFinalOutputSymbols,
-                buildFinalOutputChannels,
-                executor);
+                buildFinalOutputChannels
+        );
     }
 
     @Override
@@ -191,16 +187,8 @@ public class HashBuilderGroupJoinOperatorFactory
         private boolean spillEnabled;
         private boolean spillToHdfsEnabled;
 
-        private ListeningExecutorService executor;
-
         public Builder()
         {
-        }
-
-        public Builder withExecutor(ListeningExecutorService executor)
-        {
-            this.executor = executor;
-            return this;
         }
 
         public Builder withJoinInfo(int operatorId,
@@ -311,7 +299,6 @@ public class HashBuilderGroupJoinOperatorFactory
         {
             requireNonNull(aggrfactory, "aggrfactory is null");
             requireNonNull(aggrOnAggrfactory, "aggrOnAggrfactory is null");
-            requireNonNull(executor, "executor is null");
             requireNonNull(buildFinalOutputChannels, "buildFinalOutputChannels is null");
             requireNonNull(hashChannels, "hashChannels is null");
             return new HashBuilderGroupJoinOperatorFactory(
@@ -332,8 +319,8 @@ public class HashBuilderGroupJoinOperatorFactory
                     aggrfactory,
                     aggrOnAggrfactory,
                     buildFinalOutputSymbols,
-                    buildFinalOutputChannels,
-                    executor);
+                    buildFinalOutputChannels
+            );
         }
     }
 }
