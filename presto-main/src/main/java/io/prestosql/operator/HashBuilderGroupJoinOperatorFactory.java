@@ -14,7 +14,6 @@
 package io.prestosql.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.units.DataSize;
 import io.prestosql.execution.Lifespan;
 import io.prestosql.operator.aggregation.AccumulatorFactory;
@@ -144,8 +143,7 @@ public class HashBuilderGroupJoinOperatorFactory
                 aggrfactory,
                 aggrOnAggrfactory,
                 buildFinalOutputSymbols,
-                buildFinalOutputChannels
-        );
+                buildFinalOutputChannels);
     }
 
     @Override
@@ -249,13 +247,13 @@ public class HashBuilderGroupJoinOperatorFactory
                 Optional<PartialAggregationController> partialAggregationController,
                 boolean produceDefaultOutput)
         {
-            aggrOnAggrfactory = new GroupJoinAggregator(hashChannel,
-                    groupIdChannel,
-                    accumulatorFactories,
-                    groupByTypes,
+            aggrOnAggrfactory = GroupJoinAggregator.buildGroupJoinAggregator(groupByTypes,
                     groupByChannels,
                     globalAggregationGroupIds,
                     step,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
                     expectedGroups,
                     maxPartialMemory,
                     joinCompiler,
@@ -279,13 +277,13 @@ public class HashBuilderGroupJoinOperatorFactory
                 Optional<PartialAggregationController> partialAggregationController,
                 boolean produceDefaultOutput)
         {
-            aggrfactory = new GroupJoinAggregator(hashChannel,
-                    groupIdChannel,
-                    accumulatorFactories,
-                    groupByTypes,
+            aggrfactory = GroupJoinAggregator.buildGroupJoinAggregator(groupByTypes,
                     groupByChannels,
                     globalAggregationGroupIds,
                     step,
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
                     expectedGroups,
                     maxPartialMemory,
                     joinCompiler,
@@ -319,8 +317,7 @@ public class HashBuilderGroupJoinOperatorFactory
                     aggrfactory,
                     aggrOnAggrfactory,
                     buildFinalOutputSymbols,
-                    buildFinalOutputChannels
-            );
+                    buildFinalOutputChannels);
         }
     }
 }

@@ -16,7 +16,6 @@ package io.prestosql.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.operator.aggregation.builder.AggregationBuilder;
 import io.prestosql.operator.aggregation.builder.InMemoryHashAggregationBuilder;

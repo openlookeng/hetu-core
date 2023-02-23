@@ -15,6 +15,7 @@ package io.prestosql.operator;
 
 import io.prestosql.operator.JoinProbe.JoinProbeFactory;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spiller.PartitioningSpillerFactory;
 
@@ -98,5 +99,45 @@ public class LookupJoinOperators
                 probeJoinChannel,
                 probeHashChannel,
                 partitioningSpillerFactory);
+    }
+
+    public OperatorFactory groupInnerJoin(
+            int operatorId,
+            PlanNodeId planNodeId,
+            JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager,
+            List<Type> probeTypes,
+            List<Integer> probeJoinChannels,
+            OptionalInt probeHashChannel,
+            OptionalInt probeCountChannel,
+            List<Integer> probeOutputChannels,
+            OptionalInt totalOperatorsCount,
+            PartitioningSpillerFactory partitioningSpillerFactory,
+            boolean forked,
+            GroupJoinAggregator aggrfactory,
+            GroupJoinAggregator aggrOnAggrfactory,
+            List<Symbol> probeFinalOutputSymbols,
+            List<Integer> probeFinalOutputChannels,
+            List<Integer> buildFinalOutputChannels,
+            List<Type> outputTypes)
+    {
+        return new LookupGroupJoinOperatorFactory(
+                operatorId,
+                planNodeId,
+                lookupSourceFactoryManager,
+                probeTypes,
+                outputTypes,
+                lookupSourceFactoryManager.getBuildOutputTypes(),
+                JoinType.INNER,
+                new GroupJoinProbe.GroupJoinProbeFactory(probeOutputChannels.stream().mapToInt(i -> i).toArray(), probeJoinChannels, probeHashChannel, probeCountChannel),
+                totalOperatorsCount,
+                probeJoinChannels,
+                probeHashChannel,
+                partitioningSpillerFactory,
+                forked,
+                aggrfactory,
+                aggrOnAggrfactory,
+                probeFinalOutputSymbols,
+                probeFinalOutputChannels,
+                buildFinalOutputChannels);
     }
 }

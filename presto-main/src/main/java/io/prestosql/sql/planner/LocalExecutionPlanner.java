@@ -64,7 +64,9 @@ import io.prestosql.operator.ExchangeOperator.ExchangeOperatorFactory;
 import io.prestosql.operator.ExplainAnalyzeOperator.ExplainAnalyzeOperatorFactory;
 import io.prestosql.operator.FilterAndProjectOperator;
 import io.prestosql.operator.GroupIdOperator;
+import io.prestosql.operator.GroupJoinAggregator;
 import io.prestosql.operator.HashAggregationOperator.HashAggregationOperatorFactory;
+import io.prestosql.operator.HashBuilderGroupJoinOperatorFactory;
 import io.prestosql.operator.HashBuilderOperator.HashBuilderOperatorFactory;
 import io.prestosql.operator.HashSemiJoinOperator.HashSemiJoinOperatorFactory;
 import io.prestosql.operator.JoinBridgeManager;
@@ -160,6 +162,8 @@ import io.prestosql.spi.plan.CTEScanNode;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.GroupIdNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode.JoinInternalAggregation;
 import io.prestosql.spi.plan.LimitNode;
 import io.prestosql.spi.plan.MarkDistinctNode;
 import io.prestosql.spi.plan.OrderingScheme;
@@ -331,6 +335,7 @@ import static io.prestosql.spi.util.Reflection.constructorMethodHandle;
 import static io.prestosql.spiller.PartitioningSpillerFactory.unsupportedPartitioningSpillerFactory;
 import static io.prestosql.sql.DynamicFilters.extractStaticFilters;
 import static io.prestosql.sql.gen.LambdaBytecodeGenerator.compileLambdaProvider;
+import static io.prestosql.sql.planner.LocalExecutionPlanner.PhysicalOperation.toTypes;
 import static io.prestosql.sql.planner.RowExpressionInterpreter.Level.OPTIMIZED;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.COORDINATOR_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
@@ -2302,6 +2307,25 @@ public class LocalExecutionPlanner
         }
 
         @Override
+        public PhysicalOperation visitJoinOnAggregation(JoinOnAggregationNode node, LocalExecutionPlanContext context)
+        {
+            List<JoinNode.EquiJoinClause> clauses = node.getCriteria();
+            if (!node.getDynamicFilters().isEmpty()) {
+                log.debug("[GroupJoin] Dynamic filters: %s", node.getDynamicFilters());
+            }
+
+            List<Symbol> leftSymbols = Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft);
+            List<Symbol> rightSymbols = Lists.transform(clauses, JoinNode.EquiJoinClause::getRight);
+
+            switch (node.getType()) {
+                case INNER:
+                    return createLookupGroupJoin(node, node.getLeft(), leftSymbols, node.getLeftHashSymbol(), node.getRight(), rightSymbols, node.getRightHashSymbol(), context);
+                default:
+                    throw new UnsupportedOperationException("Unsupported join type: " + node.getType());
+            }
+        }
+
+        @Override
         public PhysicalOperation visitSpatialJoin(SpatialJoinNode node, LocalExecutionPlanContext context)
         {
             RowExpression filterExpression = node.getFilter();
@@ -2661,7 +2685,56 @@ public class LocalExecutionPlanner
             return new PhysicalOperation(operator, outputMappings.build(), context, probeSource);
         }
 
+        private PhysicalOperation createLookupGroupJoin(JoinOnAggregationNode node,
+                PlanNode probeNode,
+                List<Symbol> probeSymbols,
+                Optional<Symbol> probeHashSymbol,
+                PlanNode buildNode,
+                List<Symbol> buildSymbols,
+                Optional<Symbol> buildHashSymbol,
+                LocalExecutionPlanContext context)
+        {
+            // Plan probe
+            PhysicalOperation probeSource = probeNode.accept(this, context);
+
+            // Plan build
+            ImmutableList.Builder<Type> finalOutputBuildTypes = ImmutableList.builder();
+            ImmutableList.Builder<Integer> buildFinalOutputChannels = ImmutableList.builder();
+            JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory =
+                    createGroupLookupSourceFactory(node, buildNode, buildSymbols, buildHashSymbol, probeSource, context, finalOutputBuildTypes, buildFinalOutputChannels);
+
+            OperatorFactory operator = createGroupLookupJoin(node, probeSource, probeSymbols, probeHashSymbol, lookupSourceFactory, context, finalOutputBuildTypes.build(), buildFinalOutputChannels.build());
+
+            ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
+            List<Symbol> outputSymbols = node.getOutputSymbols();
+            for (int i = 0; i < outputSymbols.size(); i++) {
+                Symbol symbol = outputSymbols.get(i);
+                outputMappings.put(symbol, i);
+            }
+
+            return new PhysicalOperation(operator, outputMappings.build(), context, probeSource);
+        }
+
         protected Optional<LocalDynamicFilter> createDynamicFilter(JoinNode node, LocalExecutionPlanContext context, int partitionCount)
+        {
+            if (!isEnableDynamicFiltering(context.getSession())) {
+                return Optional.empty();
+            }
+            if (node.getDynamicFilters().isEmpty()) {
+                return Optional.empty();
+            }
+            LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
+            return LocalDynamicFilter
+                    .create(node, partitionCount, context.getSession(), context.taskContext.getTaskId(), stateStoreProvider)
+                    .map(filter -> {
+                        // Intersect dynamic filters' predicates when they become ready,
+                        // in order to support multiple join nodes in the same plan fragment.
+                        addSuccessCallback(filter.getDynamicFilterResultFuture(), collector::intersectDynamicFilter);
+                        return filter;
+                    });
+        }
+
+        protected Optional<LocalDynamicFilter> createDynamicFilter(JoinOnAggregationNode node, LocalExecutionPlanContext context, int partitionCount)
         {
             if (!isEnableDynamicFiltering(context.getSession())) {
                 return Optional.empty();
@@ -2829,6 +2902,172 @@ public class LocalExecutionPlanner
             return lookupSourceFactoryManager;
         }
 
+        private JoinBridgeManager<PartitionedLookupSourceFactory> createGroupLookupSourceFactory(
+                JoinOnAggregationNode node,
+                PlanNode buildNode,
+                List<Symbol> buildSymbols,
+                Optional<Symbol> buildHashSymbol,
+                PhysicalOperation probeSource,
+                LocalExecutionPlanContext context,
+                ImmutableList.Builder<Type> finalOutputBuildTypes,
+                ImmutableList.Builder<Integer> buildFinalOutputChannelsBuilder)
+        {
+            JoinInternalAggregation aggregationBuild = node.getAggrOnRight();
+            LocalExecutionPlanContext buildContext = context.createSubContext();
+            PhysicalOperation buildSource = buildNode.accept(this, buildContext);
+            if (buildSource.getPipelineExecutionStrategy() == GROUPED_EXECUTION) {
+                checkState(
+                        probeSource.getPipelineExecutionStrategy() == GROUPED_EXECUTION,
+                        "Build execution is GROUPED_EXECUTION. Probe execution is expected be GROUPED_EXECUTION, but is UNGROUPED_EXECUTION.");
+            }
+
+            ImmutableMap.Builder<Symbol, Integer> buildAggrOutputMappings = ImmutableMap.builder();
+            List<Symbol> aggrNodeOutputSymbols = aggregationBuild.getOutputSymbols();
+            for (int i = 0; i < aggrNodeOutputSymbols.size(); i++) {
+                buildAggrOutputMappings.put(aggrNodeOutputSymbols.get(i), i);
+            }
+            ImmutableMap<Symbol, Integer> buildAggrLayout = buildAggrOutputMappings.build();
+            List<Type> buildAggrTypes = toTypes(buildAggrLayout, buildContext);
+
+            List<Type> buildTypes = toTypes(buildSource.getLayout(), buildContext);
+
+            JoinInternalAggregation aggregationProbe = node.getLeftAggr();
+            ImmutableMap.Builder<Symbol, Integer> probeAggrOutputMappings = ImmutableMap.builder();
+            List<Symbol> probeAggrNodeOutputSymbols = aggregationProbe.getOutputSymbols();
+            for (int i = 0; i < probeAggrNodeOutputSymbols.size(); i++) {
+                probeAggrOutputMappings.put(probeAggrNodeOutputSymbols.get(i), i);
+            }
+            ImmutableMap<Symbol, Integer> probeAggrLayout = probeAggrOutputMappings.build();
+
+            List<Symbol> buildAggrOutputSymbols = ImmutableList.copyOf(aggregationBuild.getOutputSymbols());
+            List<Integer> buildAggrOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(buildAggrOutputSymbols, buildAggrLayout));
+            List<Integer> buildJoinChannels = ImmutableList.copyOf(getChannelsForSymbols(buildSymbols, buildAggrLayout));
+            OptionalInt buildJoinHashChannel = buildHashSymbol.map(channelGetter(buildAggrLayout))
+                                                       .map(OptionalInt::of).orElse(OptionalInt.empty());
+            int taskCount = buildContext.getDriverInstanceCount().orElse(1);
+
+            Optional<JoinFilterFunctionFactory> filterFunctionFactory = node.getFilter()
+                    .map(filterExpression -> compileJoinFilterFunction(
+                            filterExpression,
+                            probeAggrLayout,
+                            buildAggrLayout,
+                            context.getTypes(),
+                            context.getSession()));
+
+            Optional<SortExpressionContext> sortExpressionContext = node.getFilter().flatMap(filter -> SortExpressionExtractor.extractSortExpression(metadata, node.getRightOutputSymbols(), filter));
+
+            Optional<Integer> sortChannel = sortExpressionContext
+                    .map(SortExpressionContext::getSortExpression)
+                    .map(sortExpression -> sortExpressionAsSortChannel(sortExpression, probeAggrLayout, buildAggrLayout, context));
+
+            List<JoinFilterFunctionFactory> searchFunctionFactories = sortExpressionContext
+                    .map(SortExpressionContext::getSearchExpressions)
+                    .map(searchExpressions -> searchExpressions.stream()
+                            .map(searchExpression -> compileJoinFilterFunction(
+                                    searchExpression,
+                                    probeAggrLayout,
+                                    buildAggrLayout,
+                                    context.getTypes(),
+                                    context.getSession()))
+                            .collect(toImmutableList()))
+                    .orElse(ImmutableList.of());
+
+            ImmutableList<Type> buildAggrOutputTypes = buildAggrOutputChannels.stream()
+                    .map(buildAggrTypes::get)
+                    .collect(toImmutableList());
+            JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager = new JoinBridgeManager<>(
+                    false,
+                    probeSource.getPipelineExecutionStrategy(),
+                    buildSource.getPipelineExecutionStrategy(),
+                    lifespan -> new PartitionedLookupSourceFactory(
+                            buildAggrTypes,
+                            buildAggrOutputTypes,
+                            buildJoinChannels.stream()
+                                    .map(buildAggrTypes::get)
+                                    .collect(toImmutableList()),
+                            taskCount,
+                            buildAggrLayout,
+                            false,
+                            false),
+                    buildAggrOutputTypes);
+
+            ImmutableList.Builder<OperatorFactory> factoriesBuilder = new ImmutableList.Builder();
+            factoriesBuilder.addAll(buildSource.getOperatorFactories());
+
+            createDynamicFilter(node, context, taskCount).ifPresent(
+                    filter -> {
+                        List<DynamicFilterSourceOperator.Channel> filterBuildChannels = filter
+                                .getBuildChannels()
+                                .entrySet()
+                                .stream()
+                                .map(entry -> {
+                                    String filterId = entry.getKey();
+                                    int index = entry.getValue();
+                                    Type type = buildAggrTypes.get(index);
+                                    return new DynamicFilterSourceOperator.Channel(filterId, type, index, context.getSession().getQueryId().toString());
+                                })
+                                .collect(Collectors.toList());
+                        factoriesBuilder.add(
+                                new DynamicFilterSourceOperator.DynamicFilterSourceOperatorFactory(
+                                        buildContext.getNextOperatorId(),
+                                        node.getId(),
+                                        filter.getValueConsumer(), /** the consumer to process all values collected to build the dynamic filter */
+                                        filterBuildChannels,
+                                        getDynamicFilteringMaxPerDriverValueCount(buildContext.getSession()),
+                                        getDynamicFilteringMaxPerDriverSize(buildContext.getSession())));
+                    });
+
+            int startOutputChannel = 0;
+            ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
+            ImmutableMap.Builder<Symbol, Integer> finalOutputMappings = ImmutableMap.builder();
+            GroupJoinAggregator aggrfactory = prepareGroupJoinAggregator(aggregationBuild,
+                    buildSource.getLayout(),
+                    buildSource.getTypes(),
+                    startOutputChannel,
+                    outputMappings);
+            GroupJoinAggregator aggrOnAggrfactory = prepareGroupJoinAggregator(node.getAggrOnRight(),
+                    buildAggrLayout,
+                    buildAggrTypes,
+                    startOutputChannel,
+                    finalOutputMappings);
+            List<Symbol> buildFinalOutputSymbols = finalOutputMappings.build().keySet().stream()
+                    .filter(symbol -> node.getOutputSymbols().contains(symbol))
+                    .collect(toImmutableList());
+            List<Integer> buildFinalOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(buildFinalOutputSymbols, finalOutputMappings.build()));
+            buildFinalOutputChannelsBuilder.addAll(buildFinalOutputChannels);
+
+            HashBuilderGroupJoinOperatorFactory hashBuilderOperatorFactory = new HashBuilderGroupJoinOperatorFactory(
+                    buildContext.getNextOperatorId(),
+                    node.getId(),
+                    lookupSourceFactoryManager,
+                    buildAggrOutputChannels,
+                    buildJoinChannels,
+                    buildJoinHashChannel,
+                    filterFunctionFactory,
+                    sortChannel,
+                    Optional.of(buildAggrLayout.size() - 1),
+                    searchFunctionFactories,
+                    10_000,
+                    pagesIndexFactory,
+                    taskCount > 1,
+                    isSpillToHdfsEnabled(context.getSession()),
+                    aggrfactory,
+                    aggrOnAggrfactory,
+                    buildFinalOutputSymbols,
+                    buildFinalOutputChannels);
+
+            factoriesBuilder.add(hashBuilderOperatorFactory);
+
+            context.addDriverFactory(
+                    buildContext.isInputDriver(),
+                    false,
+                    factoriesBuilder.build(),
+                    buildContext.getDriverInstanceCount(),
+                    buildSource.getPipelineExecutionStrategy());
+
+            return lookupSourceFactoryManager;
+        }
+
         protected JoinFilterFunctionFactory compileJoinFilterFunction(
                 RowExpression filterExpression,
                 Map<Symbol, Integer> probeLayout,
@@ -2850,6 +3089,155 @@ public class LocalExecutionPlanner
             RowExpression rewrittenSortExpression = bindChannels(sortExpression, joinSourcesLayout, context.getTypes());
             checkArgument(rewrittenSortExpression instanceof InputReferenceExpression, "Unsupported expression type [%s]", rewrittenSortExpression);
             return ((InputReferenceExpression) rewrittenSortExpression).getField();
+        }
+
+        private OperatorFactory createGroupLookupJoin(
+                JoinOnAggregationNode node,
+                PhysicalOperation probeSource,
+                List<Symbol> probeSymbols,
+                Optional<Symbol> probeHashSymbol,
+                JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager,
+                LocalExecutionPlanContext context,
+                List<Type> finalOutputBuildTypes,
+                List<Integer> buildFinalOutputChannels)
+        {
+            // Build output depends on Left Aggregation
+            JoinInternalAggregation aggregationProbe = node.getLeftAggr();
+            ImmutableMap.Builder<Symbol, Integer> probeAggrOutputMappings = ImmutableMap.builder();
+            List<Symbol> aggrnodeOutputSymbols = aggregationProbe.getOutputSymbols();
+            for (int i = 0; i < aggrnodeOutputSymbols.size(); i++) {
+                probeAggrOutputMappings.put(aggrnodeOutputSymbols.get(i), i);
+            }
+            ImmutableMap<Symbol, Integer> probeAggrLayout = probeAggrOutputMappings.build();
+            LocalExecutionPlanContext probeContext = context.createSubContext();
+
+            List<Type> probeAggrTypes = toTypes(probeAggrLayout, probeContext);
+            List<Symbol> probeAggrOutputSymbols = ImmutableList.copyOf(aggregationProbe.getOutputSymbols());
+            List<Integer> probeAggrOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(probeAggrOutputSymbols, probeAggrLayout));
+            List<Integer> probeJoinChannels = ImmutableList.copyOf(getChannelsForSymbols(probeSymbols, probeAggrLayout));
+            OptionalInt probeJoinHashChannel = probeHashSymbol.map(channelGetter(probeAggrLayout))
+                    .map(OptionalInt::of).orElse(OptionalInt.empty());
+            OptionalInt totalOperatorsCount = context.getDriverInstanceCount();
+            OptionalInt probeAggrCountChannel = OptionalInt.of(probeAggrOutputChannels.size() - 1);
+
+            int startOutputChannel = 0;
+            ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
+            /*List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();*/
+
+            /*Optional<Integer> groupIdChannel = getOutputMappingAndGroupIdChannel(aggregationProbe.getAggregations(),
+                    aggregationProbe.getGroupingKeys(),
+                    aggregationProbe.getHashSymbol(),
+                    aggregationProbe.getGroupIdSymbol(),
+                    probeSource,
+                    startOutputChannel,
+                    outputMappings,
+                    accumulatorFactories,
+                    Optional.empty(),
+                    Optional.empty());*/
+            /*List<Integer> probeGroupByChannels = getChannelsForSymbols(aggregationProbe.getGroupingKeys(), probeSource.getLayout());*/
+            /*List<Type> probeGroupbyTypes = probeGroupByChannels.stream()
+                    .map(entry -> probeSource.getTypes().get(entry))
+                    .collect(toImmutableList());
+            Optional<Integer> probeAggrHashChannel = aggregationProbe.getHashSymbol().map(channelGetter(probeSource));*/
+            /*JoinInternalAggregation aggregationOnLeftProbe = node.getAggrOnLeft();*/
+            ImmutableMap.Builder<Symbol, Integer> finalOutputMappings = ImmutableMap.builder();
+            /*List<AccumulatorFactory> finalAccumulatorFactories = new ArrayList<>();
+            List<Integer> finalGroupByChannels = getChannelsForSymbols(aggregationOnLeftProbe.getGroupingKeys(), probeAggrLayout);*/
+            /*List<Type> finalGroupByTypes = finalGroupByChannels.stream()
+                                                   .map(probeAggrTypes::get)
+                                                   .collect(toImmutableList());
+            Optional<Integer> finalHashChannel = aggregationOnLeftProbe.getHashSymbol().map(channelGetter(probeAggrLayout));
+            Optional<Integer> finalGroupIdChannel = getOutputMappingAndGroupIdChannel(aggregationOnLeftProbe.getAggregations(),
+                    aggregationOnLeftProbe.getGroupingKeys(),
+                    aggregationOnLeftProbe.getHashSymbol(),
+                    aggregationOnLeftProbe.getGroupIdSymbol(),
+                    probeAggrLayout,
+                    probeAggrTypes,
+                    startOutputChannel,
+                    outputMappings,
+                    finalAccumulatorFactories,
+                    Optional.empty(),
+                    Optional.empty());*/
+
+            GroupJoinAggregator aggrfactory = prepareGroupJoinAggregator(aggregationProbe,
+                    probeSource.getLayout(),
+                    probeSource.getTypes(),
+                    startOutputChannel,
+                    outputMappings);
+            GroupJoinAggregator aggrOnAggrfactory = prepareGroupJoinAggregator(node.getAggrOnLeft(),
+                    probeAggrLayout,
+                    probeAggrTypes,
+                    startOutputChannel,
+                    finalOutputMappings);
+
+            List<Symbol> probeFinalOutputSymbols = finalOutputMappings.build().keySet().stream()
+                                                           .filter(symbol -> node.getOutputSymbols().contains(symbol))
+                                                           .collect(toImmutableList());
+            List<Integer> probeFinalOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(probeFinalOutputSymbols, finalOutputMappings.build()));
+
+            ImmutableList.Builder<Type> outputTypes = ImmutableList.builder();
+            outputTypes.addAll(toTypes(probeFinalOutputSymbols, probeContext)).addAll(finalOutputBuildTypes);
+
+            switch (node.getType()) {
+                case INNER:
+                    return lookupJoinOperators.groupInnerJoin(context.getNextOperatorId(),
+                            node.getId(),
+                            lookupSourceFactoryManager,
+                            probeAggrTypes,
+                            probeJoinChannels,
+                            probeJoinHashChannel,
+                            probeAggrCountChannel,
+                            probeAggrOutputChannels,
+                            totalOperatorsCount,
+                            partitioningSpillerFactory,
+                            false,
+                            aggrfactory,
+                            aggrOnAggrfactory,
+                            probeFinalOutputSymbols,
+                            probeFinalOutputChannels,
+                            buildFinalOutputChannels,
+                            outputTypes.build());
+                default:
+                    throw new UnsupportedOperationException("Unsupported join type: " + node.getType());
+            }
+        }
+
+        private GroupJoinAggregator prepareGroupJoinAggregator(JoinInternalAggregation aggregation,
+                Map<Symbol, Integer> layout,
+                List<Type> types,
+                int startOutputChannel,
+                ImmutableMap.Builder<Symbol, Integer> outputMappings)
+        {
+            List<AccumulatorFactory> accumulatorFactories = new ArrayList<>();
+            List<Integer> groupByChannels = getChannelsForSymbols(aggregation.getGroupingKeys(), layout);
+            List<Type> groupByTypes = groupByChannels.stream()
+                    .map(types::get)
+                    .collect(toImmutableList());
+            Optional<Integer> hashChannel = aggregation.getHashSymbol().map(channelGetter(layout));
+            Optional<Integer> groupIdChannel = getOutputMappingAndGroupIdChannel(aggregation.getAggregations(),
+                    aggregation.getGroupingKeys(),
+                    aggregation.getHashSymbol(),
+                    aggregation.getGroupIdSymbol(),
+                    layout,
+                    types,
+                    startOutputChannel,
+                    outputMappings,
+                    accumulatorFactories,
+                    Optional.empty(),
+                    Optional.empty());
+            return GroupJoinAggregator.buildGroupJoinAggregator(groupByTypes,
+                    groupByChannels,
+                    ImmutableList.copyOf(aggregation.getGlobalGroupingSets()),
+                    aggregation.getStep(),
+                    accumulatorFactories,
+                    hashChannel,
+                    groupIdChannel,
+                    10_000,
+                    Optional.ofNullable(maxPartialAggregationMemorySize),
+                    joinCompiler,
+                    aggregation.getStep().isOutputPartial(),
+                    createPartialAggregationController(aggregation.getStep(), session),
+                    aggregation.hasDefaultOutput());
         }
 
         private OperatorFactory createLookupJoin(
@@ -3546,13 +3934,21 @@ public class LocalExecutionPlanner
                 PhysicalOperation source,
                 Aggregation aggregation)
         {
+            return buildAccumulatorFactory(source.getLayout(), source.getTypes(), aggregation);
+        }
+
+        protected AccumulatorFactory buildAccumulatorFactory(
+                Map<Symbol, Integer> layout,
+                List<Type> types,
+                Aggregation aggregation)
+        {
             InternalAggregationFunction internalAggregationFunction = metadata.getFunctionAndTypeManager().getAggregateFunctionImplementation(aggregation.getFunctionHandle());
 
             List<Integer> valueChannels = new ArrayList<>();
             for (RowExpression argument : aggregation.getArguments()) {
                 if (!(argument instanceof LambdaDefinitionExpression)) {
                     checkArgument(argument instanceof VariableReferenceExpression, "argument must be variable reference");
-                    valueChannels.add(source.getLayout().get(new Symbol(((VariableReferenceExpression) argument).getName())));
+                    valueChannels.add(layout.get(new Symbol(((VariableReferenceExpression) argument).getName())));
                 }
             }
 
@@ -3572,7 +3968,7 @@ public class LocalExecutionPlanner
                 }
             }
 
-            Optional<Integer> maskChannel = aggregation.getMask().map(value -> source.getLayout().get(value));
+            Optional<Integer> maskChannel = aggregation.getMask().map(value -> layout.get(value));
             List<SortOrder> sortOrders = ImmutableList.of();
             List<Symbol> sortKeys = ImmutableList.of();
             if (aggregation.getOrderingScheme().isPresent()) {
@@ -3586,8 +3982,8 @@ public class LocalExecutionPlanner
             return internalAggregationFunction.bind(
                     valueChannels,
                     maskChannel,
-                    source.getTypes(),
-                    getChannelsForSymbols(sortKeys, source.getLayout()),
+                    types,
+                    getChannelsForSymbols(sortKeys, layout),
                     sortOrders,
                     pagesIndexFactory,
                     aggregation.isDistinct(),
@@ -3805,10 +4201,35 @@ public class LocalExecutionPlanner
         }
 
         private Optional<Integer> getOutputMappingAndGroupIdChannel(Map<Symbol, Aggregation> aggregations,
+                List<Symbol> groupBySymbols,
+                Optional<Symbol> hashSymbol,
+                Optional<Symbol> groupIdSymbol,
+                PhysicalOperation source,
+                int startOutputChannel,
+                ImmutableMap.Builder<Symbol, Integer> outputMappings,
+                List<AccumulatorFactory> accumulatorFactories,
+                Optional<Step> step,
+                Optional<Symbol> finalizeSymbol)
+        {
+            return getOutputMappingAndGroupIdChannel(aggregations,
+                    groupBySymbols,
+                    hashSymbol,
+                    groupIdSymbol,
+                    source.getLayout(),
+                    source.getTypes(),
+                    startOutputChannel,
+                    outputMappings,
+                    accumulatorFactories,
+                    step,
+                    finalizeSymbol);
+        }
+
+        private Optional<Integer> getOutputMappingAndGroupIdChannel(Map<Symbol, Aggregation> aggregations,
                                                                      List<Symbol> groupBySymbols,
                                                                      Optional<Symbol> hashSymbol,
                                                                      Optional<Symbol> groupIdSymbol,
-                                                                     PhysicalOperation source,
+                                                                     Map<Symbol, Integer> layout,
+                                                                     List<Type> types,
                                                                      int startOutputChannel,
                                                                      ImmutableMap.Builder<Symbol, Integer> outputMappings,
                                                                      List<AccumulatorFactory> accumulatorFactories,
@@ -3819,7 +4240,7 @@ public class LocalExecutionPlanner
             for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
                 Symbol symbol = entry.getKey();
                 Aggregation aggregation = entry.getValue();
-                accumulatorFactories.add(buildAccumulatorFactory(source, aggregation));
+                accumulatorFactories.add(buildAccumulatorFactory(layout, types, aggregation));
                 aggregationOutputSymbols.add(symbol);
             }
 
@@ -3938,9 +4359,14 @@ public class LocalExecutionPlanner
 
     protected static Function<Symbol, Integer> channelGetter(PhysicalOperation source)
     {
+        return channelGetter(source.getLayout());
+    }
+
+    protected static Function<Symbol, Integer> channelGetter(Map<Symbol, Integer> layout)
+    {
         return input -> {
-            checkArgument(source.getLayout().containsKey(input));
-            return source.getLayout().get(input);
+            checkArgument(layout.containsKey(input));
+            return layout.get(input);
         };
     }
 
@@ -3987,7 +4413,18 @@ public class LocalExecutionPlanner
             this.pipelineExecutionStrategy = pipelineExecutionStrategy;
         }
 
-        private static List<Type> toTypes(Map<Symbol, Integer> layout, LocalExecutionPlanContext context)
+        public static List<Type> toTypes(List<Symbol> symbols, LocalExecutionPlanContext context)
+        {
+            ImmutableList.Builder<Type> types = ImmutableList.builder();
+            symbols.forEach(symbol -> {
+                Type type = context.getTypes().get(symbol);
+                checkArgument(type != null, "Layout does not have a symbol for every output channel: %s", symbol);
+                types.add(type);
+            });
+            return types.build();
+        }
+
+        public static List<Type> toTypes(Map<Symbol, Integer> layout, LocalExecutionPlanContext context)
         {
             // verify layout covers all values
             int channelCount = layout.values().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;

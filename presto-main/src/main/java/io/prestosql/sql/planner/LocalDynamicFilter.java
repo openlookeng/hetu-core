@@ -28,6 +28,7 @@ import io.prestosql.spi.dynamicfilter.BloomFilterDynamicFilter;
 import io.prestosql.spi.dynamicfilter.DynamicFilter;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.Symbol;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -118,6 +119,52 @@ public class LocalDynamicFilter
     }
 
     public static Optional<LocalDynamicFilter> create(JoinNode planNode, int partitionCount, Session session, TaskId taskId, StateStoreProvider stateStoreProvider)
+    {
+        Set<String> joinDynamicFilters = planNode.getDynamicFilters().keySet();
+        // Mapping from probe-side dynamic filters' IDs to their matching probe symbols.
+        Multimap<String, Symbol> localProbeSymbols = MultimapBuilder.treeKeys().arrayListValues().build();
+        PlanNode buildNode;
+        DynamicFilter.Type localType = DynamicFilter.Type.LOCAL;
+
+        List<FilterNode> filterNodes = findFilterNodeInStage(planNode);
+        if (filterNodes.isEmpty()) {
+            buildNode = planNode.getRight();
+            mapProbeSymbolsFromCriteria(planNode.getDynamicFilters(), localProbeSymbols, planNode.getCriteria());
+            localType = DynamicFilter.Type.GLOBAL;
+        }
+        else {
+            buildNode = planNode.getRight();
+            for (FilterNode filterNode : filterNodes) {
+                mapProbeSymbols(filterNode.getPredicate(), joinDynamicFilters, localProbeSymbols);
+            }
+        }
+
+        final List<Symbol> buildSideSymbols = buildNode.getOutputSymbols();
+
+        Map<String, Integer> localBuildChannels = planNode
+                .getDynamicFilters()
+                .entrySet()
+                .stream()
+                // Skip build channels that don't match local probe dynamic filters.
+                .filter(entry -> localProbeSymbols.containsKey(entry.getKey()))
+                .collect(toMap(
+                        // Dynamic filter ID
+                        entry -> entry.getKey(),
+                        // Build-side channel index
+                        entry -> {
+                            Symbol buildSymbol = entry.getValue();
+                            int buildChannelIndex = buildSideSymbols.indexOf(buildSymbol);
+                            verify(buildChannelIndex >= 0);
+                            return buildChannelIndex;
+                        }));
+
+        if (localBuildChannels.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new LocalDynamicFilter(localProbeSymbols, localBuildChannels, partitionCount, localType, session, taskId, stateStoreProvider));
+    }
+
+    public static Optional<LocalDynamicFilter> create(JoinOnAggregationNode planNode, int partitionCount, Session session, TaskId taskId, StateStoreProvider stateStoreProvider)
     {
         Set<String> joinDynamicFilters = planNode.getDynamicFilters().keySet();
         // Mapping from probe-side dynamic filters' IDs to their matching probe symbols.

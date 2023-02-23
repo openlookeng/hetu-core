@@ -18,6 +18,7 @@ import io.prestosql.spi.dynamicfilter.DynamicFilter.DataType;
 import io.prestosql.spi.dynamicfilter.DynamicFilter.Type;
 import io.prestosql.spi.plan.FilterNode;
 import io.prestosql.spi.plan.JoinNode;
+import io.prestosql.spi.plan.JoinOnAggregationNode;
 import io.prestosql.spi.plan.PlanNode;
 import io.prestosql.spi.plan.TableScanNode;
 import io.prestosql.sql.analyzer.FeaturesConfig.DynamicFilterDataType;
@@ -64,6 +65,15 @@ public class DynamicFilterUtils
      * @return FilterNodes within the same stage and is above a TableScanNode
      */
     public static List<FilterNode> findFilterNodeInStage(JoinNode node)
+    {
+        List<FilterNode> filterNodes = PlanNodeSearcher
+                .searchFrom(node.getLeft())
+                .where(DynamicFilterUtils::isFilterAboveTableScan)
+                .findAll();
+        return filterNodes;
+    }
+
+    public static List<FilterNode> findFilterNodeInStage(JoinOnAggregationNode node)
     {
         List<FilterNode> filterNodes = PlanNodeSearcher
                 .searchFrom(node.getLeft())

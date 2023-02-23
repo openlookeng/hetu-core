@@ -225,4 +225,33 @@ public class GroupJoinAggregator
     {
         return accumulatorFactories.stream().anyMatch(AccumulatorFactory::hasDistinct);
     }
+
+    public static GroupJoinAggregator buildGroupJoinAggregator(List<Type> groupByTypes,
+            List<Integer> groupByChannels,
+            List<Integer> globalAggregationGroupIds,
+            AggregationNode.Step step,
+            List<AccumulatorFactory> accumulatorFactories,
+            Optional<Integer> hashChannel,
+            Optional<Integer> groupIdChannel,
+            int expectedGroups,
+            Optional<DataSize> maxPartialMemory,
+            JoinCompiler joinCompiler,
+            boolean useSystemMemory,
+            Optional<PartialAggregationController> partialAggregationController,
+            boolean produceDefaultOutput)
+    {
+        return new GroupJoinAggregator(hashChannel,
+                groupIdChannel,
+                accumulatorFactories,
+                groupByTypes,
+                groupByChannels,
+                globalAggregationGroupIds,
+                step,
+                expectedGroups,
+                maxPartialMemory,
+                joinCompiler,
+                useSystemMemory,
+                partialAggregationController,
+                produceDefaultOutput);
+    }
 }
