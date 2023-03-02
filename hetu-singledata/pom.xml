@@ -14,7 +14,7 @@
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-        <dep.shardingsphere.version>5.3.0</dep.shardingsphere.version>
+        <dep.shardingsphere.version>5.3.1</dep.shardingsphere.version>
         <dep.curator.version>5.1.0</dep.curator.version>
         <dep.zookeeper.verison>3.6.3</dep.zookeeper.verison>
         <dep.calcite.version>1.27.0</dep.calcite.version>
@@ -664,7 +664,7 @@
 
         <dependency>
             <groupId>org.apache.shardingsphere</groupId>
-            <artifactId>shardingsphere-single-table-core</artifactId>
+            <artifactId>shardingsphere-single-core</artifactId>
             <version>${dep.shardingsphere.version}</version>
             <exclusions>
                 <exclusion>

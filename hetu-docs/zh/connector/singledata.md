@@ -54,7 +54,7 @@ shardingsphere.server-list=localhost:2181
 
 **说明**
 
-- 目前singleData连接器只支持5.3.0版本的ShardingSphere,其他版本暂时不支持
+- 目前singleData连接器只支持5.3.1版本的ShardingSphere,其他版本暂时不支持
 
 ## TidRange模式
 

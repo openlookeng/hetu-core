@@ -44,7 +44,7 @@ import org.apache.shardingsphere.parser.rule.SQLParserRule;
 import org.apache.shardingsphere.readwritesplitting.rule.ReadwriteSplittingDataSourceRule;
 import org.apache.shardingsphere.readwritesplitting.rule.ReadwriteSplittingRule;
 import org.apache.shardingsphere.sharding.rule.ShardingRule;
-import org.apache.shardingsphere.singletable.rule.SingleTableRule;
+import org.apache.shardingsphere.single.rule.SingleRule;
 import org.apache.shardingsphere.transaction.api.TransactionType;
 import org.apache.shardingsphere.transaction.core.TransactionTypeHolder;
 
@@ -164,7 +164,7 @@ public class ShardingSphereAdaptor
 
             ShardingSphereRuleMetaData ruleMetaData = getShardingSphereDatabase(connection).getRuleMetaData();
             Optional<ShardingRule> shardingRule = ruleMetaData.findSingleRule(ShardingRule.class);
-            Optional<SingleTableRule> singleTableRule = ruleMetaData.findSingleRule(SingleTableRule.class);
+            Optional<SingleRule> singleTableRule = ruleMetaData.findSingleRule(SingleRule.class);
             Optional<ReadwriteSplittingRule> splitRule = ruleMetaData.findSingleRule(ReadwriteSplittingRule.class);
 
             if (shardingRule.isPresent() && (shardingRule.get().findTableRule(logicalTableName).isPresent()
@@ -239,7 +239,7 @@ public class ShardingSphereAdaptor
                 ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
             ShardingSphereRuleMetaData ruleMetaData = getShardingSphereDatabase(connection).getRuleMetaData();
             Optional<ShardingRule> shardingRule = ruleMetaData.findSingleRule(ShardingRule.class);
-            Optional<SingleTableRule> singleTableRule = ruleMetaData.findSingleRule(SingleTableRule.class);
+            Optional<SingleRule> singleTableRule = ruleMetaData.findSingleRule(SingleRule.class);
 
             Collection<String> tableNames = ImmutableList.of(leftTable.getTableName(), rightTable.getTableName());
 

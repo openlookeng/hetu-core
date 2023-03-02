@@ -55,7 +55,7 @@ shardingsphere.server-list=localhost:2181
 
 ****Note:****
 
-- SingleData connector only supports ShardingSphere 5.3.0 now
+- SingleData connector only supports ShardingSphere 5.3.1 now
 
 ## TidRange Mode
 
