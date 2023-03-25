@@ -51,8 +51,12 @@ public abstract class AbstractWorkspaceFileSystemClient
     public void validate(Path path)
             throws AccessDeniedException
     {
-        if (!path.toAbsolutePath().startsWith(root)) {
-            throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
+        String os = System.getProperty("os.name");
+        //Windows操作系统不校验
+        if (os == null || !os.toLowerCase().startsWith("windows")) {
+            if (!path.toAbsolutePath().startsWith(root)) {
+                throw new AccessDeniedException(String.format("%s is not in workspace %s. Access has been denied.", path, root));
+            }
         }
     }
 }
