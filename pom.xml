@@ -59,7 +59,7 @@
         <dep.prestosql.version>316</dep.prestosql.version>
         <dep.jackson.version>2.14.0</dep.jackson.version>
         <dep.hetu.version>${project.version}</dep.hetu.version>
-        <dep.jetty.version>9.4.48.v20220622</dep.jetty.version>
+        <dep.jetty.version>10.0.14</dep.jetty.version>
         <dep.bcprov.version>1.66</dep.bcprov.version>
         <dep.hudi.version>0.7.0</dep.hudi.version>
         <dep.kryo.version>5.0.3</dep.kryo.version>
