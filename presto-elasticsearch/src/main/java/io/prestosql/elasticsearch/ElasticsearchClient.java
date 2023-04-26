@@ -41,6 +41,7 @@ import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.reactor.IOReactorConfig;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.util.EntityUtils;
 import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.action.search.ClearScrollRequest;
@@ -71,8 +72,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.GeneralSecurityException;
-import java.security.KeyStore;
+import java.security.*;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -229,7 +229,15 @@ public class ElasticsearchClient
             Optional<String> trustStorePassword)
     {
         if (!keyStorePath.isPresent() && !trustStorePath.isPresent()) {
-            return Optional.empty();
+            try {
+                return Optional.of(new SSLContextBuilder().loadTrustMaterial(null, (arg0, arg1) -> true).build());
+            } catch (NoSuchAlgorithmException e) {
+                LOG.error(e, "Error buildSslContext");
+            } catch (KeyStoreException e) {
+                LOG.error(e, "Error buildSslContext");
+            } catch (KeyManagementException e) {
+                LOG.error(e, "Error buildSslContext");
+            }
         }
 
         try {
