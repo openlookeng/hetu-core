@@ -1,0 +1,350 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.prestosql.operator;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.primitives.Ints;
+import io.prestosql.memory.context.LocalMemoryContext;
+import io.prestosql.snapshot.SingleInputSnapshotState;
+import io.prestosql.spi.Page;
+import io.prestosql.spi.block.Block;
+import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.snapshot.BlockEncodingSerdeProvider;
+import io.prestosql.spi.snapshot.RestorableConfig;
+import io.prestosql.spi.type.Type;
+import io.prestosql.sql.gen.JoinCompiler;
+
+import java.io.Serializable;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.prestosql.SystemSessionProperties.isDictionaryAggregationEnabled;
+import static io.prestosql.operator.GroupByHash.createGroupByHash;
+import static java.util.Objects.requireNonNull;
+
+// When a marker is received (needsInput returns true), inputPage and unfinishedWork must be null
+@RestorableConfig(uncapturedFields = {"inputPage", "outputChannels", "unfinishedWork", "snapshotState"})
+public class BatchDistinctLimitOperator
+        implements Operator
+{
+    public static class BatchDistinctLimitOperatorFactory
+            implements OperatorFactory
+    {
+        private final int operatorId;
+        private final PlanNodeId planNodeId;
+        private final List<Integer> distinctChannels;
+        private final List<Type> sourceTypes;
+        private final AtomicLong limit;
+        private final Optional<Integer> hashChannel;
+        private boolean closed;
+        private final JoinCompiler joinCompiler;
+
+        public BatchDistinctLimitOperatorFactory(
+                int operatorId,
+                PlanNodeId planNodeId,
+                List<? extends Type> sourceTypes,
+                List<Integer> distinctChannels,
+                AtomicLong limit,
+                Optional<Integer> hashChannel,
+                JoinCompiler joinCompiler)
+        {
+            this.operatorId = operatorId;
+            this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
+            this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
+            this.distinctChannels = requireNonNull(distinctChannels, "distinctChannels is null");
+
+            checkArgument(limit.get() >= 0, "limit must be at least zero");
+            this.limit = limit;
+            this.hashChannel = requireNonNull(hashChannel, "hashChannel is null");
+            this.joinCompiler = requireNonNull(joinCompiler, "joinCompiler is null");
+        }
+
+        @Override
+        public Operator createOperator(DriverContext driverContext)
+        {
+            checkState(!closed, "Factory is already closed");
+            OperatorContext addOperatorContext = driverContext.addOperatorContext(operatorId, planNodeId, BatchDistinctLimitOperator.class.getSimpleName());
+            List<Type> distinctTypes = distinctChannels.stream()
+                    .map(sourceTypes::get)
+                    .collect(toImmutableList());
+            return new BatchDistinctLimitOperator(addOperatorContext, distinctChannels, distinctTypes, limit, hashChannel, joinCompiler);
+        }
+
+        @Override
+        public void noMoreOperators()
+        {
+            closed = true;
+        }
+
+        @Override
+        public OperatorFactory duplicate()
+        {
+            return new BatchDistinctLimitOperatorFactory(operatorId, planNodeId, sourceTypes, distinctChannels, limit, hashChannel, joinCompiler);
+        }
+    }
+
+    private final OperatorContext operatorContext;
+    private final LocalMemoryContext localUserMemoryContext;
+
+    private Page inputPage;
+    private AtomicLong remainingLimit;
+
+    private boolean finishing;
+
+    private final List<Integer> outputChannels;
+    private final GroupByHash groupByHash;
+    private long nextDistinctId;
+
+    // for yield when memory is not available
+    private GroupByIdBlock groupByIds;
+    private Work<GroupByIdBlock> unfinishedWork;
+
+    private final SingleInputSnapshotState snapshotState;
+
+    public BatchDistinctLimitOperator(OperatorContext operatorContext, List<Integer> distinctChannels, List<Type> distinctTypes, AtomicLong limit, Optional<Integer> hashChannel, JoinCompiler joinCompiler)
+    {
+        this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
+        this.localUserMemoryContext = operatorContext.localUserMemoryContext();
+        requireNonNull(distinctChannels, "distinctChannels is null");
+        requireNonNull(hashChannel, "hashChannel is null");
+
+        outputChannels = ImmutableList.<Integer>builder()
+                .addAll(distinctChannels)
+                .addAll(hashChannel.map(ImmutableList::of).orElse(ImmutableList.of()))
+                .build();
+
+        this.groupByHash = createGroupByHash(
+                distinctTypes,
+                Ints.toArray(distinctChannels),
+                hashChannel,
+                Math.max(Math.min((int) limit.get(), 10_000), 1),
+                isDictionaryAggregationEnabled(operatorContext.getSession()),
+                joinCompiler,
+                this::updateMemoryReservation);
+        remainingLimit = limit;
+
+        this.snapshotState = operatorContext.isSnapshotEnabled() ? SingleInputSnapshotState.forOperator(this, operatorContext) : null;
+    }
+
+    @Override
+    public OperatorContext getOperatorContext()
+    {
+        return operatorContext;
+    }
+
+    @Override
+    public void finish()
+    {
+        finishing = true;
+    }
+
+    @Override
+    public boolean isFinished()
+    {
+        if (snapshotState != null && snapshotState.hasMarker()) {
+            // Snapshot: there are pending markers. Need to send them out before finishing this operator.
+            return false;
+        }
+
+        return (finishing || remainingLimit.get() <= 0);
+    }
+
+    @Override
+    public boolean needsInput()
+    {
+        return !finishing && remainingLimit.get() > 0 && !hasUnfinishedInput();
+    }
+
+    @Override
+    public void addInput(Page page)
+    {
+        if (!needsInput()) {
+            inputPage = null;
+            unfinishedWork = null;
+            return;
+        }
+
+        if (snapshotState != null) {
+            if (snapshotState.processPage(page)) {
+                return;
+            }
+        }
+
+        inputPage = page;
+        unfinishedWork = groupByHash.getGroupIds(page);
+        processUnfinishedWork();
+        updateMemoryReservation();
+    }
+
+    @Override
+    public Page getOutput()
+    {
+        if (snapshotState != null) {
+            Page marker = snapshotState.nextMarker();
+            if (marker != null) {
+                return marker;
+            }
+        }
+
+        if (unfinishedWork != null && !processUnfinishedWork()) {
+            return null;
+        }
+
+        if (groupByIds == null) {
+            return null;
+        }
+
+        long limit = remainingLimit.get();
+        if (limit <= 0) {
+            return null;
+        }
+
+        verify(inputPage != null);
+        int distinctCount = 0;
+        int[] distinctPositions = new int[inputPage.getPositionCount()];
+        for (int position = 0; position < groupByIds.getPositionCount(); position++) {
+            if (groupByIds.getGroupId(position) == nextDistinctId) {
+                distinctPositions[distinctCount] = position;
+                distinctCount++;
+
+                limit--;
+                nextDistinctId++;
+                if (limit == 0) {
+                    break;
+                }
+            }
+        }
+        remainingLimit.addAndGet(-distinctCount);
+        Page result = maskToDistinctOutputPositions(distinctCount, distinctPositions);
+
+        groupByIds = null;
+        inputPage = null;
+
+        updateMemoryReservation();
+        return result;
+    }
+
+    @Override
+    public Page pollMarker()
+    {
+        return snapshotState.nextMarker();
+    }
+
+    private Page maskToDistinctOutputPositions(int distinctCount, int[] distinctPositions)
+    {
+        Page result = null;
+        if (distinctCount > 0) {
+            Block[] blocks = outputChannels.stream()
+                    .map(inputPage::getBlock)
+                    .map(block -> block.getPositions(distinctPositions, 0, distinctCount))
+                    .toArray(Block[]::new);
+            result = new Page(distinctCount, blocks);
+        }
+        return result;
+    }
+
+    private boolean processUnfinishedWork()
+    {
+        verify(unfinishedWork != null);
+        if (!unfinishedWork.process()) {
+            return false;
+        }
+        groupByIds = unfinishedWork.getResult();
+        unfinishedWork = null;
+        return true;
+    }
+
+    private boolean hasUnfinishedInput()
+    {
+        return inputPage != null || unfinishedWork != null;
+    }
+
+    /**
+     * Update memory usage.
+     *
+     * @return true if the reservation is within the limit
+     */
+    // TODO: update in the interface now that the new memory tracking framework is landed
+    // Essentially we would love to have clean interfaces to support both pushing and pulling memory usage
+    // The following implementation is a hybrid model, where the push model is going to call the pull model causing reentrancy
+    private boolean updateMemoryReservation()
+    {
+        // Operator/driver will be blocked on memory after we call localUserMemoryContext.setBytes().
+        // If memory is not available, once we return, this operator will be blocked until memory is available.
+        localUserMemoryContext.setBytes(groupByHash.getEstimatedSize());
+        // If memory is not available, inform the caller that we cannot proceed for allocation.
+        return operatorContext.isWaitingForMemory().isDone();
+    }
+
+    @VisibleForTesting
+    public int getCapacity()
+    {
+        return groupByHash.getCapacity();
+    }
+
+    @Override
+    public void close()
+    {
+        if (snapshotState != null) {
+            snapshotState.close();
+        }
+    }
+
+    @Override
+    public Object capture(BlockEncodingSerdeProvider serdeProvider)
+    {
+        DistinctLimitOperatorState myState = new DistinctLimitOperatorState();
+        myState.operatorContext = operatorContext.capture(serdeProvider);
+        myState.localUserMemoryContext = localUserMemoryContext.getBytes();
+        myState.remainingLimit = remainingLimit;
+        myState.finishing = finishing;
+        myState.groupByHash = groupByHash.capture(serdeProvider);
+        myState.nextDistinctId = nextDistinctId;
+        if (groupByIds != null) {
+            myState.groupByIds = groupByIds.capture(serdeProvider);
+        }
+        return myState;
+    }
+
+    @Override
+    public void restore(Object state, BlockEncodingSerdeProvider serdeProvider)
+    {
+        DistinctLimitOperatorState myState = (DistinctLimitOperatorState) state;
+        this.operatorContext.restore(myState.operatorContext, serdeProvider);
+        this.localUserMemoryContext.setBytes(myState.localUserMemoryContext);
+        this.remainingLimit.set(myState.remainingLimit.get());
+        this.finishing = myState.finishing;
+        this.groupByHash.restore(myState.groupByHash, serdeProvider);
+        this.nextDistinctId = myState.nextDistinctId;
+        this.groupByIds = myState.groupByIds == null ? null : GroupByIdBlock.restoreGroupedIdBlock(myState.groupByIds, serdeProvider.getBlockEncodingSerde());
+    }
+
+    private static class DistinctLimitOperatorState
+            implements Serializable
+    {
+        private Object operatorContext;
+        private long localUserMemoryContext;
+        private AtomicLong remainingLimit;
+        private boolean finishing;
+        private Object groupByHash;
+        private long nextDistinctId;
+        private Object groupByIds;
+    }
+}

@@ -36,6 +36,7 @@ import io.prestosql.cache.elements.CachedDataStorage;
 import io.prestosql.cube.CubeManager;
 import io.prestosql.dynamicfilter.DynamicFilterCacheManager;
 import io.prestosql.exchange.ExchangeManagerRegistry;
+import io.prestosql.exchange.RetryPolicy;
 import io.prestosql.execution.ExplainAnalyzeContext;
 import io.prestosql.execution.StageId;
 import io.prestosql.execution.TableExecuteContextManager;
@@ -49,6 +50,8 @@ import io.prestosql.index.IndexManager;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.operator.AggregationOperator.AggregationOperatorFactory;
 import io.prestosql.operator.AssignUniqueIdOperator;
+import io.prestosql.operator.BatchDistinctLimitOperator;
+import io.prestosql.operator.BatchLimitOperator;
 import io.prestosql.operator.BloomFilterUtils;
 import io.prestosql.operator.CacheTableFinishOperator;
 import io.prestosql.operator.CacheTableWriterOperator;
@@ -283,6 +286,7 @@ import static io.prestosql.SystemSessionProperties.getDynamicFilteringMaxPerDriv
 import static io.prestosql.SystemSessionProperties.getDynamicFilteringWaitTime;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageRowCount;
 import static io.prestosql.SystemSessionProperties.getFilterAndProjectMinOutputPageSize;
+import static io.prestosql.SystemSessionProperties.getRetryPolicy;
 import static io.prestosql.SystemSessionProperties.getSpillOperatorThresholdReuseExchange;
 import static io.prestosql.SystemSessionProperties.getTaskConcurrency;
 import static io.prestosql.SystemSessionProperties.getTaskWriterCount;
@@ -1465,8 +1469,16 @@ public class LocalExecutionPlanner
         public PhysicalOperation visitLimit(LimitNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation source = node.getSource().accept(this, context);
+            OperatorFactory operatorFactory = null;
 
-            OperatorFactory operatorFactory = new LimitOperatorFactory(context.getNextOperatorId(), node.getId(), node.getCount());
+            if (getRetryPolicy(context.getSession()) == RetryPolicy.TASK) {
+                log.info("Batch Process -> Use Batch BatchLimitOperatorFactory");
+                operatorFactory = new BatchLimitOperator.BatchLimitOperatorFactory(context.getNextOperatorId(), node.getId(), node.getAtomicCount());
+            }
+            else {
+                operatorFactory = new LimitOperatorFactory(context.getNextOperatorId(), node.getId(), node.getCount());
+            }
+
             return new PhysicalOperation(operatorFactory, source.getLayout(), context, source);
         }
 
@@ -1477,15 +1489,29 @@ public class LocalExecutionPlanner
 
             Optional<Integer> hashChannel = node.getHashSymbol().map(channelGetter(source));
             List<Integer> distinctChannels = getChannelsForSymbols(node.getDistinctSymbols(), source.getLayout());
+            OperatorFactory operatorFactory = null;
+            if (getRetryPolicy(context.getSession()) == RetryPolicy.TASK) {
+                log.info("Batch Process -> Use Batch BatchDistinctLimitOperatorFactory");
+                operatorFactory = new BatchDistinctLimitOperator.BatchDistinctLimitOperatorFactory(
+                        context.getNextOperatorId(),
+                        node.getId(),
+                        source.getTypes(),
+                        distinctChannels,
+                        node.getAtomicLimit(),
+                        hashChannel,
+                        joinCompiler);
+            }
+            else {
+                operatorFactory = new DistinctLimitOperatorFactory(
+                        context.getNextOperatorId(),
+                        node.getId(),
+                        source.getTypes(),
+                        distinctChannels,
+                        node.getLimit(),
+                        hashChannel,
+                        joinCompiler);
+            }
 
-            OperatorFactory operatorFactory = new DistinctLimitOperatorFactory(
-                    context.getNextOperatorId(),
-                    node.getId(),
-                    source.getTypes(),
-                    distinctChannels,
-                    node.getLimit(),
-                    hashChannel,
-                    joinCompiler);
             return new PhysicalOperation(operatorFactory, makeLayout(node), context, source);
         }
 

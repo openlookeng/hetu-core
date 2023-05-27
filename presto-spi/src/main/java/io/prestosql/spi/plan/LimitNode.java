@@ -22,6 +22,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -34,6 +35,7 @@ public class LimitNode
     private final long count;
     private final Optional<OrderingScheme> tiesResolvingScheme;
     private final boolean partial;
+    private AtomicLong atomicCount;
 
     public LimitNode(PlanNodeId id, PlanNode source, long count, boolean partial)
     {
@@ -57,6 +59,7 @@ public class LimitNode
 
         this.source = source;
         this.count = count;
+        this.atomicCount = new AtomicLong(count);
         this.tiesResolvingScheme = tiesResolvingScheme;
     }
 
@@ -111,5 +114,10 @@ public class LimitNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         return new LimitNode(getId(), Iterables.getOnlyElement(newChildren), count, tiesResolvingScheme, isPartial());
+    }
+
+    public AtomicLong getAtomicCount()
+    {
+        return atomicCount;
     }
 }

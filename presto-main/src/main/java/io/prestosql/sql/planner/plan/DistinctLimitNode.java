@@ -25,6 +25,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
@@ -38,6 +39,7 @@ public class DistinctLimitNode
     private final boolean partial;
     private final List<Symbol> distinctSymbols;
     private final Optional<Symbol> hashSymbol;
+    private AtomicLong atomicLimit;
 
     @JsonCreator
     public DistinctLimitNode(
@@ -52,6 +54,7 @@ public class DistinctLimitNode
         this.source = requireNonNull(source, "source is null");
         checkArgument(limit >= 0, "limit must be greater than or equal to zero");
         this.limit = limit;
+        this.atomicLimit = new AtomicLong(limit);
         this.partial = partial;
         this.distinctSymbols = ImmutableList.copyOf(distinctSymbols);
         this.hashSymbol = requireNonNull(hashSymbol, "hashSymbol is null");
@@ -113,5 +116,10 @@ public class DistinctLimitNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         return new DistinctLimitNode(getId(), Iterables.getOnlyElement(newChildren), limit, partial, distinctSymbols, hashSymbol);
+    }
+
+    public AtomicLong getAtomicLimit()
+    {
+        return atomicLimit;
     }
 }
