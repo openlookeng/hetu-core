@@ -68,9 +68,29 @@ public class QueryHistoryService
     private HetuMetastore validateMetaStore()
     {
         if (hetuMetaStoreManager.getHetuMetastore() == null) {
+            this.reviseHetuMetastore();
             return MockhetuMetaStore.getInstance();
         }
         return hetuMetaStoreManager.getHetuMetastore();
+    }
+
+    /**
+     * reviseHetuMetastore
+     */
+    private void reviseHetuMetastore()
+    {
+        new Thread(() -> {
+            while (hetuMetaStoreManager.getHetuMetastore() == null) {
+                try {
+                    TimeUnit.SECONDS.sleep(1);
+                }
+                catch (InterruptedException e) {
+                    log.error(e, "Error reviseHetuMetastore");
+                }
+            }
+
+            this.hetuMetastore = validateMetaStore();
+        }).start();
     }
 
     public void insert(QueryInfo queryInfo)
