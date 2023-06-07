@@ -62,6 +62,10 @@ class RunActions {
     RunApiUtils.kill(uuid);
   }
 
+  killAll() {
+    RunApiUtils.killAll();
+  }
+
   handleConnectionMessage(data) {
     this.dispatch(data.job);
   }

@@ -56,6 +56,7 @@ import io.prestosql.queryeditorui.store.jobs.jobs.ActiveJobsStore;
 import io.prestosql.queryeditorui.store.jobs.jobs.InMemoryActiveJobsStore;
 import io.prestosql.queryeditorui.store.queries.InMemoryQueryStore;
 import io.prestosql.queryeditorui.store.queries.QueryStore;
+import io.prestosql.server.FileUserAuthenticatorResource;
 import io.prestosql.server.InternalAuthenticationManager;
 import io.prestosql.server.InternalCommunicationConfig;
 import io.prestosql.server.security.WebUIAuthenticator;
@@ -103,6 +104,7 @@ public class QueryEditorUIModule
         jaxrsBinder(binder).bind(LoginResource.class);
         jaxrsBinder(binder).bind(UserResource.class);
         jaxrsBinder(binder).bind(AuditLogResource.class);
+        jaxrsBinder(binder).bind(FileUserAuthenticatorResource.class);
         binder.bind(SchemaService.class).in(Scopes.SINGLETON);
         binder.bind(ColumnService.class).in(Scopes.SINGLETON);
         binder.bind(PreviewTableService.class).in(Scopes.SINGLETON);

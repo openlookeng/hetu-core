@@ -16,6 +16,7 @@ package io.prestosql.queryeditorui.resources;
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 import com.google.inject.Inject;
+import io.prestosql.execution.QueryManager;
 import io.prestosql.queryeditorui.protocol.Job;
 import io.prestosql.queryeditorui.protocol.Table;
 import io.prestosql.queryeditorui.protocol.queries.CreateSavedQueryBuilder;
@@ -28,6 +29,8 @@ import io.prestosql.security.AccessControl;
 import io.prestosql.security.AccessControlUtil;
 import io.prestosql.server.HttpRequestSessionContext;
 import io.prestosql.server.ServerConfig;
+import io.prestosql.server.security.SecurityRequireNonNull;
+import io.prestosql.spi.QueryId;
 import io.prestosql.spi.security.GroupProvider;
 import org.joda.time.DateTime;
 
@@ -60,13 +63,15 @@ public class QueryResource
     private final AccessControl accessControl;
     private final ServerConfig serverConfig;
     private final GroupProvider groupProvider;
+    private final QueryManager queryManager;
+    String[] arr;
 
     @Inject
     public QueryResource(JobHistoryStore jobHistoryStore,
-                QueryStore queryStore,
-                ActiveJobsStore activeJobsStore,
-                AccessControl accessControl,
-                ServerConfig serverConfig, GroupProvider groupProvider)
+                         QueryStore queryStore,
+                         ActiveJobsStore activeJobsStore,
+                         AccessControl accessControl,
+                         ServerConfig serverConfig, GroupProvider groupProvider, QueryManager queryManager)
     {
         this.jobHistoryStore = jobHistoryStore;
         this.queryStore = queryStore;
@@ -74,6 +79,7 @@ public class QueryResource
         this.accessControl = accessControl;
         this.serverConfig = serverConfig;
         this.groupProvider = requireNonNull(groupProvider, "groupProvider is null");
+        this.queryManager = queryManager;
     }
 
     public static final Function<Job, DateTime> JOB_ORDERING = (input) ->
@@ -111,6 +117,47 @@ public class QueryResource
                 .nullsLast()
                 .onResultOf(JOB_ORDERING)
                 .immutableSortedCopy(recentlyRun);
+        return Response.ok(sortedResult).build();
+    }
+
+    @GET
+    @Path("killAll")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getkillAll(
+            @QueryParam("table") List<Table> tables,
+            @Context HttpServletRequest servletRequest)
+    {
+        // if the user is admin, don't filter results by user.
+        Optional<String> filterUser = AccessControlUtil.getUserForFilter(accessControl, serverConfig, servletRequest, groupProvider);
+
+        Set<Job> recentlyRun;
+        if (tables.size() < 1) {
+            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(filterUser, 200));
+            Set<Job> activeJobs = activeJobsStore.getJobsForUser(filterUser);
+            recentlyRun.addAll(activeJobs);
+        }
+        else {
+            Table[] tablesArray = tables.toArray(new Table[tables.size()]);
+            Table[] restTables = Arrays.copyOfRange(tablesArray, 1, tablesArray.length);
+            recentlyRun = new HashSet<>(jobHistoryStore.getRecentlyRunForUser(filterUser, 200, tablesArray[0], restTables));
+        }
+
+        List<Job> sortedResult = Ordering
+                .natural()
+                .nullsLast()
+                .onResultOf(JOB_ORDERING)
+                .immutableSortedCopy(recentlyRun);
+
+        sortedResult.forEach(x -> {
+            String state = String.valueOf(x.getState());
+            String infoUri = String.valueOf(x.getInfoUri());
+            arr = infoUri.split("\\?");
+            String queryId = arr[1];
+            if (state.equals("RUNNING") || state.equals("QUEUE")) {
+                SecurityRequireNonNull.requireNonNull(queryId, "queryId is null");
+                queryManager.cancelQuery(QueryId.valueOf(queryId));
+            }
+        });
         return Response.ok(sortedResult).build();
     }
 

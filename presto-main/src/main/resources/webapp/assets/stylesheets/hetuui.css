@@ -137,6 +137,13 @@ body {
     padding-right:20px;
 }
 
+.killBtn {
+    height: 30px;
+    margin-top: 5px;
+    padding-left:20px;
+    padding-right:20px;
+}
+
 .header h4,
 .header .menu {
     font-weight: 900;

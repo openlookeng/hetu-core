@@ -37,5 +37,11 @@ export default {
     return xhr(`../api/queries/${uuid}`, {
       method: 'delete'
     });
+  },
+
+  killAll() {
+    return xhr('../api/query/killAll', {
+      method: 'get'
+    });
   }
 };

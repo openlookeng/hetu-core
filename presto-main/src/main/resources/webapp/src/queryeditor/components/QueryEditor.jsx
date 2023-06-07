@@ -30,7 +30,18 @@ import SchemaStore from "../stores/SchemaStore";
 import {Form} from "react-bootstrap";
 import SchemaActions, { dataType } from "../actions/SchemaActions";
 import CollectionAction from "../actions/CollectionActions";
+import UserStore from "../stores/UserStore";
+import UserActions from "../actions/UserActions";
+import xhr from '../utils/xhr';
 
+function getStateFromStore() {
+  return {
+    user: UserStore.getCurrentUser()
+  };
+}
+function killAllRun() {
+  RunActions.killAll();
+}
 class QueryEditor
     extends React.Component {
   constructor(props) {
@@ -45,6 +56,8 @@ class QueryEditor
         catalog: "system",
         schema: "runtime"
       },
+      user: UserStore.getCurrentUser(),
+      adminUsers:[],
       buttonState:false
     };
     this.stateType= {
@@ -79,18 +92,26 @@ class QueryEditor
     this.errorCollapseToggle = this.errorCollapseToggle.bind(this);
     this.getBriefErrorMessage = this.getBriefErrorMessage.bind(this);
     this.onload = this.onload.bind(this);
+    this._onChange = this._onChange.bind(this);
   }
 
   componentDidMount() {
     QueryStore.listen(this._selectQuery);
     CnxnMonitorStore.listen(this.errorHandler);
     SchemaStore.listen(this.schemaContextHandler);
+    UserStore.listen(this._onChange);
+    UserActions.fetchCurrentUser();
   }
 
   componentWillUnmount() {
     QueryStore.unlisten(this._selectQuery);
     CnxnMonitorStore.unlisten(this.errorHandler);
     SchemaStore.unlisten(this.schemaContextHandler);
+    UserStore.unlisten(this._onChange);
+  }
+
+  _onChange() {
+    this.setState(getStateFromStore());
   }
 
   closeErrorDialog() {
@@ -103,6 +124,20 @@ class QueryEditor
       errorDialog: false
     })
     this.setState(state)
+  }
+
+  componentWillMount() {
+    var result = xhr("../authenticator/api/getAdminUsers")
+    result.then((data) => {
+      this.setState({
+        adminUsers: data
+      }, () => {
+        console.log(this.state.adminUsers)
+      })
+      console.log(data)
+    }, (reject) => {
+      // console.log('not admin user')
+    })
   }
 
   errorCollapseToggle() {
@@ -215,38 +250,94 @@ class QueryEditor
     let catalogs = this.state.model;
     let currentCatalogModel = _.find(catalogs, {name: currentCatalog})
     let schemas = (_.isUndefined(currentCatalogModel)) ? [] : currentCatalogModel.children;
+    let view
+    let users = this.state.adminUsers
+    console.log(users);
+    let loginUser = this.state.user.name
+    let isAdminLogin = false;
+    for (var i=0;i<users.length;i++) {
+      if(users[i] === loginUser) {
+        isAdminLogin = true;
+      }
+    }
+    console.log(isAdminLogin);
+    if (isAdminLogin) {
+      view = (
+          <div style={{display:"flex"}}>
+            <button className="btn btn-success btn-sm runBtn active"
+                    style={{marginRight:"35px", marginLeft:"35px"}}
+                    disabled={this.state.buttonState}
+                    onClick={this.handleRun}
+                    title={"Submit query"}>Run
+            </button>
+            <button className="btn btn-success btn-sm killBtn active"
+                    style={{marginRight:"35px", marginLeft:"35px"}}
+                    disabled={this.state.buttonState}
+                    onClick={killAllRun.bind(null)}
+                    title={"Kill all query"}>Kill
+            </button>
+            <Form.Label style={{marginTop:"10px", maxHeight:"30px", textAlign:"end"}}>Catalog:</Form.Label>
+            <Form.Control as="select" name="catalog" value={currentCatalog} onChange={this.handleContextChange.bind(this)}
+                          style={{fontsize:"15px", margin: "5px", width:"100px"}}>
+              {
+                catalogs.map((key) => {
+                  if (key.children.length == 0) {
+                    //Dont include catalogs without schemas
+                    return null
+                  }
+                  return <option key={key.name} value={key.name}>{key.name}</option>
+                })
+              }
+            </Form.Control>
+            <Form.Label style={{position: "relative", top: "10px", maxHeight:"30px", textAlign:"end"}}>Schema:</Form.Label>
+            <Form.Control as="select" name="schema" value={currentSchema} onChange={this.handleContextChange.bind(this)}
+                          style={{fontsize:"15px", margin: "5px",  width:"100px"}}>
+              {
+                schemas.map((key) => {
+                  return <option key={key.name} value={key.name}>{key.name}</option>
+                })
+              }
+            </Form.Control>
+          </div>
+      )
+    }
+    else {
+      view = (
+          <div style={{display:"flex"}}>
+            <button className="btn btn-success btn-sm runBtn active"
+                    style={{marginRight:"35px", marginLeft:"35px"}}
+                    disabled={this.state.buttonState}
+                    onClick={this.handleRun}
+                    title={"Submit query"}>Run
+            </button>
+            <Form.Label style={{marginTop:"10px", maxHeight:"30px", textAlign:"end"}}>Catalog:</Form.Label>
+            <Form.Control as="select" name="catalog" value={currentCatalog} onChange={this.handleContextChange.bind(this)}
+                          style={{fontsize:"15px", margin: "5px", width:"100px"}}>
+              {
+                catalogs.map((key) => {
+                  if (key.children.length == 0) {
+                    //Dont include catalogs without schemas
+                    return null
+                  }
+                  return <option key={key.name} value={key.name}>{key.name}</option>
+                })
+              }
+            </Form.Control>
+            <Form.Label style={{position: "relative", top: "10px", maxHeight:"30px", textAlign:"end"}}>Schema:</Form.Label>
+            <Form.Control as="select" name="schema" value={currentSchema} onChange={this.handleContextChange.bind(this)}
+                          style={{fontsize:"15px", margin: "5px",  width:"100px"}}>
+              {
+                schemas.map((key) => {
+                  return <option key={key.name} value={key.name}>{key.name}</option>
+                })
+              }
+            </Form.Control>
+          </div>
+      )
+    }
     return (
-        <div style={{display:"flex"}}>
-          <button className="btn btn-success btn-sm runBtn active"
-                  style={{marginRight:"35px", marginLeft:"35px"}}
-                  disabled={this.state.buttonState}
-                  onClick={this.handleRun}
-          title={"Submit query"}>Run
-          </button>
-          <Form.Label style={{marginTop:"10px", maxHeight:"30px", textAlign:"end"}}>Catalog:</Form.Label>
-          <Form.Control as="select" name="catalog" value={currentCatalog} onChange={this.handleContextChange.bind(this)}
-                        style={{fontsize:"15px", margin: "5px", width:"100px"}}>
-            {
-              catalogs.map((key) => {
-                if (key.children.length == 0) {
-                  //Dont include catalogs without schemas
-                  return null
-                }
-                return <option key={key.name} value={key.name}>{key.name}</option>
-              })
-            }
-          </Form.Control>
-          <Form.Label style={{position: "relative", top: "10px", maxHeight:"30px", textAlign:"end"}}>Schema:</Form.Label>
-          <Form.Control as="select" name="schema" value={currentSchema} onChange={this.handleContextChange.bind(this)}
-                        style={{fontsize:"15px", margin: "5px",  width:"100px"}}>
-            {
-              schemas.map((key) => {
-                return <option key={key.name} value={key.name}>{key.name}</option>
-              })
-            }
-          </Form.Control>
-        </div>
-    )
+        <div>{view}</div>
+    );
   }
 
   render() {
