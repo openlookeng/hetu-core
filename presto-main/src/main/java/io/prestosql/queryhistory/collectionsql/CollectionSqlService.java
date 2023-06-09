@@ -15,6 +15,7 @@
 package io.prestosql.queryhistory.collectionsql;
 
 import com.google.inject.Inject;
+import io.airlift.log.Logger;
 import io.prestosql.metastore.HetuMetaStoreManager;
 import io.prestosql.queryhistory.MockhetuMetaStore;
 import io.prestosql.queryhistory.QueryHistoryConfig;
@@ -23,10 +24,13 @@ import io.prestosql.spi.favorite.FavoriteEntity;
 import io.prestosql.spi.favorite.FavoriteResult;
 import io.prestosql.spi.metastore.HetuMetastore;
 
+import java.util.concurrent.TimeUnit;
+
 import static java.util.Objects.requireNonNull;
 
 public class CollectionSqlService
 {
+    private static final Logger log = Logger.get(CollectionSqlService.class);
     private final HetuMetaStoreManager hetuMetaStoreManager;
     private final QueryHistoryConfig queryHistoryConfig;
     private HetuMetastore hetuMetastore;
@@ -42,9 +46,29 @@ public class CollectionSqlService
     private HetuMetastore validateMetaStore()
     {
         if (hetuMetaStoreManager.getHetuMetastore() == null) {
+            this.reviseHetuMetastore();
             return MockhetuMetaStore.getInstance();
         }
         return hetuMetaStoreManager.getHetuMetastore();
+    }
+
+    /**
+     * reviseHetuMetastore
+     */
+    private void reviseHetuMetastore()
+    {
+        new Thread(() -> {
+            while (hetuMetaStoreManager.getHetuMetastore() == null) {
+                try {
+                    TimeUnit.SECONDS.sleep(1);
+                }
+                catch (InterruptedException e) {
+                    log.error(e, "Error reviseHetuMetastore");
+                }
+            }
+
+            this.hetuMetastore = validateMetaStore();
+        }).start();
     }
 
     public Boolean insert(FavoriteInfo favoriteInfo)
