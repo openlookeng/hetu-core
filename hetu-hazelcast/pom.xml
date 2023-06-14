@@ -17,7 +17,7 @@
         <jline.version>3.21.0</jline.version>
         <hazelcast.version>5.1</hazelcast.version>
         <aspectjweaver.version>1.9.4</aspectjweaver.version>
-        <spring-context.version>5.3.20</spring-context.version>
+        <spring-context.version>5.3.27</spring-context.version>
         <cache-api.version>1.1.1</cache-api.version>
         <jmockit.version>1.38</jmockit.version>
     </properties>
