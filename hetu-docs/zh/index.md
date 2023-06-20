@@ -18,7 +18,7 @@ headless: true
     - [部署具有高可用（HA）的openLooKeng]({{< relref "./docs/installation/deployment-ha.md" >}})
     - [openLooKeng ODBC用户手册]({{< relref "./docs/installation/odbc.md" >}})
 
-- [安全]("#")
+- [安全](#)
     - [协调节点Kerberos认证]({{< relref "./docs/security/server.md" >}})
     - [CLI接口的Kerberos认证]({{< relref "./docs/security/cli.md" >}})
     - [LDAP认证]({{< relref "./docs/security/ldap.md" >}})
@@ -29,7 +29,7 @@ headless: true
     - [内部通信安全]({{< relref "./docs/security/internal-communication.md" >}})
     - [密码加密]({{< relref "./docs/security/password-encryption.md" >}})
     - [HAZELCAST认证]({{< relref "./docs/security/hazelcast.md" >}})
-- [管理]("#")
+- [管理](#)
     - [Web界面]({{< relref "./docs/admin/web-interface.md" >}})
     - [openLooKeng调优]({{< relref "./docs/admin/tuning.md" >}})
     - [属性参考]({{< relref "./docs/admin/properties.md" >}})
@@ -48,14 +48,14 @@ headless: true
     - [JDBC数据源多分片管理]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [扩展物理执行计划]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
-- [查询优化器]("#")
+- [查询优化器](#)
     - [表统计]({{< relref "./docs/optimizer/statistics.md" >}})
     - [EXPLAIN成本]({{< relref "./docs/optimizer/cost-in-explain.md" >}})
     - [基于成本的优化]({{< relref "./docs/optimizer/cost-based-optimizations.md" >}})
     - [基于rule的优化]({{< relref "./docs/optimizer/rule-based-optimizations.md" >}})
     - [Table Pushdown的优化]({{< relref "./docs/optimizer/table-pushdown.md" >}})
 
-- [启发式索引]("#")
+- [启发式索引](#)
     - [openLooKeng启发式索引]({{< relref "./docs/indexer/overview.md" >}})
     - [位图索引]({{< relref "./docs/indexer/bitmap.md" >}})
     - [Minmax索引]({{< relref "./docs/indexer/minmax.md" >}})
@@ -105,7 +105,7 @@ headless: true
     - [Kylin]({{< relref "./docs/connector/kylin.md" >}})
     - [OmniData]({{< relref "./docs/connector/omnidata.md" >}})
     
-- [函数和运算符]("#")
+- [函数和运算符](#)
     - [逻辑运算符]({{< relref "./docs/functions/logical.md" >}})
     - [比较函数和运算符]({{< relref "./docs/functions/comparison.md" >}})
     - [条件表达式]({{< relref "./docs/functions/conditional.md" >}})
@@ -132,7 +132,7 @@ headless: true
     - [会话信息]({{< relref "./docs/functions/session.md" >}})
     - [Teradata函数]({{< relref "./docs/functions/teradata.md" >}})
 
-- [SQL语言]("#")
+- [SQL语言](#)
     - [数据类型]({{< relref "./docs/language/types.md" >}})
     - [预留关键字]({{< relref "./docs/language/reserved.md" >}})
 
@@ -196,7 +196,7 @@ headless: true
     - [VACUUM]({{< relref "./docs/sql/vacuum.md" >}})
     - [VALUES]({{< relref "./docs/sql/values.md" >}})
 
-- [迁移]("#")
+- [迁移](#)
     - [从Hive迁移]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL迁移工具]({{< relref "./docs/migration/sql-migration-tool.md" >}})
     - [支持Hive UDF]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
@@ -222,7 +222,8 @@ headless: true
     - [语句资源]({{< relref "./docs/rest/statement.md" >}})
     - [任务资源]({{< relref "./docs/rest/task.md" >}})
 
-- [发行说明]("#")
+- [发行说明](#)
+    - [1.10.0 (2023年6月30日)]({{< relref "./docs/releasenotes/releasenotes-1.10.0.md" >}})
     - [1.9.0 (2022年12月30日)]({{< relref "./docs/releasenotes/releasenotes-1.9.0.md" >}})
     - [1.8.0 (2022年9月30日)]({{< relref "./docs/releasenotes/releasenotes-1.8.0.md" >}})
     - [1.7.0 (2022年6月30日)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})

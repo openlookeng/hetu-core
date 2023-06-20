@@ -18,7 +18,7 @@ headless: true
     - [Deploying openLooKeng with High Availability(HA)]({{< relref "./docs/installation/deployment-ha.md" >}})
     - [openLooKeng ODBC User Manual]({{< relref "./docs/installation/odbc.md" >}})
 
-- [Security]("#")
+- [Security](#)
     - [Coordinator Kerberos Authentication]({{< relref "./docs/security/server.md" >}})
     - [CLI Kerberos Authentication]({{< relref "./docs/security/cli.md" >}})
     - [LDAP Authentication]({{< relref "./docs/security/ldap.md" >}})
@@ -29,7 +29,7 @@ headless: true
     - [Secure Internal Communication]({{< relref "./docs/security/internal-communication.md" >}})
     - [Password Encryption]({{< relref "./docs/security/password-encryption.md" >}})
     - [HAZELCAST Authentication]({{< relref "./docs/security/hazelcast.md" >}})
-- [Administration]("#")
+- [Administration](#)
     - [Web Interface]({{< relref "./docs/admin/web-interface.md" >}})
     - [Tuning openLooKeng]({{< relref "./docs/admin/tuning.md" >}})
     - [Properties Reference]({{< relref "./docs/admin/properties.md" >}})
@@ -48,14 +48,14 @@ headless: true
     - [JDBC Data Source Multi-Split Management]({{< relref "./docs/admin/multi-split-for-jdbc-data-source.md" >}})
     - [Extension Physical Execution Planner]({{< relref "./docs/admin/extension-execution-planner.md" >}})
 
-- [Query Optimizer]("#")
+- [Query Optimizer](#)
     - [Table Statistics]({{< relref "./docs/optimizer/statistics.md" >}})
     - [Cost in EXPLAIN]({{< relref "./docs/optimizer/cost-in-explain.md" >}})
     - [Cost based optimizations]({{< relref "./docs/optimizer/cost-based-optimizations.md" >}})
     - [Rule based optimizations]({{< relref "./docs/optimizer/rule-based-optimizations.md" >}})
     - [Table pushdown]({{< relref "./docs/optimizer/table-pushdown.md" >}})
 
-- [Heuristic Indexer]("#")
+- [Heuristic Indexer](#)
     - [openLooKeng Heuristic Indexer]({{< relref "./docs/indexer/overview.md" >}})
     - [Bitmap Index]({{< relref "./docs/indexer/bitmap.md" >}})
     - [Minmax Index]({{< relref "./docs/indexer/minmax.md" >}})
@@ -105,7 +105,7 @@ headless: true
     - [Kylin]({{< relref "./docs/connector/kylin.md" >}})
     - [OmniData]({{< relref "./docs/connector/omnidata.md" >}})
     
-- [Functions and Operators]("#")
+- [Functions and Operators](#)
     - [Logical Operators]({{< relref "./docs/functions/logical.md" >}})
     - [Comparison Functions and Operators]({{< relref "./docs/functions/comparison.md" >}})
     - [Conditional Expressions]({{< relref "./docs/functions/conditional.md" >}})
@@ -132,7 +132,7 @@ headless: true
     - [Session Information]({{< relref "./docs/functions/session.md" >}})
     - [Teradata Functions]({{< relref "./docs/functions/teradata.md" >}})
 
-- [SQL Language]("#")
+- [SQL Language](#)
     - [Data Types]({{< relref "./docs/language/types.md" >}})
     - [Reserved Keywords]({{< relref "./docs/language/reserved.md" >}})
 
@@ -196,7 +196,7 @@ headless: true
     - [VACUUM]({{< relref "./docs/sql/vacuum.md" >}})
     - [VALUES]({{< relref "./docs/sql/values.md" >}})
 
-- [Migration]("#")
+- [Migration](#)
     - [Migrating From Hive]({{< relref "./docs/migration/from-hive.md" >}})
     - [SQL Migration Tool]({{< relref "./docs/migration/sql-migration-tool.md" >}})
     - [Support Hive Functions]({{< relref "./docs/migration/hetu-hive-functions.md" >}})
@@ -222,7 +222,8 @@ headless: true
     - [Statement Resource]({{< relref "./docs/rest/statement.md" >}})
     - [Task Resource]({{< relref "./docs/rest/task.md" >}})
 
-- [Release Notes]("#")
+- [Release Notes](#)
+    - [1.10.0 (30 Jun 2023)]({{< relref "./docs/releasenotes/releasenotes-1.10.0.md" >}})
     - [1.9.0 (30 Dec 2022)]({{< relref "./docs/releasenotes/releasenotes-1.9.0.md" >}})
     - [1.8.0 (30 Nov 2022)]({{< relref "./docs/releasenotes/releasenotes-1.8.0.md" >}})
     - [1.7.0 (30 Jun 2022)]({{< relref "./docs/releasenotes/releasenotes-1.7.0.md" >}})

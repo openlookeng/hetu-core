@@ -13,7 +13,7 @@ Add the following contents in `hetu-metastore.properties`:
 
 ``` properties
 hetu.metastore.type=jdbc
-hetu.metastore.db.url=jdbc:mysql://....
+hetu.metastore.db.url=jdbc:mysql://example:port/test?createDatabaseIfNotExist=true&amp;useSSL=false
 hetu.metastore.db.user=root
 hetu.metastore.db.password=123456
 hetu.metastore.cache.type=local
