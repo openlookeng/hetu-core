@@ -3,7 +3,7 @@
     <parent>
         <artifactId>presto-root</artifactId>
         <groupId>io.hetu.core</groupId>
-        <version>1.10.0-SNAPSHOT</version>
+        <version>1.11.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -157,7 +157,7 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-postgresql</artifactId>
-            <version>1.10.0-SNAPSHOT</version>
+            <version>1.11.0-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -176,7 +176,7 @@
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-postgresql</artifactId>
-            <version>1.10.0-SNAPSHOT</version>
+            <version>1.11.0-SNAPSHOT</version>
             <classifier>tests</classifier>
             <scope>test</scope>
             <exclusions>
