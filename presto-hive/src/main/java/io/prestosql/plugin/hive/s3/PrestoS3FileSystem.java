@@ -419,7 +419,7 @@ public class PrestoS3FileSystem
         }
         catch (FileNotFoundException e) {
             // destination does not exist
-            LOG.debug("destination does not exist");
+            log.debug("destination does not exist");
         }
 
         if (keysEqual(src, dstPath)) {
