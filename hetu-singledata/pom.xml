@@ -24,7 +24,7 @@
         <dep.findbugs.version>3.0.2</dep.findbugs.version>
         <dep.caffeine.version>2.9.2</dep.caffeine.version>
         <dep.slf4j.version>1.7.36</dep.slf4j.version>
-        <dep.h2.version>2.1.214</dep.h2.version>
+        <dep.h2.version>2.2.220</dep.h2.version>
     </properties>
 
     <dependencies>

@@ -15,7 +15,7 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <version.ojdbc6>11.2.0.4</version.ojdbc6>
-        <version.h2>1.4.199</version.h2>
+        <version.h2>2.2.220</version.h2>
         <version.maven-surefire-plugin>3.0.0-M2</version.maven-surefire-plugin>
     </properties>
 
