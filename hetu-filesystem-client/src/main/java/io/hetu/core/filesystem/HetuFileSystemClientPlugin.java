@@ -15,6 +15,7 @@
 package io.hetu.core.filesystem;
 
 import com.google.common.collect.ImmutableList;
+import io.hetu.core.filesystem.db.DbFileSystemClientFactory;
 import io.prestosql.spi.Plugin;
 import io.prestosql.spi.filesystem.HetuFileSystemClientFactory;
 
@@ -29,6 +30,6 @@ public class HetuFileSystemClientPlugin
     @Override
     public Iterable<HetuFileSystemClientFactory> getFileSystemClientFactory()
     {
-        return ImmutableList.of(new LocalFileSystemClientFactory(), new HdfsFileSystemClientFactory());
+        return ImmutableList.of(new LocalFileSystemClientFactory(), new HdfsFileSystemClientFactory(), new DbFileSystemClientFactory());
     }
 }
