@@ -683,7 +683,7 @@ public class DistributedResourceGroupTemp
             }
             updateLocalValuesToStateStore();
             for (BaseResourceGroup group : subGroups.values()) {
-                ((InternalResourceGroup) group).internalGenerateCpuQuota(elapsedSeconds);
+                ((DistributedResourceGroupTemp) group).internalGenerateCpuQuota(elapsedSeconds);
             }
         }
     }
