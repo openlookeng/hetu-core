@@ -91,7 +91,7 @@ INSERT INTO t1
 
 If user specify the parameter `execute` only, the converted result will be printed onto the screen. Optionally, user can specify `output` parameter, the result will be saved into target file.
 
-User can also provide `config` parameter to control the conversion behavior. Below is an example for `config`:
+User can also provide `config` parameter to control the conversion behaviour. Below is an example for `config`:
 
 file name "config.properties" with content as below:
 
