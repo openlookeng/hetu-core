@@ -122,12 +122,17 @@ class PlanNode extends React.Component<PlanNodeProps, PlanNodeState> {
     }
 
     render() {
+        var distribution = "";
+        var matchArray = this.props.details.match(/Distribution:\s+(\w+)/);
+        if (matchArray !== null) {
+            distribution = " (" + matchArray[1] + ")";
+        }
         return (
             <div style={{color: "#000", fontFamily: "Consolas"}} data-toggle="tooltip" data-placement="bottom" data-container="body" data-html="true"
                  title={"<h4>" + this.props.name + "</h4>" + this.props.identifier}>
-                <strong>{this.props.name}</strong>
+                <strong>{this.props.name + distribution}</strong>
                 <div>
-                    {truncateString(this.props.identifier, 27)}
+                    {truncateString(this.props.identifier, 35)}
                 </div>
             </div>
         );
