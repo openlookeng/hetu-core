@@ -770,7 +770,7 @@ REFRESH META CACHE
 Additionally, metadata cache refresh command can be used to reload the metastore cache by user.
 
 
-## Performance tuning notes
+## Performance Tuning Notes
 
 #### INSERT
 
