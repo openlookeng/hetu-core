@@ -64,7 +64,7 @@ public class TestHiveVacuum
             String selectFromOnePartitionsSql = "SELECT col, fcol FROM " + tableName + " ORDER BY col";
             assertThat(query(selectFromOnePartitionsSql)).containsOnly(row(21, 1));
             String partitionPath = "/user/hive/warehouse/test_acid_table_vacuum/" + (isPartitioned ? "part_col=2/" : "");
-            String bucketFileName = (isBucketed ? "bucket_00000" : "bucket_00000");
+            String bucketFileName = "bucket_00000";
             String dirName = deltaSubdir(1, 1, 0);
             assertTrue(hdfsClient.exist(partitionPath + dirName + bucketFileName));
             obsoleteDir.add(dirName);
