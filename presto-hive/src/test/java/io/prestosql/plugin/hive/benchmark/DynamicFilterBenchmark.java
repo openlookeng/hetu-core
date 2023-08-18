@@ -54,6 +54,7 @@ import static io.prestosql.plugin.hive.HiveUtil.isPartitionFiltered;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.StandardTypes.INTEGER;
 import static io.prestosql.spi.type.TypeSignature.parseTypeSignature;
+import static org.testng.Assert.assertNotNull;
 
 @State(Scope.Benchmark)
 @OutputTimeUnit(TimeUnit.SECONDS)
@@ -129,6 +130,7 @@ public class DynamicFilterBenchmark
         List<Map<ColumnHandle, DynamicFilter>> dynamicFilters = new ArrayList<>();
         dynamicFilters.add(data.getDynamicFilters());
         Page filteredPage = HivePageSource.filter(dynamicFilters, data.getPage(), data.getEligibleColumns(), new Type[] {BIGINT, BIGINT});
+        assertNotNull(filteredPage);
     }
 
     @Benchmark
