@@ -172,7 +172,6 @@ public class TestLocalExchangeSourceOperator
         if (pipelineContext == null) {
             ScheduledExecutorService scheduler = newScheduledThreadPool(4, daemonThreadsNamed("test-%s"));
             ScheduledExecutorService scheduledExecutor = newScheduledThreadPool(2, daemonThreadsNamed("test-scheduledExecutor-%s"));
-            OperatorFactory operatorFactory = new LocalExchangeSourceOperator.LocalExchangeSourceOperatorFactory(0, new PlanNodeId("test"), localExchangeFactory, totalInputChannels);
 
             pipelineContext = createTaskContext(scheduler, scheduledExecutor, session)
                     .addPipelineContext(0, true, true, false);
