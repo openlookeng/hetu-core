@@ -24,7 +24,7 @@
 
 6. What are the version plan and roadmap of the openLooKeng community?
    
-   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to continuously launch new features. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng commuity bi-weekly PMC meeting ( https://etherpad.openlookeng.io/p/PMC-weeklymeeting ) or the openLooKeng Slack channel ( https://openlookeng.io/communication.html  ).
+   > On June 30, 2020, the code was released to the community in the openLooKeng v0.1.0 version for sharing with global developers. It is planned that an iterative version is released every three months to continuously launch new features. The roadmap of the openLooKeng will be released as required. For details, visit the openLooKeng community bi-weekly PMC meeting ( https://etherpad.openlookeng.io/p/PMC-weeklymeeting ) or the openLooKeng Slack channel ( https://openlookeng.io/communication.html  ).
 
 7. How can I obtain openLooKeng information and communicate with other developers about openLooKeng technologies?
    
