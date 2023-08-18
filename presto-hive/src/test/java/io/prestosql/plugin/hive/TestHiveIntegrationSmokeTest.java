@@ -1829,6 +1829,7 @@ public class TestHiveIntegrationSmokeTest
 
         // Hive will reorder the partition keys, so we must insert into the table assuming the partition keys have been moved to the end
         Long count = (Long) computeActual("SELECT count(*) from orders").getOnlyValue();
+        assertTrue(count >= 0, "return count should be 0 or more");
         assertUpdate(
                 session,
                 "" +
