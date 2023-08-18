@@ -400,7 +400,6 @@ public class OrcPageSourceFactory
                 else if (isFullAcid && readType instanceof RowType && column.getName().equalsIgnoreCase(HiveColumnHandle.UPDATE_ROW_ID_COLUMN_NAME)) {
                     HiveType hiveType = column.getHiveType();
                     StructTypeInfo structTypeInfo = (StructTypeInfo) hiveType.getTypeInfo();
-                    ImmutableList.Builder<ColumnAdaptation> builder = new ImmutableList.Builder<>();
                     ArrayList<String> fieldNames = structTypeInfo.getAllStructFieldNames();
                     List<ColumnAdaptation> adaptations = fieldNames.stream()
                             .map(acidColumnNames::indexOf)
