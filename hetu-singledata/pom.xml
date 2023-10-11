@@ -16,7 +16,7 @@
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <dep.shardingsphere.version>5.3.1</dep.shardingsphere.version>
         <dep.curator.version>5.1.0</dep.curator.version>
-        <dep.zookeeper.verison>3.6.3</dep.zookeeper.verison>
+        <dep.zookeeper.verison>3.7.2</dep.zookeeper.verison>
         <dep.calcite.version>1.27.0</dep.calcite.version>
         <dep.antlr4.version>4.9.2</dep.antlr4.version>
         <dep.hikari.version>4.0.3</dep.hikari.version>
