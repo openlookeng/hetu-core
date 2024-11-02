@@ -364,7 +364,10 @@ public class BackgroundHiveSplitLoader
         }
 
         Path path = new Path(getPartitionLocation(table, partition.getPartition()));
-        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, false, jobConf);
+        // For hudi mor rt table, multiple partitions and threads need to avoid modifying a JobConf at the same time,
+        // which can cause incorrect split partition paths.
+        JobConf localJobConf = new JobConf(jobConf);
+        InputFormat<?, ?> inputFormat = getInputFormat(configuration, schema, false, localJobConf);
         FileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, path);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());
 
@@ -381,10 +384,10 @@ public class BackgroundHiveSplitLoader
                 // the splits must be generated using the file system for the target path
                 // get the configuration for the target path -- it may be a different hdfs instance
                 FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(hdfsContext, targetPath);
-                jobConf.setInputFormat(TextInputFormat.class);
-                targetInputFormat.configure(jobConf);
-                FileInputFormat.setInputPaths(jobConf, targetPath);
-                InputSplit[] targetSplits = targetInputFormat.getSplits(jobConf, 0);
+                localJobConf.setInputFormat(TextInputFormat.class);
+                targetInputFormat.configure(localJobConf);
+                FileInputFormat.setInputPaths(localJobConf, targetPath);
+                InputSplit[] targetSplits = targetInputFormat.getSplits(localJobConf, 0);
 
                 InternalHiveSplitFactory splitFactory = new InternalHiveSplitFactory(
                         targetFilesystem,
@@ -446,8 +449,8 @@ public class BackgroundHiveSplitLoader
                 throw new PrestoException(NOT_SUPPORTED, "Hive transactional tables in an input format with UseFileSplitsFromInputFormat annotation are not supported: " + inputFormat.getClass().getSimpleName());
             }
 
-            FileInputFormat.setInputPaths(jobConf, path);
-            InputSplit[] splits = inputFormat.getSplits(jobConf, 0);
+            FileInputFormat.setInputPaths(localJobConf, path);
+            InputSplit[] splits = inputFormat.getSplits(localJobConf, 0);
 
             return addSplitsToSource(splits, splitFactory);
         }
